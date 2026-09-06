@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}固定收支 - 我的记账本{% endblock %}
+{% block content %}
+<h2>固定 / 重复收支</h2>
+<p class="hint">
+  设置一次后，系统会在每次打开仪表盘时自动检查并生成当月记录（每条规则每月只生成一次）。
+  也可以点击下方按钮手动生成本月记录（当前月份：{{ current_month }}）。
+</p>
+<form method="post" action="{{ url_for('manual_generate_recurring') }}">
+  <button type="submit" class="btn-primary">生成本月固定收支</button>
+</form>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr><th>类型</th><th>分组</th><th>分类</th><th>金额</th><th>每月几号</th><th>备注</th><th>状态</th><th>上次生成月份</th><th>操作</th></tr>
+  </thead>
+  <tbody>
+    {% for r in rules %}
+    <tr>
+      <td>{{ '收入' if r.type=='income' else '支出' }}</td>
+      <td>{{ {'main':'主业','side':'副业'}.get(r.group_name, '') }}</td>
+      <td>{{ r.category }}</td>
+      <td class="amount-cell {{ 'income' if r.type=='income' else 'expense' }}">{{ r.amount|money }}</td>
+      <td>{{ r.day_of_month }}</td>
+      <td>{{ r.note }}</td>
+      <td><span class="tag {{ 'tag-active' if r.is_active else 'tag-muted' }}">{{ '启用' if r.is_active else '已停用' }}</span></td>
+      <td>{{ r.last_generated_month or '—' }}</td>
+      <td class="actions">
+        <form method="post" action="{{ url_for('toggle_recurring', rule_id=r.id) }}">
+          <button type="submit" class="btn-ghost">{{ '停用' if r.is_active else '启用' }}</button>
+        </form>
+        <form method="post" action="{{ url_for('delete_recurring', rule_id=r.id) }}" class="js-delete-confirm"
+              data-confirm-title="删除这条固定收支规则？"
+              data-confirm-text="{{ '收入' if r.type=='income' else '支出' }} · {{ r.category }} · {{ r.amount|money }} · 每月{{ r.day_of_month }}号<br>删除后每月将不再自动生成，此操作不可撤销。">
+          <button type="submit" class="btn-danger-ghost">删除</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9">暂无规则</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<section class="panel">
+  <h3>新增固定收支规则</h3>
+  <form method="post" action="{{ url_for('add_recurring') }}" class="quick-add" id="quickAddForm">
+    <div class="row seg-row">
+      <label class="seg"><input type="radio" name="type" value="expense" checked onchange="onTypeChange()"><span>支出</span></label>
+      <label class="seg"><input type="radio" name="type" value="income" onchange="onTypeChange()"><span>收入</span></label>
+    </div>
+    <div class="row seg-row" id="groupRow" style="display:none;">
+      <label class="seg"><input type="radio" name="group_name" value="main" checked onchange="populateCategories()"><span>主业收入</span></label>
+      <label class="seg"><input type="radio" name="group_name" value="side" onchange="populateCategories()"><span>副业收入</span></label>
+    </div>
+    <div class="row">
+      <label>分类 <select name="category" id="categorySelect"></select></label>
+      <label>金额 <input type="number" step="0.01" min="0.01" name="amount" required></label>
+      <label>每月几号 <input type="number" min="1" max="31" name="day_of_month" value="1" required></label>
+    </div>
+    <div class="row">
+      <label>备注 <input type="text" name="note" placeholder="如：工资 / 房租"></label>
+    </div>
+    <button type="submit" class="btn-primary">添加规则</button>
+  </form>
+</section>
+
+<script>
+window.CATEGORY_DATA = {
+  expense: {{ expense_categories | tojson }},
+  income_main: {{ income_categories.main | tojson }},
+  income_side: {{ income_categories.side | tojson }}
+};
+</script>
+{% endblock %}

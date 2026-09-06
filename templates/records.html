@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}历史记录 - 我的记账本{% endblock %}
+{% block content %}
+<h2>历史记录</h2>
+
+<form method="get" class="filters">
+  <label>开始日期 <input type="date" name="start" value="{{ start }}"></label>
+  <label>结束日期 <input type="date" name="end" value="{{ end }}"></label>
+  <label>类型
+    <select name="type">
+      <option value="">全部</option>
+      <option value="income" {{ 'selected' if type=='income' }}>收入</option>
+      <option value="expense" {{ 'selected' if type=='expense' }}>支出</option>
+    </select>
+  </label>
+  <label>分类
+    <select name="category">
+      <option value="">全部</option>
+      {% for c in categories %}
+      <option value="{{ c }}" {{ 'selected' if category==c }}>{{ c }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit" class="btn-primary">筛选</button>
+  <a href="{{ url_for('records') }}" class="btn-ghost">重置</a>
+</form>
+
+<p class="hint">筛选结果合计 — 收入 {{ total_income|money }}，支出 {{ total_expense|money }}，共 {{ rows|length }} 条</p>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr><th>日期</th><th>类型</th><th>分组</th><th>分类</th><th>金额</th><th>备注</th><th>来源</th><th>操作</th></tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.date }}</td>
+      <td>{{ '收入' if r.type=='income' else '支出' }}</td>
+      <td>{{ {'main':'主业','side':'副业'}.get(r.group_name, '') }}</td>
+      <td>{{ r.category }}</td>
+      <td class="amount-cell {{ 'income' if r.type=='income' else 'expense' }}">{{ r.amount|money }}</td>
+      <td>{{ r.note }}</td>
+      <td><span class="tag">{{ {'manual':'手动','nlp':'智能记账','import':'导入','recurring':'固定收支'}.get(r.source, r.source) }}</span></td>
+      <td class="actions">
+        <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link">编辑</a>
+        <form method="post" action="{{ url_for('delete_record', tx_id=r.id) }}" class="js-delete-confirm"
+              data-confirm-title="删除这条记录？"
+              data-confirm-text="{{ r.date }} · {{ '收入' if r.type=='income' else '支出' }} · {{ r.category }} · {{ r.amount|money }}<br>删除后无法恢复。">
+          <button type="submit" class="btn-danger-ghost">删除</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">暂无记录</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

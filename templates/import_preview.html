@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}导入预览 - 我的记账本{% endblock %}
+{% block content %}
+<h2>导入预览</h2>
+<p class="hint">共读取到 {{ row_count }} 行数据，下面展示前 10 行。请将文件中的列映射到记账字段，确认后再正式导入。</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+  <tbody>
+    {% for prow in preview_rows %}
+    <tr>{% for cell in prow %}<td>{{ cell }}</td>{% endfor %}</tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<form method="post" action="{{ url_for('import_confirm') }}" class="quick-add">
+  <input type="hidden" name="token" value="{{ token }}">
+  <input type="hidden" name="ext" value="{{ ext }}">
+
+  <div class="row">
+    <label>日期列
+      <select name="date_col" required>
+        {% for c in columns %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>日期格式（可选，如 %Y/%m/%d，留空自动识别）
+      <input type="text" name="date_format" placeholder="留空自动识别">
+    </label>
+  </div>
+
+  <div class="row">
+    <label>金额列
+      <select name="amount_col" required>
+        {% for c in columns %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div class="row">
+    <label>如何判断收入/支出：</label>
+  </div>
+  <div class="row">
+    <label><input type="radio" name="type_mode" value="sign" checked onchange="toggleTypeCol()"> 按金额正负（正=收入，负=支出）</label>
+    <label><input type="radio" name="type_mode" value="fixed_expense" onchange="toggleTypeCol()"> 全部记为支出</label>
+    <label><input type="radio" name="type_mode" value="fixed_income" onchange="toggleTypeCol()"> 全部记为收入</label>
+    <label><input type="radio" name="type_mode" value="column" onchange="toggleTypeCol()"> 使用某一列的值判断</label>
+  </div>
+  <div class="row" id="typeColRow" style="display:none;">
+    <label>类型列（包含"收入"字样视为收入，其余视为支出）
+      <select name="type_col">
+        {% for c in columns %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div class="row">
+    <label>分类列（可选，留空则使用下方默认分类）
+      <select name="category_col">
+        <option value="">（不使用）</option>
+        {% for c in columns %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>默认分类
+      <input type="text" name="default_category" value="未分类">
+    </label>
+  </div>
+
+  <div class="row">
+    <label>备注列（可选）
+      <select name="note_col">
+        <option value="">（不使用）</option>
+        {% for c in columns %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>导入的收入记录默认归为
+      <select name="default_group">
+        <option value="main">主业收入</option>
+        <option value="side">副业收入</option>
+      </select>
+    </label>
+  </div>
+
+  <button type="submit" class="btn-primary">确认导入</button>
+  <a href="{{ url_for('import_page') }}" class="btn-cancel">取消</a>
+</form>
+{% endblock %}

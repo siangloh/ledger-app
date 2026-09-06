@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}编辑记录 - 我的记账本{% endblock %}
+{% block content %}
+<h2>编辑记录</h2>
+
+<form method="post" action="{{ url_for('edit_record', tx_id=row.id) }}" class="quick-add" id="quickAddForm">
+  <div class="row seg-row">
+    <label class="seg"><input type="radio" name="type" value="expense" {{ 'checked' if row.type=='expense' }} onchange="onTypeChange()"><span>支出</span></label>
+    <label class="seg"><input type="radio" name="type" value="income" {{ 'checked' if row.type=='income' }} onchange="onTypeChange()"><span>收入</span></label>
+  </div>
+  <div class="row seg-row" id="groupRow" style="{{ 'display:flex' if row.type=='income' else 'display:none' }};">
+    <label class="seg"><input type="radio" name="group_name" value="main" {{ 'checked' if row.group_name=='main' }} onchange="populateCategories()"><span>主业收入</span></label>
+    <label class="seg"><input type="radio" name="group_name" value="side" {{ 'checked' if row.group_name=='side' }} onchange="populateCategories()"><span>副业收入</span></label>
+  </div>
+  <div class="row">
+    <label>日期 <input type="date" name="date" value="{{ row.date }}" required></label>
+    <label>金额 <input type="number" step="0.01" min="0.01" name="amount" value="{{ row.amount }}" required></label>
+  </div>
+  <div class="row">
+    <label>分类 <select name="category" id="categorySelect" data-preselect="{{ row.category }}"></select></label>
+    <label>备注 <input type="text" name="note" value="{{ row.note }}"></label>
+  </div>
+  <button type="submit" class="btn-primary">保存修改</button>
+  <a href="{{ url_for('records') }}" class="btn-cancel">取消</a>
+</form>
+
+<script>
+window.CATEGORY_DATA = {
+  expense: {{ expense_categories | tojson }},
+  income_main: {{ income_categories.main | tojson }},
+  income_side: {{ income_categories.side | tojson }}
+};
+</script>
+{% endblock %}

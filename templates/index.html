@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}仪表盘 - 我的记账本{% endblock %}
+{% block content %}
+
+<div class="month-nav">
+  <a href="{{ url_for('index', month=prev_month) }}" class="month-nav-arrow">&larr; 上月</a>
+  <strong class="month-nav-current">{{ month }}</strong>
+  <a href="{{ url_for('index', month=next_month) }}" class="month-nav-arrow">下月 &rarr;</a>
+</div>
+
+<div class="cards">
+  <div class="card">
+    <span class="card-label">本月收入</span>
+    <span class="amount income">{{ total_income|money }}</span>
+  </div>
+  <div class="card">
+    <span class="card-label">本月支出</span>
+    <span class="amount expense">{{ total_expense|money }}</span>
+  </div>
+  <div class="card card-highlight {{ 'positive' if balance >= 0 else 'negative' }}">
+    <span class="card-label">本月结余</span>
+    <span class="amount">{{ balance|money }}</span>
+  </div>
+</div>
+
+<div class="panels">
+  <section class="panel">
+    <h3>快速录入</h3>
+    <form method="post" action="{{ url_for('add_transaction') }}" class="quick-add" id="quickAddForm">
+      <input type="hidden" name="source" value="manual">
+      <div class="row seg-row">
+        <label class="seg"><input type="radio" name="type" value="expense" checked onchange="onTypeChange()"><span>支出</span></label>
+        <label class="seg"><input type="radio" name="type" value="income" onchange="onTypeChange()"><span>收入</span></label>
+      </div>
+      <div class="row seg-row" id="groupRow" style="display:none;">
+        <label class="seg"><input type="radio" name="group_name" value="main" checked onchange="populateCategories()"><span>主业收入</span></label>
+        <label class="seg"><input type="radio" name="group_name" value="side" onchange="populateCategories()"><span>副业收入</span></label>
+      </div>
+      <div class="row">
+        <label>日期 <input type="date" name="date" value="{{ today }}" required></label>
+        <label>金额 <input type="number" step="0.01" min="0.01" name="amount" required></label>
+      </div>
+      <div class="row">
+        <label>分类 <select name="category" id="categorySelect"></select></label>
+        <label>备注 <input type="text" name="note" placeholder="可选"></label>
+      </div>
+      <button type="submit" class="btn-primary">保存</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h3>自然语言快速记账</h3>
+    <p class="hint">例如："午饭 15"、"副业 稿费 200"、"工资 8000"。解析后会先让你确认再保存。</p>
+    <form method="post" action="{{ url_for('nlp_parse') }}" class="nlp-form" id="nlpForm">
+      <input type="text" name="text" placeholder="输入一句话，如：打车 32.5" required>
+      <button type="submit" class="btn-primary">智能解析</button>
+    </form>
+  </section>
+</div>
+
+<div class="panels">
+  <section class="panel">
+    <h3>收入构成（主业 vs 副业）</h3>
+    <canvas id="incomeChart" width="320" height="220"></canvas>
+  </section>
+  <section class="panel">
+    <h3>支出分类占比</h3>
+    <canvas id="expenseChart" width="320" height="220"></canvas>
+  </section>
+</div>
+
+<script>
+window.CATEGORY_DATA = {
+  expense: {{ expense_categories | tojson }},
+  income_main: {{ income_categories.main | tojson }},
+  income_side: {{ income_categories.side | tojson }}
+};
+window.CHART_DATA = {
+  income: {
+    labels: ['主业收入', '副业收入'],
+    values: [{{ income_group.main }}, {{ income_group.side }}]
+  },
+  expense: {
+    labels: {{ expense_by_category.keys() | list | tojson }},
+    values: {{ expense_by_category.values() | list | tojson }}
+  }
+};
+</script>
+{% endblock %}

@@ -1,0 +1,5 @@
+ledger.db
+server.log
+__pycache__/
+*.pyc
+.env

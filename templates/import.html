@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}批量导入 - 我的记账本{% endblock %}
+{% block content %}
+<h2>批量导入（CSV / Excel）</h2>
+<p class="hint">支持从银行账单等导出的 .csv / .xlsx / .xls 文件导入，上传后可以预览并调整列映射，确认无误后再正式导入。</p>
+
+<form method="post" action="{{ url_for('import_upload') }}" enctype="multipart/form-data" class="quick-add" id="importUploadForm">
+  <div class="row">
+    <input type="file" name="file" accept=".csv,.xlsx,.xls" required>
+  </div>
+  <button type="submit" class="btn-primary">上传并预览</button>
+</form>
+{% endblock %}

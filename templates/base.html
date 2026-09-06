@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}我的记账本{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<nav class="nav">
+    <span class="brand">我的账本</span>
+    <div class="nav-links">
+        <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}">仪表盘</a>
+        <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint in ('records','edit_record') }}">历史记录</a>
+        <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}">固定收支</a>
+        <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}">分类管理</a>
+        <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}">批量导入</a>
+    </div>
+</nav>
+<main class="container">
+    {% set other_msgs = [] %}
+    {% set success_msgs = [] %}
+    {% set error_msgs = [] %}
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+        {% if category == 'success' %}
+            {% set _ = success_msgs.append(message) %}
+        {% elif category == 'error' %}
+            {% set _ = error_msgs.append(message) %}
+        {% else %}
+            {% set _ = other_msgs.append(message) %}
+        {% endif %}
+    {% endfor %}
+    {% if other_msgs %}
+    <div class="flash">
+        {% for m in other_msgs %}<div class="flash-msg">{{ m }}</div>{% endfor %}
+    </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+</main>
+{% if success_msgs %}
+<script>window.FLASH_SUCCESS = {{ success_msgs | tojson }};</script>
+{% endif %}
+{% if error_msgs %}
+<script>window.FLASH_ERROR = {{ error_msgs | tojson }};</script>
+{% endif %}
+<script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
