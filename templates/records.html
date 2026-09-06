@@ -27,34 +27,190 @@
 
 <p class="hint">筛选结果合计 — 收入 {{ total_income|money }}，支出 {{ total_expense|money }}，共 {{ rows|length }} 条</p>
 
-<div class="table-wrap">
-<table>
-  <thead>
-    <tr><th>日期</th><th>类型</th><th>分组</th><th>分类</th><th>金额</th><th>备注</th><th>来源</th><th>操作</th></tr>
-  </thead>
-  <tbody>
-    {% for r in rows %}
-    <tr>
-      <td>{{ r.date }}</td>
-      <td>{{ '收入' if r.type=='income' else '支出' }}</td>
-      <td>{{ {'main':'主业','side':'副业'}.get(r.group_name, '') }}</td>
-      <td>{{ r.category }}</td>
-      <td class="amount-cell {{ 'income' if r.type=='income' else 'expense' }}">{{ r.amount|money }}</td>
-      <td>{{ r.note }}</td>
-      <td><span class="tag">{{ {'manual':'手动','nlp':'智能记账','import':'导入','recurring':'固定收支'}.get(r.source, r.source) }}</span></td>
-      <td class="actions">
-        <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link">编辑</a>
-        <form method="post" action="{{ url_for('delete_record', tx_id=r.id) }}" class="js-delete-confirm"
-              data-confirm-title="删除这条记录？"
-              data-confirm-text="{{ r.date }} · {{ '收入' if r.type=='income' else '支出' }} · {{ r.category }} · {{ r.amount|money }}<br>删除后无法恢复。">
-          <button type="submit" class="btn-danger-ghost">删除</button>
-        </form>
-      </td>
-    </tr>
-    {% else %}
-    <tr><td colspan="8">暂无记录</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-</div>
+<form method="post" action="{{ url_for('batch_delete_records') }}" id="batchForm">
+  <!-- 批量操作控制栏 -->
+  <div class="batch-bar" id="batchBar" style="display: none; align-items: center; justify-content: space-between; background: var(--surface-soft); padding: 10px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 14px;">
+    <div style="font-size: 14px; color: var(--ink-soft);">
+      已选中 <strong id="selectedCount" style="color: var(--navy);">0</strong> 项记录
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button type="button" class="btn-ghost" onclick="clearAllSelections()" style="padding: 5px 12px; font-size: 13px;">取消选择</button>
+      <button type="button" class="btn-danger-solid" id="batchDeleteBtn" onclick="confirmBatchDelete()" style="padding: 5px 14px; font-size: 13px;">批量删除</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 40px; text-align: center;">
+          <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+        </th>
+        <th>日期</th><th>类型</th><th>分组</th><th>分类</th><th>金额</th><th>备注</th><th>来源</th><th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr class="record-row">
+        <td style="text-align: center;">
+          <input type="checkbox" name="ids" value="{{ r.id }}" class="record-checkbox" onchange="updateBatchBar()">
+        </td>
+        <td>{{ r.date }}</td>
+        <td>{{ '收入' if r.type=='income' else '支出' }}</td>
+        <td>{{ {'main':'主业','side':'副业'}.get(r.group_name, '') }}</td>
+        <td>{{ r.category }}</td>
+        <td class="amount-cell {{ 'income' if r.type=='income' else 'expense' }}">{{ r.amount|money }}</td>
+        <td>{{ r.note }}</td>
+        <td><span class="tag">{{ {'manual':'手动','nlp':'智能记账','import':'导入','recurring':'固定收支','auto_track':'自动记账','split_bill':'AA分账'}.get(r.source, r.source) }}</span></td>
+        <td class="actions">
+          <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link">编辑</a>
+          <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ '收入' if r.type=='income' else '支出' }} · {{ r.category }} · {{ r.amount|money }}')">删除</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9">暂无记录</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</form>
+
+<script>
+function toggleSelectAll(master) {
+  const checkboxes = document.querySelectorAll('.record-checkbox');
+  checkboxes.forEach(cb => {
+    cb.checked = master.checked;
+    const row = cb.closest('tr');
+    if (row) row.classList.toggle('selected-row', cb.checked);
+  });
+  updateBatchBar();
+}
+
+function updateBatchBar() {
+  const selected = document.querySelectorAll('.record-checkbox:checked');
+  const total = document.querySelectorAll('.record-checkbox');
+  const selectAll = document.getElementById('selectAllCheckbox');
+  const batchBar = document.getElementById('batchBar');
+  const selectedCount = document.getElementById('selectedCount');
+
+  if (selectAll && total.length > 0) {
+    selectAll.checked = selected.length === total.length;
+  }
+
+  // 高亮行的背景
+  document.querySelectorAll('.record-checkbox').forEach(cb => {
+    const row = cb.closest('tr');
+    if (row) row.classList.toggle('selected-row', cb.checked);
+  });
+
+  if (selected.length > 0) {
+    batchBar.style.display = 'flex';
+    selectedCount.textContent = selected.length;
+  } else {
+    batchBar.style.display = 'none';
+  }
+}
+
+function clearAllSelections() {
+  const selectAll = document.getElementById('selectAllCheckbox');
+  if (selectAll) selectAll.checked = false;
+  toggleSelectAll({ checked: false });
+}
+
+function confirmBatchDelete() {
+  const selected = document.querySelectorAll('.record-checkbox:checked');
+  if (selected.length === 0) return;
+
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      icon: 'warning',
+      iconColor: '#a8475a',
+      title: '批量删除确认',
+      html: '确认为选中的 <b>' + selected.length + '</b> 条记录进行删除操作吗？<br><span style="color:#8a877e;font-size:13px;">此操作不可撤销。</span>',
+      showCancelButton: true,
+      reverseButtons: true,
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      buttonsStyling: false,
+      customClass: {
+        popup: 'app-swal-popup',
+        title: 'app-swal-title',
+        htmlContainer: 'app-swal-html',
+        confirmButton: 'btn-danger-solid',
+        cancelButton: 'btn-ghost',
+        actions: 'app-swal-actions'
+      }
+    }).then(function (result) {
+      if (result.isConfirmed) {
+        document.getElementById('batchForm').submit();
+      }
+    });
+  } else {
+    if (confirm('确认删除选中的 ' + selected.length + ' 条记录吗？')) {
+      document.getElementById('batchForm').submit();
+    }
+  }
+}
+
+function confirmSingleDelete(actionUrl, detailText) {
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      icon: 'warning',
+      iconColor: '#a8475a',
+      title: '确认删除？',
+      html: detailText + '<br><span style="color:#8a877e;font-size:13px;">此操作不可撤销。</span>',
+      showCancelButton: true,
+      reverseButtons: true,
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      buttonsStyling: false,
+      customClass: {
+        popup: 'app-swal-popup',
+        title: 'app-swal-title',
+        htmlContainer: 'app-swal-html',
+        confirmButton: 'btn-danger-solid',
+        cancelButton: 'btn-ghost',
+        actions: 'app-swal-actions'
+      }
+    }).then(function (result) {
+      if (result.isConfirmed) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = actionUrl;
+        document.body.appendChild(form);
+        form.submit();
+      }
+    });
+  } else {
+    if (confirm('确认删除吗？')) {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = actionUrl;
+      document.body.appendChild(form);
+      form.submit();
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const tbody = document.querySelector('table tbody');
+  if (tbody) {
+    tbody.addEventListener('click', function(e) {
+      // 排除操作列（.actions）或直接点击在 checkbox / 链接 / 按钮 上的情况
+      if (e.target.closest('.actions') || e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.type === 'checkbox') {
+        return;
+      }
+      
+      const row = e.target.closest('tr.record-row');
+      if (!row) return;
+
+      const checkbox = row.querySelector('.record-checkbox');
+      if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        updateBatchBar();
+      }
+    });
+  }
+});
+</script>
 {% endblock %}

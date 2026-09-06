@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% block title %}Auto Track 自动记账 - 我的记账本{% endblock %}
+{% block content %}
+
+<div class="page-title-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <div>
+    <h2>Auto Track 自动记账服务</h2>
+    <p class="hint">通过 Webhook 接收手机银行（Maybank MAE、CIMB）、电子钱包（Touch 'n Go eWallet、GrabPay）的消费通知，自动识别金额并归类入账。</p>
+  </div>
+</div>
+
+<div class="panels">
+  <!-- 左侧：专属 Webhook 配置与在线快速测试 -->
+  <section class="panel">
+    <h3>🔗 你的专属接收网关 (Webhook URL)</h3>
+    <div style="background: var(--surface-soft); padding: 14px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin: 12px 0 18px;">
+      <div style="font-size: 12px; color: var(--muted); margin-bottom: 6px;">HTTP POST 接收地址：</div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <input type="text" id="webhookInput" value="{{ webhook_url }}" readonly style="font-family: var(--font-mono); font-size: 13px; background: #fff;">
+        <button type="button" class="btn-secondary" onclick="copyWebhookUrl()" style="white-space: nowrap;">复制</button>
+      </div>
+      <div style="font-size: 12px; color: var(--green); margin-top: 8px;">
+        ✓ 安全保护已激活：API Key = <code style="font-family: var(--font-mono); background: var(--border-soft); padding: 2px 6px; border-radius: 4px;">{{ api_key }}</code>
+      </div>
+    </div>
+
+    <h3>⚡ 在线即时测试 (Simulate Notification)</h3>
+    <p class="hint">粘贴一条真实的扣款短信或通知测试，点击测试后如果解析成功将立即入库！</p>
+    
+    <div class="quick-examples" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+      <button type="button" class="btn-ghost btn-sm" onclick="fillTestExample('tng')">范例 1：TnG 全家便利店</button>
+      <button type="button" class="btn-ghost btn-sm" onclick="fillTestExample('petronas')">范例 2：Maybank Petronas加油</button>
+      <button type="button" class="btn-ghost btn-sm" onclick="fillTestExample('starbucks')">范例 3：Starbucks 咖啡</button>
+      <button type="button" class="btn-ghost btn-sm" onclick="fillTestExample('watsons')">范例 4：Watsons 购物</button>
+    </div>
+
+    <form id="testAutoTrackForm" onsubmit="submitTestAutoTrack(event)">
+      <textarea id="testNotificationText" rows="4" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); font-family: var(--font-mono); font-size: 13px;" placeholder="在此粘贴通知内容，例如：You have successfully paid RM 15.50 to FamilyMart on 06/09..." required></textarea>
+      <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+        <button type="submit" class="btn-primary" id="btnTestSubmit">发送测试入库</button>
+      </div>
+    </form>
+
+    <div id="testResultBox" style="display: none; margin-top: 16px; padding: 14px; border-radius: var(--radius-sm); font-size: 13px;"></div>
+  </section>
+
+  <!-- 右侧：手机端 1 分钟自动配置教程 -->
+  <section class="panel">
+    <h3>📱 手机端如何实现“全自动记账”？</h3>
+    <p class="hint">只需在 Android 手机上配合常见的自动化工具，每次扣款通知弹出，手机就会自动发给上面这个接口，你甚至不需要手动打开任何网页！</p>
+
+    <div class="step-guide" style="font-size: 13.5px; line-height: 1.7; color: var(--ink-soft);">
+      <div style="margin-bottom: 14px;">
+        <strong style="color: var(--navy);">方案 A：MacroDroid（最简单，无需编写代码）</strong>
+        <ol style="padding-left: 20px; margin: 6px 0;">
+          <li>在 Google Play 下载安装 <strong>MacroDroid</strong>（免费版即可）。</li>
+          <li>新建宏，触发器 (Trigger) 选择：<strong>通知 (Notification)</strong> &rarr; 勾选 <code>Touch 'n Go eWallet</code> 或 <code>MAE</code>。</li>
+          <li>动作 (Action) 选择：<strong>网页请求 (HTTP Request)</strong>：
+            <ul>
+              <li>请求方式：<code>POST</code></li>
+              <li>URL：填入左侧复制的 Webhook URL</li>
+              <li>请求体格式：<code>application/json</code></li>
+              <li>内容填入：<code>{"text": "[notification_text]"}</code></li>
+            </ul>
+          </li>
+          <li>点击保存，大功告成！只要手机收到通知，自动实时入账。</li>
+        </ol>
+      </div>
+
+      <div style="margin-bottom: 14px;">
+        <strong style="color: var(--navy);">方案 B：Tasker 或 SmsForwarder（短信转发器）</strong>
+        <p style="margin: 4px 0;">
+          如果你的银行发的是 SMS 短信通知，可以使用开源免费的 <strong>SmsForwarder</strong>，添加发送通道为 Webhook，把左侧 URL 填入即可。
+        </p>
+      </div>
+
+      <div style="background: var(--surface-soft); padding: 12px; border-radius: var(--radius-sm); border-left: 3px solid var(--gold);">
+        <strong style="color: var(--gold);">💡 部署在 Render 上的优势：</strong><br>
+        当你把代码推送到 Render 后，把左侧地址中的域名换成你的 Render 公网二级域名，无论手机在户外用 5G 还是在家里，24 小时随刷随记！
+      </div>
+    </div>
+  </section>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyWebhookUrl() {
+  const input = document.getElementById('webhookInput');
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => {
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Webhook 地址已复制到剪贴板',
+        showConfirmButton: false,
+        timer: 2000
+      });
+    } else {
+      alert('已复制到剪贴板');
+    }
+  });
+}
+
+function fillTestExample(type) {
+  const textarea = document.getElementById('testNotificationText');
+  if (type === 'tng') {
+    textarea.value = "Touch 'n Go eWallet: You have successfully paid RM 18.50 to FamilyMart SS15 on 06/09/2026. Ref: TNG8892182.";
+  } else if (type === 'petronas') {
+    textarea.value = "MAE by Maybank: RM 50.00 spent at PETRONAS SOLARIS on 06/09/2026 via DuitNow QR.";
+  } else if (type === 'starbucks') {
+    textarea.value = "Payment of RM 16.50 to Starbucks MidValley completed via GrabPay.";
+  } else if (type === 'watsons') {
+    textarea.value = "You have paid RM 42.80 to Watsons Personal Care Stores. Date: 2026-09-06.";
+  }
+}
+
+async function submitTestAutoTrack(e) {
+  e.preventDefault();
+  const text = document.getElementById('testNotificationText').value.trim();
+  const resultBox = document.getElementById('testResultBox');
+  const btn = document.getElementById('btnTestSubmit');
+
+  if (!text) return;
+
+  btn.disabled = true;
+  btn.innerText = '正在提交解析...';
+  resultBox.style.display = 'none';
+
+  try {
+    const res = await fetch("{{ webhook_url | safe }}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text })
+    });
+    const data = await res.json();
+    resultBox.style.display = 'block';
+
+    if (res.ok && data.ok) {
+      resultBox.style.background = 'var(--green-soft)';
+      resultBox.style.border = '1px solid var(--green)';
+      resultBox.style.color = 'var(--green)';
+      resultBox.innerHTML = `
+        <strong>🎉 自动入账成功！</strong><br>
+        • 商户备注：${data.parsed.note}<br>
+        • 金额：RM ${data.parsed.amount.toFixed(2)}<br>
+        • 自动归类：${data.parsed.category} (${data.parsed.type === 'income' ? '收入' : '支出'})<br>
+        • 交易记录 ID：#${data.transaction_id}<br>
+        <span style="font-size: 12px; color: var(--ink-soft); margin-top: 6px; display: inline-block;">
+          已自动写入你的账本数据库，可以在「历史记录」中查看（来源标记为 <strong>自动记账</strong>）。
+        </span>
+      `;
+    } else {
+      resultBox.style.background = 'var(--rose-soft)';
+      resultBox.style.border = '1px solid var(--rose)';
+      resultBox.style.color = 'var(--rose)';
+      resultBox.innerHTML = `
+        <strong>⚠️ 未能入账：</strong> ${data.message || '未知错误'}<br>
+        请检查测试文本中是否包含类似 "RM 15.00" 的金额格式。
+      `;
+    }
+  } catch (err) {
+    resultBox.style.display = 'block';
+    resultBox.style.background = 'var(--rose-soft)';
+    resultBox.style.border = '1px solid var(--rose)';
+    resultBox.style.color = 'var(--rose)';
+    resultBox.innerHTML = `<strong>请求失败：</strong> ${err.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.innerText = '发送测试入库';
+  }
+}
+</script>
+{% endblock %}

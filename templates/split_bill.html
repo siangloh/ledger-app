@@ -1,0 +1,481 @@
+{% extends 'base.html' %}
+{% block title %}小票拍照与智能 AA 分账 - 我的记账本{% endblock %}
+{% block content %}
+
+<div class="page-title-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+  <div>
+    <h2>🧾 小票拍照与智能 AA 分账 (Split Bill)</h2>
+    <p class="hint">拍摄或上传餐厅/聚餐小票，或直接粘贴小票明细。自动拆分单品、服务费与税费，点选人头分摊，秒算每个人应付多少！</p>
+  </div>
+</div>
+
+<div class="split-bill-container">
+  <!-- 步骤 1：录入/解析小票 -->
+  <section class="panel" style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+      <h3 style="margin: 0;">第 1 步：录入小票信息</h3>
+      <div class="tab-options" style="display: flex; gap: 8px;">
+        <button type="button" class="btn-secondary btn-sm" onclick="loadSampleReceipt()">加载示例小票</button>
+      </div>
+    </div>
+
+    <div class="receipt-input-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+      <!-- 图片上传卡片 -->
+      <div style="border: 2px dashed var(--border); border-radius: var(--radius-md); padding: 20px; text-align: center; background: var(--surface-soft);">
+        <div style="font-size: 32px; margin-bottom: 8px;">📷</div>
+        <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">手机拍照 / 上传小票图片</div>
+        <p style="font-size: 12px; color: var(--muted); margin-bottom: 12px;">点击调起相机拍照或从相册选择小票</p>
+        <input type="file" id="receiptImageInput" accept="image/*" capture="camera" style="display: none;" onchange="handleImageUpload(event)">
+        <button type="button" class="btn-primary btn-sm" onclick="document.getElementById('receiptImageInput').click()">拍照 / 选取照片</button>
+        <div id="imageUploadStatus" style="font-size: 12px; margin-top: 8px; color: var(--navy); display: none;"></div>
+      </div>
+
+      <!-- 文本粘贴卡片 -->
+      <div>
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px;">或直接粘贴小票文本 / 明细：</label>
+        <textarea id="receiptTextInput" rows="6" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); font-family: var(--font-mono); font-size: 12px;" placeholder="例如：
+Chicken Chop 22.00
+Fish & Chips 24.00
+Ice Lemon Tea 6.50
+Latte 12.00
+Service Charge 10% 6.45
+SST 6% 4.26
+Total 75.21"></textarea>
+        <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+          <button type="button" class="btn-secondary btn-sm" onclick="parseTextReceipt()">智能解析明细</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 步骤 2：参与人管理与点选分摊 -->
+  <section class="panel" id="splitSection" style="margin-bottom: 24px;">
+    <h3>第 2 步：添加参与人 & 分配消费</h3>
+    
+    <!-- 参与人标签栏 -->
+    <div style="background: var(--surface-soft); padding: 14px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 18px;">
+      <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 8px;">参与分账人员 (Members)：</label>
+      <div id="peopleChips" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+        <!-- 动态生成的成员芯片 -->
+      </div>
+      <div style="display: flex; gap: 8px; max-width: 320px;">
+        <input type="text" id="newPersonName" placeholder="输入名字，如：小明" style="font-size: 13px; padding: 6px 12px;">
+        <button type="button" class="btn-secondary btn-sm" onclick="addPerson()">+ 添加人员</button>
+      </div>
+    </div>
+
+    <!-- 菜品分配清单表格 -->
+    <div class="table-wrap" style="margin-bottom: 18px;">
+      <table id="itemsTable">
+        <thead>
+          <tr>
+            <th style="width: 45%;">消费项目 (Item)</th>
+            <th style="width: 20%;">单价 (RM)</th>
+            <th style="width: 35%;">分摊给谁 (Split With)</th>
+          </tr>
+        </thead>
+        <tbody id="itemsTableBody">
+          <!-- 动态渲染项目行 -->
+        </tbody>
+      </table>
+    </div>
+
+    <div style="display: flex; justify-content: flex-start; gap: 10px; margin-bottom: 20px;">
+      <button type="button" class="btn-ghost btn-sm" onclick="addNewItemRow()">+ 手动加一道菜/项目</button>
+    </div>
+
+    <!-- 税费与服务费调整区 -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; background: var(--surface-soft); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 20px;">
+      <div>
+        <label style="font-size: 12px; color: var(--muted); display: block;">菜品小计 (Subtotal)</label>
+        <strong id="displaySubtotal" style="font-family: var(--font-mono); font-size: 16px; color: var(--navy);">RM 0.00</strong>
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--muted); display: block;">服务费 Service Charge (RM)</label>
+        <input type="number" step="0.01" min="0" id="inputServiceCharge" value="0.00" onchange="calculateSplit()" style="width: 100%; font-size: 14px; padding: 6px;">
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--muted); display: block;">政府税 SST / Tax (RM)</label>
+        <input type="number" step="0.01" min="0" id="inputTax" value="0.00" onchange="calculateSplit()" style="width: 100%; font-size: 14px; padding: 6px;">
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--muted); display: block;">账单实付总额 (Total)</label>
+        <strong id="displayGrandTotal" style="font-family: var(--font-mono); font-size: 18px; color: var(--rose);">RM 0.00</strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- 步骤 3：计算结果与一键结算 -->
+  <section class="panel">
+    <h3>第 3 步：分摊结果与一键催款</h3>
+    <p class="hint">系统已按每个人的净消费比例，精准分摊了服务费与 SST，公平无误。</p>
+
+    <div class="cards" id="resultsCards" style="margin-bottom: 24px;">
+      <!-- 动态渲染每个人应付的金额卡片 -->
+    </div>
+
+    <!-- 微信/WhatsApp 催款文本一键复制 -->
+    <div style="background: var(--surface-soft); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border); margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <label style="font-size: 13px; font-weight: 600; color: var(--navy);">📋 WhatsApp / 微信 催款清单格式：</label>
+        <button type="button" class="btn-secondary btn-sm" onclick="copyClaimMessage()">一键复制清单发群</button>
+      </div>
+      <textarea id="claimMessageText" rows="6" readonly style="width: 100%; font-family: var(--font-mono); font-size: 12px; background: #fff; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);"></textarea>
+    </div>
+
+    <!-- 将“我”的那份一键记账 -->
+    <div style="background: var(--gold-soft); border: 1px solid rgba(182, 144, 47, 0.4); padding: 16px 20px; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+      <div>
+        <strong style="color: var(--navy); font-size: 15px;">💾 将我的自付金额一键记入主账本</strong>
+        <p style="font-size: 12px; color: var(--ink-soft); margin: 4px 0 0;">无需重复手动打字，直接将“我”在本次聚餐中实际消费的金额记为支出。</p>
+      </div>
+      <form method="post" action="{{ url_for('split_bill_save_record') }}" style="display: flex; gap: 10px; align-items: center;">
+        <input type="hidden" name="amount" id="saveMyAmount" value="0">
+        <input type="hidden" name="date" value="{{ today }}">
+        <input type="hidden" name="category" value="餐饮">
+        <input type="text" name="note" id="saveMyNote" value="聚餐 AA 分账" style="font-size: 13px; padding: 6px 10px; width: 140px;">
+        <button type="submit" class="btn-primary" id="btnSaveToLedger">一键记入主账本</button>
+      </form>
+    </div>
+  </section>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 基础状态
+let people = ['我', '小明', '小华'];
+let items = [
+  { name: 'Chicken Chop', price: 24.00, assignedTo: ['我'] },
+  { name: 'Fish & Chips', price: 26.00, assignedTo: ['小明'] },
+  { name: 'Pasta Carbonara', price: 22.00, assignedTo: ['小华'] },
+  { name: 'Mushroom Soup (共享)', price: 12.00, assignedTo: ['我', '小明', '小华'] },
+  { name: 'Iced Lemon Tea x3', price: 18.00, assignedTo: ['我', '小明', '小华'] }
+];
+let serviceCharge = 10.20;
+let tax = 6.12;
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderPeople();
+  renderItemsTable();
+  calculateSplit();
+});
+
+function renderPeople() {
+  const container = document.getElementById('peopleChips');
+  container.innerHTML = people.map((p, idx) => `
+    <span class="tag" style="padding: 6px 12px; font-size: 13px; background: ${p === '我' ? 'var(--navy)' : 'var(--surface)'}; color: ${p === '我' ? '#fff' : 'var(--ink)'}; border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 6px;">
+      ${p}
+      ${p !== '我' ? `<span onclick="removePerson(${idx})" style="cursor: pointer; font-weight: bold; opacity: 0.6;">&times;</span>` : ''}
+    </span>
+  `).join('');
+}
+
+function addPerson() {
+  const input = document.getElementById('newPersonName');
+  const name = input.value.trim();
+  if (!name) return;
+  if (people.includes(name)) {
+    alert('该人员已存在');
+    return;
+  }
+  people.push(name);
+  input.value = '';
+  renderPeople();
+  renderItemsTable();
+  calculateSplit();
+}
+
+function removePerson(idx) {
+  const removedName = people[idx];
+  people.splice(idx, 1);
+  // 从所有已分配项中移除该人
+  items.forEach(item => {
+    item.assignedTo = item.assignedTo.filter(p => p !== removedName);
+    if (item.assignedTo.length === 0) {
+      item.assignedTo = ['我'];
+    }
+  });
+  renderPeople();
+  renderItemsTable();
+  calculateSplit();
+}
+
+function renderItemsTable() {
+  const tbody = document.getElementById('itemsTableBody');
+  tbody.innerHTML = items.map((item, idx) => {
+    const peopleCheckboxes = people.map(p => {
+      const isChecked = item.assignedTo.includes(p);
+      return `
+        <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; margin-right: 8px; cursor: pointer; user-select: none;">
+          <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleItemPerson(${idx}, '${p}')">
+          <span>${p}</span>
+        </label>
+      `;
+    }).join('');
+
+    return `
+      <tr>
+        <td>
+          <input type="text" value="${item.name}" onchange="updateItemName(${idx}, this.value)" style="width: 100%; font-size: 13px; padding: 4px 8px;">
+        </td>
+        <td>
+          <input type="number" step="0.01" min="0" value="${item.price.toFixed(2)}" onchange="updateItemPrice(${idx}, this.value)" style="width: 100%; font-size: 13px; padding: 4px 8px; font-family: var(--font-mono);">
+        </td>
+        <td>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
+            ${peopleCheckboxes}
+            <button type="button" class="btn-ghost" onclick="assignToAll(${idx})" style="padding: 2px 6px; font-size: 11px; margin-left: auto;">所有人平摊</button>
+            <button type="button" class="btn-danger-ghost" onclick="removeItemRow(${idx})" style="padding: 2px 6px; font-size: 11px;">&times;</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function updateItemName(idx, val) {
+  items[idx].name = val.trim();
+  calculateSplit();
+}
+
+function updateItemPrice(idx, val) {
+  items[idx].price = parseFloat(val) || 0;
+  calculateSplit();
+}
+
+function toggleItemPerson(itemIdx, personName) {
+  const arr = items[itemIdx].assignedTo;
+  const pIdx = arr.indexOf(personName);
+  if (pIdx >= 0) {
+    arr.splice(pIdx, 1);
+  } else {
+    arr.push(personName);
+  }
+  calculateSplit();
+}
+
+function assignToAll(itemIdx) {
+  items[itemIdx].assignedTo = [...people];
+  renderItemsTable();
+  calculateSplit();
+}
+
+function removeItemRow(idx) {
+  items.splice(idx, 1);
+  renderItemsTable();
+  calculateSplit();
+}
+
+function addNewItemRow() {
+  items.push({
+    name: '新增菜品/项目',
+    price: 10.00,
+    assignedTo: ['我']
+  });
+  renderItemsTable();
+  calculateSplit();
+}
+
+function calculateSplit() {
+  const subtotal = items.reduce((sum, it) => sum + (it.price || 0), 0);
+  serviceCharge = parseFloat(document.getElementById('inputServiceCharge').value) || 0;
+  tax = parseFloat(document.getElementById('inputTax').value) || 0;
+  const grandTotal = subtotal + serviceCharge + tax;
+
+  document.getElementById('displaySubtotal').innerText = 'RM ' + subtotal.toFixed(2);
+  document.getElementById('displayGrandTotal').innerText = 'RM ' + grandTotal.toFixed(2);
+
+  // 计算每人净额（按分配人头平摊每道菜）
+  const personNet = {};
+  const personDetails = {};
+  people.forEach(p => {
+    personNet[p] = 0;
+    personDetails[p] = [];
+  });
+
+  items.forEach(item => {
+    const assignedCount = item.assignedTo.length;
+    if (assignedCount > 0 && item.price > 0) {
+      const share = item.price / assignedCount;
+      item.assignedTo.forEach(p => {
+        if (personNet[p] !== undefined) {
+          personNet[p] += share;
+          personDetails[p].push({
+            name: item.name,
+            share: share,
+            isShared: assignedCount > 1
+          });
+        }
+      });
+    }
+  });
+
+  // 按净额比例分摊 Service Charge 和 Tax
+  const feeRate = subtotal > 0 ? (serviceCharge + tax) / subtotal : 0;
+  const personFinal = {};
+
+  people.forEach(p => {
+    const net = personNet[p] || 0;
+    const taxAndSvcShare = net * feeRate;
+    personFinal[p] = net + taxAndSvcShare;
+  });
+
+  // 渲染结果卡片
+  const cardsContainer = document.getElementById('resultsCards');
+  cardsContainer.innerHTML = people.map(p => {
+    const finalAmount = personFinal[p] || 0;
+    const netAmount = personNet[p] || 0;
+    const isMe = (p === '我');
+    return `
+      <div class="card ${isMe ? 'card-highlight positive' : ''}" style="padding: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+          <span class="card-label" style="font-size: 15px; font-weight: 600;">${p}</span>
+          ${isMe ? '<span class="tag" style="background: var(--navy); color:#fff; font-size: 11px;">我自己</span>' : ''}
+        </div>
+        <div class="amount" style="font-size: 24px; margin: 8px 0; color: ${isMe ? 'var(--green)' : 'var(--navy)'};">
+          RM ${finalAmount.toFixed(2)}
+        </div>
+        <div style="font-size: 11.5px; color: var(--muted);">
+          菜品净额: RM ${netAmount.toFixed(2)} + 税费: RM ${(finalAmount - netAmount).toFixed(2)}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // 绑定“我”的那份到记账表单
+  const myAmount = personFinal['我'] || 0;
+  document.getElementById('saveMyAmount').value = myAmount.toFixed(2);
+  document.getElementById('btnSaveToLedger').innerText = `一键记入主账本 (RM ${myAmount.toFixed(2)})`;
+
+  // 生成催款文本
+  generateClaimMessage(personFinal, personDetails);
+}
+
+function generateClaimMessage(finalMap, detailsMap) {
+  let msg = "🧾 聚餐 AA 分账明细清单\n";
+  msg += "--------------------------\n";
+  
+  people.forEach(p => {
+    const total = finalMap[p] || 0;
+    msg += `👤 【${p}】：应付 RM ${total.toFixed(2)}\n`;
+    if (detailsMap[p] && detailsMap[p].length > 0) {
+      detailsMap[p].forEach(d => {
+        msg += `   • ${d.name} (RM ${d.share.toFixed(2)})${d.isShared ? ' [平摊]' : ''}\n`;
+      });
+    }
+    msg += "\n";
+  });
+
+  const grand = document.getElementById('displayGrandTotal').innerText;
+  msg += `💰 账单总计：${grand}\n`;
+  msg += `📲 请转至 DuitNow / Touch 'n Go eWallet，收到后请回复告知，谢谢！`;
+
+  document.getElementById('claimMessageText').value = msg;
+}
+
+function copyClaimMessage() {
+  const textarea = document.getElementById('claimMessageText');
+  textarea.select();
+  navigator.clipboard.writeText(textarea.value).then(() => {
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: '催款清单已复制，可直接粘贴发群！',
+        showConfirmButton: false,
+        timer: 2200
+      });
+    } else {
+      alert('已复制到剪贴板');
+    }
+  });
+}
+
+function loadSampleReceipt() {
+  items = [
+    { name: 'Nasi Lemak Ayam Goreng', price: 18.90, assignedTo: ['我'] },
+    { name: 'Char Kuey Teow Special', price: 16.50, assignedTo: ['小明'] },
+    { name: 'Chicken Satay (10 sticks)', price: 20.00, assignedTo: ['我', '小明', '小华'] },
+    { name: 'Mee Goreng Mamak', price: 14.50, assignedTo: ['小华'] },
+    { name: 'Teh Tarik Iced x3', price: 13.50, assignedTo: ['我', '小明', '小华'] }
+  ];
+  document.getElementById('inputServiceCharge').value = "8.34";
+  document.getElementById('inputTax').value = "5.00";
+  renderItemsTable();
+  calculateSplit();
+}
+
+async function parseTextReceipt() {
+  const text = document.getElementById('receiptTextInput').value.trim();
+  if (!text) {
+    alert('请先输入或粘贴小票内容');
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append('text', text);
+    const res = await fetch('/split-bill/parse-text', {
+      method: 'POST',
+      body: formData
+    });
+    const result = await res.json();
+    if (result.ok && result.data) {
+      applyParsedReceiptData(result.data);
+    } else {
+      alert('解析失败：' + (result.message || '未知原因'));
+    }
+  } catch (err) {
+    alert('请求出错：' + err.message);
+  }
+}
+
+async function handleImageUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const status = document.getElementById('imageUploadStatus');
+  status.style.display = 'block';
+  status.innerText = '正在上传并分析小票照片...';
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await fetch('/split-bill/ocr-upload', {
+      method: 'POST',
+      body: formData
+    });
+    const result = await res.json();
+    if (result.ok && result.data) {
+      status.innerText = '✓ 小票分析成功！已提取明细菜品。';
+      applyParsedReceiptData(result.data);
+    } else {
+      status.innerText = result.message || '识别完成，请在下方文本框微调。';
+      if (result.raw_text) {
+        document.getElementById('receiptTextInput').value = result.raw_text;
+      }
+    }
+  } catch (err) {
+    status.innerText = '上传失败：' + err.message;
+  }
+}
+
+function applyParsedReceiptData(data) {
+  if (data.items && data.items.length > 0) {
+    items = data.items.map(it => ({
+      name: it.name,
+      price: it.price,
+      assignedTo: ['我']
+    }));
+  }
+  document.getElementById('inputServiceCharge').value = (data.service_charge || 0).toFixed(2);
+  document.getElementById('inputTax').value = (data.tax || 0).toFixed(2);
+  renderItemsTable();
+  calculateSplit();
+}
+</script>
+{% endblock %}

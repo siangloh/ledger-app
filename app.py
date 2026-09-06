@@ -6,15 +6,20 @@ from calendar import monthrange
 from datetime import datetime, date
 
 import pandas as pd
-from flask import Flask, g, request, redirect, url_for, render_template, flash
+from flask import Flask, g, request, redirect, url_for, render_template, flash, jsonify
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'ledger.db')
-UPLOAD_DIR = os.path.join(BASE_DIR, 'uploads')
+# 数据存储目录（Render 上可挂载持久化盘 /var/data，本地默认在项目当前目录）
+DATA_DIR = os.environ.get('DATA_DIR', BASE_DIR)
+os.makedirs(DATA_DIR, exist_ok=True)
+DB_PATH = os.path.join(DATA_DIR, 'ledger.db')
+UPLOAD_DIR = os.path.join(DATA_DIR, 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = Flask(__name__)
-app.secret_key = 'local-ledger-secret'
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'local-ledger-secret')
+# 自动记账 API 鉴权密钥，默认 'my-secret-ledger-key'
+AUTO_TRACK_KEY = os.environ.get('AUTO_TRACK_KEY', 'my-secret-ledger-key')
 # 本地单人使用的开发服务器：关闭静态文件缓存，避免浏览器缓存旧的 CSS/JS 导致改动看不到
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
@@ -169,14 +174,152 @@ INCOME_CATEGORY_KEYWORDS = {
 }
 
 EXPENSE_CATEGORY_KEYWORDS = {
-    '餐饮': ['吃', '饭', '餐', '外卖', '奶茶', '咖啡', '早饭', '午饭', '晚饭', '夜宵', '零食'],
-    '交通': ['打车', '地铁', '公交', '高铁', '火车', '机票', '油费', '停车', '交通', '出行'],
-    '房租': ['房租', '租金', '物业费'],
-    '购物': ['购物', '淘宝', '京东', '衣服', '超市'],
-    '娱乐': ['电影', '游戏', '娱乐', '唱歌', '旅游', '景点'],
-    '医疗': ['医院', '看病', '医疗', '体检', '药'],
-    '通讯': ['话费', '流量', '网费', '通讯'],
+    '餐饮': [
+        '吃', '饭', '餐', '外卖', '奶茶', '咖啡', '早饭', '午饭', '晚饭', '夜宵', '零食',
+        'kfc', 'mcd', 'mcdonald', 'starbucks', 'zus', 'chagee', 'tealive', 'subway',
+        'familymart', 'family mart', 'rotiboy', 'baker', 'kopitiam', 'restaurant',
+        'nasi', 'cafe', 'food', 'din', 'bbq', 'sushi', 'pizza'
+    ],
+    '交通': [
+        '打车', '地铁', '公交', '高铁', '火车', '机票', '油费', '停车', '交通', '出行',
+        'petronas', 'shell', 'caltex', 'bhp', 'petron', 'grab', 'touch n go', 'tng rfid',
+        'parking', 'tng reload', 'toll', 'rapidkl', 'mrt', 'lrt', 'airasia'
+    ],
+    '房租': ['房租', '租金', '物业费', 'rental', 'maintenance fee'],
+    '购物': [
+        '购物', '淘宝', '京东', '衣服', '超市', 'shopee', 'lazada', 'watsons', 'guardian',
+        'uniqlo', 'lotus', 'aeon', 'jaya grocer', 'village grocer', 'mr diy', 'econsave',
+        '99 speedmart', 'speedmart', 'donki', 'supermarket', 'mall'
+    ],
+    '娱乐': ['电影', '游戏', '娱乐', '唱歌', '旅游', '景点', 'steam', 'netflix', 'spotify', 'cinema', 'gsc', 'tgv'],
+    '医疗': ['医院', '看病', '医疗', '体检', '药', 'clinic', 'hospital', 'pharmacy', 'dental'],
+    '通讯': ['话费', '流量', '网费', '通讯', 'maxis', 'digi', 'celcom', 'umobile', 'unifi', 'tnb', 'air selangor'],
 }
+
+MERCHANT_CATEGORY_MAPPING = {
+    # 交通加油
+    'petronas': '交通', 'shell': '交通', 'caltex': '交通', 'bhp': '交通', 'petron': '交通',
+    'grab': '交通', 'touch n go': '交通', 'parking': '交通', 'toll': '交通', 'rapidkl': '交通',
+    # 餐饮
+    'familymart': '餐饮', 'family mart': '餐饮', 'kfc': '餐饮', 'mcdonald': '餐饮', 'mcd': '餐饮',
+    'starbucks': '餐饮', 'zus': '餐饮', 'chagee': '餐饮', 'tealive': '餐饮', 'subway': '餐饮',
+    'foodpanda': '餐饮', 'grabfood': '餐饮', 'kopitiam': '餐饮', 'restaurant': '餐饮', 'cafe': '餐饮',
+    # 购物超市
+    '99 speedmart': '购物', 'speedmart': '购物', 'lotus': '购物', 'aeon': '购物', 'watsons': '购物',
+    'guardian': '购物', 'mr diy': '购物', 'shopee': '购物', 'lazada': '购物', 'jaya grocer': '购物',
+    'village grocer': '购物', 'econsave': '购物', 'donki': '购物',
+    # 水电通讯
+    'tnb': '通讯', 'unifi': '通讯', 'maxis': '通讯', 'celcom': '通讯', 'digi': '通讯', 'umobile': '通讯'
+}
+
+
+def parse_auto_track_notification(raw_text):
+    """
+    解析来自 TnG eWallet / Maybank MAE / 银行短信 / 通知栏的文本。
+    提取：金额 (RM)、商户名/接收方、时间、自动匹配分类。
+    """
+    text = raw_text.strip()
+    if not text:
+        return None
+
+    # 1. 提取金额：支持 "RM 15.00", "RM15.50", "MYR 20", "15.00"
+    amount = None
+    # 优先匹配带 RM / MYR 的格式
+    m_rm = re.search(r'(?:RM|MYR)\s*([0-9]+(?:\.[0-9]{1,2})?)', text, re.IGNORECASE)
+    if m_rm:
+        try:
+            amount = float(m_rm.group(1))
+        except ValueError:
+            amount = None
+
+    if amount is None:
+        # 回退提取普通数字（选取最像金额的带两位小数或合理范围的数字）
+        nums = list(re.finditer(r'\b([0-9]+(?:\.[0-9]{1,2})?)\b', text))
+        if nums:
+            try:
+                amount = float(nums[-1].group(1))
+            except ValueError:
+                pass
+
+    if not amount or amount <= 0:
+        return None
+
+    # 2. 判断是收入还是支出（默认大多数扣款通知是 expense）
+    is_income = False
+    lower_text = text.lower()
+    if any(k in lower_text for k in ['received', 'credited', 'cashback', 'refund', '转入', '收款', '存入']):
+        is_income = True
+
+    tx_type = 'income' if is_income else 'expense'
+
+    # 3. 提取商户 / 交易对手
+    # 常见格式模式匹配：
+    # - "paid RM 15.00 to FamilyMart"
+    # - "spent RM 45.00 at PETRONAS"
+    # - "Transfer of RM 20.00 to Ali"
+    # - "Payment to Starbucks of RM 12"
+    merchant = ''
+    m_to = re.search(r'(?:to|at|paid to|transfer to|payment to)\s+([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{2,35})', text, re.IGNORECASE)
+    if m_to:
+        m_str = m_to.group(1).strip()
+        # 清理后续干扰词如 on, via, using, ref, date
+        m_cleaned = re.split(r'\s+(?:on|via|ref|using|with|at|for|date|txid)\b', m_str, flags=re.IGNORECASE)[0]
+        merchant = m_cleaned.strip(' .,-')
+
+    if not merchant:
+        # 尝试中文格式：“在【全家】消费”、“向【张三】转账”
+        m_cn = re.search(r'(?:在|向)\s*([A-Za-z0-9\u4e00-\u9fa5\s&]{2,20})\s*(?:消费|转账|付款)', text)
+        if m_cn:
+            merchant = m_cn.group(1).strip()
+
+    if not merchant:
+        merchant = '自动追踪消费' if tx_type == 'expense' else '自动追踪入账'
+
+    # 4. 自动归类分类 (Category)
+    category = '其他'
+    if tx_type == 'income':
+        category = '其他'
+        group_name = 'side'
+    else:
+        group_name = None
+        # 优先通过商户名匹配映射表
+        matched_cat = None
+        m_lower = merchant.lower()
+        for kw, cat in MERCHANT_CATEGORY_MAPPING.items():
+            if kw in m_lower or kw in lower_text:
+                matched_cat = cat
+                break
+
+        if not matched_cat:
+            # 次优按通用支出分类关键词词库匹配
+            for cat, kws in EXPENSE_CATEGORY_KEYWORDS.items():
+                if any(k in m_lower or k in lower_text for k in kws):
+                    matched_cat = cat
+                    break
+
+        category = matched_cat if matched_cat else '其他'
+
+    # 5. 提取日期（若无法从文本中解析出 YYYY-MM-DD，则默认当前日期）
+    tx_date = date.today().isoformat()
+    m_date = re.search(r'(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})', text)
+    if m_date:
+        try:
+            d_str = m_date.group(1).replace('/', '-').replace('.', '-')
+            # 格式化统一为 YYYY-MM-DD
+            parts = d_str.split('-')
+            tx_date = f'{int(parts[0]):04d}-{int(parts[1]):02d}-{int(parts[2]):02d}'
+        except Exception:
+            pass
+
+    return {
+        'date': tx_date,
+        'type': tx_type,
+        'group_name': group_name,
+        'category': category,
+        'amount': amount,
+        'note': merchant,
+        'raw_text': text
+    }
 
 
 def parse_nlp_text(text):
@@ -285,6 +428,149 @@ def index():
         expense_categories=expense_categories,
         today=date.today().isoformat(),
     )
+
+
+@app.route('/api/overview')
+def api_overview():
+    db = get_db()
+    time_range = request.args.get('range', 'all')
+    today = date.today()
+    current_month = today.strftime('%Y-%m')
+
+    start_date = None
+    end_date = None
+    month_keys = []
+
+    if time_range == '12m':
+        start_month = shift_month(current_month, -11)
+        start_date = f'{start_month}-01'
+        last_day = monthrange(today.year, today.month)[1]
+        end_date = f'{current_month}-{last_day:02d}'
+        cur = start_month
+        while cur <= current_month:
+            month_keys.append(cur)
+            cur = shift_month(cur, 1)
+    elif time_range == 'ytd':
+        start_date = f'{today.year}-01-01'
+        last_day = monthrange(today.year, today.month)[1]
+        end_date = f'{current_month}-{last_day:02d}'
+        cur = f'{today.year}-01'
+        while cur <= current_month:
+            month_keys.append(cur)
+            cur = shift_month(cur, 1)
+    elif time_range == 'custom':
+        start_date = (request.args.get('start') or '').strip() or None
+        end_date = (request.args.get('end') or '').strip() or None
+    # 'all': start_date and end_date stay None
+
+    query = 'SELECT date, type, group_name, category, amount FROM transactions WHERE 1=1'
+    params = []
+    if start_date:
+        query += ' AND date >= ?'
+        params.append(start_date)
+    if end_date:
+        query += ' AND date <= ?'
+        params.append(end_date)
+    query += ' ORDER BY date ASC'
+
+    rows = db.execute(query, params).fetchall()
+
+    # 如果是 all 或 custom，动态根据记录或参数生成连续月份
+    if time_range in ('all', 'custom'):
+        if rows:
+            min_m = rows[0]['date'][:7]
+            max_m = rows[-1]['date'][:7]
+            if start_date and start_date[:7] < min_m:
+                min_m = start_date[:7]
+            if end_date and end_date[:7] > max_m:
+                max_m = end_date[:7]
+            cur = min_m
+            while cur <= max_m:
+                month_keys.append(cur)
+                cur = shift_month(cur, 1)
+        elif start_date and end_date and start_date[:7] <= end_date[:7]:
+            cur = start_date[:7]
+            while cur <= end_date[:7]:
+                month_keys.append(cur)
+                cur = shift_month(cur, 1)
+
+    total_income = 0.0
+    total_expense = 0.0
+    monthly_stats = {m: {'income': 0.0, 'expense': 0.0} for m in month_keys}
+    expense_cats = {}
+    income_group = {'main': 0.0, 'side': 0.0}
+
+    for r in rows:
+        amt = float(r['amount'] or 0)
+        m = r['date'][:7]
+        t = r['type']
+        if m not in monthly_stats:
+            monthly_stats[m] = {'income': 0.0, 'expense': 0.0}
+            if m not in month_keys:
+                month_keys.append(m)
+
+        if t == 'income':
+            total_income += amt
+            monthly_stats[m]['income'] += amt
+            gname = r['group_name'] or 'main'
+            income_group[gname] = income_group.get(gname, 0.0) + amt
+        else:
+            total_expense += amt
+            monthly_stats[m]['expense'] += amt
+            cat = r['category'] or '其他'
+            expense_cats[cat] = expense_cats.get(cat, 0.0) + amt
+
+    month_keys.sort()
+    monthly_trend = []
+    for m in month_keys:
+        inc = round(monthly_stats[m]['income'], 2)
+        exp = round(monthly_stats[m]['expense'], 2)
+        monthly_trend.append({
+            'month': m,
+            'income': inc,
+            'expense': exp,
+            'balance': round(inc - exp, 2)
+        })
+
+    # 月均计算：有月份跨度按跨度算，否则按实际有记录的月份数，至少为 1
+    num_months = max(len(month_keys), 1)
+    avg_income = total_income / num_months
+    avg_expense = total_expense / num_months
+    net_savings = total_income - total_expense
+
+    # 支出分类按金额降序排序
+    sorted_exp = sorted(expense_cats.items(), key=lambda x: x[1], reverse=True)
+    exp_labels = [k for k, v in sorted_exp]
+    exp_values = [round(v, 2) for k, v in sorted_exp]
+
+    side_income = income_group.get('side', 0.0)
+    side_ratio = round((side_income / total_income * 100), 1) if total_income > 0 else 0.0
+
+    return jsonify({
+        'ok': True,
+        'has_data': len(rows) > 0,
+        'range': time_range,
+        'start_date': start_date,
+        'end_date': end_date,
+        'num_months': num_months,
+        'metrics': {
+            'total_income': round(total_income, 2),
+            'total_expense': round(total_expense, 2),
+            'net_savings': round(net_savings, 2),
+            'avg_income': round(avg_income, 2),
+            'avg_expense': round(avg_expense, 2),
+        },
+        'trend': monthly_trend,
+        'expense_categories': {
+            'labels': exp_labels,
+            'values': exp_values
+        },
+        'income_group': {
+            'main': round(income_group.get('main', 0.0), 2),
+            'side': round(side_income, 2),
+            'side_ratio': side_ratio
+        }
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -402,6 +688,33 @@ def delete_record(tx_id):
     return redirect(url_for('records'))
 
 
+@app.route('/records/batch-delete', methods=['POST'])
+def batch_delete_records():
+    db = get_db()
+    ids = request.form.getlist('ids')
+    if not ids:
+        flash('未选中任何记录', 'error')
+        return redirect(url_for('records'))
+
+    # 安全地过滤数字 ID
+    valid_ids = []
+    for i in ids:
+        try:
+            valid_ids.append(int(i))
+        except ValueError:
+            pass
+
+    if valid_ids:
+        placeholders = ','.join('?' * len(valid_ids))
+        db.execute(f'DELETE FROM transactions WHERE id IN ({placeholders})', valid_ids)
+        db.commit()
+        flash(f'成功批量删除 {len(valid_ids)} 条记录', 'success')
+    else:
+        flash('未选中有效的记录', 'error')
+
+    return redirect(url_for('records'))
+
+
 # ---------------------------------------------------------------------------
 # 自然语言快速记账
 # ---------------------------------------------------------------------------
@@ -417,6 +730,80 @@ def nlp_parse():
         return {'ok': False, 'message': '解析失败：' + '；'.join(warnings) + '。请改用下方快速录入表单手动填写。'}
 
     return {'ok': True, 'parsed': parsed, 'warnings': warnings, 'original_text': text}
+
+
+# ---------------------------------------------------------------------------
+# Auto Track 自动记账网关 (接收来自手机通知/Webhook)
+# ---------------------------------------------------------------------------
+
+@app.route('/api/auto-track', methods=['POST'])
+def api_auto_track():
+    # 鉴权检查：支持 URL 参数 ?key=xxx 或 Header X-API-KEY 或 JSON 中的 key
+    req_key = request.args.get('key') or request.headers.get('X-API-KEY')
+    data = {}
+    if request.is_json:
+        data = request.get_json() or {}
+        if not req_key:
+            req_key = data.get('key')
+    else:
+        req_key = req_key or request.form.get('key')
+
+    if AUTO_TRACK_KEY and req_key != AUTO_TRACK_KEY:
+        return jsonify({'ok': False, 'message': 'API Key 无效或缺失，拒绝访问'}), 401
+
+    # 获取通知文本：支持 {"text": "..."} 或 {"body": "..."} 或 {"message": "..."} 或 raw post
+    text = (data.get('text') or data.get('body') or data.get('message') or
+            request.form.get('text') or request.form.get('body') or
+            request.get_data(as_text=True)).strip()
+
+    if not text:
+        return jsonify({'ok': False, 'message': '未收到有效的通知文本内容'}), 400
+
+    parsed = parse_auto_track_notification(text)
+    if not parsed or not parsed.get('amount'):
+        return jsonify({
+            'ok': False,
+            'message': '未能从通知中提取出有效金额或商户信息',
+            'raw_text': text
+        }), 422
+
+    # 入库写入交易记录
+    db = get_db()
+    now = datetime.now().isoformat()
+    cur = db.execute(
+        'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        (
+            parsed['date'],
+            parsed['type'],
+            parsed['group_name'],
+            parsed['category'],
+            parsed['amount'],
+            parsed['note'],
+            'auto_track',
+            now
+        )
+    )
+    db.commit()
+
+    return jsonify({
+        'ok': True,
+        'message': f"成功自动记账：{parsed['note']} {money_filter(parsed['amount'])} ({parsed['category']})",
+        'transaction_id': cur.lastrowid,
+        'parsed': parsed
+    }), 201
+
+
+@app.route('/auto-track')
+def auto_track_page():
+    """Auto Track 配置与测试页面"""
+    base_url = request.host_url.rstrip('/')
+    webhook_url = f"{base_url}/api/auto-track?key={AUTO_TRACK_KEY}"
+    return render_template(
+        'auto_track.html',
+        api_key=AUTO_TRACK_KEY,
+        webhook_url=webhook_url
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -683,6 +1070,199 @@ def import_confirm():
 
 
 # ---------------------------------------------------------------------------
+# 小票识别与智能 AA 分账 (Split Bill)
+# ---------------------------------------------------------------------------
+
+def parse_receipt_text_to_items(raw_text):
+    """
+    从小票原始文本（或 OCR 识别出的行）中提取菜品项、服务费、税率与总金额。
+    """
+    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    items = []
+    subtotal = 0.0
+    service_charge = 0.0
+    service_rate = 0.0
+    tax = 0.0
+    tax_rate = 0.0
+    total = 0.0
+
+    # 常见行匹配：比如 "1 Chicken Rice 12.50" 或 "Latte  RM 14.00"
+    for line in lines:
+        lower = line.lower()
+
+        # 匹配服务费 Service Charge / SVC
+        if any(k in lower for k in ['service charge', 'svc charge', 'svc chg', 'service fee']):
+            m = re.search(r'(?:RM|MYR)?\s*([0-9]+\.[0-9]{2})', line, re.IGNORECASE)
+            if m:
+                service_charge = float(m.group(1))
+            m_pct = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*%', line)
+            if m_pct:
+                service_rate = float(m_pct.group(1))
+            continue
+
+        # 匹配政府税 / SST / GST / TAX
+        if any(k in lower for k in ['sst', 'gst', 'service tax', 'gov tax', 'tax']):
+            # 排除非税总行
+            if 'total' not in lower and 'subtotal' not in lower:
+                m = re.search(r'(?:RM|MYR)?\s*([0-9]+\.[0-9]{2})', line, re.IGNORECASE)
+                if m:
+                    tax = float(m.group(1))
+                m_pct = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*%', line)
+                if m_pct:
+                    tax_rate = float(m_pct.group(1))
+                continue
+
+        # 匹配小计 Subtotal
+        if 'subtotal' in lower or 'sub-total' in lower:
+            m = re.search(r'(?:RM|MYR)?\s*([0-9]+\.[0-9]{2})', line, re.IGNORECASE)
+            if m:
+                subtotal = float(m.group(1))
+            continue
+
+        # 匹配总计 Total / Grand Total / Net Total / Amount Due
+        if any(k in lower for k in ['grand total', 'net total', 'total amount', 'total', 'amount due']):
+            m = re.search(r'(?:RM|MYR)?\s*([0-9]+\.[0-9]{2})', line, re.IGNORECASE)
+            if m:
+                total = float(m.group(1))
+            continue
+
+        # 排除其他干扰行（如日期、电话、找零、银行卡号等）
+        if any(k in lower for k in ['cash', 'change', 'visa', 'mastercard', 'mydebit', 'table', 'date', 'tel', 'invoice', 'receipt', 'bill no']):
+            continue
+
+        # 提取常规菜品/消费条目：要求末尾有金额
+        m_item = re.search(r'^(.*?)(?:RM|MYR)?\s*([0-9]+\.[0-9]{2})$', line, re.IGNORECASE)
+        if m_item:
+            name_raw = m_item.group(1).strip(' -:\t')
+            price_val = float(m_item.group(2))
+            # 过滤名称过短或纯数字的情况
+            if name_raw and len(name_raw) >= 2 and price_val > 0:
+                # 检查是否有数量前缀（如 "2x " 或 "1 "）
+                qty = 1
+                m_qty = re.match(r'^(\d+)\s*[xX*]?\s+(.*)$', name_raw)
+                if m_qty:
+                    qty = int(m_qty.group(1))
+                    name_raw = m_qty.group(2).strip()
+                items.append({
+                    'name': name_raw,
+                    'price': price_val,
+                    'quantity': qty
+                })
+
+    # 若未找到 subtotal，则从 items 求和
+    calc_subtotal = sum(i['price'] for i in items)
+    if subtotal == 0:
+        subtotal = round(calc_subtotal, 2)
+
+    # 如果有百分比但没明确写金额，自动算出来
+    if service_charge == 0 and service_rate > 0 and subtotal > 0:
+        service_charge = round(subtotal * (service_rate / 100), 2)
+    if tax == 0 and tax_rate > 0 and subtotal > 0:
+        tax = round((subtotal + service_charge) * (tax_rate / 100), 2)
+
+    if total == 0:
+        total = round(subtotal + service_charge + tax, 2)
+
+    return {
+        'items': items,
+        'subtotal': subtotal,
+        'service_charge': service_charge,
+        'tax': tax,
+        'total': total
+    }
+
+
+@app.route('/split-bill')
+def split_bill_page():
+    """小票拍照 AA 分账页面"""
+    return render_template('split_bill.html', today=date.today().isoformat())
+
+
+@app.route('/split-bill/parse-text', methods=['POST'])
+def split_bill_parse_text():
+    """解析小票文本或粘贴内容"""
+    text = request.form.get('text', '').strip()
+    if not text:
+        return jsonify({'ok': False, 'message': '未提供小票内容'}), 400
+
+    parsed = parse_receipt_text_to_items(text)
+    return jsonify({'ok': True, 'data': parsed})
+
+
+@app.route('/split-bill/ocr-upload', methods=['POST'])
+def split_bill_ocr_upload():
+    """上传小票图片进行 OCR 提取"""
+    file = request.files.get('file')
+    if not file or file.filename == '':
+        return jsonify({'ok': False, 'message': '请选择小票图片'}), 400
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ('.jpg', '.jpeg', '.png', '.webp', '.bmp'):
+        return jsonify({'ok': False, 'message': '仅支持常见图片格式 (.jpg, .png, .webp)'}), 400
+
+    token = uuid.uuid4().hex
+    img_path = os.path.join(UPLOAD_DIR, token + ext)
+    file.save(img_path)
+
+    extracted_text = ""
+    # 优先尝试本地 pytesseract 如果系统已安装
+    try:
+        import pytesseract
+        from PIL import Image
+        img = Image.open(img_path)
+        extracted_text = pytesseract.image_to_string(img)
+    except Exception:
+        pass
+
+    # 清理图片
+    try:
+        os.remove(img_path)
+    except OSError:
+        pass
+
+    if extracted_text and extracted_text.strip():
+        parsed = parse_receipt_text_to_items(extracted_text)
+        return jsonify({'ok': True, 'raw_text': extracted_text, 'data': parsed})
+
+    # 如果运行环境暂无 OCR 引擎（如未安装 tesseract 可执行文件），给出友好提示并提供内置小票模板样例
+    return jsonify({
+        'ok': False,
+        'ocr_engine_ready': False,
+        'message': '当前云端/本地未安装 Tesseract OCR 引擎，已为你开启「小票文本快速粘贴/录入」模式。'
+    })
+
+
+@app.route('/split-bill/save-record', methods=['POST'])
+def split_bill_save_record():
+    """将 AA 分账中属于自己的部分一键存入主账本"""
+    f = request.form
+    try:
+        amount = float(f.get('amount', 0))
+    except ValueError:
+        amount = 0
+
+    if amount <= 0:
+        flash('记账金额必须大于 0', 'error')
+        return redirect(url_for('split_bill_page'))
+
+    db = get_db()
+    now = datetime.now().isoformat()
+    note = f.get('note', '').strip() or '聚餐 AA 分摊消费'
+    tx_date = f.get('date') or date.today().isoformat()
+    category = f.get('category') or '餐饮'
+
+    db.execute(
+        'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at) '
+        'VALUES (?,?,?,?,?,?,?,?)',
+        (tx_date, 'expense', None, category, amount, note, 'split_bill', now)
+    )
+    db.commit()
+    flash(f'已成功记入支出：{note} {money_filter(amount)}', 'success')
+    return redirect(url_for('records'))
+
+
+# 启动时确保数据库初始化
+init_db()
 
 if __name__ == '__main__':
     for fn in os.listdir(UPLOAD_DIR):
@@ -690,5 +1270,5 @@ if __name__ == '__main__':
             os.remove(os.path.join(UPLOAD_DIR, fn))
         except OSError:
             pass
-    init_db()
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)

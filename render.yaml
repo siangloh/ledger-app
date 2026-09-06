@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: ledger-app
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: DATA_DIR
+        value: /var/data
+      - key: AUTO_TRACK_KEY
+        value: my-secret-ledger-key
+    disk:
+      name: ledger-data
+      mountPath: /var/data
+      sizeGB: 1

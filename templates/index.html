@@ -2,71 +2,187 @@
 {% block title %}仪表盘 - 我的记账本{% endblock %}
 {% block content %}
 
-<div class="month-nav">
-  <a href="{{ url_for('index', month=prev_month) }}" class="month-nav-arrow">&larr; 上月</a>
-  <strong class="month-nav-current">{{ month }}</strong>
-  <a href="{{ url_for('index', month=next_month) }}" class="month-nav-arrow">下月 &rarr;</a>
-</div>
-
-<div class="cards">
-  <div class="card">
-    <span class="card-label">本月收入</span>
-    <span class="amount income">{{ total_income|money }}</span>
-  </div>
-  <div class="card">
-    <span class="card-label">本月支出</span>
-    <span class="amount expense">{{ total_expense|money }}</span>
-  </div>
-  <div class="card card-highlight {{ 'positive' if balance >= 0 else 'negative' }}">
-    <span class="card-label">本月结余</span>
-    <span class="amount">{{ balance|money }}</span>
+<!-- 顶部视图切换 -->
+<div class="view-header">
+  <div class="view-tabs" role="tablist">
+    <button type="button" class="tab-btn active" id="tabMonthly" onclick="switchDashboardView('monthly')">当月视图 (Monthly)</button>
+    <button type="button" class="tab-btn" id="tabOverview" onclick="switchDashboardView('overview')">总体概览 (Total Overview)</button>
   </div>
 </div>
 
-<div class="panels">
-  <section class="panel">
-    <h3>快速录入</h3>
-    <form method="post" action="{{ url_for('add_transaction') }}" class="quick-add" id="quickAddForm">
-      <input type="hidden" name="source" value="manual">
-      <div class="row seg-row">
-        <label class="seg"><input type="radio" name="type" value="expense" checked onchange="onTypeChange()"><span>支出</span></label>
-        <label class="seg"><input type="radio" name="type" value="income" onchange="onTypeChange()"><span>收入</span></label>
-      </div>
-      <div class="row seg-row" id="groupRow" style="display:none;">
-        <label class="seg"><input type="radio" name="group_name" value="main" checked onchange="populateCategories()"><span>主业收入</span></label>
-        <label class="seg"><input type="radio" name="group_name" value="side" onchange="populateCategories()"><span>副业收入</span></label>
-      </div>
-      <div class="row">
-        <label>日期 <input type="date" name="date" value="{{ today }}" required></label>
-        <label>金额 <input type="number" step="0.01" min="0.01" name="amount" required></label>
-      </div>
-      <div class="row">
-        <label>分类 <select name="category" id="categorySelect"></select></label>
-        <label>备注 <input type="text" name="note" placeholder="可选"></label>
-      </div>
-      <button type="submit" class="btn-primary">保存</button>
-    </form>
-  </section>
+<!-- ==================== 当月视图 ==================== -->
+<div id="monthlySection" class="dashboard-view">
+  <div class="month-nav">
+    <a href="{{ url_for('index', month=prev_month) }}" class="month-nav-arrow">&larr; 上月</a>
+    <strong class="month-nav-current">{{ month }}</strong>
+    <a href="{{ url_for('index', month=next_month) }}" class="month-nav-arrow">下月 &rarr;</a>
+  </div>
 
-  <section class="panel">
-    <h3>自然语言快速记账</h3>
-    <p class="hint">例如："午饭 15"、"副业 稿费 200"、"工资 8000"。解析后会先让你确认再保存。</p>
-    <form method="post" action="{{ url_for('nlp_parse') }}" class="nlp-form" id="nlpForm">
-      <input type="text" name="text" placeholder="输入一句话，如：打车 32.5" required>
-      <button type="submit" class="btn-primary">智能解析</button>
-    </form>
-  </section>
+  <div class="cards">
+    <div class="card">
+      <span class="card-label">本月收入</span>
+      <span class="amount income">{{ total_income|money }}</span>
+    </div>
+    <div class="card">
+      <span class="card-label">本月支出</span>
+      <span class="amount expense">{{ total_expense|money }}</span>
+    </div>
+    <div class="card card-highlight {{ 'positive' if balance >= 0 else 'negative' }}">
+      <span class="card-label">本月结余</span>
+      <span class="amount">{{ balance|money }}</span>
+    </div>
+  </div>
+
+  <div class="panels">
+    <section class="panel">
+      <h3>快速录入</h3>
+      <form method="post" action="{{ url_for('add_transaction') }}" class="quick-add" id="quickAddForm">
+        <input type="hidden" name="source" value="manual">
+        <div class="row seg-row">
+          <label class="seg"><input type="radio" name="type" value="expense" checked onchange="onTypeChange()"><span>支出</span></label>
+          <label class="seg"><input type="radio" name="type" value="income" onchange="onTypeChange()"><span>收入</span></label>
+        </div>
+        <div class="row seg-row" id="groupRow" style="display:none;">
+          <label class="seg"><input type="radio" name="group_name" value="main" checked onchange="populateCategories()"><span>主业收入</span></label>
+          <label class="seg"><input type="radio" name="group_name" value="side" onchange="populateCategories()"><span>副业收入</span></label>
+        </div>
+        <div class="row">
+          <label>日期 <input type="date" name="date" value="{{ today }}" required></label>
+          <label>金额 <input type="number" step="0.01" min="0.01" name="amount" required></label>
+        </div>
+        <div class="row">
+          <label>分类 <select name="category" id="categorySelect"></select></label>
+          <label>备注 <input type="text" name="note" placeholder="可选"></label>
+        </div>
+        <div class="quick-chips">
+          <button type="button" class="chip-btn" onclick="quickFillForm(10, '餐饮', '早餐')">早餐 RM10</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(15, '餐饮', '午餐')">午餐 RM15</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(12, '餐饮', '咖啡')">咖啡 RM12</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(50, '交通', 'Petronas加油')">加油 RM50</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(30, '购物', '超市日常')">超市 RM30</button>
+        </div>
+        <button type="submit" class="btn-primary">保存</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h3>自然语言快速记账</h3>
+      <p class="hint">例如："午饭 15"、"副业 稿费 200"、"工资 8000"。解析后会先让你确认再保存。</p>
+      <form method="post" action="{{ url_for('nlp_parse') }}" class="nlp-form" id="nlpForm">
+        <input type="text" name="text" placeholder="输入一句话，如：打车 32.5" required>
+        <button type="submit" class="btn-primary">智能解析</button>
+      </form>
+    </section>
+  </div>
+
+  <div class="panels">
+    <section class="panel">
+      <h3>收入构成（主业 vs 副业）</h3>
+      <div style="position:relative; height:280px;">
+        <canvas id="incomeChart"></canvas>
+      </div>
+    </section>
+    <section class="panel">
+      <h3>支出分类占比</h3>
+      <div style="position:relative; height:280px;">
+        <canvas id="expenseChart"></canvas>
+      </div>
+    </section>
+  </div>
 </div>
 
-<div class="panels">
-  <section class="panel">
-    <h3>收入构成（主业 vs 副业）</h3>
-    <canvas id="incomeChart" width="320" height="220"></canvas>
-  </section>
-  <section class="panel">
-    <h3>支出分类占比</h3>
-    <canvas id="expenseChart" width="320" height="220"></canvas>
-  </section>
+<!-- ==================== 总体概览视图 ==================== -->
+<div id="overviewSection" class="dashboard-view" style="display:none;">
+  <!-- 时间范围筛选器 -->
+  <div class="overview-toolbar">
+    <div class="filter-pills" role="tablist">
+      <button type="button" class="pill-btn active" data-range="all" onclick="selectOverviewRange('all')">全部 (All Time)</button>
+      <button type="button" class="pill-btn" data-range="12m" onclick="selectOverviewRange('12m')">近 12 个月 (12M)</button>
+      <button type="button" class="pill-btn" data-range="ytd" onclick="selectOverviewRange('ytd')">本年度 (YTD)</button>
+      <button type="button" class="pill-btn" data-range="custom" onclick="selectOverviewRange('custom')">自定义范围</button>
+    </div>
+    <div id="customDateBox" class="custom-date-box" style="display:none;">
+      <input type="date" id="overviewStartDate" aria-label="开始日期">
+      <span class="date-sep">至</span>
+      <input type="date" id="overviewEndDate" value="{{ today }}" aria-label="结束日期">
+      <button type="button" class="btn-secondary btn-sm" onclick="applyCustomOverviewFilter()">应用</button>
+    </div>
+    <div class="overview-range-badge" id="overviewRangeBadge">正在加载统计数据...</div>
+  </div>
+
+  <!-- 总体核心指标 4 张卡片 -->
+  <div class="cards cards-four">
+    <div class="card">
+      <span class="card-label">累计总收入</span>
+      <span class="amount income" id="ovTotalIncome">RM 0.00</span>
+    </div>
+    <div class="card">
+      <span class="card-label">累计总支出</span>
+      <span class="amount expense" id="ovTotalExpense">RM 0.00</span>
+    </div>
+    <div class="card card-highlight positive" id="ovNetSavingsCard">
+      <span class="card-label">累计总结余</span>
+      <span class="amount" id="ovNetSavings">RM 0.00</span>
+    </div>
+    <div class="card">
+      <span class="card-label">月均收支</span>
+      <div class="card-sub-stats">
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">月均收入</span>
+          <span class="sub-stat-val income" id="ovAvgIncome">RM 0.00</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">月均支出</span>
+          <span class="sub-stat-val expense" id="ovAvgExpense">RM 0.00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 空状态容器 -->
+  <div id="overviewEmptyState" class="empty-state" style="display:none;">
+    <div class="empty-icon">📊</div>
+    <div class="empty-title">选定范围内暂无交易记录</div>
+    <div class="empty-desc">尝试切换其他时间范围或在当月视图中添加记录。</div>
+  </div>
+
+  <!-- 总体图表区 -->
+  <div id="overviewChartsArea">
+    <!-- 收支历史趋势对比图（大卡片） -->
+    <div class="panels">
+      <section class="panel panel-full">
+        <div class="panel-header-with-legend">
+          <h3>收支历史趋势对比</h3>
+          <div class="trend-legend">
+            <span class="legend-item"><span class="legend-dot dot-income"></span> 收入</span>
+            <span class="legend-item"><span class="legend-dot dot-expense"></span> 支出</span>
+          </div>
+        </div>
+        <div class="trend-chart-wrapper" id="trendChartWrapper" style="height:280px;">
+          <canvas id="overviewTrendChart"></canvas>
+          <div id="trendTooltip" class="trend-tooltip" style="display:none;"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 长期支出分类占比 与 主副业占比 -->
+    <div class="panels">
+      <section class="panel">
+        <h3>长期支出分类占比</h3>
+        <canvas id="overviewExpenseChart"></canvas>
+      </section>
+      <section class="panel">
+        <div class="panel-header-with-legend">
+          <h3>主业 vs 副业累计占比</h3>
+          <div class="side-badge" id="sideIncomeBadge">副业占比: 0.0%</div>
+        </div>
+        <canvas id="overviewIncomeChart"></canvas>
+        <div class="side-ratio-card" id="sideRatioDesc">
+          副业收入在累计收入中起到了良好的现金流补充作用。
+        </div>
+      </section>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -87,3 +203,4 @@ window.CHART_DATA = {
 };
 </script>
 {% endblock %}
+

@@ -18,6 +18,27 @@ function onTypeChange() {
   syncSegStyles();
 }
 
+function quickFillForm(amount, category, note) {
+  const typeRadio = document.querySelector('input[name="type"][value="expense"]');
+  if (typeRadio) {
+    typeRadio.checked = true;
+    onTypeChange();
+  }
+  const amountInput = document.querySelector('input[name="amount"]');
+  if (amountInput) {
+    amountInput.value = Number(amount).toFixed(2);
+    amountInput.focus();
+  }
+  const sel = document.getElementById('categorySelect');
+  if (sel) {
+    sel.value = category;
+  }
+  const noteInput = document.querySelector('input[name="note"]');
+  if (noteInput && note) {
+    noteInput.value = note;
+  }
+}
+
 function populateCategories() {
   const sel = document.getElementById('categorySelect');
   if (!sel || !window.CATEGORY_DATA) return;
@@ -446,6 +467,712 @@ function attachNlpForm() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// 总体 / 跨月仪表盘 (Total / Overview Dashboard)
+// ---------------------------------------------------------------------------
+
+let currentOverviewData = null;
+let currentOverviewRange = 'all';
+let trendHoverIndex = -1;
+
+function switchDashboardView(view) {
+  const isMonthly = (view === 'monthly');
+  const btnMonthly = document.getElementById('tabMonthly');
+  const btnOverview = document.getElementById('tabOverview');
+  const secMonthly = document.getElementById('monthlySection');
+  const secOverview = document.getElementById('overviewSection');
+
+  if (btnMonthly) btnMonthly.classList.toggle('active', isMonthly);
+  if (btnOverview) btnOverview.classList.toggle('active', !isMonthly);
+
+  if (secMonthly) secMonthly.style.display = isMonthly ? 'block' : 'none';
+  if (secOverview) secOverview.style.display = !isMonthly ? 'block' : 'none';
+
+  try {
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, null, isMonthly ? '#monthly' : '#overview');
+    }
+  } catch (e) {}
+
+  if (!isMonthly) {
+    if (!currentOverviewData) {
+      loadOverviewData(currentOverviewRange);
+    } else {
+      renderOverview(currentOverviewData);
+    }
+    attachTrendChartHover();
+  } else {
+    if (window.CHART_DATA) {
+      drawMonthlyDoughnut('incomeChart', window.CHART_DATA.income.labels, window.CHART_DATA.income.values);
+      drawMonthlyDoughnut('expenseChart', window.CHART_DATA.expense.labels, window.CHART_DATA.expense.values);
+    }
+  }
+}
+
+function selectOverviewRange(range) {
+  currentOverviewRange = range;
+  document.querySelectorAll('.filter-pills .pill-btn').forEach(function (btn) {
+    btn.classList.toggle('active', btn.dataset.range === range);
+  });
+  const customBox = document.getElementById('customDateBox');
+  if (customBox) {
+    customBox.style.display = (range === 'custom') ? 'inline-flex' : 'none';
+  }
+  if (range !== 'custom') {
+    loadOverviewData(range);
+  }
+}
+
+function applyCustomOverviewFilter() {
+  const startInput = document.getElementById('overviewStartDate');
+  const endInput = document.getElementById('overviewEndDate');
+  const start = startInput ? startInput.value.trim() : '';
+  const end = endInput ? endInput.value.trim() : '';
+  if (start && end && start > end) {
+    if (typeof errorAlert === 'function') {
+      errorAlert('开始日期不能晚于结束日期', '筛选提示');
+    } else {
+      alert('开始日期不能晚于结束日期');
+    }
+    return;
+  }
+  loadOverviewData('custom', start, end);
+}
+
+function loadOverviewData(range, start, end) {
+  const badge = document.getElementById('overviewRangeBadge');
+  if (badge) badge.textContent = '数据计算中...';
+
+  let url = '/api/overview?range=' + encodeURIComponent(range || 'all');
+  if (start) url += '&start=' + encodeURIComponent(start);
+  if (end) url += '&end=' + encodeURIComponent(end);
+
+  fetch(url)
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.ok) {
+        if (badge) badge.textContent = '加载失败，请刷新重试';
+        return;
+      }
+      currentOverviewData = data;
+      renderOverview(data);
+      attachTrendChartHover();
+    })
+    .catch(function (err) {
+      console.error(err);
+      if (badge) badge.textContent = '网络异常，无法获取统计数据';
+    });
+}
+
+function renderOverview(data) {
+  const badge = document.getElementById('overviewRangeBadge');
+  if (badge) {
+    let rangeDesc = '全部历史';
+    if (data.range === '12m') rangeDesc = '近 12 个月';
+    else if (data.range === 'ytd') rangeDesc = '本年度 (YTD)';
+    else if (data.range === 'custom') rangeDesc = (data.start_date || '最早') + ' 至 ' + (data.end_date || '至今');
+    badge.textContent = rangeDesc + ' · 跨度 ' + data.num_months + ' 个月';
+  }
+
+  const m = data.metrics || {};
+  const totalInc = document.getElementById('ovTotalIncome');
+  const totalExp = document.getElementById('ovTotalExpense');
+  const netSav = document.getElementById('ovNetSavings');
+  const netCard = document.getElementById('ovNetSavingsCard');
+  const avgInc = document.getElementById('ovAvgIncome');
+  const avgExp = document.getElementById('ovAvgExpense');
+
+  if (totalInc) totalInc.textContent = formatMoney(m.total_income);
+  if (totalExp) totalExp.textContent = formatMoney(m.total_expense);
+  if (netSav) netSav.textContent = formatMoney(m.net_savings);
+  if (netCard) {
+    netCard.classList.toggle('positive', m.net_savings >= 0);
+    netCard.classList.toggle('negative', m.net_savings < 0);
+  }
+  if (avgInc) avgInc.textContent = formatMoney(m.avg_income);
+  if (avgExp) avgExp.textContent = formatMoney(m.avg_expense);
+
+  const emptyState = document.getElementById('overviewEmptyState');
+  const chartsArea = document.getElementById('overviewChartsArea');
+
+  if (!data.has_data) {
+    if (emptyState) emptyState.style.display = 'block';
+    if (chartsArea) chartsArea.style.display = 'none';
+    return;
+  }
+
+  if (emptyState) emptyState.style.display = 'none';
+  if (chartsArea) chartsArea.style.display = 'block';
+
+  drawOverviewBarChart(data.trend || []);
+
+  const expCats = data.expense_categories || { labels: [], values: [] };
+  drawOverviewDoughnut('overviewExpenseChart', expCats.labels, expCats.values);
+
+  const incGrp = data.income_group || { main: 0, side: 0, side_ratio: 0 };
+  drawOverviewDoughnut('overviewIncomeChart', ['主业收入', '副业收入'], [incGrp.main, incGrp.side]);
+
+  const sideBadge = document.getElementById('sideIncomeBadge');
+  if (sideBadge) {
+    sideBadge.textContent = '副业占比: ' + (incGrp.side_ratio || 0).toFixed(1) + '%';
+  }
+
+  const sideDesc = document.getElementById('sideRatioDesc');
+  if (sideDesc) {
+    const r = incGrp.side_ratio || 0;
+    if (r >= 35) {
+      sideDesc.textContent = '副业贡献率达 ' + r.toFixed(1) + '%，副业成长显著，收入来源具备很强的防御性与弹性。';
+    } else if (r > 0) {
+      sideDesc.textContent = '副业累计贡献 ' + formatMoney(incGrp.side) + ' (' + r.toFixed(1) + '%)，主业为基本盘，副业稳健增益。';
+    } else {
+      sideDesc.textContent = '选定范围内暂无副业收入记录，当前收入 100% 来自主要工作。';
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Chart.js-based overview chart renderers
+// ---------------------------------------------------------------------------
+
+var _ovTrendChart = null;
+var _ovExpenseChart = null;
+var _ovIncomeChart = null;
+var _monthlyIncomeChart = null;
+var _monthlyExpenseChart = null;
+
+var CHARTJS_INCOME_COLOR = 'rgba(16, 33, 59, 0.88)';
+var CHARTJS_INCOME_HOVER = 'rgba(30, 63, 111, 0.95)';
+var CHARTJS_EXPENSE_COLOR = 'rgba(168, 71, 90, 0.88)';
+var CHARTJS_EXPENSE_HOVER = 'rgba(191, 83, 104, 0.95)';
+var CHARTJS_PALETTE = ['#10213b', '#b6902f', '#1e7a5c', '#7a5c8a', '#4d7ea8', '#a0522d', '#5c6b73', '#b04a56'];
+
+function destroyChart(instance) {
+  if (instance) {
+    try { instance.destroy(); } catch (e) {}
+  }
+  return null;
+}
+
+function rmMoneyFmt(value) {
+  var n = Number(value) || 0;
+  if (n >= 1000000) return 'RM ' + (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return 'RM ' + (n / 1000).toFixed(1) + 'k';
+  return 'RM ' + n.toFixed(2);
+}
+
+function drawOverviewBarChart(trendData) {
+  var canvas = document.getElementById('overviewTrendChart');
+  if (!canvas) return;
+
+  _ovTrendChart = destroyChart(_ovTrendChart);
+
+  if (!trendData || trendData.length === 0) return;
+
+  var labels = trendData.map(function (d) {
+    return d.month.slice(2).replace('-', '/');
+  });
+  var incomeVals = trendData.map(function (d) { return d.income; });
+  var expenseVals = trendData.map(function (d) { return d.expense; });
+  var balanceVals = trendData.map(function (d) { return d.balance; });
+
+  _ovTrendChart = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: '收入',
+          data: incomeVals,
+          backgroundColor: CHARTJS_INCOME_COLOR,
+          hoverBackgroundColor: CHARTJS_INCOME_HOVER,
+          borderRadius: 4,
+          borderSkipped: 'bottom'
+        },
+        {
+          label: '支出',
+          data: expenseVals,
+          backgroundColor: CHARTJS_EXPENSE_COLOR,
+          hoverBackgroundColor: CHARTJS_EXPENSE_HOVER,
+          borderRadius: 4,
+          borderSkipped: 'bottom'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: 'rgba(255,255,255,0.97)',
+          titleColor: '#10213b',
+          bodyColor: '#46453f',
+          borderColor: 'rgba(27,27,31,0.1)',
+          borderWidth: 1,
+          padding: 12,
+          titleFont: { family: 'ui-monospace, SFMono-Regular, Consolas, monospace', size: 13, weight: '700' },
+          bodyFont: { family: 'Segoe UI, sans-serif', size: 12 },
+          callbacks: {
+            title: function (items) {
+              var idx = items[0].dataIndex;
+              return trendData[idx].month;
+            },
+            label: function (item) {
+              return ' ' + item.dataset.label + ': ' + formatMoney(item.raw);
+            },
+            afterBody: function (items) {
+              var idx = items[0].dataIndex;
+              var bal = balanceVals[idx];
+              return ['结余: ' + formatMoney(bal)];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            color: '#6f6c66',
+            font: { family: 'ui-monospace, SFMono-Regular, Consolas, monospace', size: 11 },
+            maxRotation: 45
+          }
+        },
+        y: {
+          grid: {
+            color: 'rgba(27,27,31,0.06)',
+            borderColor: 'rgba(27,27,31,0.18)'
+          },
+          ticks: {
+            color: '#8a877e',
+            font: { family: 'ui-monospace, SFMono-Regular, Consolas, monospace', size: 11 },
+            callback: function (value) { return rmMoneyFmt(value); }
+          }
+        }
+      }
+    }
+  });
+}
+
+function drawOverviewDoughnut(canvasId, labels, values) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  if (canvasId === 'overviewExpenseChart') {
+    _ovExpenseChart = destroyChart(_ovExpenseChart);
+  } else {
+    _ovIncomeChart = destroyChart(_ovIncomeChart);
+  }
+
+  var total = values.reduce(function (a, b) { return a + (b || 0); }, 0);
+
+  var instance = new Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: values,
+        backgroundColor: CHARTJS_PALETTE.slice(0, labels.length),
+        hoverBackgroundColor: CHARTJS_PALETTE.slice(0, labels.length).map(function (c) { return c; }),
+        borderWidth: 2,
+        borderColor: '#ffffff',
+        hoverBorderColor: '#ffffff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      cutout: '58%',
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: {
+            font: { family: 'Segoe UI, sans-serif', size: 12 },
+            color: '#3a3a40',
+            padding: 14,
+            generateLabels: function (chart) {
+              var data = chart.data;
+              return data.labels.map(function (lbl, i) {
+                var val = data.datasets[0].data[i] || 0;
+                var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
+                return {
+                  text: lbl + '  ' + formatMoney(val) + ' (' + pct + '%)',
+                  fillStyle: CHARTJS_PALETTE[i % CHARTJS_PALETTE.length],
+                  hidden: false,
+                  index: i
+                };
+              });
+            }
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(255,255,255,0.97)',
+          titleColor: '#10213b',
+          bodyColor: '#46453f',
+          borderColor: 'rgba(27,27,31,0.1)',
+          borderWidth: 1,
+          padding: 10,
+          titleFont: { family: 'Segoe UI, sans-serif', size: 12, weight: '600' },
+          bodyFont: { family: 'ui-monospace, SFMono-Regular, Consolas, monospace', size: 11 },
+          callbacks: {
+            label: function (item) {
+              var val = item.raw || 0;
+              var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
+              return ' ' + formatMoney(val) + ' (' + pct + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (canvasId === 'overviewExpenseChart') {
+    _ovExpenseChart = instance;
+  } else {
+    _ovIncomeChart = instance;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Monthly view Chart.js doughnut renderer
+// ---------------------------------------------------------------------------
+
+function drawMonthlyDoughnut(canvasId, labels, values) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  if (canvasId === 'incomeChart') {
+    _monthlyIncomeChart = destroyChart(_monthlyIncomeChart);
+  } else {
+    _monthlyExpenseChart = destroyChart(_monthlyExpenseChart);
+  }
+
+  var total = values.reduce(function (a, b) { return a + (b || 0); }, 0);
+  var isIncome = (canvasId === 'incomeChart');
+  var centerTitle = isIncome ? '本月总收入' : '本月总支出';
+
+  // 自定义中心文字插件
+  var centerTextPlugin = {
+    id: 'centerText_' + canvasId,
+    beforeDraw: function(chart) {
+      var width = chart.width;
+      var height = chart.height;
+      var ctx = chart.ctx;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      var centerX = (chart.chartArea.left + chart.chartArea.right) / 2;
+      var centerY = (chart.chartArea.top + chart.chartArea.bottom) / 2;
+
+      // 标题 (本月总收入 / 本月总支出)
+      ctx.font = '500 12px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#6f6c66';
+      ctx.fillText(centerTitle, centerX, centerY - 10);
+
+      // 金额
+      ctx.font = '600 15px ui-monospace, SFMono-Regular, Consolas, monospace';
+      ctx.fillStyle = '#10213b';
+      ctx.fillText(formatMoney(total), centerX, centerY + 10);
+      ctx.restore();
+    }
+  };
+
+  var instance = new Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: values.length > 0 && total > 0 ? values : [1],
+        backgroundColor: values.length > 0 && total > 0 ? CHARTJS_PALETTE.slice(0, labels.length) : ['#e0e0e0'],
+        borderWidth: 2,
+        borderColor: '#ffffff',
+        hoverBorderColor: '#ffffff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '70%',
+      layout: {
+        padding: { top: 10, bottom: 10 }
+      },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            font: { family: 'Segoe UI, sans-serif', size: 12 },
+            color: '#3a3a40',
+            padding: 16,
+            usePointStyle: true,
+            pointStyle: 'circle',
+            generateLabels: function (chart) {
+              if (!total || values.length === 0) {
+                return [{ text: '暂无数据', fillStyle: '#e0e0e0', hidden: false, index: 0 }];
+              }
+              var data = chart.data;
+              return data.labels.map(function (lbl, i) {
+                var val = values[i] || 0;
+                var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
+                return {
+                  text: lbl + ': ' + formatMoney(val) + ' (' + pct + '%)',
+                  fillStyle: CHARTJS_PALETTE[i % CHARTJS_PALETTE.length],
+                  strokeStyle: CHARTJS_PALETTE[i % CHARTJS_PALETTE.length],
+                  hidden: false,
+                  index: i
+                };
+              });
+            }
+          }
+        },
+        tooltip: {
+          enabled: total > 0,
+          backgroundColor: 'rgba(255,255,255,0.97)',
+          titleColor: '#10213b',
+          bodyColor: '#46453f',
+          borderColor: 'rgba(27,27,31,0.1)',
+          borderWidth: 1,
+          padding: 10,
+          titleFont: { family: 'Segoe UI, sans-serif', size: 12, weight: '600' },
+          bodyFont: { family: 'ui-monospace, SFMono-Regular, Consolas, monospace', size: 11 },
+          callbacks: {
+            label: function (item) {
+              var val = item.raw || 0;
+              var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
+              return ' ' + formatMoney(val) + ' (' + pct + '%)';
+            }
+          }
+        }
+      }
+    },
+    plugins: [centerTextPlugin]
+  });
+
+  if (canvasId === 'incomeChart') {
+    _monthlyIncomeChart = instance;
+  } else {
+    _monthlyExpenseChart = instance;
+  }
+}
+
+function attachTrendChartHover() {
+  // No-op: Chart.js handles tooltips natively
+}
+
+window.addEventListener('resize', function () {
+  // Chart.js handles resize automatically via responsive:true
+});
+
+function LEGACY_drawTrendBarChart(canvasId, trendData) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const container = canvas.parentElement;
+  const cssWidth = container ? container.clientWidth : (canvas.clientWidth || 700);
+  const cssHeight = 260;
+
+  canvas.width = cssWidth * dpr;
+  canvas.height = cssHeight * dpr;
+  canvas.style.width = cssWidth + 'px';
+  canvas.style.height = cssHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+  if (!trendData || trendData.length === 0) {
+    ctx.fillStyle = '#9a978f';
+    ctx.font = '14px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无趋势数据', cssWidth / 2, cssHeight / 2);
+    return;
+  }
+
+  const padLeft = 65;
+  const padRight = 20;
+  const padTop = 25;
+  const padBottom = 42;
+  const chartW = Math.max(10, cssWidth - padLeft - padRight);
+  const chartH = Math.max(10, cssHeight - padTop - padBottom);
+
+  let maxVal = 0;
+  trendData.forEach(function (d) {
+    if (d.income > maxVal) maxVal = d.income;
+    if (d.expense > maxVal) maxVal = d.expense;
+  });
+  if (maxVal <= 0) maxVal = 100;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(maxVal)));
+  maxVal = Math.ceil(maxVal / magnitude) * magnitude;
+  if (maxVal === 0) maxVal = 100;
+
+  // 绘制横向参考线与数值
+  const gridSteps = 4;
+  ctx.lineWidth = 1;
+  ctx.font = '11px ui-monospace, SFMono-Regular, Consolas, monospace';
+
+  for (let i = 0; i <= gridSteps; i++) {
+    const yVal = (maxVal / gridSteps) * i;
+    const yPos = padTop + chartH - (i / gridSteps) * chartH;
+
+    ctx.strokeStyle = (i === 0) ? 'rgba(27, 27, 31, 0.18)' : 'rgba(27, 27, 31, 0.06)';
+    ctx.beginPath();
+    ctx.moveTo(padLeft, yPos);
+    ctx.lineTo(cssWidth - padRight, yPos);
+    ctx.stroke();
+
+    ctx.fillStyle = '#8a877e';
+    ctx.textAlign = 'right';
+    const label = yVal >= 1000 ? (yVal / 1000).toFixed(yVal % 1000 === 0 ? 0 : 1) + 'k' : yVal.toFixed(0);
+    ctx.fillText('RM ' + label, padLeft - 8, yPos + 4);
+  }
+
+  // 绘制柱体
+  const count = trendData.length;
+  const groupWidth = chartW / count;
+  const barGap = Math.max(2, Math.min(6, groupWidth * 0.08));
+  const maxSingleBar = 24;
+  const availBarW = Math.max(2, (groupWidth - barGap * 3) / 2);
+  const singleBarW = Math.min(maxSingleBar, availBarW);
+
+  canvas._barGroups = [];
+
+  trendData.forEach(function (d, idx) {
+    const centerX = padLeft + idx * groupWidth + groupWidth / 2;
+    const incomeH = maxVal > 0 ? (d.income / maxVal) * chartH : 0;
+    const expenseH = maxVal > 0 ? (d.expense / maxVal) * chartH : 0;
+
+    const incomeX = centerX - singleBarW - barGap / 2;
+    const expenseX = centerX + barGap / 2;
+    const incomeY = padTop + chartH - incomeH;
+    const expenseY = padTop + chartH - expenseH;
+
+    canvas._barGroups.push({
+      index: idx,
+      data: d,
+      left: padLeft + idx * groupWidth,
+      right: padLeft + (idx + 1) * groupWidth,
+      centerX: centerX
+    });
+
+    const isHovered = (trendHoverIndex === idx);
+
+    // 柱形背景微光指示（悬停时）
+    if (isHovered) {
+      ctx.fillStyle = 'rgba(182, 144, 47, 0.08)';
+      ctx.fillRect(padLeft + idx * groupWidth + 1, padTop, groupWidth - 2, chartH);
+    }
+
+    // 绘制收入柱
+    ctx.fillStyle = isHovered ? '#1e3f6f' : '#10213b';
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(incomeX, incomeY, singleBarW, incomeH, [3, 3, 0, 0]);
+      ctx.fill();
+    } else {
+      ctx.fillRect(incomeX, incomeY, singleBarW, incomeH);
+    }
+
+    // 绘制支出柱
+    ctx.fillStyle = isHovered ? '#bf5368' : '#a8475a';
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(expenseX, expenseY, singleBarW, expenseH, [3, 3, 0, 0]);
+      ctx.fill();
+    } else {
+      ctx.fillRect(expenseX, expenseY, singleBarW, expenseH);
+    }
+
+    // X 轴月份标签
+    ctx.fillStyle = isHovered ? '#10213b' : '#6f6c66';
+    ctx.font = isHovered
+      ? '600 11px ui-monospace, SFMono-Regular, Consolas, monospace'
+      : '11px ui-monospace, SFMono-Regular, Consolas, monospace';
+    ctx.textAlign = 'center';
+
+    const shortLabel = d.month.length >= 7 ? d.month.slice(2).replace('-', '/') : d.month;
+    ctx.fillText(shortLabel, centerX, padTop + chartH + 18);
+  });
+}
+
+function attachTrendChartHover() {
+  const canvas = document.getElementById('overviewTrendChart');
+  const tooltip = document.getElementById('trendTooltip');
+  if (!canvas || !tooltip || canvas._hoverAttached) return;
+  canvas._hoverAttached = true;
+
+  canvas.addEventListener('mousemove', function (e) {
+    if (!canvas._barGroups || !canvas._barGroups.length) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    let found = null;
+    for (let i = 0; i < canvas._barGroups.length; i++) {
+      const g = canvas._barGroups[i];
+      if (mouseX >= g.left && mouseX <= g.right) {
+        found = g;
+        break;
+      }
+    }
+
+    if (found) {
+      if (trendHoverIndex !== found.index) {
+        trendHoverIndex = found.index;
+        if (currentOverviewData) {
+          drawTrendBarChart('overviewTrendChart', currentOverviewData.trend || []);
+        }
+      }
+      const d = found.data;
+      tooltip.style.display = 'block';
+      tooltip.innerHTML =
+        '<div class="tt-header">' + d.month + '</div>' +
+        '<div class="tt-row"><span class="tt-label"><span class="legend-dot dot-income"></span> 收入</span> <span class="tt-val income">' + formatMoney(d.income) + '</span></div>' +
+        '<div class="tt-row"><span class="tt-label"><span class="legend-dot dot-expense"></span> 支出</span> <span class="tt-val expense">' + formatMoney(d.expense) + '</span></div>' +
+        '<div class="tt-sep"></div>' +
+        '<div class="tt-row"><span class="tt-label">结余</span> <span class="tt-val ' + (d.balance >= 0 ? 'income' : 'expense') + '">' + formatMoney(d.balance) + '</span></div>';
+
+      const tipW = tooltip.offsetWidth || 140;
+      let tipX = mouseX + 16;
+      if (tipX + tipW > rect.width) {
+        tipX = mouseX - tipW - 16;
+      }
+      let tipY = mouseY - 25;
+      if (tipY < 8) tipY = 8;
+      tooltip.style.left = tipX + 'px';
+      tooltip.style.top = tipY + 'px';
+    } else {
+      if (trendHoverIndex !== -1) {
+        trendHoverIndex = -1;
+        if (currentOverviewData) {
+          drawTrendBarChart('overviewTrendChart', currentOverviewData.trend || []);
+        }
+      }
+      tooltip.style.display = 'none';
+    }
+  });
+
+  canvas.addEventListener('mouseleave', function () {
+    if (trendHoverIndex !== -1) {
+      trendHoverIndex = -1;
+      if (currentOverviewData) {
+        drawTrendBarChart('overviewTrendChart', currentOverviewData.trend || []);
+      }
+    }
+    tooltip.style.display = 'none';
+  });
+}
+
+window.addEventListener('resize', function () {
+  if (currentOverviewData && document.getElementById('overviewSection').style.display !== 'none') {
+    drawTrendBarChart('overviewTrendChart', currentOverviewData.trend || []);
+    const expCats = currentOverviewData.expense_categories || { labels: [], values: [] };
+    drawDonutChart('overviewExpenseChart', expCats.labels, expCats.values, CHART_PALETTE);
+    const incGrp = currentOverviewData.income_group || { main: 0, side: 0 };
+    drawDonutChart('overviewIncomeChart', ['主业收入', '副业收入'], [incGrp.main, incGrp.side], CHART_PALETTE);
+  }
+});
+
 document.addEventListener('DOMContentLoaded', function () {
   populateCategories();
   toggleTypeCol();
@@ -458,7 +1185,13 @@ document.addEventListener('DOMContentLoaded', function () {
   showErrorAlerts();
 
   if (window.CHART_DATA) {
-    drawDonutChart('incomeChart', window.CHART_DATA.income.labels, window.CHART_DATA.income.values, CHART_PALETTE);
-    drawDonutChart('expenseChart', window.CHART_DATA.expense.labels, window.CHART_DATA.expense.values, CHART_PALETTE);
+    drawMonthlyDoughnut('incomeChart', window.CHART_DATA.income.labels, window.CHART_DATA.income.values);
+    drawMonthlyDoughnut('expenseChart', window.CHART_DATA.expense.labels, window.CHART_DATA.expense.values);
+  }
+
+  // 检查 URL 是否指定了总体视图
+  if (window.location.hash === '#overview' || window.location.search.indexOf('view=overview') !== -1) {
+    switchDashboardView('overview');
   }
 });
+

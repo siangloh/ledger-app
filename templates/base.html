@@ -12,6 +12,8 @@
     <div class="nav-links">
         <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}">仪表盘</a>
         <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint in ('records','edit_record') }}">历史记录</a>
+        <a href="{{ url_for('split_bill_page') }}" class="{{ 'active' if request.endpoint == 'split_bill_page' }}">小票AA分账</a>
+        <a href="{{ url_for('auto_track_page') }}" class="{{ 'active' if request.endpoint == 'auto_track_page' }}">自动记账</a>
         <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}">固定收支</a>
         <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}">分类管理</a>
         <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}">批量导入</a>
@@ -44,6 +46,7 @@
 <script>window.FLASH_ERROR = {{ error_msgs | tojson }};</script>
 {% endif %}
 <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>
