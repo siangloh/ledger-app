@@ -222,22 +222,24 @@ def parse_auto_track_notification(raw_text):
     if not text:
         return None
 
-    # 1. 提取金额：支持 "RM 15.00", "RM15.50", "MYR 20", "15.00"
+    # 1. 提取金额：支持 "RM 15.00", "RM15.50", "RM 1,250.00", "MYR 20", "15.00"
     amount = None
-    # 优先匹配带 RM / MYR 的格式
-    m_rm = re.search(r'(?:RM|MYR)\s*([0-9]+(?:\.[0-9]{1,2})?)', text, re.IGNORECASE)
+    # 优先匹配带 RM / MYR 的格式 (允许千分位逗号)
+    m_rm = re.search(r'(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)', text, re.IGNORECASE)
     if m_rm:
         try:
-            amount = float(m_rm.group(1))
+            val_str = m_rm.group(1).replace(',', '')
+            amount = float(val_str)
         except ValueError:
             amount = None
 
     if amount is None:
-        # 回退提取普通数字（选取最像金额的带两位小数或合理范围的数字）
-        nums = list(re.finditer(r'\b([0-9]+(?:\.[0-9]{1,2})?)\b', text))
+        # 回退提取普通数字（允许千分位）
+        nums = list(re.finditer(r'\b([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\b', text))
         if nums:
             try:
-                amount = float(nums[-1].group(1))
+                val_str = nums[-1].group(1).replace(',', '')
+                amount = float(val_str)
             except ValueError:
                 pass
 
@@ -752,15 +754,28 @@ def api_auto_track():
         return jsonify({'ok': False, 'message': 'API Key 无效或缺失，拒绝访问'}), 401
 
     # 获取通知文本：支持 {"text": "..."} 或 {"body": "..."} 或 {"message": "..."} 或 raw post
-    text = (data.get('text') or data.get('body') or data.get('message') or
-            request.form.get('text') or request.form.get('body') or
-            request.get_data(as_text=True)).strip()
+    raw_payload = request.get_data(as_text=True)
+    print(f"[AUTO_TRACK DEBUG] Received headers: {dict(request.headers)}")
+    print(f"[AUTO_TRACK DEBUG] Received raw payload: {repr(raw_payload)}")
+
+    text = ""
+    if request.is_json and isinstance(data, dict):
+        text = data.get('text') or data.get('body') or data.get('message') or ""
+    if not text:
+        text = request.form.get('text') or request.form.get('body') or raw_payload
+    text = (text or "").strip()
+
+    print(f"[AUTO_TRACK DEBUG] Extracted text: {repr(text)}")
 
     if not text:
+        print("[AUTO_TRACK DEBUG] Text is empty! Returning 400")
         return jsonify({'ok': False, 'message': '未收到有效的通知文本内容'}), 400
 
     parsed = parse_auto_track_notification(text)
+    print(f"[AUTO_TRACK DEBUG] Parsed result: {parsed}")
+
     if not parsed or not parsed.get('amount'):
+        print("[AUTO_TRACK DEBUG] Failed to parse amount! Returning 422")
         return jsonify({
             'ok': False,
             'message': '未能从通知中提取出有效金额或商户信息',
