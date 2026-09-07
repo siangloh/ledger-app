@@ -9,12 +9,18 @@ import pandas as pd
 from flask import Flask, g, request, redirect, url_for, render_template, flash, jsonify
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# 数据存储目录（Render 上可挂载持久化盘 /var/data，本地默认在项目当前目录）
+# 数据存储目录
 DATA_DIR = os.environ.get('DATA_DIR', BASE_DIR)
 os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, 'ledger.db')
 UPLOAD_DIR = os.path.join(DATA_DIR, 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Turso 云数据库凭证
+TURSO_URL = os.environ.get('TURSO_URL', 'libsql://ledger-app-siangloh.aws-ap-northeast-1.turso.io')
+TURSO_AUTH_TOKEN = os.environ.get('TURSO_AUTH_TOKEN', 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJleHAiOjE4MjAyNzczMzIsImlhdCI6MTc4ODc0MTMzMiwiaWQiOiIwMWEwNzk0Ny1kMDAxLTcyNmQtYTQ3NC02YzUyZjM4MzlkNWEiLCJraWQiOiJQWm96VlhvclNmRWVJYWY1LVl0ZDI0QUYwbnFtMnhSTEdnUzIzdzFlNWxvIiwicmlkIjoiNDE3ZjA1NWQtZmYxZC00OGVkLThiYWMtNWFkMTE0ZjcwZTE0In0.szBZZ_JHYw84PwhRXYBsv1_DpCWcN_GheCJzmQiupHX-tUJs2CE6pfbprubnzy9nZBE9IIe2gzBfZk1LP7qeBA')
+
+import turso_db
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'local-ledger-secret')
@@ -40,8 +46,11 @@ def money_filter(value):
 
 def get_db():
     if 'db' not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
+        if TURSO_URL and TURSO_AUTH_TOKEN:
+            g.db = turso_db.TursoConnection(TURSO_URL, TURSO_AUTH_TOKEN)
+        else:
+            g.db = sqlite3.connect(DB_PATH)
+            g.db.row_factory = sqlite3.Row
     return g.db
 
 
@@ -53,7 +62,10 @@ def close_db(exception=None):
 
 
 def init_db():
-    db = sqlite3.connect(DB_PATH)
+    if TURSO_URL and TURSO_AUTH_TOKEN:
+        db = turso_db.TursoConnection(TURSO_URL, TURSO_AUTH_TOKEN)
+    else:
+        db = sqlite3.connect(DB_PATH)
     db.executescript('''
     CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
