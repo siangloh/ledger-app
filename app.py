@@ -755,21 +755,38 @@ def api_auto_track():
 
     # 获取通知文本：支持 {"text": "..."} 或 {"body": "..."} 或 {"message": "..."} 或 raw post
     raw_payload = request.get_data(as_text=True)
-    print(f"[AUTO_TRACK DEBUG] Received headers: {dict(request.headers)}")
-    print(f"[AUTO_TRACK DEBUG] Received raw payload: {repr(raw_payload)}")
-
     text = ""
-    if request.is_json and isinstance(data, dict):
-        text = data.get('text') or data.get('body') or data.get('message') or ""
+
+    # 1. 尝试从 JSON 提取
+    if request.is_json:
+        try:
+            data = request.get_json(silent=True) or {}
+            if isinstance(data, dict):
+                text = data.get('text') or data.get('body') or data.get('message') or ""
+        except Exception:
+            pass
+
+    # 2. 尝试从 Form 表单提取
     if not text:
-        text = request.form.get('text') or request.form.get('body') or raw_payload
+        text = request.form.get('text') or request.form.get('body') or request.form.get('message') or ""
+
+    # 3. 尝试从 Query 参数或 Raw Payload 提取
+    if not text:
+        text = request.args.get('text') or raw_payload
+
     text = (text or "").strip()
+    # 如果 payload 是类似 text=... 的 urlencoded 形式，自动解出
+    if text.startswith('text='):
+        from urllib.parse import unquote
+        text = unquote(text[5:]).strip()
 
-    print(f"[AUTO_TRACK DEBUG] Extracted text: {repr(text)}")
+    print(f"[AUTO_TRACK DEBUG] Final Extracted text: {repr(text)}")
 
-    if not text:
-        print("[AUTO_TRACK DEBUG] Text is empty! Returning 400")
-        return jsonify({'ok': False, 'message': '未收到有效的通知文本内容'}), 400
+    if not text or text == "None" or text == "null":
+        return jsonify({
+            'ok': False,
+            'message': '未收到有效的通知文本内容（若为手动测试，请确保当前通知栏存在真实的扣款通知）'
+        }), 400
 
     parsed = parse_auto_track_notification(text)
     print(f"[AUTO_TRACK DEBUG] Parsed result: {parsed}")
