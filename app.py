@@ -753,12 +753,12 @@ def api_auto_track():
     if AUTO_TRACK_KEY and req_key != AUTO_TRACK_KEY:
         return jsonify({'ok': False, 'message': 'API Key 无效或缺失，拒绝访问'}), 401
 
-    # 获取通知文本：支持 {"text": "..."} 或 {"body": "..."} 或 {"message": "..."} 或 raw post
+    # 获取通知文本：优先从 Query 参数获取，再从 JSON / 表单 / Raw Payload 获取
     raw_payload = request.get_data(as_text=True)
-    text = ""
+    text = request.args.get('text') or ""
 
-    # 1. 尝试从 JSON 提取
-    if request.is_json:
+    # 1. 尝试从 JSON 提取（如果 Query 参数未提供）
+    if not text and request.is_json:
         try:
             data = request.get_json(silent=True) or {}
             if isinstance(data, dict):
@@ -770,9 +770,9 @@ def api_auto_track():
     if not text:
         text = request.form.get('text') or request.form.get('body') or request.form.get('message') or ""
 
-    # 3. 尝试从 Query 参数或 Raw Payload 提取
-    if not text:
-        text = request.args.get('text') or raw_payload
+    # 3. 尝试从 Raw Payload 提取 (过滤无意义的空或极短字符)
+    if not text and raw_payload and len(raw_payload.strip()) > 3:
+        text = raw_payload
 
     text = (text or "").strip()
     # 如果 payload 是类似 text=... 的 urlencoded 形式，自动解出
