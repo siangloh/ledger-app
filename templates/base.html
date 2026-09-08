@@ -2,24 +2,94 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#10213b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
 <title>{% block title %}我的记账本{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<nav class="nav">
-    <span class="brand">我的账本</span>
-    <div class="nav-links">
-        <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}">仪表盘</a>
-        <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint in ('records','edit_record') }}">历史记录</a>
-        <a href="{{ url_for('split_bill_page') }}" class="{{ 'active' if request.endpoint == 'split_bill_page' }}">小票AA分账</a>
-        <a href="{{ url_for('auto_track_page') }}" class="{{ 'active' if request.endpoint == 'auto_track_page' }}">自动记账</a>
-        <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}">固定收支</a>
-        <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}">分类管理</a>
-        <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}">批量导入</a>
+<!-- 极速页面加载指示条 -->
+<div id="appProgressBar" class="app-progress-bar"></div>
+
+<!-- 顶部沉浸式导航栏 -->
+<header class="app-header">
+    <div class="header-inner">
+        <div class="header-left">
+            <span class="app-avatar-badge">💰</span>
+            <a href="{{ url_for('index') }}" class="brand-link"><span class="brand">我的账本</span></a>
+        </div>
+        <!-- 桌面端导航链接 -->
+        <nav class="desktop-nav-links">
+            <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}" data-nav="index">仪表盘</a>
+            <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records">历史记录</a>
+            <a href="{{ url_for('split_bill_page') }}" class="{{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill">小票AA分账</a>
+            <a href="{{ url_for('auto_track_page') }}" class="{{ 'active' if request.endpoint == 'auto_track_page' }}" data-nav="auto-track">自动记账</a>
+            <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring">固定收支</a>
+            <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories">分类管理</a>
+            <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import">批量导入</a>
+        </nav>
+        <!-- 移动端顶部状态指示 -->
+        <div class="mobile-header-right">
+            <span class="sync-badge"><span class="online-dot"></span> 云端在线</span>
+        </div>
     </div>
+</header>
+
+<!-- 手机端底部 App 导航栏 (原生移动应用体验) -->
+<nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <a href="{{ url_for('index') }}" class="bnav-item {{ 'active' if request.endpoint == 'index' }}" data-nav="index">
+        <span class="bnav-icon">📊</span>
+        <span class="bnav-label">概览</span>
+    </a>
+    <a href="{{ url_for('records') }}" class="bnav-item {{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records">
+        <span class="bnav-icon">📑</span>
+        <span class="bnav-label">明细</span>
+    </a>
+    <a href="{{ url_for('split_bill_page') }}" class="bnav-item bnav-highlight {{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill">
+        <div class="bnav-icon-highlight">🧾</div>
+        <span class="bnav-label">AA分账</span>
+    </a>
+    <a href="{{ url_for('auto_track_page') }}" class="bnav-item {{ 'active' if request.endpoint == 'auto_track_page' }}" data-nav="auto-track">
+        <span class="bnav-icon">⚡</span>
+        <span class="bnav-label">自动记账</span>
+    </a>
+    <button type="button" class="bnav-item" id="btnMoreSheet" onclick="toggleMoreSheet()">
+        <span class="bnav-icon">⚙️</span>
+        <span class="bnav-label">更多</span>
+    </button>
 </nav>
-<main class="container">
+
+<!-- 手机端“更多”功能底部弹层 (Bottom Sheet) -->
+<div class="mobile-sheet-backdrop" id="sheetBackdrop" onclick="toggleMoreSheet(false)"></div>
+<div class="mobile-bottom-sheet" id="moreSheet">
+    <div class="sheet-drag-handle" onclick="toggleMoreSheet(false)"></div>
+    <div class="sheet-header">
+        <span>更多管理功能</span>
+        <button type="button" class="sheet-close-btn" onclick="toggleMoreSheet(false)">✕</button>
+    </div>
+    <div class="sheet-grid">
+        <a href="{{ url_for('recurring_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring">
+            <span class="sheet-icon">🔄</span>
+            <span class="sheet-title">固定收支</span>
+            <span class="sheet-desc">房租工资每月自动</span>
+        </a>
+        <a href="{{ url_for('categories_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories">
+            <span class="sheet-icon">🏷️</span>
+            <span class="sheet-title">分类管理</span>
+            <span class="sheet-desc">自定义收支类别</span>
+        </a>
+        <a href="{{ url_for('import_page') }}" class="sheet-tile {{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import">
+            <span class="sheet-icon">📤</span>
+            <span class="sheet-title">批量导入</span>
+            <span class="sheet-desc">Excel/CSV 账单</span>
+        </a>
+    </div>
+</div>
+
+<main class="container" id="mainContainer">
     {% set other_msgs = [] %}
     {% set success_msgs = [] %}
     {% set error_msgs = [] %}

@@ -45,18 +45,91 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ---------- 导航栏 ---------- */
+/* ---------- 极速即时换页进度条与转场动效 ---------- */
 
-.nav {
+.app-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 0%;
+  background: linear-gradient(90deg, var(--gold), #e5a93b, #22c55e);
+  z-index: 99999;
+  transition: width 0.22s ease, opacity 0.28s ease;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 0 10px rgba(182, 144, 47, 0.7);
+}
+.app-progress-bar.loading {
+  opacity: 1;
+}
+
+.page-fade-out {
+  opacity: 0 !important;
+  transform: translateY(4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.page-fade-in {
+  animation: pageEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- 现代 App 导航栏系统 ---------- */
+
+.app-header {
   background: linear-gradient(135deg, var(--navy), var(--navy-2));
-  padding: 16px 28px;
+  box-shadow: 0 4px 18px rgba(16, 33, 59, 0.25);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 13px 22px;
   display: flex;
   align-items: center;
-  gap: 28px;
-  flex-wrap: wrap;
-  box-shadow: 0 4px 18px rgba(16, 33, 59, 0.25);
+  justify-content: space-between;
 }
-.nav .brand {
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-link {
+  text-decoration: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+}
+
+.app-avatar-badge {
+  font-size: 20px;
+  background: rgba(255, 255, 255, 0.12);
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.app-header .brand {
   font-family: var(--font-serif);
   font-size: 19px;
   letter-spacing: 0.03em;
@@ -64,27 +137,278 @@ body {
   font-weight: 600;
   white-space: nowrap;
 }
-.nav-links {
+
+.desktop-nav-links {
   display: flex;
   gap: 4px;
-  flex-wrap: wrap;
+  align-items: center;
 }
-.nav-links a {
+
+.desktop-nav-links a {
   color: rgba(255, 255, 255, 0.72);
   text-decoration: none;
-  font-size: 14px;
-  padding: 7px 14px;
+  font-size: 13.5px;
+  padding: 7px 13px;
   border-radius: 999px;
-  transition: background-color 0.18s ease, color 0.18s ease;
+  transition: all 0.18s ease;
 }
-.nav-links a:hover {
+
+.desktop-nav-links a:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.08);
 }
-.nav-links a.active {
+
+.desktop-nav-links a.active {
   color: var(--navy);
   background: var(--gold);
   font-weight: 600;
+}
+
+.mobile-header-right {
+  display: none;
+  align-items: center;
+}
+
+.sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.12);
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.online-dot {
+  width: 7px;
+  height: 7px;
+  background: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.35);
+  display: inline-block;
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: 0.65; }
+}
+
+/* ---------- 手机端专属底部 App 导航栏 (原生交互体验) ---------- */
+
+.mobile-bottom-nav {
+  display: none; /* 桌面端默认隐藏 */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 62px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-top: 1px solid rgba(16, 33, 59, 0.08);
+  box-shadow: 0 -4px 22px rgba(16, 33, 59, 0.08);
+  z-index: 1000;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0 6px;
+  padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+}
+
+.bnav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  color: #718096;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 6px 10px;
+  border-radius: 12px;
+  transition: transform 0.15s ease, color 0.15s ease;
+  flex: 1;
+  max-width: 74px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.bnav-item:active {
+  transform: scale(0.92);
+}
+
+.bnav-item .bnav-icon {
+  font-size: 20px;
+  margin-bottom: 2px;
+  transition: transform 0.18s ease;
+  display: block;
+  line-height: 1;
+}
+
+.bnav-item.active {
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.bnav-item.active .bnav-icon {
+  transform: scale(1.15);
+}
+
+/* 突出高亮的 AA 分账中间按钮 (App 核心操作) */
+.bnav-highlight .bnav-icon-highlight {
+  font-size: 20px;
+  background: linear-gradient(135deg, var(--gold), #d4af37);
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-top: -16px;
+  box-shadow: 0 4px 14px rgba(182, 144, 47, 0.45);
+  border: 2.5px solid #fff;
+  transition: transform 0.18s ease;
+}
+
+.bnav-highlight:active .bnav-icon-highlight {
+  transform: scale(0.92);
+}
+
+.bnav-highlight.active .bnav-icon-highlight {
+  transform: scale(1.08);
+  box-shadow: 0 6px 18px rgba(182, 144, 47, 0.6);
+}
+
+.bnav-highlight.active .bnav-label {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+/* ---------- 手机端“更多”功能底部抽屉 (Bottom Sheet) ---------- */
+
+.mobile-sheet-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 33, 59, 0.48);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1001;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.mobile-sheet-backdrop.show {
+  display: block;
+  opacity: 1;
+}
+
+.mobile-bottom-sheet {
+  position: fixed;
+  bottom: -360px;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -10px 40px rgba(16, 33, 59, 0.25);
+  z-index: 1002;
+  padding: 14px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  transition: bottom 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mobile-bottom-sheet.show {
+  bottom: 0;
+}
+
+.sheet-drag-handle {
+  width: 44px;
+  height: 5px;
+  background: rgba(27, 27, 31, 0.2);
+  border-radius: 999px;
+  margin: 0 auto 12px;
+  cursor: pointer;
+}
+
+.sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  color: var(--navy);
+  font-weight: 600;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.sheet-close-btn {
+  border: none;
+  background: rgba(27, 27, 31, 0.06);
+  color: var(--muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.sheet-tile {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  text-decoration: none;
+  color: var(--ink);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+  touch-action: manipulation;
+}
+
+.sheet-tile:active {
+  transform: scale(0.95);
+  background: var(--navy-soft);
+}
+
+.sheet-tile.active {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+}
+
+.sheet-icon {
+  font-size: 26px;
+  margin-bottom: 6px;
+}
+
+.sheet-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 2px;
+}
+
+.sheet-desc {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.25;
 }
 
 .container {
@@ -515,22 +839,110 @@ canvas {
   color: var(--ink) !important;
 }
 
-/* ---------- 响应式 ---------- */
+/* ---------- 响应式与手机 App 模式适配 ---------- */
 
-@media (max-width: 680px) {
-  .nav { padding: 14px 18px; gap: 12px; }
-  .container { margin: 20px auto 48px; padding: 0 14px; }
+@media (max-width: 768px) {
+  /* 隐藏桌面导航栏链接，展示移动端顶部简要标题和底部导航栏 */
+  .desktop-nav-links { display: none !important; }
+  .mobile-header-right { display: flex !important; }
+  .mobile-bottom-nav { display: flex !important; }
 
-  .cards, .panels { flex-direction: column; }
-  .card, .panel { min-width: 0; }
+  /* 留出底部导航栏的安全距离 */
+  body {
+    padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+    -webkit-tap-highlight-color: transparent;
+  }
 
-  .month-nav { gap: 12px; }
+  .container {
+    margin: 12px auto 28px;
+    padding: 0 14px;
+  }
 
-  .filters { flex-direction: column; align-items: stretch; }
-  .filters > button, .filters > a { align-self: flex-start; }
+  .cards, .panels {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .card, .panel {
+    min-width: 0;
+    padding: 16px 18px;
+    border-radius: 16px;
+  }
 
-  .row { gap: 10px; }
-  .row label { flex: 1 1 140px; }
+  .month-nav {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .month-nav-arrow {
+    padding: 8px 16px;
+    font-size: 13.5px;
+    border-radius: 999px;
+  }
+
+  .month-nav-current {
+    font-size: 17px;
+  }
+
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 14px 16px;
+    border-radius: 16px;
+  }
+  .filters > button, .filters > a {
+    width: 100%;
+    text-align: center;
+    padding: 12px;
+    font-size: 14px;
+    border-radius: 12px;
+  }
+
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .row label {
+    width: 100%;
+    flex: none;
+    font-size: 13px;
+  }
+
+  /* 输入框与选择框适配手机大触控面积，字号 15px 防止 iOS 自动缩放 */
+  input[type=text], input[type=date], input[type=number], input[type=file], select {
+    font-size: 15px;
+    padding: 11px 13px;
+    border-radius: 10px;
+  }
+
+  /* 快速录入与常用大按钮，适合手机单手点按 */
+  .btn-primary, .btn-secondary, .btn-ghost, .btn-danger-solid {
+    padding: 12px 20px;
+    font-size: 15px;
+    border-radius: 12px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .chip-btn {
+    padding: 8px 14px;
+    font-size: 13px;
+    border-radius: 999px;
+  }
+
+  /* 表格在移动端支持平滑横向滚动与紧凑排版 */
+  .table-wrap {
+    margin-bottom: 16px;
+    border-radius: 14px;
+    -webkit-overflow-scrolling: touch;
+  }
+  th, td {
+    padding: 10px 12px;
+    font-size: 12.5px;
+  }
 
   canvas { max-width: 100%; }
 }

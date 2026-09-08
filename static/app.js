@@ -18,6 +18,15 @@ function onTypeChange() {
   syncSegStyles();
 }
 
+function toggleMoreSheet(force) {
+  const sheet = document.getElementById('moreSheet');
+  const backdrop = document.getElementById('sheetBackdrop');
+  if (!sheet || !backdrop) return;
+  const isShow = typeof force === 'boolean' ? force : !sheet.classList.contains('show');
+  sheet.classList.toggle('show', isShow);
+  backdrop.classList.toggle('show', isShow);
+}
+
 function quickFillForm(amount, category, note) {
   const typeRadio = document.querySelector('input[name="type"][value="expense"]');
   if (typeRadio) {
@@ -1173,7 +1182,22 @@ window.addEventListener('resize', function () {
   }
 });
 
-document.addEventListener('DOMContentLoaded', function () {
+// 兼容 SPA 动态注入时 DOMContentLoaded 已过时的场景
+const _origDocAddEventListener = Document.prototype.addEventListener;
+Document.prototype.addEventListener = function (type, listener, options) {
+  if (type === 'DOMContentLoaded' && document.readyState !== 'loading') {
+    try {
+      listener.call(this, new Event('DOMContentLoaded'));
+    } catch (e) {
+      console.error(e);
+    }
+    return;
+  }
+  return _origDocAddEventListener.call(this, type, listener, options);
+};
+
+// 页面全局生命周期初始化函数
+function initPageLifecycle() {
   populateCategories();
   toggleTypeCol();
   attachDeleteConfirm();
@@ -1183,15 +1207,247 @@ document.addEventListener('DOMContentLoaded', function () {
   attachNlpForm();
   showSuccessToasts();
   showErrorAlerts();
+  syncSegStyles();
 
-  if (window.CHART_DATA) {
+  if (window.CHART_DATA && document.getElementById('incomeChart')) {
     drawMonthlyDoughnut('incomeChart', window.CHART_DATA.income.labels, window.CHART_DATA.income.values);
     drawMonthlyDoughnut('expenseChart', window.CHART_DATA.expense.labels, window.CHART_DATA.expense.values);
   }
 
+  // 历史记录表格移动端快速勾选绑定
+  const tbody = document.querySelector('table tbody');
+  if (tbody && !tbody.dataset.spaBound) {
+    tbody.dataset.spaBound = 'true';
+    tbody.addEventListener('click', function (e) {
+      if (e.target.closest('.actions') || e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.type === 'checkbox') {
+        return;
+      }
+      const row = e.target.closest('tr.record-row');
+      if (!row) return;
+      const checkbox = row.querySelector('.record-checkbox');
+      if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        if (typeof updateBatchBar === 'function') updateBatchBar();
+      }
+    });
+  }
+
   // 检查 URL 是否指定了总体视图
   if (window.location.hash === '#overview' || window.location.search.indexOf('view=overview') !== -1) {
-    switchDashboardView('overview');
+    if (typeof switchDashboardView === 'function') {
+      switchDashboardView('overview');
+    }
   }
+}
+
+// ---------- 零延迟即时换页引擎 (InstantNav SPA Engine) ----------
+
+const InstantNav = {
+  cache: new Map(),
+  isNavigating: false,
+  progressTimer: null,
+
+  init() {
+    // 1. 拦截站内内部链接点击，走局部无刷新秒开
+    document.addEventListener('click', (e) => {
+      const link = e.target.closest('a');
+      if (!link) return;
+
+      const href = link.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:') || link.target === '_blank' || link.hasAttribute('download')) {
+        return;
+      }
+
+      const url = new URL(href, window.location.origin);
+      if (url.origin !== window.location.origin) return;
+
+      e.preventDefault();
+      this.navigate(url.href, true);
+    });
+
+    // 2. 触控与鼠标悬停即时静默预加载 (Touch / Hover Preload)
+    const triggerPreload = (e) => {
+      const link = e.target.closest('a');
+      if (!link) return;
+      const href = link.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('javascript:') || link.target === '_blank' || link.hasAttribute('download')) return;
+      const url = new URL(href, window.location.origin);
+      if (url.origin === window.location.origin) {
+        this.preload(url.href);
+      }
+    };
+
+    document.addEventListener('touchstart', triggerPreload, { passive: true });
+    document.addEventListener('mouseover', triggerPreload, { passive: true });
+
+    // 表单提交后清空页面缓存以保证数据最新
+    document.addEventListener('submit', () => {
+      this.cache.clear();
+    });
+
+    // 3. 浏览器与 Android 硬件返回/前进键无缝支持
+    window.addEventListener('popstate', () => {
+      this.navigate(window.location.href, false);
+    });
+  },
+
+  async preload(url) {
+    if (this.cache.has(url)) return this.cache.get(url);
+    try {
+      const promise = fetch(url, { headers: { 'X-Requested-With': 'InstantNav' } })
+        .then(res => {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.text();
+        });
+      this.cache.set(url, promise);
+      return promise;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  showProgress() {
+    const bar = document.getElementById('appProgressBar');
+    if (!bar) return;
+    bar.classList.add('loading');
+    bar.style.width = '35%';
+    clearTimeout(this.progressTimer);
+    this.progressTimer = setTimeout(() => {
+      bar.style.width = '78%';
+    }, 120);
+  },
+
+  finishProgress() {
+    const bar = document.getElementById('appProgressBar');
+    if (!bar) return;
+    clearTimeout(this.progressTimer);
+    bar.style.width = '100%';
+    setTimeout(() => {
+      bar.classList.remove('loading');
+      bar.style.width = '0%';
+    }, 240);
+  },
+
+  updateActiveNav(urlStr) {
+    const url = new URL(urlStr, window.location.origin);
+    const path = url.pathname;
+
+    let navKey = 'index';
+    if (path === '/') navKey = 'index';
+    else if (path.startsWith('/records')) navKey = 'records';
+    else if (path.startsWith('/split-bill')) navKey = 'split-bill';
+    else if (path.startsWith('/auto-track')) navKey = 'auto-track';
+    else if (path.startsWith('/recurring')) navKey = 'recurring';
+    else if (path.startsWith('/categories')) navKey = 'categories';
+    else if (path.startsWith('/import')) navKey = 'import';
+
+    // 同步桌面端导航高亮
+    document.querySelectorAll('.desktop-nav-links a').forEach(a => {
+      a.classList.toggle('active', a.dataset.nav === navKey);
+    });
+
+    // 同步手机端底部导航高亮
+    document.querySelectorAll('.mobile-bottom-nav .bnav-item').forEach(btn => {
+      if (btn.dataset.nav) {
+        btn.classList.toggle('active', btn.dataset.nav === navKey);
+      }
+    });
+
+    // 同步手机端底部抽屉高亮
+    document.querySelectorAll('.sheet-tile').forEach(tile => {
+      tile.classList.toggle('active', tile.dataset.nav === navKey);
+    });
+  },
+
+  async navigate(url, pushState = true) {
+    if (this.isNavigating) return;
+    this.isNavigating = true;
+
+    // 0ms 瞬间反馈：立即高亮目标 Tab 并启动顶端极速进度条
+    this.updateActiveNav(url);
+    this.showProgress();
+
+    // 关闭打开的“更多”抽屉
+    if (typeof toggleMoreSheet === 'function') {
+      toggleMoreSheet(false);
+    }
+
+    try {
+      let htmlPromise = this.cache.get(url);
+      if (!htmlPromise) {
+        htmlPromise = this.preload(url);
+      }
+      const htmlText = await htmlPromise;
+      if (!htmlText) {
+        window.location.href = url;
+        return;
+      }
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, 'text/html');
+
+      if (doc.title) {
+        document.title = doc.title;
+      }
+
+      if (pushState && window.location.href !== url) {
+        window.history.pushState({ url }, '', url);
+      }
+
+      const currentContainer = document.getElementById('mainContainer');
+      const newContainer = doc.getElementById('mainContainer');
+
+      if (currentContainer && newContainer) {
+        currentContainer.classList.add('page-fade-out');
+
+        setTimeout(() => {
+          currentContainer.innerHTML = newContainer.innerHTML;
+          currentContainer.classList.remove('page-fade-out');
+          currentContainer.classList.add('page-fade-in');
+          setTimeout(() => currentContainer.classList.remove('page-fade-in'), 220);
+
+          // 提取并执行新容器内部与页面专属的 script
+          newContainer.querySelectorAll('script').forEach(s => {
+            const newScript = document.createElement('script');
+            Array.from(s.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+            newScript.textContent = s.textContent;
+            document.body.appendChild(newScript);
+            newScript.remove();
+          });
+
+          // 执行可能在 head 或 body 底部的动态数据变量
+          doc.querySelectorAll('script').forEach(s => {
+            const txt = s.textContent;
+            if (txt.includes('window.FLASH_SUCCESS') || txt.includes('window.FLASH_ERROR') || txt.includes('window.CATEGORY_DATA') || txt.includes('window.CHART_DATA')) {
+              try {
+                eval(txt);
+              } catch (e) {
+                console.error(e);
+              }
+            }
+          });
+
+          window.scrollTo({ top: 0, behavior: 'instant' });
+          initPageLifecycle();
+
+          this.finishProgress();
+          this.isNavigating = false;
+        }, 60);
+      } else {
+        window.location.href = url;
+      }
+    } catch (err) {
+      console.error('Instant navigation error:', err);
+      this.finishProgress();
+      this.isNavigating = false;
+      window.location.href = url;
+    }
+  }
+};
+
+document.addEventListener('DOMContentLoaded', function () {
+  InstantNav.init();
+  initPageLifecycle();
 });
+
 
