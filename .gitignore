@@ -3,3 +3,10 @@ server.log
 __pycache__/
 *.pyc
 .env
+.gradle/
+build/
+android-companion/.gradle/
+android-companion/build/
+android-companion/app/build/
+*.iml
+.idea/

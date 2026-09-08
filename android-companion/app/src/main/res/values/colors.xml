@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="navy_primary">#10213B</color>
+    <color name="navy_secondary">#17324F</color>
+    <color name="gold_accent">#B6902F</color>
+    <color name="background">#F2EFE8</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+</resources>

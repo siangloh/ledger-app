@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">我的账本</string>
+    <string name="service_name">账本自动记账服务</string>
+    <string name="permission_dialog_title">开启自动记账监听权限</string>
+    <string name="permission_dialog_msg">为了能够在收到 Touch \'n Go 或 Public Bank 扣款/转账通知时自动帮你入账，请在接下来的系统设置中允许「我的账本」读取通知。</string>
+    <string name="permission_dialog_ok">去开启</string>
+    <string name="permission_dialog_cancel">暂不开启</string>
+</resources>
