@@ -10,12 +10,16 @@ class NotificationService : NotificationListenerService() {
     companion object {
         private const val TAG = "LedgerNotifService"
 
-        // 目标监听 App 包名：Touch 'n Go eWallet 与 Public Bank MyPB
-        val TARGET_PACKAGES = setOf(
-            "com.tngdigital.ewallet",
-            "com.publicbank.mypb",
-            "my.com.maybank2u.m2umobile" // 可选 Maybank
-        )
+        // 宽松匹配包名包含 tng / touchngo / ewallet / publicbank / mypb
+        fun isTargetPackage(pkg: String): Boolean {
+            val lower = pkg.lowercase()
+            return lower.contains("tng") ||
+                   lower.contains("touch") ||
+                   lower.contains("ewallet") ||
+                   lower.contains("publicbank") ||
+                   lower.contains("mypb") ||
+                   lower.contains("maybank")
+        }
 
         // 扣款与转账关键字过滤，忽略营销广告
         val TRANSACTION_KEYWORDS = listOf(
@@ -36,13 +40,17 @@ class NotificationService : NotificationListenerService() {
         val pkgName = sbn.packageName ?: return
         if (!isTargetPackage(pkgName)) return
 
-        val extras = sbn.notification?.extras ?: return
+        val notif = sbn.notification ?: return
+        val extras = notif.extras ?: return
+
         val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
         val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
+        val subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""
+        val ticker = notif.tickerText?.toString() ?: ""
 
         // 合并所有有效文本内容
-        val fullContent = listOf(title, text, bigText)
+        val fullContent = listOf(title, text, bigText, subText, ticker)
             .filter { it.isNotBlank() }
             .distinct()
             .joinToString(" ")
@@ -50,31 +58,27 @@ class NotificationService : NotificationListenerService() {
 
         if (fullContent.isBlank()) return
 
-        Log.d(TAG, "Captured notification from $pkgName: $fullContent")
+        Log.i(TAG, "Captured notification from [$pkgName]: $fullContent")
 
-        // 检查是否包含交易关键字且包含金额特征
+        // 只要包含 RM 或 交易关键词，全部发送给后端解析
         if (isTransactionNotification(fullContent)) {
-            Log.i(TAG, "Valid transaction notification detected! Uploading to server...")
+            Log.i(TAG, "Posting transaction notification to server...")
             NetworkHelper.postNotificationAsync(fullContent) { success, msg ->
                 if (success) {
-                    Log.i(TAG, "Successfully auto-tracked transaction: $msg")
+                    Log.i(TAG, "Auto-track successful: $msg")
                 } else {
                     Log.e(TAG, "Auto-track upload failed: $msg")
                 }
             }
         } else {
-            Log.d(TAG, "Ignored non-transaction notification (likely marketing/ad).")
+            Log.d(TAG, "Ignored notification without RM or transaction keywords.")
         }
-    }
-
-    private fun isTargetPackage(pkg: String): Boolean {
-        return TARGET_PACKAGES.any { pkg.equals(it, ignoreCase = true) }
     }
 
     private fun isTransactionNotification(content: String): Boolean {
         val lower = content.lowercase()
+        val hasRm = lower.contains("rm") || lower.contains("myr")
         val hasKeyword = TRANSACTION_KEYWORDS.any { lower.contains(it) }
-        val hasAmount = Regex("""(?:rm|myr)?\s*\d+(?:\.\d{1,2})?""", RegexOption.IGNORE_CASE).containsMatchIn(content)
-        return hasKeyword && hasAmount
+        return hasRm || hasKeyword
     }
 }
