@@ -30,6 +30,7 @@
             <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring">固定收支</a>
             <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories">分类管理</a>
             <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import">批量导入</a>
+            <a href="{{ url_for('logout') }}" style="color: rgba(255, 255, 255, 0.6); margin-left: 6px; font-size: 12.5px;" title="退出登录">登出</a>
         </nav>
         <!-- 移动端顶部状态指示 -->
         <div class="mobile-header-right">
@@ -85,6 +86,11 @@
             <span class="sheet-icon">📤</span>
             <span class="sheet-title">批量导入</span>
             <span class="sheet-desc">Excel/CSV 账单</span>
+        </a>
+        <a href="{{ url_for('logout') }}" class="sheet-tile">
+            <span class="sheet-icon">🚪</span>
+            <span class="sheet-title">退出登录</span>
+            <span class="sheet-desc">锁定当前账本</span>
         </a>
     </div>
 </div>

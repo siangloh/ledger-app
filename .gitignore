@@ -10,3 +10,5 @@ android-companion/build/
 android-companion/app/build/
 *.iml
 .idea/
+local.properties
+android-companion/local.properties

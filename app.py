@@ -6,7 +6,7 @@ from calendar import monthrange
 from datetime import datetime, date
 
 import pandas as pd
-from flask import Flask, g, request, redirect, url_for, render_template, flash, jsonify
+from flask import Flask, g, request, redirect, url_for, render_template, flash, jsonify, session
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 数据存储目录
@@ -16,18 +16,72 @@ DB_PATH = os.path.join(DATA_DIR, 'ledger.db')
 UPLOAD_DIR = os.path.join(DATA_DIR, 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Turso 云数据库凭证
-TURSO_URL = os.environ.get('TURSO_URL', 'libsql://ledger-app-siangloh.aws-ap-northeast-1.turso.io')
-TURSO_AUTH_TOKEN = os.environ.get('TURSO_AUTH_TOKEN', 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJleHAiOjE4MjAyNzczMzIsImlhdCI6MTc4ODc0MTMzMiwiaWQiOiIwMWEwNzk0Ny1kMDAxLTcyNmQtYTQ3NC02YzUyZjM4MzlkNWEiLCJraWQiOiJQWm96VlhvclNmRWVJYWY1LVl0ZDI0QUYwbnFtMnhSTEdnUzIzdzFlNWxvIiwicmlkIjoiNDE3ZjA1NWQtZmYxZC00OGVkLThiYWMtNWFkMTE0ZjcwZTE0In0.szBZZ_JHYw84PwhRXYBsv1_DpCWcN_GheCJzmQiupHX-tUJs2CE6pfbprubnzy9nZBE9IIe2gzBfZk1LP7qeBA')
-
 import turso_db
 
+# Turso 云数据库凭证 (从环境变量读取，fail-fast)
+TURSO_URL = turso_db.TURSO_URL
+TURSO_AUTH_TOKEN = turso_db.TURSO_AUTH_TOKEN
+
 app = Flask(__name__)
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'local-ledger-secret')
-# 自动记账 API 鉴权密钥，默认 'my-secret-ledger-key'
-AUTO_TRACK_KEY = os.environ.get('AUTO_TRACK_KEY', 'my-secret-ledger-key')
+app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(24).hex()
+
+# 自动记账 API 鉴权密钥 (无硬编码默认值)
+AUTO_TRACK_KEY = os.environ.get('AUTO_TRACK_KEY')
+
+# 单用户访问密码 (无硬编码默认值)
+APP_PASSWORD = os.environ.get('APP_PASSWORD')
+
 # 本地单人使用的开发服务器：关闭静态文件缓存，避免浏览器缓存旧的 CSS/JS 导致改动看不到
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+
+@app.before_request
+def require_login():
+    # 允许静态资源、登录/登出路由以及外部自动记账 Webhook 豁免 Session 检查
+    if request.endpoint in ('login', 'logout', 'static') or (request.path and request.path.startswith('/static/')):
+        return
+    if request.path.startswith('/api/auto-track'):
+        return
+
+    if not session.get('logged_in'):
+        if request.headers.get('X-Requested-With') == 'InstantNav':
+            return jsonify({'error': 'unauthorized', 'redirect': url_for('login')}), 401
+        target_next = request.full_path if request.full_path and request.full_path != '/?' else '/'
+        return redirect(url_for('login', next=target_next))
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if session.get('logged_in'):
+        return redirect(url_for('index'))
+
+    next_url = request.args.get('next') or request.form.get('next') or url_for('index')
+    if not next_url.startswith('/') or next_url.startswith('//'):
+        next_url = url_for('index')
+
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        if not APP_PASSWORD:
+            flash('系统未配置 APP_PASSWORD 环境变量，请在环境或控制台配置。', 'error')
+            return render_template('login.html', next=next_url), 500
+
+        if password == APP_PASSWORD:
+            session['logged_in'] = True
+            flash('登录成功！', 'success')
+            return redirect(next_url)
+        else:
+            flash('访问密码错误，请重试。', 'error')
+            return render_template('login.html', next=next_url), 401
+
+    return render_template('login.html', next=next_url)
+
+
+@app.route('/logout', methods=['GET', 'POST'])
+def logout():
+    session.clear()
+    flash('您已成功退出登录。', 'success')
+    return redirect(url_for('login'))
+
 
 
 @app.template_filter('money')
@@ -762,8 +816,8 @@ def api_auto_track():
     else:
         req_key = req_key or request.form.get('key')
 
-    if AUTO_TRACK_KEY and req_key != AUTO_TRACK_KEY:
-        return jsonify({'ok': False, 'message': 'API Key 无效或缺失，拒绝访问'}), 401
+    if not AUTO_TRACK_KEY or req_key != AUTO_TRACK_KEY:
+        return jsonify({'ok': False, 'message': 'API Key 无效或未在服务器配置，拒绝访问'}), 401
 
     # 获取通知文本：优先从 Query 参数获取，再从 JSON / 表单 / Raw Payload 获取
     raw_payload = request.get_data(as_text=True)

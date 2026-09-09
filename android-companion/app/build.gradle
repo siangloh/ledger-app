@@ -3,9 +3,20 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+def autoTrackApiKey = localProperties.getProperty('AUTO_TRACK_KEY') ?: project.findProperty('AUTO_TRACK_KEY') ?: System.getenv('AUTO_TRACK_KEY') ?: ""
+
 android {
     namespace 'com.siangloh.ledger'
     compileSdk 34
+
+    buildFeatures {
+        buildConfig true
+    }
 
     defaultConfig {
         applicationId "com.siangloh.ledger"
@@ -13,6 +24,8 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0.0"
+
+        buildConfigField "String", "API_KEY", "\"${autoTrackApiKey}\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -9,7 +9,7 @@ import java.net.URLEncoder
 object NetworkHelper {
     private const val TAG = "LedgerNetwork"
     private const val BASE_WEBHOOK_URL = "https://ledger-app-l3hc.onrender.com/api/auto-track"
-    private const val API_KEY = "my-secret-ledger-key"
+    private val API_KEY = BuildConfig.API_KEY
 
     fun postNotificationAsync(text: String, callback: ((Boolean, String) -> Unit)? = null) {
         Thread {

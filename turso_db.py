@@ -2,7 +2,15 @@
 Turso HTTP Client wrapper that conforms to sqlite3 connection and cursor interface
 so Flask/app.py can transparently use Turso Cloud SQLite without changing business logic.
 """
+import os
 import requests
+
+TURSO_URL = os.environ.get('TURSO_URL')
+TURSO_AUTH_TOKEN = os.environ.get('TURSO_AUTH_TOKEN')
+
+if not TURSO_URL or not TURSO_AUTH_TOKEN:
+    raise RuntimeError("Missing required environment variables: TURSO_URL and TURSO_AUTH_TOKEN must be set.")
+
 
 class TursoRow(dict):
     """Row that supports both dict indexing r['name'] and integer indexing r[0]"""

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#10213b">
+<title>登录 - 我的记账本</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<style>
+  .login-page-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card-hover);
+    border-radius: 20px;
+    padding: 36px 32px;
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+  }
+  .login-logo {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, var(--navy), var(--navy-2));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    margin: 0 auto 16px;
+    box-shadow: 0 6px 18px rgba(16, 33, 59, 0.2);
+    border: 2px solid rgba(182, 144, 47, 0.4);
+  }
+  .login-title {
+    font-family: var(--font-serif);
+    font-size: 22px;
+    color: var(--navy);
+    margin: 0 0 6px;
+    font-weight: 600;
+  }
+  .login-subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 26px;
+  }
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    text-align: left;
+  }
+  .login-form label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .login-form input[type="password"] {
+    font-size: 15px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-soft);
+    width: 100%;
+  }
+  .login-form input[type="password"]:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px var(--gold-soft);
+  }
+  .btn-login {
+    background: linear-gradient(135deg, var(--navy), var(--navy-2));
+    color: #f4ead0;
+    border: none;
+    padding: 13px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s ease, filter 0.15s ease;
+    margin-top: 6px;
+  }
+  .btn-login:active {
+    transform: scale(0.98);
+  }
+  .login-hint {
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 20px;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="login-page-wrapper">
+  <div class="login-card">
+    <div class="login-logo">💰</div>
+    <h1 class="login-title">我的记账本</h1>
+    <p class="login-subtitle">私密个人财务管理系统</p>
+
+    {% set other_msgs = [] %}
+    {% set success_msgs = [] %}
+    {% set error_msgs = [] %}
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+        {% if category == 'success' %}
+            {% set _ = success_msgs.append(message) %}
+        {% elif category == 'error' %}
+            {% set _ = error_msgs.append(message) %}
+        {% else %}
+            {% set _ = other_msgs.append(message) %}
+        {% endif %}
+    {% endfor %}
+    {% if error_msgs %}
+    <div class="warning-box" style="margin-bottom: 16px;">
+        {% for m in error_msgs %}<div>{{ m }}</div>{% endfor %}
+    </div>
+    {% endif %}
+    {% if success_msgs %}
+    <div style="background: var(--green-soft); color: var(--green); padding: 10px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;">
+        {% for m in success_msgs %}<div>{{ m }}</div>{% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('login', next=next) }}" class="login-form">
+      <label>
+        访问密码
+        <input type="password" name="password" placeholder="请输入 APP_PASSWORD" required autofocus autocomplete="current-password">
+      </label>
+      {% if next %}
+      <input type="hidden" name="next" value="{{ next }}">
+      {% endif %}
+      <button type="submit" class="btn-login">安全登录</button>
+    </form>
+
+    <p class="login-hint">🔒 受个人访问密码保护，数据实时同步至安全云端数据库。</p>
+  </div>
+</div>
+</body>
+</html>

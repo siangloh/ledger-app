@@ -1,0 +1,6 @@
+# Android Companion App - Local Configuration Example
+# Copy this file to local.properties and configure your credentials.
+# Do NOT commit local.properties to git!
+
+# Your Render/Backend Auto-Track Webhook API Key
+AUTO_TRACK_KEY=your_secret_api_key_here
