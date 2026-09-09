@@ -11,6 +11,7 @@
       <option value="">全部</option>
       <option value="income" {{ 'selected' if type=='income' }}>收入</option>
       <option value="expense" {{ 'selected' if type=='expense' }}>支出</option>
+      <option value="savings" {{ 'selected' if type=='savings' }}>储蓄</option>
     </select>
   </label>
   <label>分类
@@ -25,17 +26,18 @@
   <a href="{{ url_for('records') }}" class="btn-ghost">重置</a>
 </form>
 
-<p class="hint">筛选结果合计 — 收入 {{ total_income|money }}，支出 {{ total_expense|money }}，共 {{ rows|length }} 条</p>
+<p class="hint">筛选结果合计 — 收入 {{ total_income|money }}，支出 {{ total_expense|money }}，储蓄 {{ total_savings|money }}，共 {{ rows|length }} 条</p>
 
 <form method="post" action="{{ url_for('batch_delete_records') }}" id="batchForm">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <!-- 批量操作控制栏 -->
-  <div class="batch-bar" id="batchBar" style="display: none; align-items: center; justify-content: space-between; background: var(--surface-soft); padding: 10px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 14px;">
+  <div class="batch-bar" id="batchBar" style="display: none; align-items: center; justify-content: space-between; background: var(--surface-soft); padding: 10px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
     <div style="font-size: 14px; color: var(--ink-soft);">
       已选中 <strong id="selectedCount" style="color: var(--navy);">0</strong> 项记录
     </div>
-    <div style="display: flex; gap: 10px;">
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
       <button type="button" class="btn-ghost" onclick="clearAllSelections()" style="padding: 5px 12px; font-size: 13px;">取消选择</button>
+      <button type="button" class="btn-secondary" id="batchEditBtn" onclick="openBatchEditDialog()" style="padding: 5px 14px; font-size: 13px;">批量修改分类/类型</button>
       <button type="button" class="btn-danger-solid" id="batchDeleteBtn" onclick="confirmBatchDelete()" style="padding: 5px 14px; font-size: 13px;">批量删除</button>
     </div>
   </div>
@@ -57,15 +59,15 @@
           <input type="checkbox" name="ids" value="{{ r.id }}" class="record-checkbox" onchange="updateBatchBar()">
         </td>
         <td data-col="date">{{ r.date }}</td>
-        <td data-col="type"><span class="tag {{ 'tag-income' if r.type=='income' else 'tag-expense' }}">{{ '收入' if r.type=='income' else '支出' }}</span></td>
+        <td data-col="type"><span class="tag {{ 'tag-income' if r.type=='income' else ('tag-savings' if r.type=='savings' else 'tag-expense') }}">{{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }}</span></td>
         <td data-col="group">{{ {'main':'主业','side':'副业'}.get(r.group_name, '') }}</td>
         <td data-col="category"><strong>{{ r.category }}</strong></td>
-        <td data-col="amount" class="amount-cell {{ 'income' if r.type=='income' else 'expense' }}">{{ r.amount|money }}</td>
+        <td data-col="amount" class="amount-cell {{ 'income' if r.type=='income' else ('savings' if r.type=='savings' else 'expense') }}">{{ r.amount|money }}</td>
         <td data-col="note">{{ r.note }}</td>
         <td data-col="source"><span class="tag">{{ {'manual':'手动','nlp':'智能记账','import':'导入','recurring':'固定收支','auto_track':'自动记账','split_bill':'AA分账'}.get(r.source, r.source) }}</span></td>
         <td data-col="actions" class="actions">
           <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link">编辑</a>
-          <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ '收入' if r.type=='income' else '支出' }} · {{ r.category }} · {{ r.amount|money }}', this)">删除</button>
+          <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }} · {{ r.category }} · {{ r.amount|money }}', this)">删除</button>
         </td>
       </tr>
       {% else %}
@@ -77,6 +79,136 @@
 </form>
 
 <script>
+window.ALL_CATEGORIES = {{ categories | tojson }};
+
+function openBatchEditDialog() {
+  const selected = document.querySelectorAll('.record-checkbox:checked');
+  if (selected.length === 0) {
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({ icon: 'info', title: '请先勾选需要批量修改的记录', timer: 1500, showConfirmButton: false });
+    } else {
+      alert('请先勾选需要批量修改的记录');
+    }
+    return;
+  }
+
+  const categories = window.ALL_CATEGORIES || [];
+  let catOptions = '<option value="">保持原分类不变</option>';
+  categories.forEach(c => {
+    catOptions += '<option value="' + c + '">' + c + '</option>';
+  });
+
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: '批量修改选中的 ' + selected.length + ' 项记录',
+      html: `
+        <div style="text-align: left; display:flex; flex-direction:column; gap:12px; margin-top:8px;">
+          <label style="font-size:13px; color:var(--ink); font-weight:600;">
+            修改交易类型 (Type)：
+            <select id="swalBatchType" class="swal2-input" style="margin:4px 0 0 0; width:100%; height:38px; font-size:13.5px; box-sizing:border-box;">
+              <option value="">保持原类型不变</option>
+              <option value="expense">支出 (Expense)</option>
+              <option value="income">收入 (Income)</option>
+              <option value="savings">结余储蓄 (Savings)</option>
+            </select>
+          </label>
+          <div id="swalBatchGroupWrap" style="display:none;">
+            <label style="font-size:13px; color:var(--ink); font-weight:600;">
+              收入分组 (Group)：
+              <select id="swalBatchGroup" class="swal2-input" style="margin:4px 0 0 0; width:100%; height:38px; font-size:13.5px; box-sizing:border-box;">
+                <option value="main">主业收入</option>
+                <option value="side">副业收入</option>
+              </select>
+            </label>
+          </div>
+          <label style="font-size:13px; color:var(--ink); font-weight:600;">
+            修改分类 (Category)：
+            <select id="swalBatchCategory" class="swal2-input" style="margin:4px 0 0 0; width:100%; height:38px; font-size:13.5px; box-sizing:border-box;">
+              ${catOptions}
+            </select>
+          </label>
+        </div>
+      `,
+      didOpen: () => {
+        const typeSelect = document.getElementById('swalBatchType');
+        const groupWrap = document.getElementById('swalBatchGroupWrap');
+        if (typeSelect && groupWrap) {
+          typeSelect.addEventListener('change', () => {
+            groupWrap.style.display = (typeSelect.value === 'income') ? 'block' : 'none';
+          });
+        }
+      },
+      showCancelButton: true,
+      confirmButtonText: '确认批量修改',
+      cancelButtonText: '取消',
+      buttonsStyling: false,
+      customClass: {
+        popup: 'app-swal-popup',
+        title: 'app-swal-title',
+        confirmButton: 'btn-primary',
+        cancelButton: 'btn-ghost',
+        actions: 'app-swal-actions'
+      },
+      preConfirm: () => {
+        const newType = document.getElementById('swalBatchType').value;
+        const groupName = document.getElementById('swalBatchGroup') ? document.getElementById('swalBatchGroup').value : '';
+        const newCategory = document.getElementById('swalBatchCategory').value;
+        if (!newType && !newCategory) {
+          Swal.showValidationMessage('请至少选择一项要修改的类型或分类');
+          return false;
+        }
+        return { type: newType, group_name: groupName, category: newCategory };
+      }
+    }).then(result => {
+      if (result.isConfirmed && result.value) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("batch_edit_records") }}';
+
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrf_token';
+        csrfInput.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+        form.appendChild(csrfInput);
+
+        selected.forEach(cb => {
+          const idInput = document.createElement('input');
+          idInput.type = 'hidden';
+          idInput.name = 'ids';
+          idInput.value = cb.value;
+          form.appendChild(idInput);
+        });
+
+        if (result.value.type) {
+          const typeInput = document.createElement('input');
+          typeInput.type = 'hidden';
+          typeInput.name = 'type';
+          typeInput.value = result.value.type;
+          form.appendChild(typeInput);
+
+          if (result.value.type === 'income' && result.value.group_name) {
+            const groupInput = document.createElement('input');
+            groupInput.type = 'hidden';
+            groupInput.name = 'group_name';
+            groupInput.value = result.value.group_name;
+            form.appendChild(groupInput);
+          }
+        }
+
+        if (result.value.category) {
+          const catInput = document.createElement('input');
+          catInput.type = 'hidden';
+          catInput.name = 'category';
+          catInput.value = result.value.category;
+          form.appendChild(catInput);
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+      }
+    });
+  }
+}
 function toggleSelectAll(master) {
   const checkboxes = document.querySelectorAll('.record-checkbox');
   checkboxes.forEach(cb => {

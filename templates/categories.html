@@ -1,7 +1,10 @@
 {% extends 'base.html' %}
 {% block title %}分类管理 - 我的记账本{% endblock %}
 {% block content %}
-<h2>分类管理</h2>
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+  <h2 style="margin:0;">分类管理</h2>
+  <a href="{{ url_for('category_insights_page') }}" class="btn-primary btn-sm">📊 支出分类深度洞察报告</a>
+</div>
 
 <div class="panels">
   <section class="panel">
@@ -68,6 +71,28 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="expense">
       <input type="text" name="name" placeholder="新增分类名称" required>
+      <button type="submit" class="btn-primary btn-sm">添加</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h3>结余储蓄分类</h3>
+    <ul class="cat-list">
+      {% for c in savings %}
+      <li>{{ c.name }}
+        <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
+              data-confirm-title="删除储蓄分类「{{ c.name }}」？"
+              data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
+        </form>
+      </li>
+      {% else %}<li class="hint">暂无</li>{% endfor %}
+    </ul>
+    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="type" value="savings">
+      <input type="text" name="name" placeholder="新增储蓄分类名称" required>
       <button type="submit" class="btn-primary btn-sm">添加</button>
     </form>
   </section>

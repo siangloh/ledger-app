@@ -59,6 +59,8 @@ function populateCategories() {
     const groupInput = document.querySelector('input[name="group_name"]:checked');
     const group = groupInput ? groupInput.value : 'main';
     options = window.CATEGORY_DATA['income_' + group] || [];
+  } else if (type === 'savings') {
+    options = window.CATEGORY_DATA.savings || ['定期存款', '应急基金', '投资理财', '心愿基金'];
   } else {
     options = window.CATEGORY_DATA.expense || [];
   }

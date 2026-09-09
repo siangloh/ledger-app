@@ -19,10 +19,10 @@
   <tbody>
     {% for r in rules %}
     <tr>
-      <td>{{ '收入' if r.type=='income' else '支出' }}</td>
+      <td>{{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }}</td>
       <td>{{ {'main':'主业','side':'副业'}.get(r.group_name, '') }}</td>
       <td>{{ r.category }}</td>
-      <td class="amount-cell {{ 'income' if r.type=='income' else 'expense' }}">{{ r.amount|money }}</td>
+      <td class="amount-cell {{ 'income' if r.type=='income' else ('savings' if r.type=='savings' else 'expense') }}">{{ r.amount|money }}</td>
       <td>{{ r.day_of_month }}</td>
       <td>{{ r.note }}</td>
       <td><span class="tag {{ 'tag-active' if r.is_active else 'tag-muted' }}">{{ '启用' if r.is_active else '已停用' }}</span></td>
@@ -34,7 +34,7 @@
         </form>
         <form method="post" action="{{ url_for('delete_recurring', rule_id=r.id) }}" class="js-delete-confirm"
               data-confirm-title="删除这条固定收支规则？"
-              data-confirm-text="{{ '收入' if r.type=='income' else '支出' }} · {{ r.category }} · {{ r.amount|money }} · 每月{{ r.day_of_month }}号<br>删除后每月将不再自动生成，此操作不可撤销。">
+              data-confirm-text="{{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }} · {{ r.category }} · {{ r.amount|money }} · 每月{{ r.day_of_month }}号<br>删除后每月将不再自动生成，此操作不可撤销。">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn-danger-ghost">删除</button>
         </form>
@@ -54,6 +54,7 @@
     <div class="row seg-row">
       <label class="seg"><input type="radio" name="type" value="expense" checked onchange="onTypeChange()"><span>支出</span></label>
       <label class="seg"><input type="radio" name="type" value="income" onchange="onTypeChange()"><span>收入</span></label>
+      <label class="seg"><input type="radio" name="type" value="savings" onchange="onTypeChange()"><span>储蓄</span></label>
     </div>
     <div class="row seg-row" id="groupRow" style="display:none;">
       <label class="seg"><input type="radio" name="group_name" value="main" checked onchange="populateCategories()"><span>主业收入</span></label>
@@ -65,7 +66,7 @@
       <label>每月几号 <input type="number" min="1" max="31" name="day_of_month" value="1" required></label>
     </div>
     <div class="row">
-      <label>备注 <input type="text" name="note" placeholder="如：工资 / 房租"></label>
+      <label>备注 <input type="text" name="note" placeholder="如：工资 / 房租 / 定投储蓄"></label>
     </div>
     <button type="submit" class="btn-primary">添加规则</button>
   </form>
@@ -75,7 +76,8 @@
 window.CATEGORY_DATA = {
   expense: {{ expense_categories | tojson }},
   income_main: {{ income_categories.main | tojson }},
-  income_side: {{ income_categories.side | tojson }}
+  income_side: {{ income_categories.side | tojson }},
+  savings: {{ savings_categories | tojson }}
 };
 </script>
 {% endblock %}

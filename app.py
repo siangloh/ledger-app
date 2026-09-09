@@ -192,6 +192,12 @@ def init_db():
         last_generated_month TEXT,
         created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS merchant_category_overrides (
+        merchant_note TEXT PRIMARY KEY,
+        category TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
     ''')
     if db.execute('SELECT COUNT(*) FROM categories').fetchone()[0] == 0:
         defaults = [
@@ -211,11 +217,21 @@ def init_db():
         ]
         db.executemany('INSERT INTO categories (type, group_name, name) VALUES (?,?,?)', defaults)
         db.commit()
+
+    if db.execute("SELECT COUNT(*) FROM categories WHERE type='savings'").fetchone()[0] == 0:
+        savings_defaults = [
+            ('savings', None, '定期存款'),
+            ('savings', None, '应急基金'),
+            ('savings', None, '投资理财'),
+            ('savings', None, '心愿基金'),
+        ]
+        db.executemany('INSERT INTO categories (type, group_name, name) VALUES (?,?,?)', savings_defaults)
+        db.commit()
     db.close()
 
 
 def get_categories(db, type_, group_name):
-    if type_ == 'expense':
+    if type_ in ('expense', 'savings'):
         rows = db.execute('SELECT name FROM categories WHERE type=? ORDER BY id', (type_,)).fetchall()
     else:
         rows = db.execute(
@@ -503,23 +519,29 @@ def index():
 
     total_income = sum(r['amount'] for r in rows if r['type'] == 'income')
     total_expense = sum(r['amount'] for r in rows if r['type'] == 'expense')
+    total_savings = sum(r['amount'] for r in rows if r['type'] == 'savings')
     balance = total_income - total_expense
 
     income_group = {'main': 0.0, 'side': 0.0}
     expense_by_category = {}
+    savings_by_category = {}
     for r in rows:
         if r['type'] == 'income':
             gname = r['group_name'] or 'main'
             income_group[gname] = income_group.get(gname, 0.0) + r['amount']
-        else:
+        elif r['type'] == 'expense':
             c = r['category'] or '其他'
             expense_by_category[c] = expense_by_category.get(c, 0.0) + r['amount']
+        elif r['type'] == 'savings':
+            c = r['category'] or '储蓄'
+            savings_by_category[c] = savings_by_category.get(c, 0.0) + r['amount']
 
     income_categories = {
         'main': get_categories(db, 'income', 'main'),
         'side': get_categories(db, 'income', 'side'),
     }
     expense_categories = get_categories(db, 'expense', None)
+    savings_categories = get_categories(db, 'savings', None)
 
     return render_template(
         'index.html',
@@ -528,11 +550,14 @@ def index():
         next_month=shift_month(month, 1),
         total_income=total_income,
         total_expense=total_expense,
+        total_savings=total_savings,
         balance=balance,
         income_group=income_group,
         expense_by_category=expense_by_category,
+        savings_by_category=savings_by_category,
         income_categories=income_categories,
         expense_categories=expense_categories,
+        savings_categories=savings_categories,
         today=date.today().isoformat(),
     )
 
@@ -603,8 +628,10 @@ def api_overview():
 
     total_income = 0.0
     total_expense = 0.0
-    monthly_stats = {m: {'income': 0.0, 'expense': 0.0} for m in month_keys}
+    total_savings = 0.0
+    monthly_stats = {m: {'income': 0.0, 'expense': 0.0, 'savings': 0.0} for m in month_keys}
     expense_cats = {}
+    savings_cats = {}
     income_group = {'main': 0.0, 'side': 0.0}
 
     for r in rows:
@@ -612,7 +639,7 @@ def api_overview():
         m = r['date'][:7]
         t = r['type']
         if m not in monthly_stats:
-            monthly_stats[m] = {'income': 0.0, 'expense': 0.0}
+            monthly_stats[m] = {'income': 0.0, 'expense': 0.0, 'savings': 0.0}
             if m not in month_keys:
                 month_keys.append(m)
 
@@ -621,21 +648,28 @@ def api_overview():
             monthly_stats[m]['income'] += amt
             gname = r['group_name'] or 'main'
             income_group[gname] = income_group.get(gname, 0.0) + amt
-        else:
+        elif t == 'expense':
             total_expense += amt
             monthly_stats[m]['expense'] += amt
             cat = r['category'] or '其他'
             expense_cats[cat] = expense_cats.get(cat, 0.0) + amt
+        elif t == 'savings':
+            total_savings += amt
+            monthly_stats[m]['savings'] = monthly_stats[m].get('savings', 0.0) + amt
+            cat = r['category'] or '储蓄'
+            savings_cats[cat] = savings_cats.get(cat, 0.0) + amt
 
     month_keys.sort()
     monthly_trend = []
     for m in month_keys:
         inc = round(monthly_stats[m]['income'], 2)
         exp = round(monthly_stats[m]['expense'], 2)
+        sav = round(monthly_stats[m].get('savings', 0.0), 2)
         monthly_trend.append({
             'month': m,
             'income': inc,
             'expense': exp,
+            'savings': sav,
             'balance': round(inc - exp, 2)
         })
 
@@ -643,6 +677,7 @@ def api_overview():
     num_months = max(len(month_keys), 1)
     avg_income = total_income / num_months
     avg_expense = total_expense / num_months
+    avg_savings = total_savings / num_months
     net_savings = total_income - total_expense
 
     # 支出分类按金额降序排序
@@ -663,14 +698,20 @@ def api_overview():
         'metrics': {
             'total_income': round(total_income, 2),
             'total_expense': round(total_expense, 2),
+            'total_savings': round(total_savings, 2),
             'net_savings': round(net_savings, 2),
             'avg_income': round(avg_income, 2),
             'avg_expense': round(avg_expense, 2),
+            'avg_savings': round(avg_savings, 2),
         },
         'trend': monthly_trend,
         'expense_categories': {
             'labels': exp_labels,
             'values': exp_values
+        },
+        'savings_categories': {
+            'labels': list(savings_cats.keys()),
+            'values': [round(v, 2) for v in savings_cats.values()]
         },
         'income_group': {
             'main': round(income_group.get('main', 0.0), 2),
@@ -678,6 +719,176 @@ def api_overview():
             'side_ratio': side_ratio
         }
     })
+
+
+# ---------------------------------------------------------------------------
+# 支出分类深度洞察报告 (Category Breakdown & Insights)
+# ---------------------------------------------------------------------------
+
+def get_category_insights_data(db, time_range='all', start_date=None, end_date=None):
+    today = date.today()
+    current_month = today.strftime('%Y-%m')
+    prev_month = shift_month(current_month, -1)
+
+    month_keys = []
+    if time_range == '12m':
+        start_month = shift_month(current_month, -11)
+        start_date = f'{start_month}-01'
+        last_day = monthrange(today.year, today.month)[1]
+        end_date = f'{current_month}-{last_day:02d}'
+        cur = start_month
+        while cur <= current_month:
+            month_keys.append(cur)
+            cur = shift_month(cur, 1)
+    elif time_range == 'ytd':
+        start_date = f'{today.year}-01-01'
+        last_day = monthrange(today.year, today.month)[1]
+        end_date = f'{current_month}-{last_day:02d}'
+        cur = f'{today.year}-01'
+        while cur <= current_month:
+            month_keys.append(cur)
+            cur = shift_month(cur, 1)
+
+    query = "SELECT date, category, amount FROM transactions WHERE type='expense'"
+    params = []
+    if start_date:
+        query += " AND date >= ?"
+        params.append(start_date)
+    if end_date:
+        query += " AND date <= ?"
+        params.append(end_date)
+    query += " ORDER BY date ASC"
+
+    rows = db.execute(query, params).fetchall()
+
+    if time_range in ('all', 'custom'):
+        if rows:
+            min_m = rows[0]['date'][:7]
+            max_m = rows[-1]['date'][:7]
+            if start_date and start_date[:7] < min_m:
+                min_m = start_date[:7]
+            if end_date and end_date[:7] > max_m:
+                max_m = end_date[:7]
+            cur = min_m
+            while cur <= max_m:
+                month_keys.append(cur)
+                cur = shift_month(cur, 1)
+        elif start_date and end_date and start_date[:7] <= end_date[:7]:
+            cur = start_date[:7]
+            while cur <= end_date[:7]:
+                month_keys.append(cur)
+                cur = shift_month(cur, 1)
+
+    month_keys.sort()
+    num_months = max(len(month_keys), 1)
+
+    # 统计当月与上月的绝对支出
+    cur_month_rows = db.execute(
+        "SELECT category, SUM(amount) as total FROM transactions WHERE type='expense' AND date LIKE ? GROUP BY category",
+        (f"{current_month}%",)
+    ).fetchall()
+    cur_month_map = {r['category'] or '其他': float(r['total'] or 0) for r in cur_month_rows}
+
+    prev_month_rows = db.execute(
+        "SELECT category, SUM(amount) as total FROM transactions WHERE type='expense' AND date LIKE ? GROUP BY category",
+        (f"{prev_month}%",)
+    ).fetchall()
+    prev_month_map = {r['category'] or '其他': float(r['total'] or 0) for r in prev_month_rows}
+
+    # 统计分类汇总及月度分布
+    cat_stats = {}
+    for r in rows:
+        cat = r['category'] or '其他'
+        amt = float(r['amount'] or 0)
+        m = r['date'][:7]
+        if cat not in cat_stats:
+            cat_stats[cat] = {'total': 0.0, 'monthly': {mk: 0.0 for mk in month_keys}}
+        cat_stats[cat]['total'] += amt
+        if m in cat_stats[cat]['monthly']:
+            cat_stats[cat]['monthly'][m] += amt
+        else:
+            cat_stats[cat]['monthly'][m] = amt
+
+    categories_list = []
+    for cat, info in cat_stats.items():
+        total_amt = round(info['total'], 2)
+        avg_monthly = round(total_amt / num_months, 2)
+        cur_amt = round(cur_month_map.get(cat, 0.0), 2)
+        prev_amt = round(prev_month_map.get(cat, 0.0), 2)
+
+        if prev_amt > 0:
+            diff = cur_amt - prev_amt
+            pct = round((diff / prev_amt) * 100, 1)
+            if pct > 0:
+                trend_dir = 'up'
+                trend_text = f"+{pct}%"
+            elif pct < 0:
+                trend_dir = 'down'
+                trend_text = f"{pct}%"
+            else:
+                trend_dir = 'flat'
+                trend_text = "持平 0%"
+        else:
+            if cur_amt > 0:
+                trend_dir = 'up'
+                trend_text = "本月新增"
+            else:
+                trend_dir = 'flat'
+                trend_text = "—"
+
+        sorted_months = sorted(info['monthly'].keys())
+        monthly_values = [round(info['monthly'][mk], 2) for mk in sorted_months]
+
+        categories_list.append({
+            'category': cat,
+            'total_amt': total_amt,
+            'this_month': cur_amt,
+            'last_month': prev_amt,
+            'avg_monthly': avg_monthly,
+            'trend_dir': trend_dir,
+            'trend_text': trend_text,
+            'months': sorted_months,
+            'monthly_values': monthly_values,
+        })
+
+    categories_list.sort(key=lambda x: (x['this_month'], x['total_amt']), reverse=True)
+
+    return {
+        'ok': True,
+        'range': time_range,
+        'start_date': start_date,
+        'end_date': end_date,
+        'current_month': current_month,
+        'prev_month': prev_month,
+        'num_months': num_months,
+        'categories': categories_list,
+        'total_categories': len(categories_list),
+        'total_expense': round(sum(c['total_amt'] for c in categories_list), 2)
+    }
+
+
+@app.route('/api/category-insights')
+def api_category_insights():
+    db = get_db()
+    time_range = request.args.get('range', 'all')
+    start_date = (request.args.get('start') or '').strip() or None
+    end_date = (request.args.get('end') or '').strip() or None
+    data = get_category_insights_data(db, time_range, start_date, end_date)
+    return jsonify(data)
+
+
+@app.route('/categories/insights')
+def category_insights_page():
+    db = get_db()
+    time_range = request.args.get('range', 'all')
+    start_date = (request.args.get('start') or '').strip() or None
+    end_date = (request.args.get('end') or '').strip() or None
+    insights_data = get_category_insights_data(db, time_range, start_date, end_date)
+    return render_template(
+        'category_insights.html',
+        insights=insights_data,
+        today=date.today().isoformat()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -744,12 +955,13 @@ def records():
 
     total_income = sum(r['amount'] for r in rows if r['type'] == 'income')
     total_expense = sum(r['amount'] for r in rows if r['type'] == 'expense')
+    total_savings = sum(r['amount'] for r in rows if r['type'] == 'savings')
 
     return render_template(
         'records.html',
         rows=rows, start=start, end=end, type=type_, category=category,
         categories=[c['category'] for c in all_categories],
-        total_income=total_income, total_expense=total_expense,
+        total_income=total_income, total_expense=total_expense, total_savings=total_savings,
     )
 
 
@@ -766,9 +978,22 @@ def edit_record(tx_id):
             amount = float(f.get('amount') or 0)
         except ValueError:
             amount = 0
+        new_category = f.get('category')
+
+        # 检查是否为 auto_track 来源且修改了分类，若是则记忆商户-分类映射覆盖
+        current_tx = db.execute('SELECT source, note, category FROM transactions WHERE id=?', (tx_id,)).fetchone()
+        if current_tx and current_tx['source'] == 'auto_track' and current_tx['note'] and new_category:
+            merchant_note = current_tx['note'].strip()
+            if merchant_note:
+                now_str = datetime.now().isoformat()
+                db.execute(
+                    'INSERT OR REPLACE INTO merchant_category_overrides (merchant_note, category, updated_at) VALUES (?, ?, ?)',
+                    (merchant_note, new_category, now_str)
+                )
+
         db.execute(
             'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=? WHERE id=?',
-            (f.get('date'), tx_type, group_name, f.get('category'), amount, f.get('note', ''), tx_id)
+            (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), tx_id)
         )
         db.commit()
         flash('记录已更新', 'success')
@@ -780,9 +1005,12 @@ def edit_record(tx_id):
         'side': get_categories(db, 'income', 'side'),
     }
     expense_categories = get_categories(db, 'expense', None)
+    savings_categories = get_categories(db, 'savings', None)
     return render_template(
         'edit_record.html', row=row,
-        income_categories=income_categories, expense_categories=expense_categories,
+        income_categories=income_categories,
+        expense_categories=expense_categories,
+        savings_categories=savings_categories,
     )
 
 
@@ -819,6 +1047,61 @@ def batch_delete_records():
     else:
         flash('未选中有效的记录', 'error')
 
+    return redirect(url_for('records'))
+
+
+@app.route('/records/batch-edit', methods=['POST'])
+def batch_edit_records():
+    """批量修改记录的分类与类型"""
+    db = get_db()
+    ids = request.form.getlist('ids')
+    new_type = request.form.get('type')
+    new_category = request.form.get('category')
+    group_name = request.form.get('group_name') or None
+    if new_type and new_type != 'income':
+        group_name = None
+
+    if not ids:
+        flash('未选中任何记录', 'error')
+        return redirect(url_for('records'))
+
+    valid_ids = []
+    for i in ids:
+        try:
+            valid_ids.append(int(i))
+        except ValueError:
+            pass
+
+    if not valid_ids:
+        flash('未选中有效的记录', 'error')
+        return redirect(url_for('records'))
+
+    if not new_type and not new_category:
+        flash('未指定需要修改的分类或类型', 'warning')
+        return redirect(url_for('records'))
+
+    updates = []
+    params = []
+    if new_type:
+        updates.append("type = ?")
+        params.append(new_type)
+        if new_type == 'income' and group_name:
+            updates.append("group_name = ?")
+            params.append(group_name)
+        elif new_type != 'income':
+            updates.append("group_name = NULL")
+
+    if new_category:
+        updates.append("category = ?")
+        params.append(new_category)
+
+    set_clause = ", ".join(updates)
+    placeholders = ','.join('?' * len(valid_ids))
+    params.extend(valid_ids)
+
+    db.execute(f"UPDATE transactions SET {set_clause} WHERE id IN ({placeholders})", params)
+    db.commit()
+    flash(f'成功批量修改 {len(valid_ids)} 条记录', 'success')
     return redirect(url_for('records'))
 
 
@@ -955,6 +1238,19 @@ def api_auto_track():
             'raw_text': text
         }), 422
 
+    # 优先检查是否存在商户历史手动纠偏记录（精确匹配提取到的商户/备注名，优先级高于默认推断与 LLM 分类）
+    merchant_note = (parsed.get('note') or '').strip()
+    if merchant_note:
+        db = get_db()
+        override = db.execute(
+            'SELECT category FROM merchant_category_overrides WHERE merchant_note = ?',
+            (merchant_note,)
+        ).fetchone()
+        if override and override['category']:
+            parsed['category'] = override['category']
+            if AUTO_TRACK_DEBUG_LOG:
+                print(f"[AUTO_TRACK DEBUG] Applied remembered merchant override: '{merchant_note}' -> '{override['category']}'")
+
     # Phase-2: 本地 LLM 营销广告二次校验（Fail-open 策略）
     is_real = classify_notification_with_llm(text)
     if not is_real:
@@ -1076,7 +1372,8 @@ def categories_page():
     income_main = db.execute("SELECT * FROM categories WHERE type='income' AND group_name='main' ORDER BY id").fetchall()
     income_side = db.execute("SELECT * FROM categories WHERE type='income' AND group_name='side' ORDER BY id").fetchall()
     expense = db.execute("SELECT * FROM categories WHERE type='expense' ORDER BY id").fetchall()
-    return render_template('categories.html', income_main=income_main, income_side=income_side, expense=expense)
+    savings = db.execute("SELECT * FROM categories WHERE type='savings' ORDER BY id").fetchall()
+    return render_template('categories.html', income_main=income_main, income_side=income_side, expense=expense, savings=savings)
 
 
 @app.route('/categories/add', methods=['POST'])
@@ -1122,9 +1419,12 @@ def recurring_page():
         'side': get_categories(db, 'income', 'side'),
     }
     expense_categories = get_categories(db, 'expense', None)
+    savings_categories = get_categories(db, 'savings', None)
     return render_template(
         'recurring.html', rules=rules,
-        income_categories=income_categories, expense_categories=expense_categories,
+        income_categories=income_categories,
+        expense_categories=expense_categories,
+        savings_categories=savings_categories,
         current_month=date.today().strftime('%Y-%m'),
     )
 

@@ -1,0 +1,230 @@
+{% extends 'base.html' %}
+{% block title %}支出分类深度洞察 - 我的记账本{% endblock %}
+{% block content %}
+<div class="insights-page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+  <div>
+    <h2>📊 支出分类深度洞察</h2>
+    <p class="hint" style="margin-top:4px;">精准对比各支出分类在当前月、上个月及历史月均的支出表现与波动趋势</p>
+  </div>
+  <div style="display:flex; gap:10px;">
+    <a href="{{ url_for('categories_page') }}" class="btn-ghost">管理分类</a>
+    <a href="{{ url_for('index') }}" class="btn-secondary">返回仪表盘</a>
+  </div>
+</div>
+
+<!-- 时间范围筛选工具栏 (与概览视图完全统一的交互体验) -->
+<div class="overview-toolbar" style="margin-bottom:20px;">
+  <div class="filter-pills" role="tablist">
+    <button type="button" class="pill-btn {{ 'active' if insights.range=='all' }}" data-range="all" onclick="selectInsightsRange('all')">全部 (All Time)</button>
+    <button type="button" class="pill-btn {{ 'active' if insights.range=='12m' }}" data-range="12m" onclick="selectInsightsRange('12m')">近 12 个月 (12M)</button>
+    <button type="button" class="pill-btn {{ 'active' if insights.range=='ytd' }}" data-range="ytd" onclick="selectInsightsRange('ytd')">本年度 (YTD)</button>
+    <button type="button" class="pill-btn {{ 'active' if insights.range=='custom' }}" data-range="custom" onclick="selectInsightsRange('custom')">自定义范围</button>
+  </div>
+  <div id="customDateBox" class="custom-date-box" style="{{ 'display:flex' if insights.range=='custom' else 'display:none' }};">
+    <input type="date" id="insightsStartDate" value="{{ insights.start_date or '' }}" aria-label="开始日期">
+    <span class="date-sep">至</span>
+    <input type="date" id="insightsEndDate" value="{{ insights.end_date or today }}" aria-label="结束日期">
+    <button type="button" class="btn-secondary btn-sm" onclick="applyCustomInsightsFilter()">应用</button>
+  </div>
+  <div class="overview-range-badge" id="insightsRangeBadge">
+    {% if insights.range == '12m' %}统计范围：近 12 个月 ({{ insights.start_date }} 至 {{ insights.end_date }})
+    {% elif insights.range == 'ytd' %}统计范围：本年度 YTD ({{ insights.start_date }} 至今)
+    {% elif insights.range == 'custom' %}统计范围：{{ insights.start_date }} 至 {{ insights.end_date }}
+    {% else %}统计范围：全部历史记录 (共计 {{ insights.num_months }} 个有效统计月)
+    {% endif %}
+  </div>
+</div>
+
+<!-- 核心汇总指标卡片 -->
+<div class="cards cards-four" style="margin-bottom:24px;">
+  <div class="card">
+    <span class="card-label">区间总支出</span>
+    <span class="amount expense" id="kpiTotalExpense">{{ insights.total_expense|money }}</span>
+  </div>
+  <div class="card">
+    <span class="card-label">本月支出 ({{ insights.current_month }})</span>
+    <span class="amount expense" id="kpiThisMonth">{{ (insights.categories|map(attribute='this_month')|sum)|money }}</span>
+  </div>
+  <div class="card">
+    <span class="card-label">上月支出 ({{ insights.prev_month }})</span>
+    <span class="amount" style="color:var(--ink-soft);" id="kpiLastMonth">{{ (insights.categories|map(attribute='last_month')|sum)|money }}</span>
+  </div>
+  <div class="card card-highlight">
+    <span class="card-label">活跃支出分类</span>
+    <span class="amount" style="color:var(--navy);" id="kpiCatCount">{{ insights.total_categories }} 个</span>
+  </div>
+</div>
+
+<!-- 分类对比与走势主列表 -->
+<div class="panel" style="padding:0; overflow:hidden;">
+  <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+    <h3 style="margin:0;">分类支出明细与月度环比</h3>
+    <span class="hint" style="margin:0; font-size:12.5px;">💡 点击分类行可展开/收起该分类在选定范围内的月度消费走势柱状图</span>
+  </div>
+
+  <div class="table-wrap" style="margin:0;">
+    <table class="insights-table" style="margin:0; width:100%;">
+      <thead>
+        <tr>
+          <th style="width:40px;"></th>
+          <th>分类名称</th>
+          <th style="text-align:right;">本月支出</th>
+          <th style="text-align:right;">上月支出</th>
+          <th style="text-align:right;">月均支出</th>
+          <th style="text-align:right;">区间累计</th>
+          <th style="text-align:center;">环比上月</th>
+          <th style="text-align:center;">操作</th>
+        </tr>
+      </thead>
+      <tbody id="insightsTableBody">
+        {% for cat in insights.categories %}
+        <tr class="insights-row" data-cat-idx="{{ loop.index0 }}" onclick="toggleCategoryChart({{ loop.index0 }})" style="cursor:pointer;">
+          <td style="text-align:center; color:var(--muted);" id="toggle-icon-{{ loop.index0 }}">▶</td>
+          <td>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="chart-legend-dot" style="background-color: var(--navy); width:9px; height:9px; border-radius:50%;"></span>
+              <strong style="font-size:14px; color:var(--ink);">{{ cat.category }}</strong>
+            </div>
+          </td>
+          <td style="text-align:right; font-family:var(--font-mono); font-weight:600; color:var(--rose);">{{ cat.this_month|money }}</td>
+          <td style="text-align:right; font-family:var(--font-mono); color:var(--muted);">{{ cat.last_month|money }}</td>
+          <td style="text-align:right; font-family:var(--font-mono); color:var(--ink-soft);">{{ cat.avg_monthly|money }}</td>
+          <td style="text-align:right; font-family:var(--font-mono); color:var(--ink);">{{ cat.total_amt|money }}</td>
+          <td style="text-align:center;">
+            {% if cat.trend_dir == 'up' %}
+            <span class="tag tag-expense" style="font-weight:600;">↑ {{ cat.trend_text }}</span>
+            {% elif cat.trend_dir == 'down' %}
+            <span class="tag tag-income" style="font-weight:600;">↓ {{ cat.trend_text }}</span>
+            {% else %}
+            <span class="tag tag-muted">{{ cat.trend_text }}</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center;" onclick="event.stopPropagation();">
+            <button type="button" class="btn-ghost btn-sm" onclick="toggleCategoryChart({{ loop.index0 }})">走势图</button>
+          </td>
+        </tr>
+        <!-- 展开的柱状图容器行 -->
+        <tr id="chart-row-{{ loop.index0 }}" class="chart-expand-row" style="display:none; background:var(--surface-soft);">
+          <td colspan="8" style="padding:16px 24px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:13px; font-weight:600; color:var(--ink);">「{{ cat.category }}」月度支出走势</span>
+              <span style="font-size:12px; color:var(--muted);">月均: {{ cat.avg_monthly|money }} · 累计: {{ cat.total_amt|money }}</span>
+            </div>
+            <div style="position:relative; height:180px; width:100%;">
+              <canvas id="chart-canvas-{{ loop.index0 }}"></canvas>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" style="text-align:center; padding:32px; color:var(--muted);">选定统计范围内暂无支出分类数据</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+window.INSIGHTS_DATA = {{ insights | tojson }};
+const _catChartInstances = {};
+
+function toggleCategoryChart(idx) {
+  const row = document.getElementById('chart-row-' + idx);
+  const icon = document.getElementById('toggle-icon-' + idx);
+  if (!row) return;
+
+  const isHidden = (row.style.display === 'none');
+  row.style.display = isHidden ? 'table-row' : 'none';
+  if (icon) icon.textContent = isHidden ? '▼' : '▶';
+
+  if (isHidden) {
+    renderCategoryChart(idx);
+  }
+}
+
+function renderCategoryChart(idx) {
+  const cat = window.INSIGHTS_DATA.categories[idx];
+  if (!cat) return;
+  const canvas = document.getElementById('chart-canvas-' + idx);
+  if (!canvas) return;
+
+  if (_catChartInstances[idx]) {
+    _catChartInstances[idx].destroy();
+  }
+
+  const ctx = canvas.getContext('2d');
+  _catChartInstances[idx] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: cat.months,
+      datasets: [{
+        label: cat.category + ' 支出 (RM)',
+        data: cat.monthly_values,
+        backgroundColor: 'rgba(251, 113, 133, 0.75)',
+        borderColor: '#fb7185',
+        borderWidth: 1.5,
+        borderRadius: 4,
+        maxBarThickness: 36
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(c) {
+              return ' 支出: ' + formatMoney(c.parsed.y);
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#8e9bb0', font: { size: 11 } }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(255,255,255,0.06)' },
+          ticks: {
+            color: '#8e9bb0',
+            font: { size: 11 },
+            callback: function(v) { return 'RM ' + v; }
+          }
+        }
+      }
+    }
+  });
+}
+
+function selectInsightsRange(rangeKey) {
+  if (rangeKey === 'custom') {
+    const box = document.getElementById('customDateBox');
+    if (box) box.style.display = 'flex';
+    return;
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set('range', rangeKey);
+  url.searchParams.delete('start');
+  url.searchParams.delete('end');
+  window.location.href = url.toString();
+}
+
+function applyCustomInsightsFilter() {
+  const start = document.getElementById('insightsStartDate').value;
+  const end = document.getElementById('insightsEndDate').value;
+  if (!start || !end) {
+    alert('请选择完整的开始与结束日期');
+    return;
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set('range', 'custom');
+  url.searchParams.set('start', start);
+  url.searchParams.set('end', end);
+  window.location.href = url.toString();
+}
+</script>
+{% endblock %}

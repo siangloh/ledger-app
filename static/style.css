@@ -784,6 +784,8 @@ tbody tr .actions { cursor: default; }
 }
 .amount-cell.income { color: var(--green); }
 .amount-cell.expense { color: var(--rose); }
+.amount-cell.savings { color: var(--gold); }
+.amount.savings { color: var(--gold); }
 
 .tag {
   display: inline-block;
@@ -793,6 +795,9 @@ tbody tr .actions { cursor: default; }
   background: var(--navy-soft);
   color: var(--navy);
 }
+.tag-income { background: var(--green-soft); color: var(--green); }
+.tag-expense { background: var(--rose-soft); color: var(--rose); }
+.tag-savings { background: var(--gold-soft); color: var(--gold); }
 .tag-active { background: var(--green-soft); color: var(--green); }
 .tag-muted { background: rgba(27, 27, 31, 0.06); color: var(--muted); }
 
@@ -1594,5 +1599,16 @@ canvas {
     color: var(--ink-soft);
     border-color: var(--border);
   }
+}
+
+/* ---------- 分类深度洞察报告样式 ---------- */
+.insights-table tbody tr.insights-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.chart-expand-row {
+  transition: all 0.2s ease;
+}
+.chart-expand-row td {
+  border-top: none !important;
 }
 

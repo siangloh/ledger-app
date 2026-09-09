@@ -29,6 +29,7 @@
             <a href="{{ url_for('split_bill_page') }}" class="{{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill">小票AA分账</a>
             <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring">固定收支</a>
             <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories">分类管理</a>
+            <a href="{{ url_for('category_insights_page') }}" class="{{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights">分类洞察</a>
             <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import">批量导入</a>
             <span class="sync-badge desktop-sync-badge" id="desktopSyncStatusBadge">
                 <span class="online-dot" id="desktopSyncStatusDot"></span>
@@ -75,6 +76,11 @@
         <button type="button" class="sheet-close-btn" onclick="toggleMoreSheet(false)">✕</button>
     </div>
     <div class="sheet-grid">
+        <a href="{{ url_for('category_insights_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights">
+            <span class="sheet-icon">📊</span>
+            <span class="sheet-title">分类洞察</span>
+            <span class="sheet-desc">支出环比与走势图</span>
+        </a>
         <a href="{{ url_for('recurring_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring">
             <span class="sheet-icon">🔄</span>
             <span class="sheet-title">固定收支</span>
