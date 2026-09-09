@@ -6,6 +6,7 @@ from calendar import monthrange
 from datetime import datetime, date
 
 import pandas as pd
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, g, request, redirect, url_for, render_template, flash, jsonify, session, send_from_directory, make_response
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -165,12 +166,29 @@ def inject_globals():
     }
 
 
+def get_current_user_id():
+    uid = session.get('user_id')
+    if uid:
+        return uid
+    try:
+        db = get_db()
+        admin = db.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
+        if admin:
+            return admin['id']
+        first = db.execute("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").fetchone()
+        if first:
+            return first['id']
+    except Exception:
+        pass
+    return None
+
+
 @app.before_request
 def require_login():
-    # 允许静态资源、登录/登出路由、健康检查、PWA 核心资源以及外部自动记账 Webhook 豁免 Session 检查
+    # 允许静态资源、登录/注册/登出路由、健康检查、PWA 核心资源以及外部自动记账 Webhook 豁免 Session 检查
     if (
-        request.endpoint in ('login', 'logout', 'static', 'health', 'api_realtime_check', 'manifest', 'service_worker', 'offline_page')
-        or request.path in ('/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html')
+        request.endpoint in ('login', 'register', 'logout', 'static', 'health', 'api_realtime_check', 'manifest', 'service_worker', 'offline_page')
+        or request.path in ('/login', '/register', '/logout', '/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html')
         or (request.path and request.path.startswith('/static/'))
     ):
         return
@@ -183,16 +201,69 @@ def require_login():
         if request.path.startswith('/api/auto-track'):
             return
 
-    if not session.get('logged_in'):
+    if not session.get('logged_in') or not session.get('user_id'):
         if request.headers.get('X-Requested-With') == 'InstantNav':
             return jsonify({'error': 'unauthorized', 'redirect': url_for('login')}), 401
         target_next = request.full_path if request.full_path and request.full_path != '/?' else '/'
         return redirect(url_for('login', next=target_next))
 
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if session.get('logged_in') and session.get('user_id'):
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        username = (request.form.get('username') or '').strip()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        if not username:
+            flash('用户名不能为空', 'error')
+            return render_template('register.html')
+        if len(username) < 3 or len(username) > 30:
+            flash('用户名长度需在 3 到 30 个字符之间', 'error')
+            return render_template('register.html')
+        if not re.match(r'^[a-zA-Z0-9_\-\u4e00-\u9fa5]+$', username):
+            flash('用户名仅支持中文、字母、数字及下划线', 'error')
+            return render_template('register.html')
+        if not password or len(password) < 6:
+            flash('密码长度至少需要 6 个字符', 'error')
+            return render_template('register.html')
+        if password != confirm_password:
+            flash('两次输入的密码不一致', 'error')
+            return render_template('register.html')
+
+        db = get_db()
+        existing = db.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()
+        if existing:
+            flash('该用户名已被注册，请直接登录或换一个用户名', 'error')
+            return render_template('register.html')
+
+        user_id = str(uuid.uuid4())
+        pw_hash = generate_password_hash(password)
+        now_str = datetime.now().isoformat()
+        db.execute(
+            'INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)',
+            (user_id, username, pw_hash, now_str)
+        )
+        db.commit()
+
+        # 为新注册账号初始化专属独立的默认分类集
+        init_user_default_categories(db, user_id)
+
+        session['logged_in'] = True
+        session['user_id'] = user_id
+        session['username'] = username
+        flash(f'注册成功，欢迎使用多账本个人财务系统，{username}！', 'success')
+        return redirect(url_for('index'))
+
+    return render_template('register.html')
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if session.get('logged_in'):
+    if session.get('logged_in') and session.get('user_id'):
         return redirect(url_for('index'))
 
     next_url = request.args.get('next') or request.form.get('next') or url_for('index')
@@ -200,16 +271,40 @@ def login():
         next_url = url_for('index')
 
     if request.method == 'POST':
+        username = (request.form.get('username') or '').strip()
         password = request.form.get('password', '')
-        valid_password = get_app_password()
 
-        if password == valid_password:
+        if not username or not password:
+            flash('请输入用户名和密码', 'error')
+            return render_template('login.html', next=next_url, username=username), 400
+
+        db = get_db()
+        user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+
+        if user and check_password_hash(user['password_hash'], password):
             session['logged_in'] = True
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            flash(f'欢迎回来，{user["username"]}！', 'success')
+            return redirect(next_url)
+        elif username == 'admin' and password == get_app_password():
+            if user:
+                admin_id = user['id']
+            else:
+                admin_id = str(uuid.uuid4())
+                db.execute(
+                    'INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)',
+                    (admin_id, 'admin', generate_password_hash(password), datetime.now().isoformat())
+                )
+                db.commit()
+            session['logged_in'] = True
+            session['user_id'] = admin_id
+            session['username'] = 'admin'
             flash('登录成功！', 'success')
             return redirect(next_url)
         else:
-            flash('访问密码错误，请重试。默认密码为 admin123', 'error')
-            return render_template('login.html', next=next_url), 401
+            flash('用户名或密码错误，请重试', 'error')
+            return render_template('login.html', next=next_url, username=username), 401
 
     return render_template('login.html', next=next_url)
 
@@ -253,34 +348,137 @@ def close_db(exception=None):
         db.close()
 
 
+def init_user_default_categories(db, user_id):
+    row = db.execute("SELECT COUNT(*) FROM categories WHERE user_id=?", (user_id,)).fetchone()
+    count = row[0] if row else 0
+    if count == 0:
+        defaults = [
+            (user_id, 'income', 'main', '工资'),
+            (user_id, 'income', 'main', '奖金'),
+            (user_id, 'income', 'side', '自由职业'),
+            (user_id, 'income', 'side', '兼职'),
+            (user_id, 'income', 'side', '投资'),
+            (user_id, 'expense', None, '餐饮'),
+            (user_id, 'expense', None, '交通'),
+            (user_id, 'expense', None, '房租'),
+            (user_id, 'expense', None, '购物'),
+            (user_id, 'expense', None, '娱乐'),
+            (user_id, 'expense', None, '医疗'),
+            (user_id, 'expense', None, '通讯'),
+            (user_id, 'expense', None, '其他'),
+            (user_id, 'savings', None, '定期存款'),
+            (user_id, 'savings', None, '应急基金'),
+            (user_id, 'savings', None, '投资理财'),
+            (user_id, 'savings', None, '心愿基金'),
+        ]
+        db.executemany('INSERT INTO categories (user_id, type, group_name, name) VALUES (?,?,?,?)', defaults)
+        db.commit()
+
+
 def init_db():
     if TURSO_URL and TURSO_AUTH_TOKEN:
         db = turso_db.TursoConnection(TURSO_URL, TURSO_AUTH_TOKEN)
     else:
         db = sqlite3.connect(DB_PATH)
-    db.executescript('''
-    CREATE TABLE IF NOT EXISTS categories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL,            -- income / expense
-        group_name TEXT,               -- main / side，仅 income 使用
-        name TEXT NOT NULL,
-        UNIQUE(type, group_name, name)
-    );
+        db.row_factory = sqlite3.Row
 
+    # 1. 用户表（UUID 主键，确保安全性和唯一性）
+    db.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    );
+    ''')
+    db.commit()
+
+    # 确保默认 admin 用户存在，分配独立 UUID
+    admin_row = db.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
+    if not admin_row:
+        admin_id = str(uuid.uuid4())
+        admin_pw = get_app_password() or 'admin123'
+        db.execute(
+            "INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
+            (admin_id, 'admin', generate_password_hash(admin_pw), datetime.now().isoformat())
+        )
+        db.commit()
+    else:
+        admin_id = admin_row['id'] if (isinstance(admin_row, sqlite3.Row) or isinstance(admin_row, dict)) else admin_row[0]
+
+    # 2. 检查 categories 表是否已有 user_id 字段及独立复合唯一约束 UNIQUE(user_id, type, group_name, name)
+    try:
+        col_names = [r[1] for r in db.execute("PRAGMA table_info(categories)").fetchall()]
+    except Exception:
+        col_names = []
+
+    if not col_names:
+        db.execute('''
+        CREATE TABLE categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            type TEXT NOT NULL,
+            group_name TEXT,
+            name TEXT NOT NULL,
+            UNIQUE(user_id, type, group_name, name)
+        );
+        ''')
+        db.commit()
+    elif 'user_id' not in col_names:
+        # 进行安全迁移，重构为支持多用户独立分类且保留历史数据
+        db.execute("ALTER TABLE categories RENAME TO categories_old")
+        db.execute('''
+        CREATE TABLE categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            type TEXT NOT NULL,
+            group_name TEXT,
+            name TEXT NOT NULL,
+            UNIQUE(user_id, type, group_name, name)
+        );
+        ''')
+        db.execute('''
+        INSERT INTO categories (id, user_id, type, group_name, name)
+        SELECT id, ?, type, group_name, name FROM categories_old
+        ''', (admin_id,))
+        db.execute("DROP TABLE categories_old")
+        db.commit()
+
+    # 3. 交易表与多用户支持
+    db.execute('''
     CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
         date TEXT NOT NULL,
-        type TEXT NOT NULL,            -- income / expense
-        group_name TEXT,               -- main / side，仅 income 使用
+        type TEXT NOT NULL,
+        group_name TEXT,
         category TEXT,
         amount REAL NOT NULL,
         note TEXT,
-        source TEXT DEFAULT 'manual',  -- manual / nlp / import / recurring
+        source TEXT DEFAULT 'manual',
         created_at TEXT NOT NULL
     );
+    ''')
+    db.commit()
 
+    try:
+        tx_cols = [r[1] for r in db.execute("PRAGMA table_info(transactions)").fetchall()]
+    except Exception:
+        tx_cols = []
+    if 'user_id' not in tx_cols:
+        try:
+            db.execute("ALTER TABLE transactions ADD COLUMN user_id TEXT")
+            db.commit()
+        except Exception:
+            pass
+    db.execute("UPDATE transactions SET user_id = ? WHERE user_id IS NULL OR user_id = ''", (admin_id,))
+    db.commit()
+
+    # 4. 固定收支表与多用户支持
+    db.execute('''
     CREATE TABLE IF NOT EXISTS recurring_rules (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
         type TEXT NOT NULL,
         group_name TEXT,
         category TEXT,
@@ -291,7 +489,24 @@ def init_db():
         last_generated_month TEXT,
         created_at TEXT NOT NULL
     );
+    ''')
+    db.commit()
 
+    try:
+        rec_cols = [r[1] for r in db.execute("PRAGMA table_info(recurring_rules)").fetchall()]
+    except Exception:
+        rec_cols = []
+    if 'user_id' not in rec_cols:
+        try:
+            db.execute("ALTER TABLE recurring_rules ADD COLUMN user_id TEXT")
+            db.commit()
+        except Exception:
+            pass
+    db.execute("UPDATE recurring_rules SET user_id = ? WHERE user_id IS NULL OR user_id = ''", (admin_id,))
+    db.commit()
+
+    # 5. 商户-分类记忆表与系统配置表
+    db.executescript('''
     CREATE TABLE IF NOT EXISTS merchant_category_overrides (
         merchant_note TEXT PRIMARY KEY,
         category TEXT NOT NULL,
@@ -303,6 +518,8 @@ def init_db():
         value TEXT NOT NULL
     );
     ''')
+    db.commit()
+
     try:
         db.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES ('auto_track_key', ?)", (DEFAULT_AUTO_TRACK_KEY,))
         db.execute("UPDATE system_settings SET value = ? WHERE key = 'auto_track_key' AND (value IS NULL OR value = '' OR value = 'ledger-auto-track-default-key')", (DEFAULT_AUTO_TRACK_KEY,))
@@ -322,56 +539,44 @@ def init_db():
     except Exception:
         pass
 
-    if db.execute('SELECT COUNT(*) FROM categories').fetchone()[0] == 0:
-        defaults = [
-            ('income', 'main', '工资'),
-            ('income', 'main', '奖金'),
-            ('income', 'side', '自由职业'),
-            ('income', 'side', '兼职'),
-            ('income', 'side', '投资'),
-            ('expense', None, '餐饮'),
-            ('expense', None, '交通'),
-            ('expense', None, '房租'),
-            ('expense', None, '购物'),
-            ('expense', None, '娱乐'),
-            ('expense', None, '医疗'),
-            ('expense', None, '通讯'),
-            ('expense', None, '其他'),
-        ]
-        db.executemany('INSERT INTO categories (type, group_name, name) VALUES (?,?,?)', defaults)
+    # 索引优化
+    try:
+        db.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_categories_user ON categories(user_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_recurring_user ON recurring_rules(user_id)")
         db.commit()
+    except Exception:
+        pass
 
-    if db.execute("SELECT COUNT(*) FROM categories WHERE type='savings'").fetchone()[0] == 0:
-        savings_defaults = [
-            ('savings', None, '定期存款'),
-            ('savings', None, '应急基金'),
-            ('savings', None, '投资理财'),
-            ('savings', None, '心愿基金'),
-        ]
-        db.executemany('INSERT INTO categories (type, group_name, name) VALUES (?,?,?)', savings_defaults)
-        db.commit()
+    # 确保 admin 用户具备默认分类
+    init_user_default_categories(db, admin_id)
     db.close()
 
 
-def get_categories(db, type_, group_name):
+def get_categories(db, type_, group_name, user_id=None):
+    if not user_id:
+        user_id = get_current_user_id()
     if type_ in ('expense', 'savings'):
-        rows = db.execute('SELECT name FROM categories WHERE type=? ORDER BY id', (type_,)).fetchall()
+        rows = db.execute('SELECT name FROM categories WHERE user_id=? AND type=? ORDER BY id', (user_id, type_)).fetchall()
     else:
         rows = db.execute(
-            'SELECT name FROM categories WHERE type=? AND group_name=? ORDER BY id',
-            (type_, group_name)
+            'SELECT name FROM categories WHERE user_id=? AND type=? AND group_name=? ORDER BY id',
+            (user_id, type_, group_name)
         ).fetchall()
     return [r['name'] for r in rows]
 
 
-def get_savings_breakdown(db):
+def get_savings_breakdown(db, user_id=None):
     """
-    计算所有历史储蓄分类的累计结余（储蓄资金池）：
+    计算当前用户所有历史储蓄分类的累计结余（储蓄资金池）：
     各分类累计存入 - 从该分类扣除的历史支出
     返回: (savings_pool_by_category: dict, total_savings_pool: float)
     """
+    if not user_id:
+        user_id = get_current_user_id()
     in_rows = db.execute(
-        "SELECT category, SUM(amount) as total FROM transactions WHERE type='savings' GROUP BY category"
+        "SELECT category, SUM(amount) as total FROM transactions WHERE user_id=? AND type='savings' GROUP BY category",
+        (user_id,)
     ).fetchall()
     savings_in = {}
     for r in in_rows:
@@ -380,14 +585,15 @@ def get_savings_breakdown(db):
 
     out_rows = db.execute(
         "SELECT COALESCE(NULLIF(from_savings_category, ''), category, '其他') as scat, SUM(amount) as total "
-        "FROM transactions WHERE type='expense' AND COALESCE(from_savings, 0)=1 GROUP BY scat"
+        "FROM transactions WHERE user_id=? AND type='expense' AND COALESCE(from_savings, 0)=1 GROUP BY scat",
+        (user_id,)
     ).fetchall()
     savings_out = {}
     for r in out_rows:
         scat = r['scat'] or '其他'
         savings_out[scat] = savings_out.get(scat, 0.0) + float(r['total'] or 0.0)
 
-    configured_cats = [c['name'] for c in db.execute("SELECT name FROM categories WHERE type='savings'").fetchall()]
+    configured_cats = [c['name'] for c in db.execute("SELECT name FROM categories WHERE user_id=? AND type='savings'", (user_id,)).fetchall()]
     all_cats = list(dict.fromkeys(list(savings_in.keys()) + list(savings_out.keys()) + configured_cats))
 
     savings_pool = {}
@@ -419,24 +625,29 @@ def shift_month(month_str, delta):
     return f'{y:04d}-{m:02d}'
 
 
-def generate_due_recurring():
+def generate_due_recurring(user_id=None):
     """按当前真实月份生成到期的固定收支记录（每个规则每月只生成一次）。"""
     db = get_db()
     current_month = date.today().strftime('%Y-%m')
     year, mon = map(int, current_month.split('-'))
     last_day = monthrange(year, mon)[1]
 
-    rules = db.execute('SELECT * FROM recurring_rules WHERE is_active=1').fetchall()
+    if user_id:
+        rules = db.execute('SELECT * FROM recurring_rules WHERE user_id=? AND is_active=1', (user_id,)).fetchall()
+    else:
+        rules = db.execute('SELECT * FROM recurring_rules WHERE is_active=1').fetchall()
+
     count = 0
     for r in rules:
         if r['last_generated_month'] == current_month:
             continue
         day = min(r['day_of_month'], last_day)
         tx_date = f'{current_month}-{day:02d}'
+        r_uid = r['user_id'] if ('user_id' in r.keys() and r['user_id']) else (user_id or get_current_user_id())
         db.execute(
-            'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at) '
-            'VALUES (?,?,?,?,?,?,?,?)',
-            (tx_date, r['type'], r['group_name'], r['category'], r['amount'], r['note'] or '',
+            'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
+            'VALUES (?,?,?,?,?,?,?,?,?)',
+            (r_uid, tx_date, r['type'], r['group_name'], r['category'], r['amount'], r['note'] or '',
              'recurring', datetime.now().isoformat())
         )
         db.execute('UPDATE recurring_rules SET last_generated_month=? WHERE id=?', (current_month, r['id']))
@@ -675,7 +886,8 @@ def parse_nlp_text(text):
 
 @app.route('/')
 def index():
-    generated = generate_due_recurring()
+    user_id = get_current_user_id()
+    generated = generate_due_recurring(user_id)
     if generated:
         flash(f'已自动生成本月固定收支 {generated} 条', 'success')
 
@@ -688,8 +900,8 @@ def index():
     end = f'{month}-{last_day:02d}'
 
     rows = db.execute(
-        'SELECT type, group_name, category, amount, COALESCE(from_savings, 0) as from_savings FROM transactions WHERE date BETWEEN ? AND ?',
-        (start, end)
+        'SELECT type, group_name, category, amount, COALESCE(from_savings, 0) as from_savings FROM transactions WHERE user_id = ? AND date BETWEEN ? AND ?',
+        (user_id, start, end)
     ).fetchall()
 
     total_income = sum(r['amount'] for r in rows if r['type'] == 'income')
@@ -702,7 +914,7 @@ def index():
     balance = total_income - regular_expense - month_savings_in
 
     # 储蓄资金池明细与累计总储蓄
-    savings_pool_by_category, total_savings_pool = get_savings_breakdown(db)
+    savings_pool_by_category, total_savings_pool = get_savings_breakdown(db, user_id)
 
     income_group = {'main': 0.0, 'side': 0.0}
     expense_by_category = {}
@@ -715,11 +927,11 @@ def index():
             expense_by_category[c] = expense_by_category.get(c, 0.0) + r['amount']
 
     income_categories = {
-        'main': get_categories(db, 'income', 'main'),
-        'side': get_categories(db, 'income', 'side'),
+        'main': get_categories(db, 'income', 'main', user_id),
+        'side': get_categories(db, 'income', 'side', user_id),
     }
-    expense_categories = get_categories(db, 'expense', None)
-    savings_categories = get_categories(db, 'savings', None)
+    expense_categories = get_categories(db, 'expense', None, user_id)
+    savings_categories = get_categories(db, 'savings', None, user_id)
 
     return render_template(
         'index.html',
@@ -761,6 +973,7 @@ def api_realtime_check():
 
 @app.route('/partial/dashboard-cards')
 def partial_dashboard_cards():
+    user_id = get_current_user_id()
     month = request.args.get('month') or date.today().strftime('%Y-%m')
     db = get_db()
     year, mon = map(int, month.split('-'))
@@ -769,8 +982,8 @@ def partial_dashboard_cards():
     end = f'{month}-{last_day:02d}'
 
     rows = db.execute(
-        'SELECT type, group_name, category, amount, COALESCE(from_savings, 0) as from_savings FROM transactions WHERE date BETWEEN ? AND ?',
-        (start, end)
+        'SELECT type, group_name, category, amount, COALESCE(from_savings, 0) as from_savings FROM transactions WHERE user_id = ? AND date BETWEEN ? AND ?',
+        (user_id, start, end)
     ).fetchall()
 
     total_income = sum(r['amount'] for r in rows if r['type'] == 'income')
@@ -781,7 +994,7 @@ def partial_dashboard_cards():
 
     balance = total_income - regular_expense - month_savings_in
 
-    savings_pool_by_category, total_savings_pool = get_savings_breakdown(db)
+    savings_pool_by_category, total_savings_pool = get_savings_breakdown(db, user_id)
 
     return render_template(
         'partials/dashboard_cards.html',
@@ -799,6 +1012,7 @@ def partial_dashboard_cards():
 
 @app.route('/api/dashboard-charts')
 def api_dashboard_charts():
+    user_id = get_current_user_id()
     month = request.args.get('month') or date.today().strftime('%Y-%m')
     db = get_db()
     year, mon = map(int, month.split('-'))
@@ -807,8 +1021,8 @@ def api_dashboard_charts():
     end = f'{month}-{last_day:02d}'
 
     rows = db.execute(
-        'SELECT type, group_name, category, amount FROM transactions WHERE date BETWEEN ? AND ?',
-        (start, end)
+        'SELECT type, group_name, category, amount FROM transactions WHERE user_id = ? AND date BETWEEN ? AND ?',
+        (user_id, start, end)
     ).fetchall()
 
     income_group = {'main': 0.0, 'side': 0.0}
@@ -837,6 +1051,7 @@ def api_dashboard_charts():
 
 @app.route('/api/overview')
 def api_overview():
+    user_id = get_current_user_id()
     db = get_db()
     time_range = request.args.get('range', 'all')
     today = date.today()
@@ -868,8 +1083,8 @@ def api_overview():
         end_date = (request.args.get('end') or '').strip() or None
     # 'all': start_date and end_date stay None
 
-    query = 'SELECT date, type, group_name, category, amount, COALESCE(from_savings, 0) as from_savings FROM transactions WHERE 1=1'
-    params = []
+    query = 'SELECT date, type, group_name, category, amount, COALESCE(from_savings, 0) as from_savings FROM transactions WHERE user_id = ?'
+    params = [user_id]
     if start_date:
         query += ' AND date >= ?'
         params.append(start_date)
@@ -965,8 +1180,8 @@ def api_overview():
     avg_savings = total_savings / num_months
     net_savings = total_income - regular_expense - total_savings
 
-    all_savings_in = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='savings'").fetchone()[0] or 0.0
-    all_savings_out = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='expense' AND COALESCE(from_savings, 0)=1").fetchone()[0] or 0.0
+    all_savings_in = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = ? AND type='savings'", (user_id,)).fetchone()[0] or 0.0
+    all_savings_out = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = ? AND type='expense' AND COALESCE(from_savings, 0)=1", (user_id,)).fetchone()[0] or 0.0
     total_savings_pool = max(float(all_savings_in) - float(all_savings_out), 0.0)
 
     # 支出分类按金额降序排序
@@ -1014,7 +1229,9 @@ def api_overview():
 # 支出分类深度洞察报告 (Category Breakdown & Insights)
 # ---------------------------------------------------------------------------
 
-def get_category_insights_data(db, time_range='all', start_date=None, end_date=None):
+def get_category_insights_data(db, time_range='all', start_date=None, end_date=None, user_id=None):
+    if not user_id:
+        user_id = get_current_user_id()
     today = date.today()
     current_month = today.strftime('%Y-%m')
     prev_month = shift_month(current_month, -1)
@@ -1038,8 +1255,8 @@ def get_category_insights_data(db, time_range='all', start_date=None, end_date=N
             month_keys.append(cur)
             cur = shift_month(cur, 1)
 
-    query = "SELECT date, category, amount FROM transactions WHERE type='expense'"
-    params = []
+    query = "SELECT date, category, amount FROM transactions WHERE user_id = ? AND type='expense'"
+    params = [user_id]
     if start_date:
         query += " AND date >= ?"
         params.append(start_date)
@@ -1073,14 +1290,14 @@ def get_category_insights_data(db, time_range='all', start_date=None, end_date=N
 
     # 统计当月与上月的绝对支出
     cur_month_rows = db.execute(
-        "SELECT category, SUM(amount) as total FROM transactions WHERE type='expense' AND date LIKE ? GROUP BY category",
-        (f"{current_month}%",)
+        "SELECT category, SUM(amount) as total FROM transactions WHERE user_id = ? AND type='expense' AND date LIKE ? GROUP BY category",
+        (user_id, f"{current_month}%")
     ).fetchall()
     cur_month_map = {r['category'] or '其他': float(r['total'] or 0) for r in cur_month_rows}
 
     prev_month_rows = db.execute(
-        "SELECT category, SUM(amount) as total FROM transactions WHERE type='expense' AND date LIKE ? GROUP BY category",
-        (f"{prev_month}%",)
+        "SELECT category, SUM(amount) as total FROM transactions WHERE user_id = ? AND type='expense' AND date LIKE ? GROUP BY category",
+        (user_id, f"{prev_month}%")
     ).fetchall()
     prev_month_map = {r['category'] or '其他': float(r['total'] or 0) for r in prev_month_rows}
 
@@ -1158,21 +1375,23 @@ def get_category_insights_data(db, time_range='all', start_date=None, end_date=N
 
 @app.route('/api/category-insights')
 def api_category_insights():
+    user_id = get_current_user_id()
     db = get_db()
     time_range = request.args.get('range', 'all')
     start_date = (request.args.get('start') or '').strip() or None
     end_date = (request.args.get('end') or '').strip() or None
-    data = get_category_insights_data(db, time_range, start_date, end_date)
+    data = get_category_insights_data(db, time_range, start_date, end_date, user_id=user_id)
     return jsonify(data)
 
 
 @app.route('/categories/insights')
 def category_insights_page():
+    user_id = get_current_user_id()
     db = get_db()
     time_range = request.args.get('range', 'all')
     start_date = (request.args.get('start') or '').strip() or None
     end_date = (request.args.get('end') or '').strip() or None
-    insights_data = get_category_insights_data(db, time_range, start_date, end_date)
+    insights_data = get_category_insights_data(db, time_range, start_date, end_date, user_id=user_id)
     return render_template(
         'category_insights.html',
         insights=insights_data,
@@ -1186,6 +1405,7 @@ def category_insights_page():
 
 @app.route('/transactions/add', methods=['POST'])
 def add_transaction():
+    user_id = get_current_user_id()
     db = get_db()
     f = request.form
     try:
@@ -1210,9 +1430,9 @@ def add_transaction():
 
     tx_date = f.get('date') or date.today().isoformat()
     cur = db.execute(
-        'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at, from_savings, from_savings_category) '
-        'VALUES (?,?,?,?,?,?,?,?,?,?)',
-        (tx_date, tx_type, group_name, f.get('category'), amount, f.get('note', ''),
+        'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at, from_savings, from_savings_category) '
+        'VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+        (user_id, tx_date, tx_type, group_name, f.get('category'), amount, f.get('note', ''),
          f.get('source', 'manual'), datetime.now().isoformat(), from_savings, from_savings_category)
     )
     db.commit()
@@ -1225,10 +1445,12 @@ def add_transaction():
         'date': tx_date,
         'from_savings': from_savings,
         'from_savings_category': from_savings_category,
-        'source': f.get('source', 'manual')
+        'source': f.get('source', 'manual'),
+        'user_id': user_id
     })
 
     if is_ajax_request():
+        savings_pool, total_pool = get_savings_breakdown(db, user_id)
         return jsonify({
             'ok': True,
             'message': '记录已添加',
@@ -1239,8 +1461,12 @@ def add_transaction():
                 'group_name': group_name,
                 'category': f.get('category'),
                 'amount': amount,
-                'note': f.get('note', '')
-            }
+                'note': f.get('note', ''),
+                'from_savings': from_savings,
+                'from_savings_category': from_savings_category
+            },
+            'savings_pool': savings_pool,
+            'total_savings_pool': total_pool
         })
 
     flash('记录已添加', 'success')
@@ -1249,14 +1475,15 @@ def add_transaction():
 
 @app.route('/records')
 def records():
+    user_id = get_current_user_id()
     db = get_db()
     start = request.args.get('start', '')
     end = request.args.get('end', '')
     type_ = request.args.get('type', '')
     category = request.args.get('category', '')
 
-    query = 'SELECT * FROM transactions WHERE 1=1'
-    params = []
+    query = 'SELECT * FROM transactions WHERE user_id = ?'
+    params = [user_id]
     if start:
         query += ' AND date >= ?'
         params.append(start)
@@ -1273,7 +1500,8 @@ def records():
 
     rows = db.execute(query, params).fetchall()
     all_categories = db.execute(
-        'SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL ORDER BY category'
+        'SELECT DISTINCT category FROM transactions WHERE user_id = ? AND category IS NOT NULL ORDER BY category',
+        (user_id,)
     ).fetchall()
 
     total_income = sum(r['amount'] for r in rows if r['type'] == 'income')
@@ -1303,6 +1531,7 @@ def records():
 
 @app.route('/records/<int:tx_id>/edit', methods=['GET', 'POST'])
 def edit_record(tx_id):
+    user_id = get_current_user_id()
     db = get_db()
     if request.method == 'POST':
         f = request.form
@@ -1317,7 +1546,7 @@ def edit_record(tx_id):
         new_category = f.get('category')
 
         # 检查是否为 auto_track 来源且修改了分类，若是则记忆商户-分类映射覆盖
-        current_tx = db.execute('SELECT source, note, category FROM transactions WHERE id=?', (tx_id,)).fetchone()
+        current_tx = db.execute('SELECT source, note, category FROM transactions WHERE id=? AND user_id=?', (tx_id, user_id)).fetchone()
         if current_tx and current_tx['source'] == 'auto_track' and current_tx['note'] and new_category:
             merchant_note = current_tx['note'].strip()
             if merchant_note:
@@ -1333,8 +1562,8 @@ def edit_record(tx_id):
             from_savings_category = f.get('category') or '储蓄'
 
         db.execute(
-            'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=?, from_savings=?, from_savings_category=? WHERE id=?',
-            (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), from_savings, from_savings_category, tx_id)
+            'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=?, from_savings=?, from_savings_category=? WHERE id=? AND user_id=?',
+            (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), from_savings, from_savings_category, tx_id, user_id)
         )
         db.commit()
         bump_data_version('edit', {'id': tx_id, 'from_savings': from_savings, 'from_savings_category': from_savings_category})
@@ -1345,14 +1574,14 @@ def edit_record(tx_id):
         flash('记录已更新', 'success')
         return redirect(url_for('records'))
 
-    row = db.execute('SELECT * FROM transactions WHERE id=?', (tx_id,)).fetchone()
+    row = db.execute('SELECT * FROM transactions WHERE id=? AND user_id=?', (tx_id, user_id)).fetchone()
     income_categories = {
-        'main': get_categories(db, 'income', 'main'),
-        'side': get_categories(db, 'income', 'side'),
+        'main': get_categories(db, 'income', 'main', user_id),
+        'side': get_categories(db, 'income', 'side', user_id),
     }
-    expense_categories = get_categories(db, 'expense', None)
-    savings_categories = get_categories(db, 'savings', None)
-    savings_pool_by_category, total_savings_pool = get_savings_breakdown(db)
+    expense_categories = get_categories(db, 'expense', None, user_id)
+    savings_categories = get_categories(db, 'savings', None, user_id)
+    savings_pool_by_category, total_savings_pool = get_savings_breakdown(db, user_id)
     return render_template(
         'edit_record.html', row=row,
         income_categories=income_categories,
@@ -1364,8 +1593,9 @@ def edit_record(tx_id):
 
 @app.route('/records/<int:tx_id>/delete', methods=['POST'])
 def delete_record(tx_id):
+    user_id = get_current_user_id()
     db = get_db()
-    db.execute('DELETE FROM transactions WHERE id=?', (tx_id,))
+    db.execute('DELETE FROM transactions WHERE id=? AND user_id=?', (tx_id, user_id))
     db.commit()
     bump_data_version('delete', {'id': tx_id})
 
@@ -1378,6 +1608,7 @@ def delete_record(tx_id):
 
 @app.route('/records/batch-delete', methods=['POST'])
 def batch_delete_records():
+    user_id = get_current_user_id()
     db = get_db()
     ids = request.form.getlist('ids')
     if not ids:
@@ -1396,7 +1627,7 @@ def batch_delete_records():
 
     if valid_ids:
         placeholders = ','.join('?' * len(valid_ids))
-        db.execute(f'DELETE FROM transactions WHERE id IN ({placeholders})', valid_ids)
+        db.execute(f'DELETE FROM transactions WHERE user_id = ? AND id IN ({placeholders})', [user_id] + valid_ids)
         db.commit()
         bump_data_version('batch_delete', {'count': len(valid_ids)})
 
@@ -1415,6 +1646,7 @@ def batch_delete_records():
 @app.route('/records/batch-edit', methods=['POST'])
 def batch_edit_records():
     """批量修改记录的分类与类型"""
+    user_id = get_current_user_id()
     db = get_db()
     ids = request.form.getlist('ids')
     new_type = request.form.get('type')
@@ -1465,9 +1697,8 @@ def batch_edit_records():
 
     set_clause = ", ".join(updates)
     placeholders = ','.join('?' * len(valid_ids))
-    params.extend(valid_ids)
-
-    db.execute(f"UPDATE transactions SET {set_clause} WHERE id IN ({placeholders})", params)
+    sql = f"UPDATE transactions SET {set_clause} WHERE user_id = ? AND id IN ({placeholders})"
+    db.execute(sql, params + [user_id] + valid_ids)
     db.commit()
     bump_data_version('batch_edit', {'count': len(valid_ids)})
 
@@ -1659,10 +1890,26 @@ def api_auto_track():
     # 入库写入交易记录
     db = get_db()
     now = datetime.now().isoformat()
+    # 确定入账归属用户（支持参数指定 user_id 或 username，保底使用 admin 或首位用户）
+    target_user_id = data.get('user_id') or request.args.get('user_id')
+    target_username = data.get('username') or request.args.get('username')
+    if target_username and not target_user_id:
+        u_row = db.execute("SELECT id FROM users WHERE username = ?", (target_username,)).fetchone()
+        if u_row:
+            target_user_id = u_row['id']
+    if not target_user_id:
+        admin_row = db.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
+        if admin_row:
+            target_user_id = admin_row['id']
+        else:
+            first_row = db.execute("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").fetchone()
+            target_user_id = first_row['id'] if first_row else None
+
     cur = db.execute(
-        'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         (
+            target_user_id,
             parsed['date'],
             parsed['type'],
             parsed['group_name'],
@@ -1681,15 +1928,23 @@ def api_auto_track():
         'category': parsed['category'],
         'type': parsed['type'],
         'date': parsed['date'],
-        'source': 'auto_track'
+        'source': 'auto_track',
+        'user_id': target_user_id
     })
+
+    type_text = '支出' if parsed['type'] == 'expense' else '收入' if parsed['type'] == 'income' else '储蓄'
+    note_str = f" ({parsed['note']})" if parsed['note'] else ""
+    notification_title = "自动记账成功 💸"
+    notification_body = f"已自动记入【{type_text} · {parsed['category']}】{money_filter(parsed['amount'])}{note_str}"
 
     return jsonify({
         'ok': True,
         'verdict': 'accepted',
         'message': f"成功自动记账：{parsed['note']} {money_filter(parsed['amount'])} ({parsed['category']})",
         'transaction_id': cur.lastrowid,
-        'parsed': parsed
+        'parsed': parsed,
+        'notification_title': notification_title,
+        'notification_body': notification_body
     }), 201
 
 
@@ -1702,8 +1957,9 @@ def api_get_categories():
         if not session.get('logged_in'):
             return jsonify({'ok': False, 'message': 'API Key 无效或未登录'}), 401
 
+    user_id = get_current_user_id()
     db = get_db()
-    rows = db.execute('SELECT id, name, type, group_name FROM categories ORDER BY type, id').fetchall()
+    rows = db.execute('SELECT id, name, type, group_name FROM categories WHERE user_id = ? ORDER BY type, id', (user_id,)).fetchall()
     categories = [{'id': r['id'], 'name': r['name'], 'type': r['type'], 'group_name': r['group_name']} for r in rows]
     return jsonify({'ok': True, 'categories': categories})
 
@@ -1722,15 +1978,17 @@ def api_sync_transactions():
     if not txs:
         return jsonify({'ok': True, 'synced_count': 0, 'synced_ids': []})
 
+    user_id = get_current_user_id()
     db = get_db()
     now = datetime.now().isoformat()
     synced_ids = []
     for item in txs:
         try:
             cur = db.execute(
-                'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at) '
-                'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
+                'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 (
+                    user_id,
                     item.get('date') or date.today().isoformat(),
                     item.get('type') or 'expense',
                     item.get('group_name') or 'personal',
@@ -1769,16 +2027,18 @@ def auto_track_page():
 
 @app.route('/categories')
 def categories_page():
+    user_id = get_current_user_id()
     db = get_db()
-    income_main = db.execute("SELECT * FROM categories WHERE type='income' AND group_name='main' ORDER BY id").fetchall()
-    income_side = db.execute("SELECT * FROM categories WHERE type='income' AND group_name='side' ORDER BY id").fetchall()
-    expense = db.execute("SELECT * FROM categories WHERE type='expense' ORDER BY id").fetchall()
-    savings = db.execute("SELECT * FROM categories WHERE type='savings' ORDER BY id").fetchall()
+    income_main = db.execute("SELECT * FROM categories WHERE user_id = ? AND type='income' AND group_name='main' ORDER BY id", (user_id,)).fetchall()
+    income_side = db.execute("SELECT * FROM categories WHERE user_id = ? AND type='income' AND group_name='side' ORDER BY id", (user_id,)).fetchall()
+    expense = db.execute("SELECT * FROM categories WHERE user_id = ? AND type='expense' ORDER BY id", (user_id,)).fetchall()
+    savings = db.execute("SELECT * FROM categories WHERE user_id = ? AND type='savings' ORDER BY id", (user_id,)).fetchall()
     return render_template('categories.html', income_main=income_main, income_side=income_side, expense=expense, savings=savings)
 
 
 @app.route('/categories/add', methods=['POST'])
 def add_category():
+    user_id = get_current_user_id()
     db = get_db()
     f = request.form
     type_ = f.get('type')
@@ -1792,7 +2052,7 @@ def add_category():
         flash('分类名称不能为空', 'error')
         return redirect(url_for('categories_page'))
     try:
-        db.execute('INSERT INTO categories (type, group_name, name) VALUES (?,?,?)', (type_, group_name, name))
+        db.execute('INSERT INTO categories (user_id, type, group_name, name) VALUES (?,?,?,?)', (user_id, type_, group_name, name))
         db.commit()
         if is_ajax_request():
             return jsonify({'ok': True, 'message': '分类已添加'})
@@ -1806,8 +2066,9 @@ def add_category():
 
 @app.route('/categories/<int:cat_id>/delete', methods=['POST'])
 def delete_category(cat_id):
+    user_id = get_current_user_id()
     db = get_db()
-    db.execute('DELETE FROM categories WHERE id=?', (cat_id,))
+    db.execute('DELETE FROM categories WHERE id = ? AND user_id = ?', (cat_id, user_id))
     db.commit()
     if is_ajax_request():
         return jsonify({'ok': True, 'message': '分类已删除（历史记录中的旧数据不受影响）', 'id': cat_id})
@@ -1821,14 +2082,15 @@ def delete_category(cat_id):
 
 @app.route('/recurring')
 def recurring_page():
+    user_id = get_current_user_id()
     db = get_db()
-    rules = db.execute('SELECT * FROM recurring_rules ORDER BY id DESC').fetchall()
+    rules = db.execute('SELECT * FROM recurring_rules WHERE user_id = ? ORDER BY id DESC', (user_id,)).fetchall()
     income_categories = {
-        'main': get_categories(db, 'income', 'main'),
-        'side': get_categories(db, 'income', 'side'),
+        'main': get_categories(db, 'income', 'main', user_id),
+        'side': get_categories(db, 'income', 'side', user_id),
     }
-    expense_categories = get_categories(db, 'expense', None)
-    savings_categories = get_categories(db, 'savings', None)
+    expense_categories = get_categories(db, 'expense', None, user_id)
+    savings_categories = get_categories(db, 'savings', None, user_id)
     return render_template(
         'recurring.html', rules=rules,
         income_categories=income_categories,
@@ -1840,6 +2102,7 @@ def recurring_page():
 
 @app.route('/recurring/add', methods=['POST'])
 def add_recurring():
+    user_id = get_current_user_id()
     db = get_db()
     f = request.form
     tx_type = f.get('type')
@@ -1864,12 +2127,12 @@ def add_recurring():
 
     db.execute(
         'INSERT INTO recurring_rules '
-        '(type, group_name, category, amount, note, day_of_month, is_active, last_generated_month, created_at) '
-        'VALUES (?,?,?,?,?,?,1,NULL,?)',
-        (tx_type, group_name, f.get('category'), amount, f.get('note', ''), day, datetime.now().isoformat())
+        '(user_id, type, group_name, category, amount, note, day_of_month, is_active, last_generated_month, created_at) '
+        'VALUES (?,?,?,?,?,?,?,1,NULL,?)',
+        (user_id, tx_type, group_name, f.get('category'), amount, f.get('note', ''), day, datetime.now().isoformat())
     )
     db.commit()
-    bump_data_version('recurring_add', {'type': tx_type, 'amount': amount, 'day_of_month': day, 'category': f.get('category')})
+    bump_data_version('recurring_add', {'type': tx_type, 'amount': amount, 'day_of_month': day, 'category': f.get('category'), 'user_id': user_id})
     if is_ajax_request():
         return jsonify({'ok': True, 'message': '固定收支规则已添加'})
     flash('固定收支规则已添加', 'success')
@@ -1878,10 +2141,11 @@ def add_recurring():
 
 @app.route('/recurring/<int:rule_id>/delete', methods=['POST'])
 def delete_recurring(rule_id):
+    user_id = get_current_user_id()
     db = get_db()
-    db.execute('DELETE FROM recurring_rules WHERE id=?', (rule_id,))
+    db.execute('DELETE FROM recurring_rules WHERE id = ? AND user_id = ?', (rule_id, user_id))
     db.commit()
-    bump_data_version('recurring_delete', {'id': rule_id})
+    bump_data_version('recurring_delete', {'id': rule_id, 'user_id': user_id})
     if is_ajax_request():
         return jsonify({'ok': True, 'message': '规则已删除', 'id': rule_id})
     flash('规则已删除', 'success')
@@ -1890,13 +2154,14 @@ def delete_recurring(rule_id):
 
 @app.route('/recurring/<int:rule_id>/toggle', methods=['POST'])
 def toggle_recurring(rule_id):
+    user_id = get_current_user_id()
     db = get_db()
-    row = db.execute('SELECT is_active FROM recurring_rules WHERE id=?', (rule_id,)).fetchone()
+    row = db.execute('SELECT is_active FROM recurring_rules WHERE id = ? AND user_id = ?', (rule_id, user_id)).fetchone()
     if row:
         new_active = 0 if row['is_active'] else 1
-        db.execute('UPDATE recurring_rules SET is_active=? WHERE id=?', (new_active, rule_id))
+        db.execute('UPDATE recurring_rules SET is_active = ? WHERE id = ? AND user_id = ?', (new_active, rule_id, user_id))
         db.commit()
-        bump_data_version('recurring_toggle', {'id': rule_id})
+        bump_data_version('recurring_toggle', {'id': rule_id, 'user_id': user_id})
         msg = '规则已停用' if row['is_active'] else '规则已启用'
         if is_ajax_request():
             return jsonify({'ok': True, 'message': msg, 'id': rule_id, 'is_active': new_active})
@@ -1909,9 +2174,10 @@ def toggle_recurring(rule_id):
 
 @app.route('/recurring/generate', methods=['POST'])
 def manual_generate_recurring():
-    count = generate_due_recurring()
+    user_id = get_current_user_id()
+    count = generate_due_recurring(user_id)
     if count:
-        bump_data_version('recurring_generate', {'count': count})
+        bump_data_version('recurring_generate', {'count': count, 'user_id': user_id})
         msg = f'已生成 {count} 条本月固定收支记录'
     else:
         msg = '本月固定收支已全部生成，无需重复生成'
@@ -1968,8 +2234,9 @@ def import_upload():
     preview_rows = df.head(10).fillna('').values.tolist()
 
     db = get_db()
-    expense_categories = get_categories(db, 'expense', None)
-    income_categories_flat = get_categories(db, 'income', 'main') + get_categories(db, 'income', 'side')
+    user_id = get_current_user_id()
+    expense_categories = get_categories(db, 'expense', None, user_id)
+    income_categories_flat = get_categories(db, 'income', 'main', user_id) + get_categories(db, 'income', 'side', user_id)
 
     return render_template(
         'import_preview.html',
@@ -2005,6 +2272,7 @@ def import_confirm():
     default_group = f.get('default_group') or 'main'
     date_format = f.get('date_format') or None
 
+    user_id = get_current_user_id()
     db = get_db()
     inserted = 0
     skipped = 0
@@ -2047,9 +2315,9 @@ def import_confirm():
             note = str(row[note_col]).strip() if note_col else ''
 
             db.execute(
-                'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at) '
-                'VALUES (?,?,?,?,?,?,?,?)',
-                (tx_date, tx_type, group_name, category, amount, note, 'import', now)
+                'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
+                'VALUES (?,?,?,?,?,?,?,?,?)',
+                (user_id, tx_date, tx_type, group_name, category, amount, note, 'import', now)
             )
             inserted += 1
         except Exception:
@@ -2240,6 +2508,7 @@ def split_bill_save_record():
         flash('记账金额必须大于 0', 'error')
         return redirect(url_for('split_bill_page'))
 
+    user_id = get_current_user_id()
     db = get_db()
     now = datetime.now().isoformat()
     note = f.get('note', '').strip() or '聚餐 AA 分摊消费'
@@ -2247,12 +2516,12 @@ def split_bill_save_record():
     category = f.get('category') or '餐饮'
 
     db.execute(
-        'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at) '
-        'VALUES (?,?,?,?,?,?,?,?)',
-        (tx_date, 'expense', None, category, amount, note, 'split_bill', now)
+        'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
+        'VALUES (?,?,?,?,?,?,?,?,?)',
+        (user_id, tx_date, 'expense', None, category, amount, note, 'split_bill', now)
     )
     db.commit()
-    bump_data_version('split_bill', {'note': note, 'amount': amount, 'category': category, 'type': 'expense'})
+    bump_data_version('split_bill', {'note': note, 'amount': amount, 'category': category, 'type': 'expense', 'user_id': user_id})
     msg = f'已成功记入支出：{note} {money_filter(amount)}'
     if is_ajax_request():
         return jsonify({'ok': True, 'message': msg})

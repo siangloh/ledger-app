@@ -121,9 +121,9 @@
 <script>
   window.CATEGORY_DATA = {
     expense: {{ expense_categories | tojson }},
-  income_main: { { income_categories.main | tojson } },
-  income_side: { { income_categories.side | tojson } },
-  savings: { { savings_categories | tojson } }
-};
+    income_main: {{ income_categories.main | tojson }},
+    income_side: {{ income_categories.side | tojson }},
+    savings: {{ savings_categories | tojson }}
+  };
 </script>
 {% endblock %}

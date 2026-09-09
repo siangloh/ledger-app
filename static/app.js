@@ -507,10 +507,23 @@ function attachQuickAddFormAjax() {
           const noteInput = form.querySelector('input[name="note"]');
           if (noteInput) noteInput.value = '';
 
-          if (typeof htmx !== 'undefined') {
-            htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
-          } else {
-            window.location.reload();
+          // 局部平滑无刷新更新仪表盘卡片与图表，彻底避免整页/整容器重载闪烁
+          if (typeof refreshDashboardPartials === 'function') {
+            refreshDashboardPartials(data.transaction);
+          }
+
+          // 动态更新储蓄资金池下拉选择中各分类的最新结余金额
+          if (data.savings_pool) {
+            const savingsSelect = document.getElementById('fromSavingsCategorySelect');
+            if (savingsSelect) {
+              Array.from(savingsSelect.options).forEach(opt => {
+                const catName = opt.value;
+                if (catName) {
+                  const bal = data.savings_pool[catName] !== undefined ? data.savings_pool[catName] : 0;
+                  opt.textContent = `${catName} (结余: RM ${Number(bal).toFixed(2)})`;
+                }
+              });
+            }
           }
         }
       } else {

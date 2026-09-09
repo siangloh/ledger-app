@@ -7,12 +7,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
-<title>登录 - 我的记账本</title>
+<title>注册账号 - 我的记账本</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
 <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260910_v1">
 <style>
   .login-page-wrapper {
     min-height: 100vh;
@@ -54,12 +54,12 @@
   .login-subtitle {
     font-size: 13px;
     color: var(--muted);
-    margin: 0 0 26px;
+    margin: 0 0 24px;
   }
   .login-form {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 15px;
     text-align: left;
   }
   .login-form label {
@@ -100,10 +100,24 @@
   .btn-login:active {
     transform: scale(0.98);
   }
+  .login-bottom-links {
+    margin-top: 20px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .login-bottom-links a {
+    color: var(--gold);
+    text-decoration: none;
+    font-weight: 600;
+    margin-left: 4px;
+  }
+  .login-bottom-links a:hover {
+    text-decoration: underline;
+  }
   .login-hint {
     font-size: 11.5px;
     color: var(--muted);
-    margin-top: 20px;
+    margin-top: 18px;
     line-height: 1.5;
   }
 </style>
@@ -111,9 +125,9 @@
 <body>
 <div class="login-page-wrapper">
   <div class="login-card">
-    <div class="login-logo">💰</div>
-    <h1 class="login-title">我的记账本</h1>
-    <p class="login-subtitle">私密个人财务管理系统</p>
+    <div class="login-logo">✨</div>
+    <h1 class="login-title">创建新账本账号</h1>
+    <p class="login-subtitle">注册后拥有独享的私密财务与分类空间</p>
 
     {% set other_msgs = [] %}
     {% set success_msgs = [] %}
@@ -138,41 +152,29 @@
     </div>
     {% endif %}
 
-    <form method="post" action="{{ url_for('login', next=next) }}" class="login-form">
+    <form method="post" action="{{ url_for('register') }}" class="login-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>
         用户名 / 账号
-        <input type="text" name="username" value="{{ username or 'admin' }}" placeholder="请输入用户名（默认：admin）" required autofocus autocomplete="username">
+        <input type="text" name="username" value="{{ username or '' }}" placeholder="请输入用户名（如：alice）" required autofocus autocomplete="username" minlength="2" maxlength="30">
       </label>
       <label>
-        登录密码
-        <input type="password" name="password" placeholder="请输入密码（默认：admin123）" required autocomplete="current-password">
+        设置密码
+        <input type="password" name="password" placeholder="请输入至少 4 位登录密码" required autocomplete="new-password" minlength="4">
       </label>
-      {% if next %}
-      <input type="hidden" name="next" value="{{ next }}">
-      {% endif %}
-      <button type="submit" class="btn-login">安全登录</button>
+      <label>
+        确认密码
+        <input type="password" name="confirm_password" placeholder="请再次输入密码" required autocomplete="new-password" minlength="4">
+      </label>
+      <button type="submit" class="btn-login">立即注册并进入</button>
     </form>
 
-    <div style="margin-top: 20px; font-size: 13px; color: var(--muted);">
-      还没有账号？<a href="{{ url_for('register') }}" style="color: var(--gold); text-decoration: none; font-weight: 600;">立即注册新账号 &rarr;</a>
+    <div class="login-bottom-links">
+      已有账号？<a href="{{ url_for('login') }}">立即登录 &rarr;</a>
     </div>
 
     <p class="login-hint">🔒 每个账号采用安全 UUID 隔离，数据完全独立私密。</p>
   </div>
 </div>
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-      navigator.serviceWorker.register('/sw.js', { scope: '/' })
-        .then(function(reg) {
-          console.log('[PWA] ServiceWorker registered on login page:', reg.scope);
-        })
-        .catch(function(err) {
-          console.warn('[PWA] ServiceWorker registration failed:', err);
-        });
-    });
-  }
-</script>
 </body>
 </html>

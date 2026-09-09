@@ -52,20 +52,27 @@
 
     <div class="step-guide" style="font-size: 13.5px; line-height: 1.7; color: var(--ink-soft);">
       <div style="margin-bottom: 14px;">
-        <strong style="color: var(--navy);">方案 A：MacroDroid（最简单，无需编写代码）</strong>
+        <strong style="color: var(--navy);">方案 A：MacroDroid（推荐：免开 App，后台静默记账并直接弹出手机原生通知）</strong>
         <ol style="padding-left: 20px; margin: 6px 0;">
-          <li>在 Google Play 下载安装 <strong>MacroDroid</strong>（免费版即可）。</li>
-          <li>新建宏，触发器 (Trigger) 选择：<strong>通知 (Notification)</strong> &rarr; 勾选 <code>Touch 'n Go eWallet</code> 或 <code>MAE</code>。</li>
-          <li>动作 (Action) 选择：<strong>网页请求 (HTTP Request)</strong>：
+          <li>在手机上打开 <strong>MacroDroid</strong>。</li>
+          <li>新建宏，触发器 (Trigger) 选择：<strong>通知 (Notification)</strong> &rarr; <strong>已收到通知</strong> &rarr; 勾选 <code>Touch 'n Go eWallet</code>、<code>MAE</code> 等银行/钱包。</li>
+          <li><strong>动作 1 (Action)</strong> 选择：<strong>网页请求 (HTTP Request)</strong>：
             <ul>
               <li>请求方式：<code>POST</code></li>
               <li>URL：填入左侧复制的 Webhook URL</li>
               <li>请求头 (Headers)：添加 <code>X-API-KEY: {{ api_key }}</code></li>
               <li>请求体格式：<code>application/json</code></li>
               <li>内容填入：<code>{"text": "[notification_text]"}</code></li>
+              <li><strong>响应存储</strong>：在下方勾选「保存响应结果」，将响应存储到字符串局部变量（如命名为 <code>response</code>）。</li>
             </ul>
           </li>
-          <li>点击保存，大功告成！只要手机收到通知，自动实时入账。</li>
+          <li><strong>动作 2 (后台原生通知)</strong> 选择：<strong>通知 (Notification)</strong> &rarr; <strong>显示通知 (Display Notification)</strong>：
+            <ul>
+              <li>通知标题：<code>{lv=response[notification_title]}</code>（或填 <code>自动记账成功 💸</code>）</li>
+              <li>通知内容：<code>{lv=response[notification_body]}</code></li>
+            </ul>
+          </li>
+          <li>点击保存启用！每次付款收到银行通知，MacroDroid 就会在后台自动完成记账，并<strong>直接在手机通知栏弹出记账结果通知</strong>，无需打开任何网页或 App，零打扰又即时！</li>
         </ol>
       </div>
 
