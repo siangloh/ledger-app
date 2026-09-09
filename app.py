@@ -316,6 +316,12 @@ def init_db():
     except Exception:
         pass
 
+    try:
+        db.execute("ALTER TABLE transactions ADD COLUMN from_savings_category TEXT")
+        db.commit()
+    except Exception:
+        pass
+
     if db.execute('SELECT COUNT(*) FROM categories').fetchone()[0] == 0:
         defaults = [
             ('income', 'main', '工资'),
@@ -356,6 +362,49 @@ def get_categories(db, type_, group_name):
             (type_, group_name)
         ).fetchall()
     return [r['name'] for r in rows]
+
+
+def get_savings_breakdown(db):
+    """
+    计算所有历史储蓄分类的累计结余（储蓄资金池）：
+    各分类累计存入 - 从该分类扣除的历史支出
+    返回: (savings_pool_by_category: dict, total_savings_pool: float)
+    """
+    in_rows = db.execute(
+        "SELECT category, SUM(amount) as total FROM transactions WHERE type='savings' GROUP BY category"
+    ).fetchall()
+    savings_in = {}
+    for r in in_rows:
+        cat = r['category'] or '储蓄'
+        savings_in[cat] = savings_in.get(cat, 0.0) + float(r['total'] or 0.0)
+
+    out_rows = db.execute(
+        "SELECT COALESCE(NULLIF(from_savings_category, ''), category, '其他') as scat, SUM(amount) as total "
+        "FROM transactions WHERE type='expense' AND COALESCE(from_savings, 0)=1 GROUP BY scat"
+    ).fetchall()
+    savings_out = {}
+    for r in out_rows:
+        scat = r['scat'] or '其他'
+        savings_out[scat] = savings_out.get(scat, 0.0) + float(r['total'] or 0.0)
+
+    configured_cats = [c['name'] for c in db.execute("SELECT name FROM categories WHERE type='savings'").fetchall()]
+    all_cats = list(dict.fromkeys(list(savings_in.keys()) + list(savings_out.keys()) + configured_cats))
+
+    savings_pool = {}
+    for c in all_cats:
+        c_in = savings_in.get(c, 0.0)
+        c_out = savings_out.get(c, 0.0)
+        bal = c_in - c_out
+        if c_in > 0 or c_out > 0:
+            savings_pool[c] = round(bal, 2)
+
+    sorted_pool = dict(sorted(savings_pool.items(), key=lambda item: item[1], reverse=True))
+
+    all_in_total = sum(savings_in.values())
+    all_out_total = sum(savings_out.values())
+    total_savings_pool = max(all_in_total - all_out_total, 0.0)
+
+    return sorted_pool, round(total_savings_pool, 2)
 
 
 def shift_month(month_str, delta):
@@ -650,14 +699,11 @@ def index():
     # 本月净结余：收入 - 日常支出 - 存入储蓄（从储蓄扣除的支出不扣当月结余）
     balance = total_income - regular_expense - month_savings_in
 
-    # 当前累计总储蓄资金池（持续累加历史所有存入储蓄，减去从储蓄池支付的支出）
-    all_savings_in = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='savings'").fetchone()[0] or 0.0
-    all_savings_out = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='expense' AND COALESCE(from_savings, 0)=1").fetchone()[0] or 0.0
-    total_savings_pool = max(float(all_savings_in) - float(all_savings_out), 0.0)
+    # 储蓄资金池明细与累计总储蓄
+    savings_pool_by_category, total_savings_pool = get_savings_breakdown(db)
 
     income_group = {'main': 0.0, 'side': 0.0}
     expense_by_category = {}
-    savings_by_category = {}
     for r in rows:
         if r['type'] == 'income':
             gname = r['group_name'] or 'main'
@@ -665,9 +711,6 @@ def index():
         elif r['type'] == 'expense':
             c = r['category'] or '其他'
             expense_by_category[c] = expense_by_category.get(c, 0.0) + r['amount']
-        elif r['type'] == 'savings':
-            c = r['category'] or '储蓄'
-            savings_by_category[c] = savings_by_category.get(c, 0.0) + r['amount']
 
     income_categories = {
         'main': get_categories(db, 'income', 'main'),
@@ -691,7 +734,8 @@ def index():
         balance=balance,
         income_group=income_group,
         expense_by_category=expense_by_category,
-        savings_by_category=savings_by_category,
+        savings_by_category=savings_pool_by_category,
+        savings_pool_by_category=savings_pool_by_category,
         income_categories=income_categories,
         expense_categories=expense_categories,
         savings_categories=savings_categories,
@@ -735,15 +779,7 @@ def partial_dashboard_cards():
 
     balance = total_income - regular_expense - month_savings_in
 
-    all_savings_in = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='savings'").fetchone()[0] or 0.0
-    all_savings_out = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='expense' AND COALESCE(from_savings, 0)=1").fetchone()[0] or 0.0
-    total_savings_pool = max(float(all_savings_in) - float(all_savings_out), 0.0)
-
-    savings_by_category = {}
-    for r in rows:
-        if r['type'] == 'savings':
-            c = r['category'] or '储蓄'
-            savings_by_category[c] = savings_by_category.get(c, 0.0) + r['amount']
+    savings_pool_by_category, total_savings_pool = get_savings_breakdown(db)
 
     return render_template(
         'partials/dashboard_cards.html',
@@ -755,7 +791,7 @@ def partial_dashboard_cards():
         regular_expense=regular_expense,
         savings_expense=savings_expense,
         balance=balance,
-        savings_by_category=savings_by_category,
+        savings_by_category=savings_pool_by_category,
     )
 
 
@@ -1166,13 +1202,16 @@ def add_transaction():
         group_name = None
 
     from_savings = 1 if (tx_type == 'expense' and f.get('from_savings') in ('1', 'true', 'on')) else 0
+    from_savings_category = (f.get('from_savings_category') or '').strip() if from_savings else None
+    if from_savings and not from_savings_category:
+        from_savings_category = f.get('category') or '储蓄'
 
     tx_date = f.get('date') or date.today().isoformat()
     cur = db.execute(
-        'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at, from_savings) '
-        'VALUES (?,?,?,?,?,?,?,?,?)',
+        'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at, from_savings, from_savings_category) '
+        'VALUES (?,?,?,?,?,?,?,?,?,?)',
         (tx_date, tx_type, group_name, f.get('category'), amount, f.get('note', ''),
-         f.get('source', 'manual'), datetime.now().isoformat(), from_savings)
+         f.get('source', 'manual'), datetime.now().isoformat(), from_savings, from_savings_category)
     )
     db.commit()
     bump_data_version('add', {
@@ -1183,6 +1222,7 @@ def add_transaction():
         'type': tx_type,
         'date': tx_date,
         'from_savings': from_savings,
+        'from_savings_category': from_savings_category,
         'source': f.get('source', 'manual')
     })
 
@@ -1286,12 +1326,16 @@ def edit_record(tx_id):
                 )
 
         from_savings = 1 if (tx_type == 'expense' and f.get('from_savings') in ('1', 'true', 'on')) else 0
+        from_savings_category = (f.get('from_savings_category') or '').strip() if from_savings else None
+        if from_savings and not from_savings_category:
+            from_savings_category = f.get('category') or '储蓄'
+
         db.execute(
-            'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=?, from_savings=? WHERE id=?',
-            (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), from_savings, tx_id)
+            'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=?, from_savings=?, from_savings_category=? WHERE id=?',
+            (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), from_savings, from_savings_category, tx_id)
         )
         db.commit()
-        bump_data_version('edit', {'id': tx_id, 'from_savings': from_savings})
+        bump_data_version('edit', {'id': tx_id, 'from_savings': from_savings, 'from_savings_category': from_savings_category})
 
         if is_ajax_request():
             return jsonify({'ok': True, 'message': '记录已更新'})
@@ -1306,11 +1350,13 @@ def edit_record(tx_id):
     }
     expense_categories = get_categories(db, 'expense', None)
     savings_categories = get_categories(db, 'savings', None)
+    savings_pool_by_category, total_savings_pool = get_savings_breakdown(db)
     return render_template(
         'edit_record.html', row=row,
         income_categories=income_categories,
         expense_categories=expense_categories,
         savings_categories=savings_categories,
+        savings_pool_by_category=savings_pool_by_category,
     )
 
 

@@ -10,6 +10,13 @@ function syncSegStyles() {
   });
 }
 
+function toggleFromSavingsCategoryBox(checked) {
+  const box = document.getElementById('fromSavingsCategoryBox');
+  if (box) {
+    box.style.display = checked ? 'block' : 'none';
+  }
+}
+
 function onTypeChange() {
   const checkedRadio = document.querySelector('input[name="type"]:checked');
   if (!checkedRadio) return;
@@ -17,11 +24,17 @@ function onTypeChange() {
   const groupRow = document.getElementById('groupRow');
   if (groupRow) groupRow.style.display = (type === 'income') ? 'flex' : 'none';
   const fromSavingsRow = document.getElementById('fromSavingsRow');
+  const fromSavingsCategoryBox = document.getElementById('fromSavingsCategoryBox');
   if (fromSavingsRow) {
     fromSavingsRow.style.display = (type === 'expense') ? 'flex' : 'none';
+    const chk = fromSavingsRow.querySelector('input[type="checkbox"]');
     if (type !== 'expense') {
-      const chk = fromSavingsRow.querySelector('input[type="checkbox"]');
       if (chk) chk.checked = false;
+      if (fromSavingsCategoryBox) fromSavingsCategoryBox.style.display = 'none';
+    } else {
+      if (fromSavingsCategoryBox) {
+        fromSavingsCategoryBox.style.display = (chk && chk.checked) ? 'block' : 'none';
+      }
     }
   }
   populateCategories();

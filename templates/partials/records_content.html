@@ -18,7 +18,7 @@
       </td>
       <td data-col="type">
         <span class="tag {{ 'tag-income' if r.type=='income' else ('tag-savings' if r.type=='savings' else 'tag-expense') }}">{{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }}</span>
-        {% if r.from_savings %}<span class="tag tag-savings" style="margin-left: 4px; font-size: 10px; padding: 2px 6px;" title="使用储蓄储备付款">储蓄扣减</span>{% endif %}
+        {% if r.from_savings %}<span class="tag tag-savings" style="margin-left: 4px; font-size: 10px; padding: 2px 6px;" title="从储蓄储备扣除">扣: {{ r.from_savings_category or '储蓄' }}</span>{% endif %}
       </td>
       <td data-col="group">{{ {'main':'主业','side':'副业'}.get(r.group_name, '') }}</td>
       <td data-col="category"><strong>{{ r.category }}</strong></td>
