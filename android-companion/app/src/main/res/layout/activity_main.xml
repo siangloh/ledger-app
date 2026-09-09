@@ -5,6 +5,49 @@
     android:layout_height="match_parent"
     android:background="@color/navy_primary">
 
+    <!-- 电池优化提醒横幅 -->
+    <LinearLayout
+        android:id="@+id/batteryBanner"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="#FFF3CD"
+        android:paddingStart="12dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="⚠️ 为防止小米/OPPO/vivo等系统杀掉通知自动记账服务，请关闭电池优化并允许自启动。"
+            android:textColor="#856404"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnFixBattery"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="去设置"
+            android:textColor="@color/navy_primary"
+            android:textSize="12sp" />
+
+        <ImageButton
+            android:id="@+id/btnCloseBatteryBanner"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:contentDescription="关闭" />
+    </LinearLayout>
+
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefreshLayout"
         android:layout_width="0dp"
@@ -12,7 +55,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintTop_toBottomOf="@id/batteryBanner">
 
         <WebView
             android:id="@+id/webView"
@@ -33,6 +76,96 @@
         android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toBottomOf="@id/batteryBanner" />
+
+    <!-- 原生离线模式展示层 (断网时显示，替代空白 WebView) -->
+    <LinearLayout
+        android:id="@+id/offlineContainer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="28dp"
+        android:background="@color/background"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/batteryBanner"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📡"
+            android:textSize="56sp"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="当前处于离线模式 (Offline Mode)"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/navy_primary"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="未检测到网络连接。您仍可使用本地功能快速记账，系统将在网络恢复后自动同步至云端账本。"
+            android:textSize="13sp"
+            android:textColor="#666666"
+            android:gravity="center"
+            android:layout_marginBottom="28dp" />
+
+        <Button
+            android:id="@+id/btnOfflineQuickAdd"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:backgroundTint="@color/navy_primary"
+            android:text="⚡ 离线快速记账"
+            android:textColor="@color/white"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btnOfflineLogs"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="📋 查看通知与同步日志"
+            android:textColor="@color/navy_primary"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btnOfflineSettings"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="⚙️ 监测的应用设置"
+            android:textColor="@color/navy_primary"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btnOfflineRetry"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="🔄 重新检查网络连接"
+            android:textColor="@color/gold_accent" />
+
+    </LinearLayout>
+
+    <!-- 悬浮快捷入口：在线时也可快速唤起离线记账 / 监听设置 / 日志 -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabQuickAdd"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="20dp"
+        android:backgroundTint="@color/navy_primary"
+        android:contentDescription="快速记账"
+        app:tint="@color/white"
+        app:srcCompat="@android:drawable/ic_input_add"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

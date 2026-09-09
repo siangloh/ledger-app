@@ -9,8 +9,16 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
-    <!-- 通知读取权限 -->
+    <!-- 通知读取与电量优化权限 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- 查询已安装应用 (用于自定义监听应用列表) -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -20,7 +28,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MyLedgerCompanion">
 
-        <!-- 主活动：全屏展示账本 UI -->
+        <!-- 主活动：全屏展示账本 UI 及离线回退视图 -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -31,7 +39,25 @@
             </intent-filter>
         </activity>
 
-        <!-- 原生通知监听服务：系统级监听 TNG / MyPB 扣款与转账 -->
+        <!-- 原生离线快速记账界面 -->
+        <activity
+            android:name=".ui.QuickAddActivity"
+            android:exported="false"
+            android:label="离线快速记账" />
+
+        <!-- 监测的应用列表设置界面 -->
+        <activity
+            android:name=".ui.AppSelectionActivity"
+            android:exported="false"
+            android:label="监测的应用列表" />
+
+        <!-- 本地通知与同步诊断日志界面 -->
+        <activity
+            android:name=".ui.NotificationLogActivity"
+            android:exported="false"
+            android:label="通知诊断日志" />
+
+        <!-- 原生通知监听服务：系统级监听电子钱包与银行扣款通知 -->
         <service
             android:name=".NotificationService"
             android:label="@string/service_name"

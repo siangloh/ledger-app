@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <!-- Top Toolbar -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/navy_primary"
+        app:titleTextColor="@color/white"
+        app:title="通知诊断日志 (Notification Log)" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#E8E2D2"
+        android:padding="12dp"
+        android:textColor="@color/navy_primary"
+        android:textSize="12sp"
+        android:text="🔒 此日志仅保存在手机本机数据库，包含过滤判定结果（Phase-1 本地关键词，Phase-2 服务端 LLM 广告判定），绝不会随代码上传至任何代码仓库。" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/logRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="12dp"
+        android:clipToPadding="false" />
+
+    <TextView
+        android:id="@+id/emptyLogView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:text="暂无通知记录"
+        android:textColor="#888888"
+        android:visibility="gone" />
+
+</LinearLayout>

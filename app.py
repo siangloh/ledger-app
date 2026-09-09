@@ -43,6 +43,10 @@ app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 AUTO_TRACK_KEY = os.environ.get('AUTO_TRACK_KEY')
 AUTO_TRACK_DEBUG_LOG = os.environ.get('AUTO_TRACK_DEBUG_LOG', '0') == '1'
 
+# 本地 LLM (Ollama) 配置用于过滤营销推广假通知 (Phase-2)
+OLLAMA_URL = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
+OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'qwen2.5')
+
 # 单用户访问密码 (无硬编码默认值)
 APP_PASSWORD = os.environ.get('APP_PASSWORD')
 
@@ -64,8 +68,14 @@ def require_login():
     # 允许静态资源、登录/登出路由以及外部自动记账 Webhook 豁免 Session 检查
     if request.endpoint in ('login', 'logout', 'static') or (request.path and request.path.startswith('/static/')):
         return
-    if request.path.startswith('/api/auto-track'):
-        return
+    if request.path.startswith('/api/'):
+        req_key = request.headers.get('X-API-KEY')
+        if not req_key and request.is_json:
+            req_key = (request.get_json(silent=True) or {}).get('key')
+        if AUTO_TRACK_KEY and req_key == AUTO_TRACK_KEY:
+            return
+        if request.path.startswith('/api/auto-track'):
+            return
 
     if not session.get('logged_in'):
         if request.headers.get('X-Requested-With') == 'InstantNav':
@@ -828,6 +838,53 @@ def nlp_parse():
 # Auto Track 自动记账网关 (接收来自手机通知/Webhook)
 # ---------------------------------------------------------------------------
 
+def classify_notification_with_llm(text):
+    """
+    Phase-2 智能营销/广告过滤：
+    调用本地 Ollama LLM 二次校验通知是否为真实完成的扣款/入账交易，还是营销促销广告。
+    采用 Fail-open 策略：若 Ollama 无法连接、超时或返回异常，打印警告并放行作为真实交易，
+    确保不因本地 LLM 服务不可用而影响正常记账。
+    返回: True (真实交易) 或 False (营销广告)
+    """
+    import json as py_json
+    import requests
+
+    endpoint = f"{OLLAMA_URL.rstrip('/')}/api/generate"
+    prompt = (
+        "You are an expert financial transaction validator. "
+        "Analyze the following mobile notification text and decide whether it describes an ACTUAL COMPLETED "
+        "financial transaction (payment, transfer, debit, credit), OR if it is a PROMOTIONAL, MARKETING, "
+        "VOUCHER, DISCOUNT, REWARD, or TOP-UP INVITATION message.\n\n"
+        f"Notification text:\n\"\"\"{text}\"\"\"\n\n"
+        "Reply with ONLY a valid JSON object in this exact format: {\"is_real_transaction\": true/false, \"reason\": \"short explanation\"}"
+    )
+
+    try:
+        resp = requests.post(
+            endpoint,
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "format": "json"
+            },
+            timeout=3.5
+        )
+        if resp.status_code == 200:
+            res_data = resp.json()
+            raw_response = res_data.get('response', '{}')
+            parsed_json = py_json.loads(raw_response)
+            is_real = parsed_json.get('is_real_transaction')
+            if is_real is not None:
+                return bool(is_real)
+        else:
+            print(f"[AUTO_TRACK WARNING] Ollama LLM returned status {resp.status_code}, failing open")
+    except Exception as e:
+        print(f"[AUTO_TRACK WARNING] Ollama LLM unreachable or error ({e}), failing open")
+
+    return True
+
+
 @app.route('/api/auto-track', methods=['POST'])
 @csrf.exempt
 def api_auto_track():
@@ -893,6 +950,19 @@ def api_auto_track():
             'raw_text': text
         }), 422
 
+    # Phase-2: 本地 LLM 营销广告二次校验（Fail-open 策略）
+    is_real = classify_notification_with_llm(text)
+    if not is_real:
+        if AUTO_TRACK_DEBUG_LOG:
+            print(f"[AUTO_TRACK DEBUG] Notification rejected by Phase-2 LLM as promotional: {repr(text)}")
+        return jsonify({
+            'ok': False,
+            'verdict': 'rejected_promo',
+            'message': '通知被识别为营销推广或非真实交易，已忽略入账',
+            'parsed': parsed,
+            'raw_text': text
+        }), 200
+
     # 入库写入交易记录
     db = get_db()
     now = datetime.now().isoformat()
@@ -914,10 +984,69 @@ def api_auto_track():
 
     return jsonify({
         'ok': True,
+        'verdict': 'accepted',
         'message': f"成功自动记账：{parsed['note']} {money_filter(parsed['amount'])} ({parsed['category']})",
         'transaction_id': cur.lastrowid,
         'parsed': parsed
     }), 201
+
+
+@app.route('/api/categories', methods=['GET'])
+@csrf.exempt
+def api_get_categories():
+    """获取所有可用分类列表（支持 Android 端离线缓存与下拉选择）"""
+    req_key = request.headers.get('X-API-KEY')
+    if not AUTO_TRACK_KEY or req_key != AUTO_TRACK_KEY:
+        if not session.get('logged_in'):
+            return jsonify({'ok': False, 'message': 'API Key 无效或未登录'}), 401
+
+    db = get_db()
+    rows = db.execute('SELECT id, name, type, group_name FROM categories ORDER BY type, id').fetchall()
+    categories = [{'id': r['id'], 'name': r['name'], 'type': r['type'], 'group_name': r['group_name']} for r in rows]
+    return jsonify({'ok': True, 'categories': categories})
+
+
+@app.route('/api/transactions/sync', methods=['POST'])
+@csrf.exempt
+def api_sync_transactions():
+    """批量同步移动端离线记账数据"""
+    req_key = request.headers.get('X-API-KEY')
+    if not AUTO_TRACK_KEY or req_key != AUTO_TRACK_KEY:
+        if not session.get('logged_in'):
+            return jsonify({'ok': False, 'message': 'API Key 无效或未登录'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    txs = payload.get('transactions', [])
+    if not txs:
+        return jsonify({'ok': True, 'synced_count': 0, 'synced_ids': []})
+
+    db = get_db()
+    now = datetime.now().isoformat()
+    synced_ids = []
+    for item in txs:
+        try:
+            cur = db.execute(
+                'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at) '
+                'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                (
+                    item.get('date') or date.today().isoformat(),
+                    item.get('type') or 'expense',
+                    item.get('group_name') or 'personal',
+                    item.get('category') or '其他',
+                    float(item.get('amount') or 0.0),
+                    item.get('note') or '离线录入',
+                    item.get('source') or 'offline_sync',
+                    now
+                )
+            )
+            local_id = item.get('local_id') or item.get('id')
+            if local_id is not None:
+                synced_ids.append(local_id)
+        except Exception as e:
+            print(f"[SYNC ERROR] Failed to insert offline transaction: {e}")
+
+    db.commit()
+    return jsonify({'ok': True, 'synced_count': len(synced_ids), 'synced_ids': synced_ids})
 
 
 @app.route('/auto-track')
