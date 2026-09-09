@@ -246,33 +246,8 @@ body {
   align-items: center;
 }
 
-.sync-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.12);
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  transition: all 0.25s ease;
-}
-
-.sync-badge.badge-offline {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #fca5a5;
-}
-
-.sync-badge.badge-unreachable {
-  background: rgba(245, 158, 11, 0.2);
-  border-color: rgba(245, 158, 11, 0.4);
-  color: #fde68a;
-}
-
-.desktop-sync-badge {
-  margin: 0 8px;
+.sync-badge, .desktop-sync-badge {
+  display: none !important;
 }
 
 .online-dot {

@@ -35,19 +35,8 @@
             <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories" hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">分类管理</a>
             <a href="{{ url_for('category_insights_page') }}" class="{{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">分类洞察</a>
             <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">批量导入</a>
-            <span class="sync-badge desktop-sync-badge" id="desktopSyncStatusBadge" title="服务在线正常">
-                <span class="online-dot" id="desktopSyncStatusDot"></span>
-                <span id="desktopSyncStatusText"></span>
-            </span>
-            <a href="{{ url_for('logout') }}" style="color: rgba(255, 255, 255, 0.6); margin-left: 6px; font-size: 12.5px;" title="退出登录">登出</a>
+            <a href="{{ url_for('logout') }}" style="color: rgba(255, 255, 255, 0.6); margin-left: 12px; font-size: 13px;" title="退出登录">登出</a>
         </nav>
-        <!-- 移动端顶部状态指示 -->
-        <div class="mobile-header-right">
-            <span class="sync-badge" id="syncStatusBadge" title="服务在线正常">
-                <span class="online-dot" id="syncStatusDot"></span>
-                <span id="syncStatusText"></span>
-            </span>
-        </div>
     </div>
 </header>
 
