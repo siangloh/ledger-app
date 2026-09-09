@@ -992,7 +992,12 @@ canvas {
   .mobile-header-right { display: flex !important; }
   .mobile-bottom-nav { display: flex !important; }
 
-  /* 留出底部导航栏的安全距离 */
+  /* 留出底部导航栏的安全距离并杜绝全局横向溢出 */
+  html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
   body {
     padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
     -webkit-tap-highlight-color: transparent;
@@ -1001,6 +1006,9 @@ canvas {
   .container {
     margin: 12px auto 28px;
     padding: 0 14px;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
   }
 
   .cards, .panels {
@@ -1079,10 +1087,15 @@ canvas {
   }
 
   /* 表格在移动端支持平滑横向滚动与紧凑排版 */
+  /* 普通表格在移动端支持平滑局部横向滚动，不撑破全局视口 */
   .table-wrap {
     margin-bottom: 16px;
     border-radius: 14px;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
   }
   th, td {
     padding: 10px 12px;
@@ -1090,8 +1103,13 @@ canvas {
   }
 
   /* 移动端交易记录卡片化布局，彻底告别横向拖动 */
-  .table-wrap {
+  #recordsTableWrap {
     overflow-x: visible !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin-bottom: 16px;
   }
   table.records-table {
     display: block !important;
@@ -1107,6 +1125,15 @@ canvas {
     flex-direction: column !important;
     gap: 10px !important;
     width: 100% !important;
+  }
+  table.records-table tbody tr:not(.record-row) {
+    display: block !important;
+    text-align: center !important;
+    padding: 24px !important;
+    background: var(--surface) !important;
+    border-radius: 14px !important;
+    border: 1px solid var(--border) !important;
+    color: var(--muted) !important;
   }
   table.records-table tr.record-row {
     display: grid !important;

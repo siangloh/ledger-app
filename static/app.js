@@ -2220,23 +2220,39 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// 检查并更新 PWA 安装入口与浮动横幅状态
+function checkPwaUi() {
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const sheetBtn = document.getElementById('pwaSheetInstallBtn');
+  const banner = document.getElementById('pwaInstallBanner');
+
+  if (isStandalone) {
+    if (sheetBtn) sheetBtn.style.display = 'none';
+    if (banner) banner.style.display = 'none';
+    return;
+  }
+
+  // 非独立 App 模式下，在“更多”面板中始终展示安装入口
+  if (sheetBtn) {
+    sheetBtn.style.display = 'flex';
+  }
+
+  // 手机端且当前会话尚未关闭过提示条，延迟 1 秒平滑滑出
+  if (banner && !sessionStorage.getItem('pwa_banner_closed')) {
+    setTimeout(() => {
+      const stillNotStandalone = !(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true);
+      if (stillNotStandalone && !sessionStorage.getItem('pwa_banner_closed')) {
+        banner.style.display = 'flex';
+      }
+    }, 1000);
+  }
+}
+
 // 捕获 Android / Chrome 原生安装提示事件
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPwaPrompt = e;
-  
-  // 显示“更多”弹层中的安装入口
-  const sheetBtn = document.getElementById('pwaSheetInstallBtn');
-  if (sheetBtn) {
-    sheetBtn.style.display = 'flex';
-  }
-  
-  // 如果尚未安装且未在当前会话被用户主动关闭，展示轻量安装浮条
-  const banner = document.getElementById('pwaInstallBanner');
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  if (banner && !isStandalone && !sessionStorage.getItem('pwa_banner_closed')) {
-    banner.style.display = 'flex';
-  }
+  checkPwaUi();
 });
 
 // 监听安装完成事件
@@ -2266,29 +2282,36 @@ window.installPwaApp = function () {
     deferredPwaPrompt.userChoice.then((choiceResult) => {
       if (choiceResult && choiceResult.outcome === 'accepted') {
         console.log('[PWA] User accepted install prompt');
+        const banner = document.getElementById('pwaInstallBanner');
+        if (banner) banner.style.display = 'none';
       }
       deferredPwaPrompt = null;
     });
   } else {
-    // 检测 iOS Safari 提示
+    // 检测是否为 iOS Safari
     const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
     if (isIos && typeof Swal !== 'undefined') {
       Swal.fire({
-        title: '添加到主屏幕',
-        html: '<div style="text-align: left; font-size: 14px; line-height: 1.8; color: var(--text-secondary);">' +
+        title: '📲 添加到手机主屏幕',
+        html: '<div style="text-align: left; font-size: 14px; line-height: 1.8; color: var(--ink-soft);">' +
               '1. 点击 Safari 底部中间的 <b>分享按钮</b> <span style="font-size: 18px;">📤</span><br>' +
-              '2. 向下滑动找到并选择 <b>「添加到主屏幕」</b> <span style="font-size: 18px;">➕</span><br>' +
-              '3. 点击右上角「添加」即可免开浏览器沉浸使用！</div>',
+              '2. 向上滑动菜单找到并点击 <b>「添加到主屏幕」</b> <span style="font-size: 18px;">➕</span><br>' +
+              '3. 点击右上角「添加」，即可像原生 App 一样全屏使用！</div>',
         icon: 'info',
         confirmButtonText: '我知道了'
       });
     } else if (typeof Swal !== 'undefined') {
       Swal.fire({
-        title: '添加到主屏幕',
-        text: '请在浏览器菜单中选择「添加到主屏幕」或「安装应用」即可！',
+        title: '📲 安装为手机应用',
+        html: '<div style="text-align: left; font-size: 14px; line-height: 1.8; color: var(--ink-soft);">' +
+              '1. 点击浏览器右上角或底部的 <b>菜单按钮</b>（通常是三个点 <b>⋮</b> 或图标）<br>' +
+              '2. 在弹出的菜单列表中选择 <b>「安装应用」</b> 或 <b>「添加到主屏幕」</b> ➕<br>' +
+              '3. 确认后手机桌面即会生成独立 App 图标，无需再开浏览器！</div>',
         icon: 'info',
-        confirmButtonText: '确定'
+        confirmButtonText: '我知道了'
       });
+    } else {
+      alert('请在手机浏览器菜单中点击「安装应用」或「添加到主屏幕」！');
     }
   }
   if (typeof toggleMoreSheet === 'function') {
@@ -2301,6 +2324,12 @@ window.dismissPwaBanner = function () {
   if (banner) banner.style.display = 'none';
   sessionStorage.setItem('pwa_banner_closed', 'true');
 };
+
+// 页面加载及 HTMX 切换后主动检查 PWA 入口
+window.addEventListener('load', checkPwaUi);
+document.addEventListener('DOMContentLoaded', checkPwaUi);
+document.body.addEventListener('htmx:afterSwap', checkPwaUi);
+
 
 
 
