@@ -2156,6 +2156,34 @@ const InstantNav = {
 document.addEventListener('DOMContentLoaded', function () {
   initPageLifecycle();
 
+  // 核心优化：导航按钮点击瞬间（0ms 零延迟）立即点亮目标导航 Active 状态！
+  document.addEventListener('click', function (e) {
+    const navItem = e.target.closest('.mobile-bottom-nav .bnav-item, .desktop-nav-links a, .sheet-tile');
+    if (!navItem) return;
+    if (navItem.id === 'btnMoreSheet') return;
+
+    const navKey = navItem.dataset.nav;
+    if (navKey) {
+      // 1. 立即同步手机端底部导航高亮
+      const isSecondary = ['insights', 'recurring', 'categories', 'import', 'auto-track'].includes(navKey);
+      document.querySelectorAll('.mobile-bottom-nav .bnav-item').forEach(btn => {
+        if (btn.id === 'btnMoreSheet') {
+          btn.classList.toggle('active', isSecondary);
+        } else if (btn.dataset.nav) {
+          btn.classList.toggle('active', btn.dataset.nav === navKey);
+        }
+      });
+      // 2. 立即同步桌面端导航高亮
+      document.querySelectorAll('.desktop-nav-links a').forEach(a => {
+        a.classList.toggle('active', a.dataset.nav === navKey);
+      });
+      // 3. 立即同步底部抽屉高亮
+      document.querySelectorAll('.sheet-tile').forEach(tile => {
+        tile.classList.toggle('active', tile.dataset.nav === navKey);
+      });
+    }
+  }, true);
+
   // HTMX 事件监听器：连接顶部加载条、骨架屏与生命周期重新水合
   document.body.addEventListener('htmx:beforeRequest', function (evt) {
     showProgressBar();
@@ -2169,7 +2197,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 页面级导航时立即展示优雅的微光骨架屏，杜绝空白或卡顿等待
     const target = evt.detail.target;
-    const elt = evt.detail.elt;
+    const elt = evt.target || (evt.detail && evt.detail.elt);
     if (target && target.id === 'mainContainer') {
       const isNav = elt && (
         elt.closest('.desktop-nav-links') || 
@@ -2178,7 +2206,10 @@ document.addEventListener('DOMContentLoaded', function () {
         elt.tagName === 'A'
       );
       if (isNav) {
-        const targetUrl = (evt.detail.requestConfig && evt.detail.requestConfig.path) || (elt && elt.getAttribute('href')) || '';
+        const targetUrl = (evt.detail.pathInfo && evt.detail.pathInfo.requestPath) || 
+                          (evt.detail.requestConfig && evt.detail.requestConfig.path) || 
+                          (elt && elt.getAttribute('href')) || 
+                          (elt && elt.getAttribute('hx-get')) || '';
         // 关键改进：在触发骨架屏展示的瞬间，立即同步点亮对应页面的 Navigation 按钮为 Active 状态！
         if (targetUrl) {
           updateActiveNav(targetUrl);
