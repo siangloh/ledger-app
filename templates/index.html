@@ -37,6 +37,7 @@
     <section class="panel">
       <h3>快速录入</h3>
       <form method="post" action="{{ url_for('add_transaction') }}" class="quick-add" id="quickAddForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="source" value="manual">
         <div class="row seg-row">
           <label class="seg"><input type="radio" name="type" value="expense" checked onchange="onTypeChange()"><span>支出</span></label>
@@ -69,6 +70,7 @@
       <h3>自然语言快速记账</h3>
       <p class="hint">例如："午饭 15"、"副业 稿费 200"、"工资 8000"。解析后会先让你确认再保存。</p>
       <form method="post" action="{{ url_for('nlp_parse') }}" class="nlp-form" id="nlpForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="text" name="text" placeholder="输入一句话，如：打车 32.5" required>
         <button type="submit" class="btn-primary">智能解析</button>
       </form>

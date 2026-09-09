@@ -59,6 +59,7 @@
             <ul>
               <li>请求方式：<code>POST</code></li>
               <li>URL：填入左侧复制的 Webhook URL</li>
+              <li>请求头 (Headers)：添加 <code>X-API-KEY: {{ api_key }}</code></li>
               <li>请求体格式：<code>application/json</code></li>
               <li>内容填入：<code>{"text": "[notification_text]"}</code></li>
             </ul>
@@ -70,7 +71,7 @@
       <div style="margin-bottom: 14px;">
         <strong style="color: var(--navy);">方案 B：Tasker 或 SmsForwarder（短信转发器）</strong>
         <p style="margin: 4px 0;">
-          如果你的银行发的是 SMS 短信通知，可以使用开源免费的 <strong>SmsForwarder</strong>，添加发送通道为 Webhook，把左侧 URL 填入即可。
+          如果你的银行发的是 SMS 短信通知，可以使用开源免费的 <strong>SmsForwarder</strong>，添加发送通道为 Webhook，把左侧 URL 填入，并在 Headers 请求头中添加 <code>X-API-KEY: {{ api_key }}</code> 即可。
         </p>
       </div>
 
@@ -133,7 +134,10 @@ async function submitTestAutoTrack(e) {
   try {
     const res = await fetch("{{ webhook_url | safe }}", {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-KEY': '{{ api_key }}'
+      },
       body: JSON.stringify({ text: text })
     });
     const data = await res.json();

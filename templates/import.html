@@ -5,6 +5,7 @@
 <p class="hint">支持从银行账单等导出的 .csv / .xlsx / .xls 文件导入，上传后可以预览并调整列映射，确认无误后再正式导入。</p>
 
 <form method="post" action="{{ url_for('import_upload') }}" enctype="multipart/form-data" class="quick-add" id="importUploadForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="row">
     <input type="file" name="file" accept=".csv,.xlsx,.xls" required>
   </div>

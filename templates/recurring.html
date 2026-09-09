@@ -7,6 +7,7 @@
   也可以点击下方按钮手动生成本月记录（当前月份：{{ current_month }}）。
 </p>
 <form method="post" action="{{ url_for('manual_generate_recurring') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <button type="submit" class="btn-primary">生成本月固定收支</button>
 </form>
 
@@ -28,11 +29,13 @@
       <td>{{ r.last_generated_month or '—' }}</td>
       <td class="actions">
         <form method="post" action="{{ url_for('toggle_recurring', rule_id=r.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn-ghost">{{ '停用' if r.is_active else '启用' }}</button>
         </form>
         <form method="post" action="{{ url_for('delete_recurring', rule_id=r.id) }}" class="js-delete-confirm"
               data-confirm-title="删除这条固定收支规则？"
               data-confirm-text="{{ '收入' if r.type=='income' else '支出' }} · {{ r.category }} · {{ r.amount|money }} · 每月{{ r.day_of_month }}号<br>删除后每月将不再自动生成，此操作不可撤销。">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn-danger-ghost">删除</button>
         </form>
       </td>
@@ -47,6 +50,7 @@
 <section class="panel">
   <h3>新增固定收支规则</h3>
   <form method="post" action="{{ url_for('add_recurring') }}" class="quick-add" id="quickAddForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="row seg-row">
       <label class="seg"><input type="radio" name="type" value="expense" checked onchange="onTypeChange()"><span>支出</span></label>
       <label class="seg"><input type="radio" name="type" value="income" onchange="onTypeChange()"><span>收入</span></label>

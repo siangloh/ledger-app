@@ -16,6 +16,7 @@
 </div>
 
 <form method="post" action="{{ url_for('import_confirm') }}" class="quick-add">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="token" value="{{ token }}">
   <input type="hidden" name="ext" value="{{ ext }}">
 

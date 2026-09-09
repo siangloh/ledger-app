@@ -18,8 +18,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MyLedgerCompanion"
-        android:usesCleartextTraffic="true">
+        android:theme="@style/Theme.MyLedgerCompanion">
 
         <!-- 主活动：全屏展示账本 UI -->
         <activity

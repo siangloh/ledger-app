@@ -12,12 +12,14 @@
         <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
               data-confirm-title="删除分类「{{ c.name }}」？"
               data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
         </form>
       </li>
       {% else %}<li class="hint">暂无</li>{% endfor %}
     </ul>
     <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="income">
       <input type="hidden" name="group_name" value="main">
       <input type="text" name="name" placeholder="新增子分类名称" required>
@@ -33,12 +35,14 @@
         <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
               data-confirm-title="删除分类「{{ c.name }}」？"
               data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
         </form>
       </li>
       {% else %}<li class="hint">暂无</li>{% endfor %}
     </ul>
     <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="income">
       <input type="hidden" name="group_name" value="side">
       <input type="text" name="name" placeholder="新增子分类名称" required>
@@ -54,12 +58,14 @@
         <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
               data-confirm-title="删除分类「{{ c.name }}」？"
               data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
         </form>
       </li>
       {% else %}<li class="hint">暂无</li>{% endfor %}
     </ul>
     <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="expense">
       <input type="text" name="name" placeholder="新增分类名称" required>
       <button type="submit" class="btn-primary btn-sm">添加</button>

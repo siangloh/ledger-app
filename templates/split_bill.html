@@ -130,6 +130,7 @@ Total 75.21"></textarea>
         <p style="font-size: 12px; color: var(--ink-soft); margin: 4px 0 0;">无需重复手动打字，直接将“我”在本次聚餐中实际消费的金额记为支出。</p>
       </div>
       <form method="post" action="{{ url_for('split_bill_save_record') }}" style="display: flex; gap: 10px; align-items: center;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="amount" id="saveMyAmount" value="0">
         <input type="hidden" name="date" value="{{ today }}">
         <input type="hidden" name="category" value="餐饮">
@@ -417,6 +418,7 @@ async function parseTextReceipt() {
 
   try {
     const formData = new FormData();
+    formData.append('csrf_token', document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}');
     formData.append('text', text);
     const res = await fetch('/split-bill/parse-text', {
       method: 'POST',
@@ -442,6 +444,7 @@ async function handleImageUpload(e) {
   status.innerText = '正在上传并分析小票照片...';
 
   const formData = new FormData();
+  formData.append('csrf_token', document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}');
   formData.append('file', file);
 
   try {

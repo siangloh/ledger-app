@@ -22,17 +22,41 @@ import turso_db
 TURSO_URL = turso_db.TURSO_URL
 TURSO_AUTH_TOKEN = turso_db.TURSO_AUTH_TOKEN
 
+from flask_wtf.csrf import CSRFProtect
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(24).hex()
 
+# CSRF 保护 (全局启用，自动化 Webhook 使用 @csrf.exempt 排除)
+csrf = CSRFProtect(app)
+
+# 安全 Session Cookie 标志 (生产环境/HTTPS 开启 Secure)
+is_production = os.environ.get('RENDER') or os.environ.get('FLASK_ENV') == 'production' or os.environ.get('SESSION_COOKIE_SECURE', '0') == '1'
+app.config['SESSION_COOKIE_SECURE'] = bool(is_production)
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# 限制上传文件大小最大 10MB
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
+
 # 自动记账 API 鉴权密钥 (无硬编码默认值)
 AUTO_TRACK_KEY = os.environ.get('AUTO_TRACK_KEY')
+AUTO_TRACK_DEBUG_LOG = os.environ.get('AUTO_TRACK_DEBUG_LOG', '0') == '1'
 
 # 单用户访问密码 (无硬编码默认值)
 APP_PASSWORD = os.environ.get('APP_PASSWORD')
 
 # 本地单人使用的开发服务器：关闭静态文件缓存，避免浏览器缓存旧的 CSS/JS 导致改动看不到
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    if request.is_json or request.path.startswith('/split-bill/ocr-upload'):
+        return jsonify({'ok': False, 'message': '上传文件大小超出限制（最大允许 10MB）'}), 413
+    flash('上传文件大小超出限制（最大允许 10MB）', 'error')
+    return redirect(request.referrer or url_for('index'))
+
 
 
 @app.before_request
@@ -805,12 +829,13 @@ def nlp_parse():
 # ---------------------------------------------------------------------------
 
 @app.route('/api/auto-track', methods=['POST'])
+@csrf.exempt
 def api_auto_track():
-    # 鉴权检查：支持 URL 参数 ?key=xxx 或 Header X-API-KEY 或 JSON 中的 key
-    req_key = request.args.get('key') or request.headers.get('X-API-KEY')
+    # 鉴权检查：仅支持 Header X-API-KEY 或 JSON/Form 中的 key (禁止使用 URL ?key= 参数以避免日志与历史记录泄露)
+    req_key = request.headers.get('X-API-KEY')
     data = {}
     if request.is_json:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         if not req_key:
             req_key = data.get('key')
     else:
@@ -846,7 +871,8 @@ def api_auto_track():
         from urllib.parse import unquote
         text = unquote(text[5:]).strip()
 
-    print(f"[AUTO_TRACK DEBUG] Final Extracted text: {repr(text)}")
+    if AUTO_TRACK_DEBUG_LOG:
+        print(f"[AUTO_TRACK DEBUG] Final Extracted text: {repr(text)}")
 
     if not text or text == "None" or text == "null":
         return jsonify({
@@ -855,10 +881,12 @@ def api_auto_track():
         }), 400
 
     parsed = parse_auto_track_notification(text)
-    print(f"[AUTO_TRACK DEBUG] Parsed result: {parsed}")
+    if AUTO_TRACK_DEBUG_LOG:
+        print(f"[AUTO_TRACK DEBUG] Parsed result: {parsed}")
 
     if not parsed or not parsed.get('amount'):
-        print("[AUTO_TRACK DEBUG] Failed to parse amount! Returning 422")
+        if AUTO_TRACK_DEBUG_LOG:
+            print("[AUTO_TRACK DEBUG] Failed to parse amount! Returning 422")
         return jsonify({
             'ok': False,
             'message': '未能从通知中提取出有效金额或商户信息',
@@ -896,7 +924,7 @@ def api_auto_track():
 def auto_track_page():
     """Auto Track 配置与测试页面"""
     base_url = request.host_url.rstrip('/')
-    webhook_url = f"{base_url}/api/auto-track?key={AUTO_TRACK_KEY}"
+    webhook_url = f"{base_url}/api/auto-track"
     return render_template(
         'auto_track.html',
         api_key=AUTO_TRACK_KEY,
@@ -1368,5 +1396,7 @@ if __name__ == '__main__':
             os.remove(os.path.join(UPLOAD_DIR, fn))
         except OSError:
             pass
+    flask_debug = os.environ.get('FLASK_DEBUG', '0').lower() in ('1', 'true')
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host='0.0.0.0', port=port)
+    app.run(debug=flask_debug, host='0.0.0.0', port=port)
+

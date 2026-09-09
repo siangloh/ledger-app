@@ -15,11 +15,12 @@ object NetworkHelper {
         Thread {
             try {
                 val encodedText = URLEncoder.encode(text, "UTF-8")
-                val fullUrl = "$BASE_WEBHOOK_URL?key=$API_KEY&text=$encodedText"
+                val fullUrl = "$BASE_WEBHOOK_URL?text=$encodedText"
 
                 val url = URL(fullUrl)
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
+                conn.setRequestProperty("X-API-KEY", API_KEY)
                 conn.connectTimeout = 15000
                 conn.readTimeout = 15000
                 conn.doOutput = true

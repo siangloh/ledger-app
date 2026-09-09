@@ -28,6 +28,7 @@
 <p class="hint">筛选结果合计 — 收入 {{ total_income|money }}，支出 {{ total_expense|money }}，共 {{ rows|length }} 条</p>
 
 <form method="post" action="{{ url_for('batch_delete_records') }}" id="batchForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <!-- 批量操作控制栏 -->
   <div class="batch-bar" id="batchBar" style="display: none; align-items: center; justify-content: space-between; background: var(--surface-soft); padding: 10px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 14px;">
     <div style="font-size: 14px; color: var(--ink-soft);">
@@ -177,6 +178,11 @@ function confirmSingleDelete(actionUrl, detailText) {
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = actionUrl;
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrf_token';
+        csrfInput.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+        form.appendChild(csrfInput);
         document.body.appendChild(form);
         form.submit();
       }
@@ -186,6 +192,11 @@ function confirmSingleDelete(actionUrl, detailText) {
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = actionUrl;
+      const csrfInput = document.createElement('input');
+      csrfInput.type = 'hidden';
+      csrfInput.name = 'csrf_token';
+      csrfInput.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+      form.appendChild(csrfInput);
       document.body.appendChild(form);
       form.submit();
     }
