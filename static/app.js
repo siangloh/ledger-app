@@ -51,6 +51,8 @@ function sendPhoneNotification(title, body, options = {}) {
 }
 
 function onExpenseModeChange() {
+  const typeRadio = document.querySelector('input[name="type"]:checked');
+  const isExpense = !typeRadio || typeRadio.value === 'expense';
   const modeRadio = document.querySelector('input[name="expense_mode"]:checked');
   const mode = modeRadio ? modeRadio.value : 'regular';
   const fromSavingsInput = document.getElementById('fromSavingsInput');
@@ -58,13 +60,13 @@ function onExpenseModeChange() {
   const quickChips = document.getElementById('quickChipsRow');
 
   if (fromSavingsInput) {
-    fromSavingsInput.value = (mode === 'savings') ? '1' : '0';
+    fromSavingsInput.value = (isExpense && mode === 'savings') ? '1' : '0';
   }
   if (fromSavingsBox) {
-    fromSavingsBox.style.display = (mode === 'savings') ? 'block' : 'none';
+    fromSavingsBox.style.display = (isExpense && mode === 'savings') ? 'block' : 'none';
   }
   if (quickChips) {
-    quickChips.style.display = (mode === 'regular') ? 'flex' : 'none';
+    quickChips.style.display = (isExpense && mode === 'regular') ? 'flex' : 'none';
   }
   syncSegStyles();
 }
@@ -2013,6 +2015,7 @@ function updateActiveNav(urlStr) {
 
 // 页面全局生命周期初始化函数
 function initPageLifecycle() {
+  onTypeChange();
   populateCategories();
   toggleTypeCol();
   attachDeleteConfirm();

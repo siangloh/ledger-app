@@ -58,5 +58,8 @@ window.CATEGORY_DATA = {
   income_side: {{ income_categories.side | tojson }},
   savings: {{ savings_categories | tojson }}
 };
+if (typeof onTypeChange === 'function') {
+  onTypeChange();
+}
 </script>
 {% endblock %}

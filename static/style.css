@@ -2139,5 +2139,32 @@ canvas {
   background: rgba(255, 255, 255, 0.4);
 }
 
+/* ----------------------------------------------------
+   快速录入 / 编辑表单：基于 CSS :has() 的纯原生条件显示规则
+   确保即使 JS 尚未就绪或网络/缓存延迟，也绝不出现选项串场
+   ---------------------------------------------------- */
+/* 仅当选择“支出”时，才允许普通支出/储蓄支出子行显示 */
+#quickAddForm:has(input[name="type"][value="income"]:checked) #expenseSubRow,
+#quickAddForm:has(input[name="type"][value="savings"]:checked) #expenseSubRow {
+  display: none !important;
+}
 
+/* 仅在“普通支出”时才显示快捷标签（早餐、午餐等） */
+#quickAddForm:has(input[name="type"][value="income"]:checked) #quickChipsRow,
+#quickAddForm:has(input[name="type"][value="savings"]:checked) #quickChipsRow,
+#quickAddForm:has(input[name="expense_mode"][value="savings"]:checked) #quickChipsRow {
+  display: none !important;
+}
 
+/* 仅在“储蓄支出”时才显示从哪项储蓄扣除的下拉框 */
+#quickAddForm:has(input[name="type"][value="income"]:checked) #fromSavingsCategoryBox,
+#quickAddForm:has(input[name="type"][value="savings"]:checked) #fromSavingsCategoryBox,
+#quickAddForm:has(input[name="expense_mode"][value="regular"]:checked) #fromSavingsCategoryBox {
+  display: none !important;
+}
+
+/* 仅在“收入”时才显示主业/副业单选行 */
+#quickAddForm:has(input[name="type"][value="expense"]:checked) #groupRow,
+#quickAddForm:has(input[name="type"][value="savings"]:checked) #groupRow {
+  display: none !important;
+}
