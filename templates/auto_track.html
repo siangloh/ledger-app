@@ -29,9 +29,10 @@
     
     <div class="quick-examples" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
       <button type="button" class="btn-ghost btn-sm" onclick="fillTestExample('tng')">范例 1：TnG 全家便利店</button>
-      <button type="button" class="btn-ghost btn-sm" onclick="fillTestExample('petronas')">范例 2：Maybank Petronas加油</button>
-      <button type="button" class="btn-ghost btn-sm" onclick="fillTestExample('starbucks')">范例 3：Starbucks 咖啡</button>
-      <button type="button" class="btn-ghost btn-sm" onclick="fillTestExample('watsons')">范例 4：Watsons 购物</button>
+      <button type="button" class="btn-ghost btn-sm" onclick="fillTestExample('transfer')">范例 2：TnG 转账成功 (Transfer)</button>
+      <button type="button" class="btn-ghost btn-sm" onclick="fillTestExample('petronas')">范例 3：Maybank Petronas加油</button>
+      <button type="button" class="btn-ghost btn-sm" onclick="fillTestExample('starbucks')">范例 4：Starbucks 咖啡</button>
+      <button type="button" class="btn-ghost btn-sm" onclick="fillTestExample('watsons')">范例 5：Watsons 购物</button>
     </div>
 
     <form id="testAutoTrackForm" onsubmit="submitTestAutoTrack(event)">
@@ -110,6 +111,8 @@ function fillTestExample(type) {
   const textarea = document.getElementById('testNotificationText');
   if (type === 'tng') {
     textarea.value = "Touch 'n Go eWallet: You have successfully paid RM 18.50 to FamilyMart SS15 on 06/09/2026. Ref: TNG8892182.";
+  } else if (type === 'transfer') {
+    textarea.value = "Transfer Successful.\n\nRM 0.01 has been successfully transferred to xxx.";
   } else if (type === 'petronas') {
     textarea.value = "MAE by Maybank: RM 50.00 spent at PETRONAS SOLARIS on 06/09/2026 via DuitNow QR.";
   } else if (type === 'starbucks') {

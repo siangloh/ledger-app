@@ -39,23 +39,35 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 # 限制上传文件大小最大 10MB
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 
-# 自动记账 API 鉴权密钥 (无硬编码默认值)
+# 自动记账 API 鉴权密钥 (支持用户指定 key、环境变量及数据库配置)
+DEFAULT_AUTO_TRACK_KEY = 'zo}SxK_}_%0LO8w;'
 AUTO_TRACK_KEY = os.environ.get('AUTO_TRACK_KEY')
 AUTO_TRACK_DEBUG_LOG = os.environ.get('AUTO_TRACK_DEBUG_LOG', '0') == '1'
 
-# 获取有效的 AUTO_TRACK_KEY（优先环境变量，次选数据库 system_settings，保底默认 key）
+# 获取有效的 AUTO_TRACK_KEY（优先环境变量，次选数据库 system_settings，保底指定默认 key）
 def get_auto_track_key():
-    if AUTO_TRACK_KEY:
-        return AUTO_TRACK_KEY
+    if AUTO_TRACK_KEY and AUTO_TRACK_KEY.strip():
+        return AUTO_TRACK_KEY.strip()
     try:
         db = get_db()
         row = db.execute("SELECT value FROM system_settings WHERE key='auto_track_key'").fetchone()
-        if row and row['value']:
-            return row['value']
+        if row and row['value'] and str(row['value']).strip():
+            return str(row['value']).strip()
     except Exception:
         pass
-    # 保底默认 key（部署时强烈建议在 Render 环境变量设置 AUTO_TRACK_KEY 覆盖此值）
-    return 'ledger-auto-track-default-key'
+    return DEFAULT_AUTO_TRACK_KEY
+
+
+def is_valid_api_key(req_key):
+    """检验 API Key 是否合法（支持去除首尾空格、兼容默认与环境变量 key）"""
+    if not req_key:
+        return False
+    k = str(req_key).strip()
+    effective = (get_auto_track_key() or '').strip()
+    valid_set = {effective, DEFAULT_AUTO_TRACK_KEY, 'ledger-auto-track-default-key'}
+    if AUTO_TRACK_KEY and AUTO_TRACK_KEY.strip():
+        valid_set.add(AUTO_TRACK_KEY.strip())
+    return k in valid_set
 
 # 本地 LLM (Ollama) 配置用于过滤营销推广假通知 (Phase-2)
 OLLAMA_URL = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
@@ -121,7 +133,7 @@ def require_login():
         req_key = request.headers.get('X-API-KEY')
         if not req_key and request.is_json:
             req_key = (request.get_json(silent=True) or {}).get('key')
-        if AUTO_TRACK_KEY and req_key == AUTO_TRACK_KEY:
+        if is_valid_api_key(req_key):
             return
         if request.path.startswith('/api/auto-track'):
             return
@@ -246,6 +258,13 @@ def init_db():
         value TEXT NOT NULL
     );
     ''')
+    try:
+        db.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES ('auto_track_key', ?)", (DEFAULT_AUTO_TRACK_KEY,))
+        db.execute("UPDATE system_settings SET value = ? WHERE key = 'auto_track_key' AND (value IS NULL OR value = '' OR value = 'ledger-auto-track-default-key')", (DEFAULT_AUTO_TRACK_KEY,))
+        db.commit()
+    except Exception:
+        pass
+
     if db.execute('SELECT COUNT(*) FROM categories').fetchone()[0] == 0:
         defaults = [
             ('income', 'main', '工资'),
@@ -1289,8 +1308,7 @@ def api_auto_track():
     if not req_key:
         req_key = request.args.get('key')
 
-    effective_key = get_auto_track_key()
-    if not effective_key or req_key != effective_key:
+    if not is_valid_api_key(req_key):
         return jsonify({'ok': False, 'message': 'API Key 无效或未在服务器配置，拒绝访问'}), 401
 
     # 获取通知文本：优先从 Query 参数获取，再从 JSON / 表单 / Raw Payload 获取
@@ -1360,7 +1378,9 @@ def api_auto_track():
     lower_text = text.lower()
     has_strong_payment_receipt = any(k in lower_text for k in [
         'paid rm', 'paid to', 'payment of rm', 'payment of', 'spent rm', 'spent at',
-        'transfer of rm', 'transferred rm', 'transferred to', 'duitnow qr', 'duitnow transfer',
+        'transfer of rm', 'transferred rm', 'transferred to', 'transfer to',
+        'transfer successful', 'transferred to', 'successfully transferred',
+        'duitnow qr', 'duitnow transfer', 'payment successful',
         '付款 rm', '付款成功', '扣款 rm', '扣款成功', '转账给', '已支付', 'successfully paid'
     ])
 
@@ -1413,7 +1433,7 @@ def api_auto_track():
 def api_get_categories():
     """获取所有可用分类列表（支持 Android 端离线缓存与下拉选择）"""
     req_key = request.headers.get('X-API-KEY')
-    if not get_auto_track_key() or req_key != get_auto_track_key():
+    if not is_valid_api_key(req_key):
         if not session.get('logged_in'):
             return jsonify({'ok': False, 'message': 'API Key 无效或未登录'}), 401
 
@@ -1428,7 +1448,7 @@ def api_get_categories():
 def api_sync_transactions():
     """批量同步移动端离线记账数据"""
     req_key = request.headers.get('X-API-KEY')
-    if not get_auto_track_key() or req_key != get_auto_track_key():
+    if not is_valid_api_key(req_key):
         if not session.get('logged_in'):
             return jsonify({'ok': False, 'message': 'API Key 无效或未登录'}), 401
 
