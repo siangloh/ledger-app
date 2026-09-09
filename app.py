@@ -47,7 +47,20 @@ AUTO_TRACK_DEBUG_LOG = os.environ.get('AUTO_TRACK_DEBUG_LOG', '0') == '1'
 OLLAMA_URL = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
 OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'qwen2.5')
 
-# 单用户访问密码 (无硬编码默认值)
+# 单用户访问密码 (优先环境变量，次选数据库 system_settings，保底 admin123)
+def get_app_password():
+    env_pw = os.environ.get('APP_PASSWORD')
+    if env_pw:
+        return env_pw
+    try:
+        db = get_db()
+        row = db.execute("SELECT value FROM system_settings WHERE key='app_password'").fetchone()
+        if row and row['value']:
+            return row['value']
+    except Exception:
+        pass
+    return 'admin123'
+
 APP_PASSWORD = os.environ.get('APP_PASSWORD')
 
 # 本地单人使用的开发服务器：关闭静态文件缓存，避免浏览器缓存旧的 CSS/JS 导致改动看不到
@@ -117,16 +130,14 @@ def login():
 
     if request.method == 'POST':
         password = request.form.get('password', '')
-        if not APP_PASSWORD:
-            flash('系统未配置 APP_PASSWORD 环境变量，请在环境或控制台配置。', 'error')
-            return render_template('login.html', next=next_url), 500
+        valid_password = get_app_password()
 
-        if password == APP_PASSWORD:
+        if password == valid_password:
             session['logged_in'] = True
             flash('登录成功！', 'success')
             return redirect(next_url)
         else:
-            flash('访问密码错误，请重试。', 'error')
+            flash('访问密码错误，请重试。默认密码为 admin123', 'error')
             return render_template('login.html', next=next_url), 401
 
     return render_template('login.html', next=next_url)
@@ -214,6 +225,11 @@ def init_db():
         merchant_note TEXT PRIMARY KEY,
         category TEXT NOT NULL,
         updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS system_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
     );
     ''')
     if db.execute('SELECT COUNT(*) FROM categories').fetchone()[0] == 0:

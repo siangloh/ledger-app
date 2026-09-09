@@ -133,7 +133,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>
         访问密码
-        <input type="password" name="password" placeholder="请输入 APP_PASSWORD" required autofocus autocomplete="current-password">
+        <input type="password" name="password" placeholder="请输入访问密码（默认：admin123）" required autofocus autocomplete="current-password">
       </label>
       {% if next %}
       <input type="hidden" name="next" value="{{ next }}">
