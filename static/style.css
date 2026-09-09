@@ -1818,3 +1818,48 @@ canvas {
   border-top: none !important;
 }
 
+/* ---------- 实时无刷新局部更新动态反馈 ---------- */
+@keyframes livePulseGlow {
+  0% {
+    background-color: rgba(30, 122, 92, 0.35) !important;
+    box-shadow: 0 0 16px rgba(30, 122, 92, 0.45);
+    transform: scale(1.008);
+  }
+  50% {
+    background-color: rgba(30, 122, 92, 0.18) !important;
+    box-shadow: 0 0 8px rgba(30, 122, 92, 0.25);
+  }
+  100% {
+    background-color: transparent !important;
+    box-shadow: none;
+    transform: scale(1);
+  }
+}
+
+.row-highlight-new {
+  animation: livePulseGlow 3.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.card-live-pulse {
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+}
+
+.card-updated {
+  animation: livePulseGlow 2.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sync-badge.live-active {
+  background: rgba(30, 122, 92, 0.18);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.sync-badge.live-pulse {
+  animation: syncBadgeFlash 1.5s ease-out;
+}
+
+@keyframes syncBadgeFlash {
+  0% { background: var(--green); color: #fff; transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+

@@ -94,6 +94,24 @@ def get_app_password():
 
 APP_PASSWORD = os.environ.get('APP_PASSWORD')
 
+# ---------------------------------------------------------------------------
+# 实时同步与局部更新状态版本控制
+# ---------------------------------------------------------------------------
+import time
+
+DATA_VERSION = int(time.time() * 1000)
+LATEST_EVENT = None
+
+def bump_data_version(event_type='update', data=None):
+    global DATA_VERSION, LATEST_EVENT
+    DATA_VERSION = int(time.time() * 1000)
+    LATEST_EVENT = {
+        'version': DATA_VERSION,
+        'type': event_type,
+        'timestamp': datetime.now().isoformat(),
+        'data': data or {}
+    }
+
 # 本地单人使用的开发服务器：关闭静态文件缓存，避免浏览器缓存旧的 CSS/JS 导致改动看不到
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
@@ -104,7 +122,6 @@ def request_entity_too_large(error):
         return jsonify({'ok': False, 'message': '上传文件大小超出限制（最大允许 10MB）'}), 413
     flash('上传文件大小超出限制（最大允许 10MB）', 'error')
     return redirect(request.referrer or url_for('index'))
-
 
 
 @app.route('/health')
@@ -125,14 +142,15 @@ def inject_globals():
     is_hx = bool(request.headers.get('HX-Request'))
     return {
         'layout': 'partial.html' if is_hx else 'base.html',
-        'is_hx': is_hx
+        'is_hx': is_hx,
+        'data_version': DATA_VERSION
     }
 
 
 @app.before_request
 def require_login():
     # 允许静态资源、登录/登出路由、健康检查以及外部自动记账 Webhook 豁免 Session 检查
-    if request.endpoint in ('login', 'logout', 'static', 'health') or request.path == '/health' or (request.path and request.path.startswith('/static/')):
+    if request.endpoint in ('login', 'logout', 'static', 'health', 'api_realtime_check') or request.path in ('/health', '/api/realtime/check') or (request.path and request.path.startswith('/static/')):
         return
     if request.path.startswith('/api/'):
         req_key = request.headers.get('X-API-KEY')
@@ -640,6 +658,93 @@ def index():
     )
 
 
+@app.route('/api/realtime/check')
+def api_realtime_check():
+    client_v = request.args.get('v', type=int)
+    has_update = False
+    if client_v is not None and client_v < DATA_VERSION:
+        has_update = True
+    return jsonify({
+        'ok': True,
+        'version': DATA_VERSION,
+        'has_update': has_update,
+        'event': LATEST_EVENT if has_update else None
+    })
+
+
+@app.route('/partial/dashboard-cards')
+def partial_dashboard_cards():
+    month = request.args.get('month') or date.today().strftime('%Y-%m')
+    db = get_db()
+    year, mon = map(int, month.split('-'))
+    last_day = monthrange(year, mon)[1]
+    start = f'{month}-01'
+    end = f'{month}-{last_day:02d}'
+
+    rows = db.execute(
+        'SELECT type, group_name, category, amount FROM transactions WHERE date BETWEEN ? AND ?',
+        (start, end)
+    ).fetchall()
+
+    total_income = sum(r['amount'] for r in rows if r['type'] == 'income')
+    total_expense = sum(r['amount'] for r in rows if r['type'] == 'expense')
+    total_savings = sum(r['amount'] for r in rows if r['type'] == 'savings')
+    balance = total_income - total_expense
+
+    savings_by_category = {}
+    for r in rows:
+        if r['type'] == 'savings':
+            c = r['category'] or '储蓄'
+            savings_by_category[c] = savings_by_category.get(c, 0.0) + r['amount']
+
+    return render_template(
+        'partials/dashboard_cards.html',
+        total_income=total_income,
+        total_expense=total_expense,
+        total_savings=total_savings,
+        balance=balance,
+        savings_by_category=savings_by_category,
+    )
+
+
+@app.route('/api/dashboard-charts')
+def api_dashboard_charts():
+    month = request.args.get('month') or date.today().strftime('%Y-%m')
+    db = get_db()
+    year, mon = map(int, month.split('-'))
+    last_day = monthrange(year, mon)[1]
+    start = f'{month}-01'
+    end = f'{month}-{last_day:02d}'
+
+    rows = db.execute(
+        'SELECT type, group_name, category, amount FROM transactions WHERE date BETWEEN ? AND ?',
+        (start, end)
+    ).fetchall()
+
+    income_group = {'main': 0.0, 'side': 0.0}
+    expense_by_category = {}
+    for r in rows:
+        if r['type'] == 'income':
+            gname = r['group_name'] or 'main'
+            income_group[gname] = income_group.get(gname, 0.0) + r['amount']
+        elif r['type'] == 'expense':
+            c = r['category'] or '其他'
+            expense_by_category[c] = expense_by_category.get(c, 0.0) + r['amount']
+
+    return jsonify({
+        'ok': True,
+        'month': month,
+        'income': {
+            'labels': ['主业收入', '副业收入'],
+            'values': [income_group.get('main', 0.0), income_group.get('side', 0.0)]
+        },
+        'expense': {
+            'labels': list(expense_by_category.keys()),
+            'values': list(expense_by_category.values())
+        }
+    })
+
+
 @app.route('/api/overview')
 def api_overview():
     db = get_db()
@@ -1000,6 +1105,15 @@ def add_transaction():
          f.get('source', 'manual'), datetime.now().isoformat())
     )
     db.commit()
+    bump_data_version('add', {
+        'id': cur.lastrowid,
+        'note': f.get('note', ''),
+        'amount': amount,
+        'category': f.get('category'),
+        'type': tx_type,
+        'date': tx_date,
+        'source': f.get('source', 'manual')
+    })
 
     if is_ajax_request():
         return jsonify({
@@ -1053,11 +1167,24 @@ def records():
     total_expense = sum(r['amount'] for r in rows if r['type'] == 'expense')
     total_savings = sum(r['amount'] for r in rows if r['type'] == 'savings')
 
+    latest_id = LATEST_EVENT['data'].get('id') if LATEST_EVENT and LATEST_EVENT.get('data') else None
+
+    if request.args.get('partial') == '1':
+        return render_template(
+            'partials/records_content.html',
+            rows=rows,
+            total_income=total_income,
+            total_expense=total_expense,
+            total_savings=total_savings,
+            latest_id=latest_id
+        )
+
     return render_template(
         'records.html',
         rows=rows, start=start, end=end, type=type_, category=category,
         categories=[c['category'] for c in all_categories],
         total_income=total_income, total_expense=total_expense, total_savings=total_savings,
+        latest_id=latest_id
     )
 
 
@@ -1092,6 +1219,7 @@ def edit_record(tx_id):
             (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), tx_id)
         )
         db.commit()
+        bump_data_version('edit', {'id': tx_id})
 
         if is_ajax_request():
             return jsonify({'ok': True, 'message': '记录已更新'})
@@ -1119,6 +1247,7 @@ def delete_record(tx_id):
     db = get_db()
     db.execute('DELETE FROM transactions WHERE id=?', (tx_id,))
     db.commit()
+    bump_data_version('delete', {'id': tx_id})
 
     if is_ajax_request():
         return jsonify({'ok': True, 'message': '记录已删除', 'id': tx_id})
@@ -1149,6 +1278,7 @@ def batch_delete_records():
         placeholders = ','.join('?' * len(valid_ids))
         db.execute(f'DELETE FROM transactions WHERE id IN ({placeholders})', valid_ids)
         db.commit()
+        bump_data_version('batch_delete', {'count': len(valid_ids)})
 
         if is_ajax_request():
             return jsonify({'ok': True, 'message': f'成功批量删除 {len(valid_ids)} 条记录', 'deleted_ids': valid_ids})
@@ -1219,6 +1349,7 @@ def batch_edit_records():
 
     db.execute(f"UPDATE transactions SET {set_clause} WHERE id IN ({placeholders})", params)
     db.commit()
+    bump_data_version('batch_edit', {'count': len(valid_ids)})
 
     if is_ajax_request():
         return jsonify({'ok': True, 'message': f'成功批量修改 {len(valid_ids)} 条记录', 'edited_ids': valid_ids})
@@ -1423,6 +1554,15 @@ def api_auto_track():
         )
     )
     db.commit()
+    bump_data_version('auto_track', {
+        'id': cur.lastrowid,
+        'note': parsed['note'],
+        'amount': parsed['amount'],
+        'category': parsed['category'],
+        'type': parsed['type'],
+        'date': parsed['date'],
+        'source': 'auto_track'
+    })
 
     return jsonify({
         'ok': True,
@@ -1988,6 +2128,7 @@ def split_bill_save_record():
         (tx_date, 'expense', None, category, amount, note, 'split_bill', now)
     )
     db.commit()
+    bump_data_version('split_bill', {'note': note, 'amount': amount, 'category': category, 'type': 'expense'})
     msg = f'已成功记入支出：{note} {money_filter(amount)}'
     if is_ajax_request():
         return jsonify({'ok': True, 'message': msg})

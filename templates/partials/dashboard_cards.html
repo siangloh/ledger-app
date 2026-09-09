@@ -1,0 +1,28 @@
+<div class="cards cards-four" id="dashboardSummaryCards">
+  <div class="card card-live-pulse">
+    <span class="card-label">本月收入</span>
+    <span class="amount income">{{ total_income|money }}</span>
+  </div>
+  <div class="card card-live-pulse">
+    <span class="card-label">本月支出</span>
+    <span class="amount expense">{{ total_expense|money }}</span>
+  </div>
+  <div class="card card-live-pulse">
+    <span class="card-label">本月储蓄</span>
+    <span class="amount savings" style="color:var(--gold);">{{ total_savings|money }}</span>
+    {% if savings_by_category %}
+    <div class="card-sub-stats" style="margin-top: 6px; font-size: 11.5px;">
+      {% for scat, samt in savings_by_category.items() %}
+      <div class="sub-stat-row">
+        <span class="sub-stat-label">{{ scat }}</span>
+        <span class="sub-stat-val">{{ samt|money }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  <div class="card card-highlight card-live-pulse {{ 'positive' if balance >= 0 else 'negative' }}">
+    <span class="card-label">本月净结余</span>
+    <span class="amount">{{ balance|money }}</span>
+  </div>
+</div>

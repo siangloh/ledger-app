@@ -1618,29 +1618,186 @@ function updateSyncBadge(state) {
   }
 }
 
-function checkLiveHealth() {
+let _currentDataVersion = null;
+let _isPollingActive = false;
+
+function flashSyncBadgeUpdated() {
+  const badges = [document.getElementById('syncStatusBadge'), document.getElementById('desktopSyncStatusBadge')].filter(Boolean);
+  const texts = [document.getElementById('syncStatusText'), document.getElementById('desktopSyncStatusText')].filter(Boolean);
+
+  badges.forEach(b => {
+    b.classList.add('live-active', 'live-pulse');
+  });
+  texts.forEach(t => {
+    t.textContent = '实时已更新';
+  });
+
+  setTimeout(() => {
+    badges.forEach(b => {
+      b.classList.remove('live-pulse');
+    });
+    texts.forEach(t => {
+      t.textContent = '云端在线';
+    });
+  }, 3000);
+}
+
+function refreshDashboardPartials(event) {
+  const monthElem = document.querySelector('.month-nav-current');
+  const month = monthElem ? monthElem.textContent.trim() : '';
+
+  // 1. 局部刷新 4 张核心统计卡片
+  fetch('/partial/dashboard-cards' + (month ? '?month=' + encodeURIComponent(month) : ''), {
+    cache: 'no-store'
+  })
+    .then(res => res.text())
+    .then(html => {
+      const wrap = document.getElementById('dashboardSummaryCardsWrap');
+      if (wrap) {
+        wrap.innerHTML = html;
+        wrap.querySelectorAll('.card').forEach(c => c.classList.add('card-updated'));
+        setTimeout(() => {
+          wrap.querySelectorAll('.card').forEach(c => c.classList.remove('card-updated'));
+        }, 2500);
+      }
+    })
+    .catch(console.error);
+
+  // 2. 局部重新拉取当月图表数据并平滑重绘
+  fetch('/api/dashboard-charts' + (month ? '?month=' + encodeURIComponent(month) : ''), {
+    cache: 'no-store'
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (!data || !data.ok) return;
+      if (window.CHART_DATA) {
+        window.CHART_DATA.income = data.income;
+        window.CHART_DATA.expense = data.expense;
+      }
+      if (typeof renderDonutCharts === 'function') {
+        renderDonutCharts();
+      }
+    })
+    .catch(console.error);
+
+  // 3. 如果在总体概览 Tab，重新拉取概览数据
+  const ovSec = document.getElementById('overviewSection');
+  if (ovSec && ovSec.style.display !== 'none' && typeof loadOverviewStats === 'function') {
+    loadOverviewStats();
+  }
+}
+
+function refreshRecordsPartials(event) {
+  const container = document.getElementById('recordsLiveContainer');
+  if (!container) return;
+
+  const filterForm = document.querySelector('form.filters');
+  const params = new URLSearchParams();
+  params.set('partial', '1');
+
+  if (filterForm) {
+    const formData = new FormData(filterForm);
+    for (const [k, v] of formData.entries()) {
+      if (v) params.set(k, v);
+    }
+  }
+
+  fetch('/records?' + params.toString(), {
+    cache: 'no-store'
+  })
+    .then(res => res.text())
+    .then(html => {
+      container.innerHTML = html;
+
+      // 如果有新添加的交易 ID，添加脉冲动画
+      if (event && event.data && event.data.id) {
+        const row = document.getElementById('row-' + event.data.id);
+        if (row) {
+          row.classList.add('row-highlight-new');
+          setTimeout(() => row.classList.remove('row-highlight-new'), 3500);
+        }
+      }
+    })
+    .catch(console.error);
+}
+
+function handleRealtimeUpdate(event) {
+  flashSyncBadgeUpdated();
+
+  const isDashboard = document.getElementById('dashboardSummaryCardsWrap') !== null;
+  const isRecords = document.getElementById('recordsLiveContainer') !== null;
+
+  if (isDashboard) {
+    refreshDashboardPartials(event);
+  }
+
+  if (isRecords) {
+    refreshRecordsPartials(event);
+  }
+
+  // 显示优雅的非侵入式 Toast 提示
+  if (event && event.data) {
+    const tx = event.data;
+    const amountStr = tx.amount ? ' RM ' + Number(tx.amount).toFixed(2) : '';
+    const noteStr = tx.note ? `【${tx.note}】` : '';
+    const title = event.type === 'auto_track' 
+      ? `🎉 自动记账实时入账：${noteStr} ${amountStr}`
+      : `⚡ 账本数据已实时更新：${noteStr} ${amountStr}`;
+
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: title,
+        showConfirmButton: false,
+        timer: 3500,
+        background: 'var(--surface)',
+        color: 'var(--navy)'
+      });
+    }
+  }
+}
+
+function checkRealtimeUpdates() {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     updateSyncBadge('offline');
     return;
   }
-  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timeoutId = controller ? setTimeout(() => controller.abort(), 4000) : null;
+  if (_isPollingActive) return;
+  _isPollingActive = true;
 
-  fetch('/health', {
+  const url = '/api/realtime/check' + (_currentDataVersion !== null ? '?v=' + _currentDataVersion : '');
+
+  fetch(url, {
     method: 'GET',
     cache: 'no-store',
-    signal: controller ? controller.signal : undefined
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
   })
     .then(res => {
-      if (timeoutId) clearTimeout(timeoutId);
       if (res.ok) {
         updateSyncBadge('online');
-      } else {
-        updateSyncBadge('unreachable');
+        return res.json();
+      }
+      updateSyncBadge('unreachable');
+      return null;
+    })
+    .then(data => {
+      _isPollingActive = false;
+      if (!data || !data.ok) return;
+
+      if (_currentDataVersion === null) {
+        _currentDataVersion = data.version;
+        return;
+      }
+
+      if (data.has_update && data.version > _currentDataVersion) {
+        _currentDataVersion = data.version;
+        handleRealtimeUpdate(data.event);
       }
     })
     .catch(() => {
-      if (timeoutId) clearTimeout(timeoutId);
+      _isPollingActive = false;
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         updateSyncBadge('offline');
       } else {
@@ -1650,26 +1807,33 @@ function checkLiveHealth() {
 }
 
 function initLiveSyncStatus() {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    updateSyncBadge('offline');
-  } else {
-    checkLiveHealth();
-  }
+  checkRealtimeUpdates();
 
   if (!_syncListenersAttached && typeof window !== 'undefined') {
     _syncListenersAttached = true;
     window.addEventListener('online', function () {
-      checkLiveHealth();
+      updateSyncBadge('online');
+      checkRealtimeUpdates();
     });
     window.addEventListener('offline', function () {
       updateSyncBadge('offline');
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') {
+        checkRealtimeUpdates();
+      }
     });
   }
 
   if (_healthCheckTimer) {
     clearInterval(_healthCheckTimer);
   }
-  _healthCheckTimer = setInterval(checkLiveHealth, 20000);
+  // 活跃状态下每 2.5 秒进行一次轻量级版本检查
+  _healthCheckTimer = setInterval(function () {
+    if (document.visibilityState === 'visible') {
+      checkRealtimeUpdates();
+    }
+  }, 2500);
 }
 
 // 进度条控制

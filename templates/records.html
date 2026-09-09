@@ -26,8 +26,6 @@
   <a href="{{ url_for('records') }}" class="btn-ghost">重置</a>
 </form>
 
-<p class="hint">筛选结果合计 — 收入 {{ total_income|money }}，支出 {{ total_expense|money }}，储蓄 {{ total_savings|money }}，共 {{ rows|length }} 条</p>
-
 <form method="post" action="{{ url_for('batch_delete_records') }}" id="batchForm">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <!-- 批量操作控制栏 -->
@@ -42,39 +40,8 @@
     </div>
   </div>
 
-  <div class="table-wrap">
-  <table>
-    <thead>
-      <tr>
-        <th style="width: 40px; text-align: center;">
-          <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
-        </th>
-        <th>日期</th><th>类型</th><th>分组</th><th>分类</th><th>金额</th><th>备注</th><th>来源</th><th>操作</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in rows %}
-      <tr class="record-row" id="row-{{ r.id }}">
-        <td data-col="checkbox" style="text-align: center;">
-          <input type="checkbox" name="ids" value="{{ r.id }}" class="record-checkbox" onchange="updateBatchBar()">
-        </td>
-        <td data-col="date">{{ r.date }}</td>
-        <td data-col="type"><span class="tag {{ 'tag-income' if r.type=='income' else ('tag-savings' if r.type=='savings' else 'tag-expense') }}">{{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }}</span></td>
-        <td data-col="group">{{ {'main':'主业','side':'副业'}.get(r.group_name, '') }}</td>
-        <td data-col="category"><strong>{{ r.category }}</strong></td>
-        <td data-col="amount" class="amount-cell {{ 'income' if r.type=='income' else ('savings' if r.type=='savings' else 'expense') }}">{{ r.amount|money }}</td>
-        <td data-col="note">{{ r.note }}</td>
-        <td data-col="source"><span class="tag">{{ {'manual':'手动','nlp':'智能记账','import':'导入','recurring':'固定收支','auto_track':'自动记账','split_bill':'AA分账'}.get(r.source, r.source) }}</span></td>
-        <td data-col="actions" class="actions">
-          <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link" hx-get="{{ url_for('edit_record', tx_id=r.id) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">编辑</a>
-          <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }} · {{ r.category }} · {{ r.amount|money }}', this)">删除</button>
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="9">暂无记录</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div id="recordsLiveContainer">
+    {% include 'partials/records_content.html' %}
   </div>
 </form>
 
