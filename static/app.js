@@ -11,9 +11,19 @@ function syncSegStyles() {
 }
 
 function onTypeChange() {
-  const type = document.querySelector('input[name="type"]:checked').value;
+  const checkedRadio = document.querySelector('input[name="type"]:checked');
+  if (!checkedRadio) return;
+  const type = checkedRadio.value;
   const groupRow = document.getElementById('groupRow');
   if (groupRow) groupRow.style.display = (type === 'income') ? 'flex' : 'none';
+  const fromSavingsRow = document.getElementById('fromSavingsRow');
+  if (fromSavingsRow) {
+    fromSavingsRow.style.display = (type === 'expense') ? 'flex' : 'none';
+    if (type !== 'expense') {
+      const chk = fromSavingsRow.querySelector('input[type="checkbox"]');
+      if (chk) chk.checked = false;
+    }
+  }
   populateCategories();
   syncSegStyles();
 }
@@ -1739,10 +1749,18 @@ function handleRealtimeUpdate(event) {
 
   if (isDashboard) {
     refreshDashboardPartials(event);
-  }
-
-  if (isRecords) {
+  } else if (isRecords) {
     refreshRecordsPartials(event);
+  } else {
+    // 全站其它所有页面（分类洞察、固定收支、分类管理、AA分账等）进行实时局部更新
+    const mainContainer = document.getElementById('mainContainer');
+    if (mainContainer && typeof htmx !== 'undefined') {
+      htmx.ajax('GET', window.location.href, {
+        target: '#mainContainer',
+        swap: 'innerHTML',
+        headers: { 'HX-Request': 'true' }
+      });
+    }
   }
 
   // 显示优雅的非侵入式 Toast 提示
@@ -1752,7 +1770,7 @@ function handleRealtimeUpdate(event) {
     const noteStr = tx.note ? `【${tx.note}】` : '';
     const title = event.type === 'auto_track' 
       ? `🎉 自动记账实时入账：${noteStr} ${amountStr}`
-      : `⚡ 账本数据已实时更新：${noteStr} ${amountStr}`;
+      : `⚡ 账本数据已实时同步：${noteStr} ${amountStr}`;
 
     if (typeof Swal !== 'undefined') {
       Swal.fire({

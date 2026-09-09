@@ -6,23 +6,29 @@
   <div class="card card-live-pulse">
     <span class="card-label">本月支出</span>
     <span class="amount expense">{{ total_expense|money }}</span>
+    {% if savings_expense and savings_expense > 0 %}
+    <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">含储蓄支付 {{ savings_expense|money }}</div>
+    {% endif %}
   </div>
   <div class="card card-live-pulse">
-    <span class="card-label">本月储蓄</span>
-    <span class="amount savings" style="color:var(--gold);">{{ total_savings|money }}</span>
-    {% if savings_by_category %}
+    <span class="card-label">累计总储蓄</span>
+    <span class="amount savings" style="color:var(--gold);">{{ (total_savings_pool if total_savings_pool is defined else total_savings)|money }}</span>
     <div class="card-sub-stats" style="margin-top: 6px; font-size: 11.5px;">
-      {% for scat, samt in savings_by_category.items() %}
       <div class="sub-stat-row">
-        <span class="sub-stat-label">{{ scat }}</span>
-        <span class="sub-stat-val">{{ samt|money }}</span>
+        <span class="sub-stat-label">本月存入</span>
+        <span class="sub-stat-val">+{{ (month_savings_in if month_savings_in is defined else total_savings)|money }}</span>
       </div>
-      {% endfor %}
+      {% if savings_expense and savings_expense > 0 %}
+      <div class="sub-stat-row">
+        <span class="sub-stat-label">储蓄扣减</span>
+        <span class="sub-stat-val" style="color:var(--rose);">-{{ savings_expense|money }}</span>
+      </div>
+      {% endif %}
     </div>
-    {% endif %}
   </div>
   <div class="card card-highlight card-live-pulse {{ 'positive' if balance >= 0 else 'negative' }}">
     <span class="card-label">本月净结余</span>
     <span class="amount">{{ balance|money }}</span>
+    <div style="font-size: 10.5px; color: rgba(255,255,255,0.6); margin-top: 4px;">已扣减本月储蓄</div>
   </div>
 </div>

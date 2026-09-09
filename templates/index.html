@@ -37,6 +37,12 @@
           <label class="seg"><input type="radio" name="group_name" value="main" checked onchange="populateCategories()"><span>主业收入</span></label>
           <label class="seg"><input type="radio" name="group_name" value="side" onchange="populateCategories()"><span>副业收入</span></label>
         </div>
+        <div class="row" id="fromSavingsRow" style="display:flex; align-items:center; margin: 4px 0 10px 0;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:var(--gold); user-select:none;">
+            <input type="checkbox" name="from_savings" value="1" id="fromSavingsCheck" style="width:16px; height:16px; accent-color:var(--gold); cursor:pointer;">
+            <span>从储蓄中支出（仅扣除储蓄储备，不扣当月结余）</span>
+          </label>
+        </div>
         <div class="row">
           <label>日期 <input type="date" name="date" value="{{ today }}" required></label>
           <label>金额 <input type="number" step="0.01" min="0.01" name="amount" required></label>

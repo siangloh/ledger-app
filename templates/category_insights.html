@@ -79,18 +79,18 @@
       <tbody id="insightsTableBody">
         {% for cat in insights.categories %}
         <tr class="insights-row" data-cat-idx="{{ loop.index0 }}" onclick="toggleCategoryChart({{ loop.index0 }})" style="cursor:pointer;">
-          <td style="text-align:center; color:var(--muted);" id="toggle-icon-{{ loop.index0 }}">▶</td>
-          <td>
+          <td class="col-toggle" style="text-align:center; color:var(--muted);" id="toggle-icon-{{ loop.index0 }}">▶</td>
+          <td class="col-name">
             <div style="display:flex; align-items:center; gap:8px;">
               <span class="chart-legend-dot" style="background-color: var(--navy); width:9px; height:9px; border-radius:50%;"></span>
               <strong style="font-size:14px; color:var(--ink);">{{ cat.category }}</strong>
             </div>
           </td>
-          <td style="text-align:right; font-family:var(--font-mono); font-weight:600; color:var(--rose);">{{ cat.this_month|money }}</td>
-          <td style="text-align:right; font-family:var(--font-mono); color:var(--muted);">{{ cat.last_month|money }}</td>
-          <td style="text-align:right; font-family:var(--font-mono); color:var(--ink-soft);">{{ cat.avg_monthly|money }}</td>
-          <td style="text-align:right; font-family:var(--font-mono); color:var(--ink);">{{ cat.total_amt|money }}</td>
-          <td style="text-align:center;">
+          <td class="col-this-month" style="text-align:right; font-family:var(--font-mono); font-weight:600; color:var(--rose);">{{ cat.this_month|money }}</td>
+          <td class="col-last-month" style="text-align:right; font-family:var(--font-mono); color:var(--muted);">{{ cat.last_month|money }}</td>
+          <td class="col-avg" style="text-align:right; font-family:var(--font-mono); color:var(--ink-soft);">{{ cat.avg_monthly|money }}</td>
+          <td class="col-total" style="text-align:right; font-family:var(--font-mono); color:var(--ink);">{{ cat.total_amt|money }}</td>
+          <td class="col-trend" style="text-align:center;">
             {% if cat.trend_dir == 'up' %}
             <span class="tag tag-expense" style="font-weight:600;">↑ {{ cat.trend_text }}</span>
             {% elif cat.trend_dir == 'down' %}
@@ -99,7 +99,7 @@
             <span class="tag tag-muted">{{ cat.trend_text }}</span>
             {% endif %}
           </td>
-          <td style="text-align:center;" onclick="event.stopPropagation();">
+          <td class="col-action" style="text-align:center;" onclick="event.stopPropagation();">
             <button type="button" class="btn-ghost btn-sm" onclick="toggleCategoryChart({{ loop.index0 }})">走势图</button>
           </td>
         </tr>

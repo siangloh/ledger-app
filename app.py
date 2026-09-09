@@ -310,6 +310,12 @@ def init_db():
     except Exception:
         pass
 
+    try:
+        db.execute("ALTER TABLE transactions ADD COLUMN from_savings INTEGER DEFAULT 0")
+        db.commit()
+    except Exception:
+        pass
+
     if db.execute('SELECT COUNT(*) FROM categories').fetchone()[0] == 0:
         defaults = [
             ('income', 'main', '工资'),
@@ -631,14 +637,23 @@ def index():
     end = f'{month}-{last_day:02d}'
 
     rows = db.execute(
-        'SELECT type, group_name, category, amount FROM transactions WHERE date BETWEEN ? AND ?',
+        'SELECT type, group_name, category, amount, COALESCE(from_savings, 0) as from_savings FROM transactions WHERE date BETWEEN ? AND ?',
         (start, end)
     ).fetchall()
 
     total_income = sum(r['amount'] for r in rows if r['type'] == 'income')
     total_expense = sum(r['amount'] for r in rows if r['type'] == 'expense')
-    total_savings = sum(r['amount'] for r in rows if r['type'] == 'savings')
-    balance = total_income - total_expense
+    regular_expense = sum(r['amount'] for r in rows if r['type'] == 'expense' and not r['from_savings'])
+    savings_expense = sum(r['amount'] for r in rows if r['type'] == 'expense' and r['from_savings'])
+    month_savings_in = sum(r['amount'] for r in rows if r['type'] == 'savings')
+
+    # 本月净结余：收入 - 日常支出 - 存入储蓄（从储蓄扣除的支出不扣当月结余）
+    balance = total_income - regular_expense - month_savings_in
+
+    # 当前累计总储蓄资金池（持续累加历史所有存入储蓄，减去从储蓄池支付的支出）
+    all_savings_in = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='savings'").fetchone()[0] or 0.0
+    all_savings_out = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='expense' AND COALESCE(from_savings, 0)=1").fetchone()[0] or 0.0
+    total_savings_pool = max(float(all_savings_in) - float(all_savings_out), 0.0)
 
     income_group = {'main': 0.0, 'side': 0.0}
     expense_by_category = {}
@@ -668,7 +683,11 @@ def index():
         next_month=shift_month(month, 1),
         total_income=total_income,
         total_expense=total_expense,
-        total_savings=total_savings,
+        total_savings=month_savings_in,
+        total_savings_pool=total_savings_pool,
+        month_savings_in=month_savings_in,
+        regular_expense=regular_expense,
+        savings_expense=savings_expense,
         balance=balance,
         income_group=income_group,
         expense_by_category=expense_by_category,
@@ -704,14 +723,21 @@ def partial_dashboard_cards():
     end = f'{month}-{last_day:02d}'
 
     rows = db.execute(
-        'SELECT type, group_name, category, amount FROM transactions WHERE date BETWEEN ? AND ?',
+        'SELECT type, group_name, category, amount, COALESCE(from_savings, 0) as from_savings FROM transactions WHERE date BETWEEN ? AND ?',
         (start, end)
     ).fetchall()
 
     total_income = sum(r['amount'] for r in rows if r['type'] == 'income')
     total_expense = sum(r['amount'] for r in rows if r['type'] == 'expense')
-    total_savings = sum(r['amount'] for r in rows if r['type'] == 'savings')
-    balance = total_income - total_expense
+    regular_expense = sum(r['amount'] for r in rows if r['type'] == 'expense' and not r['from_savings'])
+    savings_expense = sum(r['amount'] for r in rows if r['type'] == 'expense' and r['from_savings'])
+    month_savings_in = sum(r['amount'] for r in rows if r['type'] == 'savings')
+
+    balance = total_income - regular_expense - month_savings_in
+
+    all_savings_in = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='savings'").fetchone()[0] or 0.0
+    all_savings_out = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='expense' AND COALESCE(from_savings, 0)=1").fetchone()[0] or 0.0
+    total_savings_pool = max(float(all_savings_in) - float(all_savings_out), 0.0)
 
     savings_by_category = {}
     for r in rows:
@@ -723,7 +749,11 @@ def partial_dashboard_cards():
         'partials/dashboard_cards.html',
         total_income=total_income,
         total_expense=total_expense,
-        total_savings=total_savings,
+        total_savings=month_savings_in,
+        total_savings_pool=total_savings_pool,
+        month_savings_in=month_savings_in,
+        regular_expense=regular_expense,
+        savings_expense=savings_expense,
         balance=balance,
         savings_by_category=savings_by_category,
     )
@@ -800,7 +830,7 @@ def api_overview():
         end_date = (request.args.get('end') or '').strip() or None
     # 'all': start_date and end_date stay None
 
-    query = 'SELECT date, type, group_name, category, amount FROM transactions WHERE 1=1'
+    query = 'SELECT date, type, group_name, category, amount, COALESCE(from_savings, 0) as from_savings FROM transactions WHERE 1=1'
     params = []
     if start_date:
         query += ' AND date >= ?'
@@ -833,8 +863,10 @@ def api_overview():
 
     total_income = 0.0
     total_expense = 0.0
+    regular_expense = 0.0
+    savings_expense = 0.0
     total_savings = 0.0
-    monthly_stats = {m: {'income': 0.0, 'expense': 0.0, 'savings': 0.0} for m in month_keys}
+    monthly_stats = {m: {'income': 0.0, 'expense': 0.0, 'regular_expense': 0.0, 'savings_expense': 0.0, 'savings': 0.0} for m in month_keys}
     expense_cats = {}
     savings_cats = {}
     income_group = {'main': 0.0, 'side': 0.0}
@@ -844,7 +876,7 @@ def api_overview():
         m = r['date'][:7]
         t = r['type']
         if m not in monthly_stats:
-            monthly_stats[m] = {'income': 0.0, 'expense': 0.0, 'savings': 0.0}
+            monthly_stats[m] = {'income': 0.0, 'expense': 0.0, 'regular_expense': 0.0, 'savings_expense': 0.0, 'savings': 0.0}
             if m not in month_keys:
                 month_keys.append(m)
 
@@ -856,6 +888,13 @@ def api_overview():
         elif t == 'expense':
             total_expense += amt
             monthly_stats[m]['expense'] += amt
+            is_from_savings = bool(r['from_savings'])
+            if is_from_savings:
+                savings_expense += amt
+                monthly_stats[m]['savings_expense'] += amt
+            else:
+                regular_expense += amt
+                monthly_stats[m]['regular_expense'] += amt
             cat = r['category'] or '其他'
             expense_cats[cat] = expense_cats.get(cat, 0.0) + amt
         elif t == 'savings':
@@ -869,13 +908,16 @@ def api_overview():
     for m in month_keys:
         inc = round(monthly_stats[m]['income'], 2)
         exp = round(monthly_stats[m]['expense'], 2)
+        reg_exp = round(monthly_stats[m]['regular_expense'], 2)
         sav = round(monthly_stats[m].get('savings', 0.0), 2)
         monthly_trend.append({
             'month': m,
             'income': inc,
             'expense': exp,
+            'regular_expense': reg_exp,
+            'savings_expense': round(monthly_stats[m]['savings_expense'], 2),
             'savings': sav,
-            'balance': round(inc - exp, 2)
+            'balance': round(inc - reg_exp - sav, 2)
         })
 
     # 月均计算：有月份跨度按跨度算，否则按实际有记录的月份数，至少为 1
@@ -883,7 +925,11 @@ def api_overview():
     avg_income = total_income / num_months
     avg_expense = total_expense / num_months
     avg_savings = total_savings / num_months
-    net_savings = total_income - total_expense
+    net_savings = total_income - regular_expense - total_savings
+
+    all_savings_in = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='savings'").fetchone()[0] or 0.0
+    all_savings_out = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='expense' AND COALESCE(from_savings, 0)=1").fetchone()[0] or 0.0
+    total_savings_pool = max(float(all_savings_in) - float(all_savings_out), 0.0)
 
     # 支出分类按金额降序排序
     sorted_exp = sorted(expense_cats.items(), key=lambda x: x[1], reverse=True)
@@ -1119,12 +1165,14 @@ def add_transaction():
     if tx_type != 'income':
         group_name = None
 
+    from_savings = 1 if (tx_type == 'expense' and f.get('from_savings') in ('1', 'true', 'on')) else 0
+
     tx_date = f.get('date') or date.today().isoformat()
     cur = db.execute(
-        'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at) '
-        'VALUES (?,?,?,?,?,?,?,?)',
+        'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at, from_savings) '
+        'VALUES (?,?,?,?,?,?,?,?,?)',
         (tx_date, tx_type, group_name, f.get('category'), amount, f.get('note', ''),
-         f.get('source', 'manual'), datetime.now().isoformat())
+         f.get('source', 'manual'), datetime.now().isoformat(), from_savings)
     )
     db.commit()
     bump_data_version('add', {
@@ -1134,6 +1182,7 @@ def add_transaction():
         'category': f.get('category'),
         'type': tx_type,
         'date': tx_date,
+        'from_savings': from_savings,
         'source': f.get('source', 'manual')
     })
 
@@ -1236,12 +1285,13 @@ def edit_record(tx_id):
                     (merchant_note, new_category, now_str)
                 )
 
+        from_savings = 1 if (tx_type == 'expense' and f.get('from_savings') in ('1', 'true', 'on')) else 0
         db.execute(
-            'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=? WHERE id=?',
-            (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), tx_id)
+            'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=?, from_savings=? WHERE id=?',
+            (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), from_savings, tx_id)
         )
         db.commit()
-        bump_data_version('edit', {'id': tx_id})
+        bump_data_version('edit', {'id': tx_id, 'from_savings': from_savings})
 
         if is_ajax_request():
             return jsonify({'ok': True, 'message': '记录已更新'})
