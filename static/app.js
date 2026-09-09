@@ -2203,4 +2203,104 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 
+// ==========================================
+// PWA (Progressive Web App) 注册与安装交互
+// ==========================================
+let deferredPwaPrompt = null;
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then((reg) => {
+        console.log('[PWA] ServiceWorker registered with scope:', reg.scope);
+      })
+      .catch((err) => {
+        console.warn('[PWA] ServiceWorker registration failed:', err);
+      });
+  });
+}
+
+// 捕获 Android / Chrome 原生安装提示事件
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPwaPrompt = e;
+  
+  // 显示“更多”弹层中的安装入口
+  const sheetBtn = document.getElementById('pwaSheetInstallBtn');
+  if (sheetBtn) {
+    sheetBtn.style.display = 'flex';
+  }
+  
+  // 如果尚未安装且未在当前会话被用户主动关闭，展示轻量安装浮条
+  const banner = document.getElementById('pwaInstallBanner');
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (banner && !isStandalone && !sessionStorage.getItem('pwa_banner_closed')) {
+    banner.style.display = 'flex';
+  }
+});
+
+// 监听安装完成事件
+window.addEventListener('appinstalled', () => {
+  deferredPwaPrompt = null;
+  console.log('[PWA] App successfully installed');
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) banner.style.display = 'none';
+  const sheetBtn = document.getElementById('pwaSheetInstallBtn');
+  if (sheetBtn) sheetBtn.style.display = 'none';
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      toast: true,
+      position: 'top',
+      icon: 'success',
+      title: '已成功添加到主屏幕！',
+      showConfirmButton: false,
+      timer: 2500
+    });
+  }
+});
+
+// 手动触发安装操作
+window.installPwaApp = function () {
+  if (deferredPwaPrompt) {
+    deferredPwaPrompt.prompt();
+    deferredPwaPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult && choiceResult.outcome === 'accepted') {
+        console.log('[PWA] User accepted install prompt');
+      }
+      deferredPwaPrompt = null;
+    });
+  } else {
+    // 检测 iOS Safari 提示
+    const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+    if (isIos && typeof Swal !== 'undefined') {
+      Swal.fire({
+        title: '添加到主屏幕',
+        html: '<div style="text-align: left; font-size: 14px; line-height: 1.8; color: var(--text-secondary);">' +
+              '1. 点击 Safari 底部中间的 <b>分享按钮</b> <span style="font-size: 18px;">📤</span><br>' +
+              '2. 向下滑动找到并选择 <b>「添加到主屏幕」</b> <span style="font-size: 18px;">➕</span><br>' +
+              '3. 点击右上角「添加」即可免开浏览器沉浸使用！</div>',
+        icon: 'info',
+        confirmButtonText: '我知道了'
+      });
+    } else if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        title: '添加到主屏幕',
+        text: '请在浏览器菜单中选择「添加到主屏幕」或「安装应用」即可！',
+        icon: 'info',
+        confirmButtonText: '确定'
+      });
+    }
+  }
+  if (typeof toggleMoreSheet === 'function') {
+    toggleMoreSheet(false);
+  }
+};
+
+window.dismissPwaBanner = function () {
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) banner.style.display = 'none';
+  sessionStorage.setItem('pwa_banner_closed', 'true');
+};
+
+
 

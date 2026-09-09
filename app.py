@@ -6,7 +6,7 @@ from calendar import monthrange
 from datetime import datetime, date
 
 import pandas as pd
-from flask import Flask, g, request, redirect, url_for, render_template, flash, jsonify, session
+from flask import Flask, g, request, redirect, url_for, render_template, flash, jsonify, session, send_from_directory, make_response
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 数据存储目录
@@ -129,6 +129,24 @@ def health():
     return jsonify({'ok': True, 'status': 'online'})
 
 
+@app.route('/manifest.json')
+def manifest():
+    return send_from_directory('static', 'manifest.json', mimetype='application/manifest+json')
+
+
+@app.route('/sw.js')
+def service_worker():
+    response = make_response(send_from_directory('static', 'sw.js', mimetype='application/javascript'))
+    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
+
+
+@app.route('/offline.html')
+def offline_page():
+    return send_from_directory('static', 'offline.html', mimetype='text/html')
+
+
 def is_ajax_request():
     return (
         request.is_json
@@ -149,8 +167,12 @@ def inject_globals():
 
 @app.before_request
 def require_login():
-    # 允许静态资源、登录/登出路由、健康检查以及外部自动记账 Webhook 豁免 Session 检查
-    if request.endpoint in ('login', 'logout', 'static', 'health', 'api_realtime_check') or request.path in ('/health', '/api/realtime/check') or (request.path and request.path.startswith('/static/')):
+    # 允许静态资源、登录/登出路由、健康检查、PWA 核心资源以及外部自动记账 Webhook 豁免 Session 检查
+    if (
+        request.endpoint in ('login', 'logout', 'static', 'health', 'api_realtime_check', 'manifest', 'service_worker', 'offline_page')
+        or request.path in ('/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html')
+        or (request.path and request.path.startswith('/static/'))
+    ):
         return
     if request.path.startswith('/api/'):
         req_key = request.headers.get('X-API-KEY')

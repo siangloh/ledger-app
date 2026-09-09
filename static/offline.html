@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#10213b">
+<title>网络已断开 - 我的记账本</title>
+<style>
+  :root {
+    --bg-base: #0a1120;
+    --card-bg: #10213b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent: #38bdf8;
+    --border: rgba(255, 255, 255, 0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .offline-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 40px 28px;
+    text-align: center;
+    max-width: 380px;
+    width: 100%;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    animation: fadeIn 0.4s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .icon-box {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    margin: 0 auto 20px;
+    border: 1px solid rgba(56, 189, 248, 0.2);
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 28px;
+  }
+  .btn-retry {
+    background: linear-gradient(135deg, #0284c7, #2563eb);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 13px 28px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  }
+  .btn-retry:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
+  .status-tip {
+    margin-top: 18px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+</style>
+</head>
+<body>
+  <div class="offline-card">
+    <div class="icon-box">📡</div>
+    <h1>当前处于离线状态</h1>
+    <p>未能连接到云端服务器。请检查您的 Wi-Fi 或移动网络设置。网络恢复后将自动重连。</p>
+    <button class="btn-retry" onclick="checkConnection()">重新连接</button>
+    <div class="status-tip" id="statusTip">正在等待网络连接...</div>
+  </div>
+
+  <script>
+    function checkConnection() {
+      const tip = document.getElementById('statusTip');
+      tip.innerText = '正在尝试重新连接...';
+      fetch('/health', { cache: 'no-store' })
+        .then(res => {
+          if (res.ok) {
+            window.location.reload();
+          } else {
+            tip.innerText = '服务器暂不可达，请稍后重试';
+          }
+        })
+        .catch(() => {
+          tip.innerText = '仍处于离线状态，请检查网络设置';
+        });
+    }
+
+    // 当网络恢复时自动重新加载页面
+    window.addEventListener('online', () => {
+      document.getElementById('statusTip').innerText = '网络已恢复，正在进入...';
+      window.location.reload();
+    });
+  </script>
+</body>
+</html>

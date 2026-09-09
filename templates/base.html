@@ -9,6 +9,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <title>{% block title %}我的记账本{% endblock %}</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
+<link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -67,6 +71,19 @@
     </button>
 </nav>
 
+<!-- PWA 轻量安装浮动提示条 -->
+<div class="pwa-install-banner" id="pwaInstallBanner">
+    <span class="pwa-banner-icon">📲</span>
+    <div class="pwa-banner-text">
+        <div class="pwa-banner-title">安装为手机应用</div>
+        <div class="pwa-banner-desc">免开浏览器，享受全屏原生 App 体验</div>
+    </div>
+    <div class="pwa-banner-actions">
+        <button type="button" class="pwa-btn-install" onclick="installPwaApp()">安装</button>
+        <button type="button" class="pwa-btn-close" onclick="dismissPwaBanner()" title="暂不安装">✕</button>
+    </div>
+</div>
+
 <!-- 手机端“更多”功能底部弹层 (Bottom Sheet) -->
 <div class="mobile-sheet-backdrop" id="sheetBackdrop" onclick="toggleMoreSheet(false)"></div>
 <div class="mobile-bottom-sheet" id="moreSheet">
@@ -76,6 +93,11 @@
         <button type="button" class="sheet-close-btn" onclick="toggleMoreSheet(false)">✕</button>
     </div>
     <div class="sheet-grid">
+        <button type="button" class="sheet-tile" id="pwaSheetInstallBtn" onclick="installPwaApp()" style="display: none; background: none; border: 1px solid var(--border); width: 100%; text-align: left; cursor: pointer;">
+            <span class="sheet-icon">📲</span>
+            <span class="sheet-title">安装为应用</span>
+            <span class="sheet-desc">添加到主屏幕，免开浏览器</span>
+        </button>
         <a href="{{ url_for('category_insights_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
             <span class="sheet-icon">📊</span>
             <span class="sheet-title">分类洞察</span>
