@@ -300,10 +300,13 @@ function attachDeleteConfirm() {
                 body: formData,
                 headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
               })
-              .then(r => r.json())
+              .then(r => {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+              })
               .then(data => {
                 if (typeof finishProgressBar === 'function') finishProgressBar();
-                if (data.ok) {
+                if (data && data.ok) {
                   if (row) row.remove();
                   Swal.fire({
                     toast: true,
@@ -314,17 +317,24 @@ function attachDeleteConfirm() {
                     timer: 2000,
                     customClass: { popup: 'app-swal-toast' }
                   });
-                  if (typeof updateBatchBar === 'function') updateBatchBar();
+                  try {
+                    if (typeof updateBatchBar === 'function' && document.getElementById('batchBar')) {
+                      updateBatchBar();
+                    }
+                  } catch (e) {
+                    console.warn(e);
+                  }
                 } else {
                   if (row) {
                     row.style.opacity = '';
                     row.style.filter = '';
                     row.style.pointerEvents = '';
                   }
-                  errorAlert(data.message || '删除失败');
+                  errorAlert((data && data.message) || '删除失败');
                 }
               })
-              .catch(() => {
+              .catch(err => {
+                console.error('Delete request failed:', err);
                 if (typeof finishProgressBar === 'function') finishProgressBar();
                 if (row) {
                   row.style.opacity = '';

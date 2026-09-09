@@ -1760,6 +1760,7 @@ def delete_recurring(rule_id):
     db = get_db()
     db.execute('DELETE FROM recurring_rules WHERE id=?', (rule_id,))
     db.commit()
+    bump_data_version('recurring_delete', {'id': rule_id})
     if is_ajax_request():
         return jsonify({'ok': True, 'message': '规则已删除', 'id': rule_id})
     flash('规则已删除', 'success')
@@ -1774,6 +1775,7 @@ def toggle_recurring(rule_id):
         new_active = 0 if row['is_active'] else 1
         db.execute('UPDATE recurring_rules SET is_active=? WHERE id=?', (new_active, rule_id))
         db.commit()
+        bump_data_version('recurring_toggle', {'id': rule_id})
         msg = '规则已停用' if row['is_active'] else '规则已启用'
         if is_ajax_request():
             return jsonify({'ok': True, 'message': msg, 'id': rule_id, 'is_active': new_active})

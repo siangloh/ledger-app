@@ -189,10 +189,11 @@ function toggleSelectAll(master) {
 }
 
 function updateBatchBar() {
+  const batchBar = document.getElementById('batchBar');
+  if (!batchBar) return;
   const selected = document.querySelectorAll('.record-checkbox:checked');
   const total = document.querySelectorAll('.record-checkbox');
   const selectAll = document.getElementById('selectAllCheckbox');
-  const batchBar = document.getElementById('batchBar');
   const selectedCount = document.getElementById('selectedCount');
 
   if (selectAll && total.length > 0) {
@@ -207,7 +208,7 @@ function updateBatchBar() {
 
   if (selected.length > 0) {
     batchBar.style.display = 'flex';
-    selectedCount.textContent = selected.length;
+    if (selectedCount) selectedCount.textContent = selected.length;
   } else {
     batchBar.style.display = 'none';
   }
