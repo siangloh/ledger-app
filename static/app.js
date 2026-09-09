@@ -185,11 +185,13 @@ function drawDonutChart(canvasId, labels, values, colors) {
 
 function showSuccessToasts() {
   if (typeof Swal === 'undefined' || !window.FLASH_SUCCESS || !window.FLASH_SUCCESS.length) return;
+  const msgs = window.FLASH_SUCCESS.slice();
+  window.FLASH_SUCCESS = null; // 消费后立刻置空！防止页面重新水合或导航时重复提示
   Swal.fire({
     toast: true,
     position: 'top-end',
     icon: 'success',
-    title: window.FLASH_SUCCESS.join('　'),
+    title: msgs.join('　'),
     showConfirmButton: false,
     timer: 2600,
     timerProgressBar: true,
@@ -218,7 +220,9 @@ function errorAlert(message, title) {
 
 function showErrorAlerts() {
   if (!window.FLASH_ERROR || !window.FLASH_ERROR.length) return;
-  errorAlert(window.FLASH_ERROR.join('<br>'), '操作未完成');
+  const msgs = window.FLASH_ERROR.slice();
+  window.FLASH_ERROR = null; // 消费后立刻置空！
+  errorAlert(msgs.join('<br>'), '操作未完成');
 }
 
 // ---------- SweetAlert2：删除确认 ----------
@@ -855,7 +859,18 @@ function applyCustomOverviewFilter() {
 
 function loadOverviewData(range, start, end) {
   const badge = document.getElementById('overviewRangeBadge');
-  if (badge) badge.textContent = '数据计算中...';
+  if (badge) {
+    badge.innerHTML = '<span class="skeleton-shimmer" style="display:inline-block; width:140px; height:15px; vertical-align:middle; border-radius:4px;"></span>';
+  }
+
+  // 给 4 个总览指标卡片数字加上优雅微光骨架状态，避免直显 RM 0.00 造成迟钝感
+  const ovIds = ['ovTotalIncome', 'ovTotalExpense', 'ovNetSavings', 'ovAvgIncome', 'ovAvgExpense'];
+  ovIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = '<span class="skeleton-shimmer" style="display:inline-block; width:85px; height:24px; vertical-align:middle; border-radius:4px;"></span>';
+    }
+  });
 
   let url = '/api/overview?range=' + encodeURIComponent(range || 'all');
   if (start) url += '&start=' + encodeURIComponent(start);
@@ -1766,6 +1781,162 @@ function initPageLifecycle() {
   }
 }
 
+// ---------- 智能微光骨架屏渲染器 (Skeleton Screen Renderer) ----------
+
+function getDashboardSkeletonHtml() {
+  return `
+  <div class="skeleton-screen">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+      <div class="skeleton-shimmer" style="height:34px; width:150px; border-radius:999px;"></div>
+      <div style="display:flex; gap:8px;">
+        <div class="skeleton-shimmer" style="height:32px; width:90px; border-radius:999px;"></div>
+        <div class="skeleton-shimmer" style="height:32px; width:90px; border-radius:999px;"></div>
+      </div>
+    </div>
+    <div class="cards cards-four" style="margin-bottom:24px;">
+      <div class="skeleton-card">
+        <div class="skeleton-shimmer" style="height:13px; width:55px; margin-bottom:12px;"></div>
+        <div class="skeleton-shimmer" style="height:28px; width:110px;"></div>
+      </div>
+      <div class="skeleton-card">
+        <div class="skeleton-shimmer" style="height:13px; width:55px; margin-bottom:12px;"></div>
+        <div class="skeleton-shimmer" style="height:28px; width:110px;"></div>
+      </div>
+      <div class="skeleton-card">
+        <div class="skeleton-shimmer" style="height:13px; width:55px; margin-bottom:12px;"></div>
+        <div class="skeleton-shimmer" style="height:28px; width:110px;"></div>
+      </div>
+      <div class="skeleton-card">
+        <div class="skeleton-shimmer" style="height:13px; width:55px; margin-bottom:12px;"></div>
+        <div class="skeleton-shimmer" style="height:28px; width:110px;"></div>
+      </div>
+    </div>
+    <div class="panels" style="margin-bottom:22px;">
+      <div class="panel skeleton-panel" style="flex:1; min-width:300px;">
+        <div class="skeleton-shimmer" style="height:20px; width:85px; margin-bottom:18px;"></div>
+        <div style="display:flex; gap:10px; margin-bottom:16px;">
+          <div class="skeleton-shimmer" style="height:34px; flex:1; border-radius:8px;"></div>
+          <div class="skeleton-shimmer" style="height:34px; flex:1; border-radius:8px;"></div>
+          <div class="skeleton-shimmer" style="height:34px; flex:1; border-radius:8px;"></div>
+        </div>
+        <div style="display:flex; gap:12px; margin-bottom:14px;">
+          <div class="skeleton-shimmer" style="height:38px; flex:1; border-radius:8px;"></div>
+          <div class="skeleton-shimmer" style="height:38px; flex:1; border-radius:8px;"></div>
+        </div>
+        <div style="display:flex; gap:8px; margin:12px 0 16px;">
+          <div class="skeleton-shimmer" style="height:28px; width:75px; border-radius:999px;"></div>
+          <div class="skeleton-shimmer" style="height:28px; width:75px; border-radius:999px;"></div>
+          <div class="skeleton-shimmer" style="height:28px; width:75px; border-radius:999px;"></div>
+        </div>
+        <div class="skeleton-shimmer" style="height:38px; width:90px; border-radius:8px;"></div>
+      </div>
+      <div class="panel skeleton-panel" style="flex:1; min-width:300px;">
+        <div class="skeleton-shimmer" style="height:20px; width:130px; margin-bottom:14px;"></div>
+        <div class="skeleton-shimmer" style="height:14px; width:80%; margin-bottom:22px;"></div>
+        <div class="skeleton-shimmer" style="height:42px; width:100%; border-radius:8px; margin-bottom:16px;"></div>
+        <div class="skeleton-shimmer" style="height:38px; width:96px; border-radius:8px;"></div>
+      </div>
+    </div>
+    <div class="panels">
+      <div class="panel skeleton-panel" style="flex:1; min-width:300px; display:flex; flex-direction:column; align-items:center;">
+        <div class="skeleton-shimmer" style="height:18px; width:140px; align-self:flex-start; margin-bottom:20px;"></div>
+        <div class="skeleton-shimmer" style="height:130px; width:130px; border-radius:50%; margin-bottom:18px;"></div>
+        <div class="skeleton-shimmer" style="height:14px; width:65%; border-radius:4px;"></div>
+      </div>
+      <div class="panel skeleton-panel" style="flex:1; min-width:300px; display:flex; flex-direction:column; align-items:center;">
+        <div class="skeleton-shimmer" style="height:18px; width:120px; align-self:flex-start; margin-bottom:20px;"></div>
+        <div class="skeleton-shimmer" style="height:130px; width:130px; border-radius:50%; margin-bottom:18px;"></div>
+        <div class="skeleton-shimmer" style="height:14px; width:65%; border-radius:4px;"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function getRecordsSkeletonHtml() {
+  return `
+  <div class="skeleton-screen">
+    <div class="panel skeleton-panel" style="margin-bottom:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+        <div class="skeleton-shimmer" style="height:24px; width:120px;"></div>
+        <div style="display:flex; gap:8px;">
+          <div class="skeleton-shimmer" style="height:32px; width:80px; border-radius:8px;"></div>
+          <div class="skeleton-shimmer" style="height:32px; width:80px; border-radius:8px;"></div>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <div class="skeleton-shimmer" style="height:36px; width:140px; border-radius:8px;"></div>
+        <div class="skeleton-shimmer" style="height:36px; width:140px; border-radius:8px;"></div>
+        <div class="skeleton-shimmer" style="height:36px; width:110px; border-radius:8px;"></div>
+        <div class="skeleton-shimmer" style="height:36px; flex:1; min-width:180px; border-radius:8px;"></div>
+        <div class="skeleton-shimmer" style="height:36px; width:70px; border-radius:8px;"></div>
+      </div>
+    </div>
+    <div class="cards cards-four" style="margin-bottom:20px;">
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:13px; width:50px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:22px; width:85px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:13px; width:50px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:22px; width:85px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:13px; width:50px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:22px; width:85px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:13px; width:50px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:22px; width:85px;"></div></div>
+    </div>
+    <div class="panel skeleton-panel" style="padding:0; overflow:hidden;">
+      <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <div class="skeleton-shimmer" style="height:16px; width:100px;"></div>
+        <div class="skeleton-shimmer" style="height:28px; width:90px; border-radius:6px;"></div>
+      </div>
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="height:15px; width:80px;"></div><div class="skeleton-shimmer" style="height:22px; width:55px; border-radius:999px;"></div><div class="skeleton-shimmer" style="height:15px; flex:1; margin:0 12px;"></div><div class="skeleton-shimmer" style="height:18px; width:80px;"></div><div class="skeleton-shimmer" style="height:20px; width:50px; border-radius:4px;"></div></div>
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="height:15px; width:80px;"></div><div class="skeleton-shimmer" style="height:22px; width:55px; border-radius:999px;"></div><div class="skeleton-shimmer" style="height:15px; flex:1; margin:0 12px;"></div><div class="skeleton-shimmer" style="height:18px; width:80px;"></div><div class="skeleton-shimmer" style="height:20px; width:50px; border-radius:4px;"></div></div>
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="height:15px; width:80px;"></div><div class="skeleton-shimmer" style="height:22px; width:55px; border-radius:999px;"></div><div class="skeleton-shimmer" style="height:15px; flex:1; margin:0 12px;"></div><div class="skeleton-shimmer" style="height:18px; width:80px;"></div><div class="skeleton-shimmer" style="height:20px; width:50px; border-radius:4px;"></div></div>
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="height:15px; width:80px;"></div><div class="skeleton-shimmer" style="height:22px; width:55px; border-radius:999px;"></div><div class="skeleton-shimmer" style="height:15px; flex:1; margin:0 12px;"></div><div class="skeleton-shimmer" style="height:18px; width:80px;"></div><div class="skeleton-shimmer" style="height:20px; width:50px; border-radius:4px;"></div></div>
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="height:15px; width:80px;"></div><div class="skeleton-shimmer" style="height:22px; width:55px; border-radius:999px;"></div><div class="skeleton-shimmer" style="height:15px; flex:1; margin:0 12px;"></div><div class="skeleton-shimmer" style="height:18px; width:80px;"></div><div class="skeleton-shimmer" style="height:20px; width:50px; border-radius:4px;"></div></div>
+    </div>
+  </div>`;
+}
+
+function getGenericSkeletonHtml() {
+  return `
+  <div class="skeleton-screen">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:22px;">
+      <div class="skeleton-shimmer" style="height:28px; width:160px; border-radius:6px;"></div>
+      <div class="skeleton-shimmer" style="height:32px; width:100px; border-radius:8px;"></div>
+    </div>
+    <div class="cards cards-four" style="margin-bottom:20px;">
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:13px; width:60px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:24px; width:90px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:13px; width:60px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:24px; width:90px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:13px; width:60px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:24px; width:90px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:13px; width:60px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:24px; width:90px;"></div></div>
+    </div>
+    <div class="panel skeleton-panel" style="margin-bottom:20px;">
+      <div class="skeleton-shimmer" style="height:20px; width:120px; margin-bottom:16px;"></div>
+      <div class="skeleton-shimmer" style="height:14px; width:75%; margin-bottom:20px;"></div>
+      <div style="display:flex; gap:12px; margin-bottom:14px;">
+        <div class="skeleton-shimmer" style="height:40px; flex:1; border-radius:8px;"></div>
+        <div class="skeleton-shimmer" style="height:40px; flex:1; border-radius:8px;"></div>
+      </div>
+      <div class="skeleton-shimmer" style="height:42px; width:120px; border-radius:8px;"></div>
+    </div>
+    <div class="panel skeleton-panel" style="padding:0; overflow:hidden;">
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="height:16px; width:100px;"></div><div class="skeleton-shimmer" style="height:16px; flex:1; margin:0 16px;"></div><div class="skeleton-shimmer" style="height:18px; width:80px;"></div></div>
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="height:16px; width:100px;"></div><div class="skeleton-shimmer" style="height:16px; flex:1; margin:0 16px;"></div><div class="skeleton-shimmer" style="height:18px; width:80px;"></div></div>
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="height:16px; width:100px;"></div><div class="skeleton-shimmer" style="height:16px; flex:1; margin:0 16px;"></div><div class="skeleton-shimmer" style="height:18px; width:80px;"></div></div>
+    </div>
+  </div>`;
+}
+
+function renderSkeletonScreen(urlStr) {
+  let path = urlStr || '';
+  try {
+    const u = new URL(urlStr, window.location.origin);
+    path = u.pathname;
+  } catch (e) {}
+
+  if (path === '/' || path === '/index' || path === '') {
+    return getDashboardSkeletonHtml();
+  }
+  if (path.startsWith('/records')) {
+    return getRecordsSkeletonHtml();
+  }
+  return getGenericSkeletonHtml();
+}
+
 // ---------- HTMX 页面平滑切换集成 (Smooth Navigation with HTMX) ----------
 
 const InstantNav = {
@@ -1773,6 +1944,10 @@ const InstantNav = {
   finishProgress: finishProgressBar,
   updateActiveNav: updateActiveNav,
   navigate(url) {
+    const container = document.getElementById('mainContainer');
+    if (container) {
+      container.innerHTML = renderSkeletonScreen(url);
+    }
     if (typeof htmx !== 'undefined') {
       htmx.ajax('GET', url, { target: '#mainContainer', swap: 'innerHTML show:window:top' });
       history.pushState({}, '', url);
@@ -1786,11 +1961,32 @@ const InstantNav = {
 document.addEventListener('DOMContentLoaded', function () {
   initPageLifecycle();
 
-  // HTMX 事件监听器：连接顶部加载条与生命周期重新水合
-  document.body.addEventListener('htmx:beforeRequest', function () {
+  // HTMX 事件监听器：连接顶部加载条、骨架屏与生命周期重新水合
+  document.body.addEventListener('htmx:beforeRequest', function (evt) {
     showProgressBar();
     if (typeof toggleMoreSheet === 'function') {
       toggleMoreSheet(false);
+    }
+
+    // 换页时清空滞留的全局 Toast 消息变量，防止换页误触重复弹窗
+    window.FLASH_SUCCESS = null;
+    window.FLASH_ERROR = null;
+
+    // 页面级导航时立即展示优雅的微光骨架屏，杜绝空白或卡顿等待
+    const target = evt.detail.target;
+    const elt = evt.detail.elt;
+    if (target && target.id === 'mainContainer') {
+      const isNav = elt && (
+        elt.closest('.desktop-nav-links') || 
+        elt.closest('.mobile-bottom-nav') || 
+        elt.closest('.mobile-bottom-sheet') || 
+        elt.tagName === 'A'
+      );
+      if (isNav) {
+        const targetUrl = (evt.detail.requestConfig && evt.detail.requestConfig.path) || (elt && elt.getAttribute('href')) || '';
+        target.innerHTML = renderSkeletonScreen(targetUrl);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
     }
   });
 

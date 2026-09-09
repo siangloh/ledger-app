@@ -85,6 +85,83 @@ body {
   }
 }
 
+/* ---------- 智能骨架屏动效 (Skeleton Screen Shimmer) ---------- */
+
+.skeleton-screen {
+  width: 100%;
+  animation: pageEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none;
+  user-select: none;
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: rgba(27, 27, 31, 0.07);
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: skeletonShimmer 1.35s ease-in-out infinite;
+}
+
+@keyframes skeletonShimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-card);
+}
+
+.skeleton-panel {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border);
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+@media (prefers-color-scheme: dark) {
+  .skeleton-shimmer {
+    background-color: rgba(255, 255, 255, 0.07);
+  }
+  .skeleton-shimmer::after {
+    background-image: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0,
+      rgba(255, 255, 255, 0.12) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
+}
+
 /* ---------- 现代 App 导航栏系统 ---------- */
 
 .app-header {
