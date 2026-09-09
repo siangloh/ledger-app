@@ -43,6 +43,20 @@ app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 AUTO_TRACK_KEY = os.environ.get('AUTO_TRACK_KEY')
 AUTO_TRACK_DEBUG_LOG = os.environ.get('AUTO_TRACK_DEBUG_LOG', '0') == '1'
 
+# 获取有效的 AUTO_TRACK_KEY（优先环境变量，次选数据库 system_settings，保底默认 key）
+def get_auto_track_key():
+    if AUTO_TRACK_KEY:
+        return AUTO_TRACK_KEY
+    try:
+        db = get_db()
+        row = db.execute("SELECT value FROM system_settings WHERE key='auto_track_key'").fetchone()
+        if row and row['value']:
+            return row['value']
+    except Exception:
+        pass
+    # 保底默认 key（部署时强烈建议在 Render 环境变量设置 AUTO_TRACK_KEY 覆盖此值）
+    return 'ledger-auto-track-default-key'
+
 # 本地 LLM (Ollama) 配置用于过滤营销推广假通知 (Phase-2)
 OLLAMA_URL = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
 OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'qwen2.5')
@@ -1275,7 +1289,8 @@ def api_auto_track():
     if not req_key:
         req_key = request.args.get('key')
 
-    if not AUTO_TRACK_KEY or req_key != AUTO_TRACK_KEY:
+    effective_key = get_auto_track_key()
+    if not effective_key or req_key != effective_key:
         return jsonify({'ok': False, 'message': 'API Key 无效或未在服务器配置，拒绝访问'}), 401
 
     # 获取通知文本：优先从 Query 参数获取，再从 JSON / 表单 / Raw Payload 获取
@@ -1398,7 +1413,7 @@ def api_auto_track():
 def api_get_categories():
     """获取所有可用分类列表（支持 Android 端离线缓存与下拉选择）"""
     req_key = request.headers.get('X-API-KEY')
-    if not AUTO_TRACK_KEY or req_key != AUTO_TRACK_KEY:
+    if not get_auto_track_key() or req_key != get_auto_track_key():
         if not session.get('logged_in'):
             return jsonify({'ok': False, 'message': 'API Key 无效或未登录'}), 401
 
@@ -1413,7 +1428,7 @@ def api_get_categories():
 def api_sync_transactions():
     """批量同步移动端离线记账数据"""
     req_key = request.headers.get('X-API-KEY')
-    if not AUTO_TRACK_KEY or req_key != AUTO_TRACK_KEY:
+    if not get_auto_track_key() or req_key != get_auto_track_key():
         if not session.get('logged_in'):
             return jsonify({'ok': False, 'message': 'API Key 无效或未登录'}), 401
 
@@ -1458,7 +1473,7 @@ def auto_track_page():
     webhook_url = f"{base_url}/api/auto-track"
     return render_template(
         'auto_track.html',
-        api_key=AUTO_TRACK_KEY,
+        api_key=get_auto_track_key(),
         webhook_url=webhook_url
     )
 
