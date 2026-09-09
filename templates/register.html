@@ -12,7 +12,7 @@
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
 <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260910_v1">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260910_v2">
 <style>
   .login-page-wrapper {
     min-height: 100vh;
@@ -28,8 +28,9 @@
     border-radius: 20px;
     padding: 36px 32px;
     width: 100%;
-    max-width: 400px;
+    max-width: 420px;
     text-align: center;
+    box-sizing: border-box;
   }
   .login-logo {
     width: 60px;
@@ -54,37 +55,170 @@
   .login-subtitle {
     font-size: 13px;
     color: var(--muted);
-    margin: 0 0 24px;
+    margin: 0 0 22px;
   }
   .login-form {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 16px;
     text-align: left;
   }
-  .login-form label {
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+  }
+  .form-group label {
     font-size: 12.5px;
     font-weight: 600;
     color: var(--ink-soft);
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .label-hint {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: normal;
+  }
+  .input-wrap {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
   }
   .login-form input[type="text"],
   .login-form input[type="password"] {
     font-size: 14.5px;
-    padding: 11px 14px;
+    padding: 11px 40px 11px 14px;
     border-radius: 10px;
-    border: 1px solid var(--border);
+    border: 1.5px solid var(--border);
     background: var(--surface-soft);
     color: var(--ink);
     width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
   }
   .login-form input:focus {
     outline: none;
     border-color: var(--gold);
     box-shadow: 0 0 0 3px var(--gold-soft);
   }
+
+  /* 实时校验状态边框与背景 */
+  .login-form input.input-error {
+    border-color: #f87171 !important;
+    background-color: rgba(239, 68, 68, 0.05) !important;
+    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.18) !important;
+  }
+  .login-form input.input-success {
+    border-color: #34d399 !important;
+    background-color: rgba(52, 211, 153, 0.04) !important;
+    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15) !important;
+  }
+
+  /* 实时错误提示文字 */
+  .realtime-feedback {
+    font-size: 12px;
+    line-height: 1.4;
+    min-height: 17px;
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0;
+    transform: translateY(-3px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .realtime-feedback.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .realtime-feedback.is-error {
+    color: #f87171;
+    font-weight: 500;
+  }
+  .realtime-feedback.is-success {
+    color: #34d399;
+    font-weight: 500;
+  }
+  .realtime-feedback.is-checking {
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* 密码显隐切换按钮 */
+  .btn-toggle-pwd {
+    position: absolute;
+    right: 10px;
+    background: transparent;
+    border: none;
+    font-size: 15px;
+    cursor: pointer;
+    color: var(--muted);
+    padding: 6px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    transition: opacity 0.15s ease;
+  }
+  .btn-toggle-pwd:hover {
+    opacity: 0.8;
+  }
+
+  /* 状态小图标 (如：加载中旋转、对勾) */
+  .status-badge {
+    position: absolute;
+    right: 12px;
+    font-size: 13px;
+    pointer-events: none;
+  }
+  .status-spin {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border: 2px solid rgba(182, 144, 47, 0.3);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* 密码强度条 */
+  .pwd-strength-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    transition: opacity 0.2s ease;
+  }
+  .strength-track {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .strength-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 2px;
+    transition: width 0.3s ease, background-color 0.3s ease;
+  }
+  .strength-text {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    min-width: 44px;
+    text-align: right;
+  }
+
+  /* 提交按钮 */
   .btn-login {
     background: linear-gradient(135deg, var(--navy), var(--navy-2));
     color: #f4ead0;
@@ -94,12 +228,17 @@
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    transition: transform 0.15s ease, filter 0.15s ease;
-    margin-top: 6px;
+    transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
+    margin-top: 4px;
   }
   .btn-login:active {
     transform: scale(0.98);
   }
+  .btn-login:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   .login-bottom-links {
     margin-top: 20px;
     font-size: 13px;
@@ -119,6 +258,16 @@
     color: var(--muted);
     margin-top: 18px;
     line-height: 1.5;
+  }
+
+  /* 震动动画 */
+  @keyframes fieldShake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
+  }
+  .shake-animate {
+    animation: fieldShake 0.35s ease-in-out;
   }
 </style>
 </head>
@@ -152,29 +301,322 @@
     </div>
     {% endif %}
 
-    <form method="post" action="{{ url_for('register') }}" class="login-form">
+    <form method="post" action="{{ url_for('register') }}" class="login-form" id="registerForm" novalidate>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label>
-        用户名 / 账号
-        <input type="text" name="username" value="{{ username or '' }}" placeholder="请输入用户名（如：alice）" required autofocus autocomplete="username" minlength="2" maxlength="30">
-      </label>
-      <label>
-        设置密码
-        <input type="password" name="password" placeholder="请输入至少 4 位登录密码" required autocomplete="new-password" minlength="4">
-      </label>
-      <label>
-        确认密码
-        <input type="password" name="confirm_password" placeholder="请再次输入密码" required autocomplete="new-password" minlength="4">
-      </label>
-      <button type="submit" class="btn-login">立即注册并进入</button>
+
+      <!-- 用户名输入框 -->
+      <div class="form-group" id="groupUsername">
+        <label for="usernameInput">
+          用户名 / 账号
+          <span class="label-hint">3-30位 字母/数字/中文</span>
+        </label>
+        <div class="input-wrap">
+          <input type="text" id="usernameInput" name="username" value="{{ username or '' }}" placeholder="设置用户名（如：alex_2026）" required autofocus autocomplete="username" minlength="3" maxlength="30" spellcheck="false">
+          <span class="status-badge" id="usernameStatusBadge"></span>
+        </div>
+        <div class="realtime-feedback" id="usernameFeedback" role="alert"></div>
+      </div>
+
+      <!-- 设置密码输入框 -->
+      <div class="form-group" id="groupPassword">
+        <label for="passwordInput">
+          设置密码
+          <span class="label-hint">至少 6 位字符</span>
+        </label>
+        <div class="input-wrap">
+          <input type="password" id="passwordInput" name="password" placeholder="设置登录密码（至少 6 位）" required autocomplete="new-password" minlength="6">
+          <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('passwordInput', this)" aria-label="查看密码" tabindex="-1">👁️</button>
+        </div>
+        <div class="pwd-strength-wrap" id="pwdStrengthWrap" style="display:none;">
+          <div class="strength-track">
+            <div class="strength-fill" id="pwdStrengthFill"></div>
+          </div>
+          <span class="strength-text" id="pwdStrengthText"></span>
+        </div>
+        <div class="realtime-feedback" id="passwordFeedback" role="alert"></div>
+      </div>
+
+      <!-- 确认密码输入框 -->
+      <div class="form-group" id="groupConfirmPassword">
+        <label for="confirmPasswordInput">
+          确认密码
+          <span class="label-hint">保持与上方一致</span>
+        </label>
+        <div class="input-wrap">
+          <input type="password" id="confirmPasswordInput" name="confirm_password" placeholder="再次输入相同的密码" required autocomplete="new-password" minlength="6">
+          <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('confirmPasswordInput', this)" aria-label="查看密码" tabindex="-1">👁️</button>
+        </div>
+        <div class="realtime-feedback" id="confirmPasswordFeedback" role="alert"></div>
+      </div>
+
+      <button type="submit" class="btn-login" id="btnSubmit">立即注册并进入</button>
     </form>
 
     <div class="login-bottom-links">
       已有账号？<a href="{{ url_for('login') }}">立即登录 &rarr;</a>
     </div>
 
-    <p class="login-hint">🔒 每个账号采用安全 UUID 隔离，数据完全独立私密。</p>
+    <p class="login-hint">🔒 每个账号采用安全 UUID 隔离，数据与分类完全独立私密。</p>
   </div>
 </div>
+
+<script>
+// 显隐密码切换
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+    btn.setAttribute('aria-label', '隐藏密码');
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁️';
+    btn.setAttribute('aria-label', '查看密码');
+  }
+}
+
+(function() {
+  const form = document.getElementById('registerForm');
+  const uInput = document.getElementById('usernameInput');
+  const pInput = document.getElementById('passwordInput');
+  const cpInput = document.getElementById('confirmPasswordInput');
+
+  const uFeedback = document.getElementById('usernameFeedback');
+  const pFeedback = document.getElementById('passwordFeedback');
+  const cpFeedback = document.getElementById('confirmPasswordFeedback');
+  const uBadge = document.getElementById('usernameStatusBadge');
+
+  const pwdStrengthWrap = document.getElementById('pwdStrengthWrap');
+  const pwdStrengthFill = document.getElementById('pwdStrengthFill');
+  const pwdStrengthText = document.getElementById('pwdStrengthText');
+
+  let usernameCheckTimer = null;
+  let isUsernameAvailable = false;
+  let lastCheckedUsername = '';
+
+  // 设置反馈信息辅助函数
+  function setFeedback(targetEl, inputEl, message, type) {
+    if (!message) {
+      targetEl.textContent = '';
+      targetEl.className = 'realtime-feedback';
+      inputEl.classList.remove('input-error', 'input-success');
+      return;
+    }
+    targetEl.textContent = message;
+    targetEl.className = `realtime-feedback visible is-${type}`;
+    if (type === 'error') {
+      inputEl.classList.add('input-error');
+      inputEl.classList.remove('input-success');
+    } else if (type === 'success') {
+      inputEl.classList.add('input-success');
+      inputEl.classList.remove('input-error');
+    } else {
+      inputEl.classList.remove('input-error', 'input-success');
+    }
+  }
+
+  // 1. 用户名实时校验
+  function validateUsername(isBlur = false) {
+    const val = uInput.value.trim();
+    clearTimeout(usernameCheckTimer);
+
+    if (!val) {
+      isUsernameAvailable = false;
+      uBadge.innerHTML = '';
+      if (isBlur) {
+        setFeedback(uFeedback, uInput, '⚠️ 用户名不能为空', 'error');
+      } else {
+        setFeedback(uFeedback, uInput, '', '');
+      }
+      return false;
+    }
+
+    if (val.length < 3) {
+      isUsernameAvailable = false;
+      uBadge.innerHTML = '';
+      setFeedback(uFeedback, uInput, `⚠️ 用户名太短，至少需要 3 个字符（当前 ${val.length} 个）`, 'error');
+      return false;
+    }
+
+    if (val.length > 30) {
+      isUsernameAvailable = false;
+      uBadge.innerHTML = '';
+      setFeedback(uFeedback, uInput, '⚠️ 用户名不能超过 30 个字符', 'error');
+      return false;
+    }
+
+    const reg = /^[a-zA-Z0-9_\-\u4e00-\u9fa5]+$/;
+    if (!reg.test(val)) {
+      isUsernameAvailable = false;
+      uBadge.innerHTML = '';
+      setFeedback(uFeedback, uInput, '⚠️ 格式不合规：仅支持中文、英文字母、数字、下划线及连字符', 'error');
+      return false;
+    }
+
+    // 格式合法，防抖请求后端验证用户名是否已被占用
+    if (val === lastCheckedUsername && isUsernameAvailable) {
+      setFeedback(uFeedback, uInput, '✓ 该用户名可用', 'success');
+      return true;
+    }
+
+    setFeedback(uFeedback, uInput, '正在检查用户名可用性...', 'checking');
+    uBadge.innerHTML = '<span class="status-spin"></span>';
+
+    usernameCheckTimer = setTimeout(() => {
+      fetch(`/api/check-username?username=${encodeURIComponent(val)}`)
+        .then(r => r.json())
+        .then(data => {
+          uBadge.innerHTML = '';
+          lastCheckedUsername = val;
+          if (data.ok && data.available) {
+            isUsernameAvailable = true;
+            setFeedback(uFeedback, uInput, '✓ ' + data.message, 'success');
+          } else {
+            isUsernameAvailable = false;
+            setFeedback(uFeedback, uInput, '⚠️ ' + (data.message || '该用户名已被占用'), 'error');
+          }
+        })
+        .catch(() => {
+          uBadge.innerHTML = '';
+          // 网络失败时退化为本地格式有效
+          isUsernameAvailable = true;
+          setFeedback(uFeedback, uInput, '✓ 用户名格式正确', 'success');
+        });
+    }, isBlur ? 50 : 280);
+
+    return true;
+  }
+
+  // 2. 密码实时校验与强度计算
+  function validatePassword(isBlur = false) {
+    const pwd = pInput.value;
+    if (!pwd) {
+      pwdStrengthWrap.style.display = 'none';
+      if (isBlur) {
+        setFeedback(pFeedback, pInput, '⚠️ 密码不能为空', 'error');
+      } else {
+        setFeedback(pFeedback, pInput, '', '');
+      }
+      return false;
+    }
+
+    // 显示强度指示条
+    pwdStrengthWrap.style.display = 'flex';
+    let strengthScore = 0;
+    if (pwd.length >= 6) strengthScore += 1;
+    if (pwd.length >= 9) strengthScore += 1;
+    if (/[A-Z]/.test(pwd) || /[^a-zA-Z0-9]/.test(pwd)) strengthScore += 1;
+    if (/\d/.test(pwd) && /[a-zA-Z]/.test(pwd)) strengthScore += 1;
+
+    if (pwd.length < 6) {
+      pwdStrengthFill.style.width = '25%';
+      pwdStrengthFill.style.backgroundColor = '#f87171';
+      pwdStrengthText.textContent = '过短';
+      pwdStrengthText.style.color = '#f87171';
+      setFeedback(pFeedback, pInput, `⚠️ 密码太短，至少需要 6 位字符（当前 ${pwd.length} 位）`, 'error');
+      return false;
+    } else if (strengthScore <= 2) {
+      pwdStrengthFill.style.width = '50%';
+      pwdStrengthFill.style.backgroundColor = '#fbbf24';
+      pwdStrengthText.textContent = '中等';
+      pwdStrengthText.style.color = '#fbbf24';
+    } else {
+      pwdStrengthFill.style.width = '100%';
+      pwdStrengthFill.style.backgroundColor = '#34d399';
+      pwdStrengthText.textContent = '强';
+      pwdStrengthText.style.color = '#34d399';
+    }
+
+    setFeedback(pFeedback, pInput, '✓ 密码长度合规', 'success');
+
+    // 若确认密码框已有输入，顺便联动重新校验确认密码
+    if (cpInput.value) {
+      validateConfirmPassword();
+    }
+
+    return true;
+  }
+
+  // 3. 确认密码实时校验
+  function validateConfirmPassword(isBlur = false) {
+    const pwd = pInput.value;
+    const cpwd = cpInput.value;
+
+    if (!cpwd) {
+      if (isBlur) {
+        setFeedback(cpFeedback, cpInput, '⚠️ 请再次输入密码以确认', 'error');
+      } else {
+        setFeedback(cpFeedback, cpInput, '', '');
+      }
+      return false;
+    }
+
+    if (cpwd !== pwd) {
+      setFeedback(cpFeedback, cpInput, '⚠️ 两次输入的密码不一致，请检查', 'error');
+      return false;
+    }
+
+    if (pwd.length < 6) {
+      setFeedback(cpFeedback, cpInput, '⚠️ 请先将上方密码设置至少 6 位', 'error');
+      return false;
+    }
+
+    setFeedback(cpFeedback, cpInput, '✓ 两次密码输入一致', 'success');
+    return true;
+  }
+
+  // 绑定实时输入事件与失去焦点事件
+  uInput.addEventListener('input', () => validateUsername(false));
+  uInput.addEventListener('blur', () => validateUsername(true));
+
+  pInput.addEventListener('input', () => validatePassword(false));
+  pInput.addEventListener('blur', () => validatePassword(true));
+
+  cpInput.addEventListener('input', () => validateConfirmPassword(false));
+  cpInput.addEventListener('blur', () => validateConfirmPassword(true));
+
+  // 表单提交拦截与震动提示
+  form.addEventListener('submit', function(e) {
+    const isUValid = validateUsername(true);
+    const isPValid = validatePassword(true);
+    const isCPValid = validateConfirmPassword(true);
+
+    if (!isUValid || !isUsernameAvailable) {
+      e.preventDefault();
+      triggerShake('groupUsername');
+      uInput.focus();
+      return;
+    }
+
+    if (!isPValid) {
+      e.preventDefault();
+      triggerShake('groupPassword');
+      pInput.focus();
+      return;
+    }
+
+    if (!isCPValid) {
+      e.preventDefault();
+      triggerShake('groupConfirmPassword');
+      cpInput.focus();
+      return;
+    }
+  });
+
+  function triggerShake(groupId) {
+    const g = document.getElementById(groupId);
+    if (!g) return;
+    g.classList.remove('shake-animate');
+    void g.offsetWidth; // 触发 reflow 重启关键帧动画
+    g.classList.add('shake-animate');
+  }
+
+  // 若带初始值（如后端回填），触发一次初始化校验
+  if (uInput.value.trim()) {
+    validateUsername(true);
+  }
+})();
+</script>
 </body>
 </html>

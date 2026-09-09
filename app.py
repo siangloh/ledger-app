@@ -196,8 +196,8 @@ def get_current_user_id():
 def require_login():
     # 允许静态资源、登录/注册/登出路由、健康检查、PWA 核心资源以及外部自动记账 Webhook 豁免 Session 检查
     if (
-        request.endpoint in ('login', 'register', 'logout', 'static', 'health', 'api_realtime_check', 'manifest', 'service_worker', 'offline_page')
-        or request.path in ('/login', '/register', '/logout', '/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html')
+        request.endpoint in ('login', 'register', 'logout', 'static', 'health', 'api_realtime_check', 'manifest', 'service_worker', 'offline_page', 'api_check_username')
+        or request.path in ('/login', '/register', '/logout', '/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html', '/api/check-username')
         or (request.path and request.path.startswith('/static/'))
     ):
         return
@@ -215,6 +215,24 @@ def require_login():
             return jsonify({'error': 'unauthorized', 'redirect': url_for('login')}), 401
         target_next = request.full_path if request.full_path and request.full_path != '/?' else '/'
         return redirect(url_for('login', next=target_next))
+
+
+@app.route('/api/check-username')
+def api_check_username():
+    username = (request.args.get('username') or '').strip()
+    if not username:
+        return jsonify({'ok': False, 'available': False, 'message': '请输入用户名'})
+    if len(username) < 3:
+        return jsonify({'ok': False, 'available': False, 'message': f'用户名太短，至少需 3 个字符（当前 {len(username)} 个）'})
+    if len(username) > 30:
+        return jsonify({'ok': False, 'available': False, 'message': '用户名不能超过 30 个字符'})
+    if not re.match(r'^[a-zA-Z0-9_\-\u4e00-\u9fa5]+$', username):
+        return jsonify({'ok': False, 'available': False, 'message': '仅支持中文、英文字母、数字、下划线及连字符'})
+    db = get_db()
+    existing = db.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()
+    if existing:
+        return jsonify({'ok': True, 'available': False, 'message': '该用户名已被占用，请直接登录或更换'})
+    return jsonify({'ok': True, 'available': True, 'message': '该用户名可用 ✓'})
 
 
 @app.route('/register', methods=['GET', 'POST'])
