@@ -1601,13 +1601,13 @@ function updateSyncBadge(state) {
   if (state === 'online') {
     badges.forEach(b => {
       b.classList.remove('badge-offline', 'badge-unreachable');
-      b.title = '网络良好，已连接至云端服务';
+      b.title = '网络良好，服务正常';
     });
     dots.forEach(d => {
       d.classList.remove('dot-offline', 'dot-unreachable');
     });
     texts.forEach(t => {
-      t.textContent = '云端在线';
+      t.textContent = '';
     });
   } else if (state === 'offline') {
     badges.forEach(b => {
@@ -1620,7 +1620,7 @@ function updateSyncBadge(state) {
       d.classList.add('dot-offline');
     });
     texts.forEach(t => {
-      t.textContent = '网络离线';
+      t.textContent = '离线';
     });
   } else if (state === 'unreachable') {
     badges.forEach(b => {
@@ -1633,7 +1633,7 @@ function updateSyncBadge(state) {
       d.classList.add('dot-unreachable');
     });
     texts.forEach(t => {
-      t.textContent = '连接中断';
+      t.textContent = '断开';
     });
   }
 }
@@ -1649,7 +1649,7 @@ function flashSyncBadgeUpdated() {
     b.classList.add('live-active', 'live-pulse');
   });
   texts.forEach(t => {
-    t.textContent = '实时已更新';
+    t.textContent = '已更新';
   });
 
   setTimeout(() => {
@@ -1657,7 +1657,7 @@ function flashSyncBadgeUpdated() {
       b.classList.remove('live-pulse');
     });
     texts.forEach(t => {
-      t.textContent = '云端在线';
+      t.textContent = '';
     });
   }, 3000);
 }
@@ -1912,9 +1912,12 @@ function updateActiveNav(urlStr) {
     a.classList.toggle('active', a.dataset.nav === navKey);
   });
 
-  // 同步手机端底部导航高亮
+  // 同步手机端底部导航高亮（如果是二级功能如分类洞察、固定收支、分类管理、批量导入，则高亮“更多”按钮）
+  const isSecondaryPage = ['insights', 'recurring', 'categories', 'import', 'auto-track'].includes(navKey);
   document.querySelectorAll('.mobile-bottom-nav .bnav-item').forEach(btn => {
-    if (btn.dataset.nav) {
+    if (btn.id === 'btnMoreSheet') {
+      btn.classList.toggle('active', isSecondaryPage);
+    } else if (btn.dataset.nav) {
       btn.classList.toggle('active', btn.dataset.nav === navKey);
     }
   });
@@ -2136,6 +2139,7 @@ const InstantNav = {
   finishProgress: finishProgressBar,
   updateActiveNav: updateActiveNav,
   navigate(url) {
+    updateActiveNav(url); // 立即高亮目标导航按钮
     const container = document.getElementById('mainContainer');
     if (container) {
       container.innerHTML = renderSkeletonScreen(url);
@@ -2143,7 +2147,6 @@ const InstantNav = {
     if (typeof htmx !== 'undefined') {
       htmx.ajax('GET', url, { target: '#mainContainer', swap: 'innerHTML show:window:top' });
       history.pushState({}, '', url);
-      updateActiveNav(url);
     } else {
       window.location.href = url;
     }
@@ -2176,6 +2179,15 @@ document.addEventListener('DOMContentLoaded', function () {
       );
       if (isNav) {
         const targetUrl = (evt.detail.requestConfig && evt.detail.requestConfig.path) || (elt && elt.getAttribute('href')) || '';
+        // 关键改进：在触发骨架屏展示的瞬间，立即同步点亮对应页面的 Navigation 按钮为 Active 状态！
+        if (targetUrl) {
+          updateActiveNav(targetUrl);
+        } else {
+          const navEl = elt && elt.closest('[data-nav]');
+          if (navEl && navEl.dataset.nav) {
+            updateActiveNav('/' + (navEl.dataset.nav === 'index' ? '' : navEl.dataset.nav));
+          }
+        }
         target.innerHTML = renderSkeletonScreen(targetUrl);
         window.scrollTo({ top: 0, behavior: 'instant' });
       }

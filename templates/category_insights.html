@@ -205,30 +205,82 @@ function renderCategoryChart(idx) {
 }
 
 function selectInsightsRange(rangeKey) {
+  // 1. 立即给选中的药丸按钮添加 active 高亮，给用户即时视觉反馈
+  document.querySelectorAll('.overview-toolbar .filter-pills .pill-btn').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.range === rangeKey);
+  });
+
+  const box = document.getElementById('customDateBox');
   if (rangeKey === 'custom') {
-    const box = document.getElementById('customDateBox');
     if (box) box.style.display = 'flex';
     return;
   }
+  if (box) box.style.display = 'none';
+
+  // 2. 构造目标 URL
   const url = new URL(window.location.href);
+  url.pathname = '/categories/insights';
   url.searchParams.set('range', rangeKey);
   url.searchParams.delete('start');
   url.searchParams.delete('end');
-  window.location.href = url.toString();
+
+  // 3. 优先使用 HTMX 进行无感极速局部刷新，避免整页白屏重载
+  if (typeof htmx !== 'undefined') {
+    const badge = document.getElementById('insightsRangeBadge');
+    if (badge) {
+      badge.innerHTML = '<span class="skeleton-shimmer" style="display:inline-block; width:160px; height:15px; border-radius:4px; vertical-align:middle;"></span>';
+    }
+    htmx.ajax('GET', url.toString(), {
+      target: '#mainContainer',
+      swap: 'innerHTML show:window:top',
+      headers: { 'HX-Request': 'true' }
+    });
+    history.pushState({}, '', url.toString());
+  } else {
+    window.location.href = url.toString();
+  }
 }
 
 function applyCustomInsightsFilter() {
   const start = document.getElementById('insightsStartDate').value;
   const end = document.getElementById('insightsEndDate').value;
   if (!start || !end) {
-    alert('请选择完整的开始与结束日期');
+    if (typeof errorAlert === 'function') {
+      errorAlert('请选择完整的开始与结束日期', '筛选提示');
+    } else {
+      alert('请选择完整的开始与结束日期');
+    }
     return;
   }
+  if (start > end) {
+    if (typeof errorAlert === 'function') {
+      errorAlert('开始日期不能晚于结束日期', '筛选提示');
+    } else {
+      alert('开始日期不能晚于结束日期');
+    }
+    return;
+  }
+
   const url = new URL(window.location.href);
+  url.pathname = '/categories/insights';
   url.searchParams.set('range', 'custom');
   url.searchParams.set('start', start);
   url.searchParams.set('end', end);
-  window.location.href = url.toString();
+
+  if (typeof htmx !== 'undefined') {
+    const badge = document.getElementById('insightsRangeBadge');
+    if (badge) {
+      badge.innerHTML = '<span class="skeleton-shimmer" style="display:inline-block; width:160px; height:15px; border-radius:4px; vertical-align:middle;"></span>';
+    }
+    htmx.ajax('GET', url.toString(), {
+      target: '#mainContainer',
+      swap: 'innerHTML show:window:top',
+      headers: { 'HX-Request': 'true' }
+    });
+    history.pushState({}, '', url.toString());
+  } else {
+    window.location.href = url.toString();
+  }
 }
 </script>
 {% endblock %}

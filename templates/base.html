@@ -35,17 +35,17 @@
             <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories" hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">分类管理</a>
             <a href="{{ url_for('category_insights_page') }}" class="{{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">分类洞察</a>
             <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">批量导入</a>
-            <span class="sync-badge desktop-sync-badge" id="desktopSyncStatusBadge">
+            <span class="sync-badge desktop-sync-badge" id="desktopSyncStatusBadge" title="服务在线正常">
                 <span class="online-dot" id="desktopSyncStatusDot"></span>
-                <span id="desktopSyncStatusText">云端在线</span>
+                <span id="desktopSyncStatusText"></span>
             </span>
             <a href="{{ url_for('logout') }}" style="color: rgba(255, 255, 255, 0.6); margin-left: 6px; font-size: 12.5px;" title="退出登录">登出</a>
         </nav>
         <!-- 移动端顶部状态指示 -->
         <div class="mobile-header-right">
-            <span class="sync-badge" id="syncStatusBadge">
+            <span class="sync-badge" id="syncStatusBadge" title="服务在线正常">
                 <span class="online-dot" id="syncStatusDot"></span>
-                <span id="syncStatusText">云端在线</span>
+                <span id="syncStatusText"></span>
             </span>
         </div>
     </div>
@@ -61,8 +61,8 @@
         <span class="bnav-icon">📑</span>
         <span class="bnav-label">明细</span>
     </a>
-    <a href="{{ url_for('split_bill_page') }}" class="bnav-item bnav-highlight {{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill" hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
-        <div class="bnav-icon-highlight">🧾</div>
+    <a href="{{ url_for('split_bill_page') }}" class="bnav-item {{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill" hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
+        <span class="bnav-icon">🧾</span>
         <span class="bnav-label">AA分账</span>
     </a>
     <button type="button" class="bnav-item" id="btnMoreSheet" onclick="toggleMoreSheet()">
