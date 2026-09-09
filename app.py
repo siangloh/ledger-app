@@ -400,10 +400,17 @@ def parse_auto_track_notification(raw_text):
     if not amount or amount <= 0:
         return None
 
-    # 2. 判断是收入还是支出（默认大多数扣款通知是 expense）
+    # 2. 判断是收入还是支出（优先匹配明确扣款/支出，避免通知末尾带的 cashback/voucher 奖励词误把支出判定为收入）
     is_income = False
     lower_text = text.lower()
-    if any(k in lower_text for k in ['received', 'credited', 'cashback', 'refund', '转入', '收款', '存入']):
+
+    is_expense = any(k in lower_text for k in [
+        'paid', 'spent', 'payment to', 'payment of', 'payment successful',
+        'deducted', 'debited', 'transfer to', 'transferred to', 'transfer of',
+        '付款', '支出', '扣款', '转账给', '已支付', '买单', '消费'
+    ])
+
+    if not is_expense and any(k in lower_text for k in ['received', 'credited', 'refund', '转入', '收款', '存入', '退款']):
         is_income = True
 
     tx_type = 'income' if is_income else 'expense'
@@ -415,11 +422,11 @@ def parse_auto_track_notification(raw_text):
     # - "Transfer of RM 20.00 to Ali"
     # - "Payment to Starbucks of RM 12"
     merchant = ''
-    m_to = re.search(r'(?:to|at|paid to|transfer to|payment to)\s+([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{2,35})', text, re.IGNORECASE)
+    m_to = re.search(r'(?:to|at|from|paid to|transfer to|payment to)\s+([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{2,35})', text, re.IGNORECASE)
     if m_to:
         m_str = m_to.group(1).strip()
-        # 清理后续干扰词如 on, via, using, ref, date
-        m_cleaned = re.split(r'\s+(?:on|via|ref|using|with|at|for|date|txid)\b', m_str, flags=re.IGNORECASE)[0]
+        # 清理后续干扰词如 on, via, using, ref, date, claim, cashback, voucher 等以及句号/换行
+        m_cleaned = re.split(r'[\.\n\r]|\s+(?:on|via|ref|using|with|at|for|date|txid|claim|get|earn|earned|cashback|voucher|was|is|successful)\b', m_str, flags=re.IGNORECASE)[0]
         merchant = m_cleaned.strip(' .,-')
 
     if not merchant:
@@ -1216,10 +1223,12 @@ def classify_notification_with_llm(text):
 
     endpoint = f"{OLLAMA_URL.rstrip('/')}/api/generate"
     prompt = (
-        "You are an expert financial transaction validator. "
+        "You are an expert financial transaction validator for Malaysian e-wallets (Touch 'n Go, MAE, GrabPay, Boost). "
         "Analyze the following mobile notification text and decide whether it describes an ACTUAL COMPLETED "
-        "financial transaction (payment, transfer, debit, credit), OR if it is a PROMOTIONAL, MARKETING, "
-        "VOUCHER, DISCOUNT, REWARD, or TOP-UP INVITATION message.\n\n"
+        "financial transaction (payment, transfer, debit, credit), OR if it is PURELY a promotional marketing message.\n\n"
+        "NOTE: Genuine Malaysian e-wallet transaction receipts frequently append reward promotions at the end "
+        "(e.g., 'You have paid RM 15.00 to FamilyMart. Claim your cashback voucher!'). If money was actually spent or transferred, "
+        "it IS a real transaction (is_real_transaction: true). Only return false if NO actual transaction took place.\n\n"
         f"Notification text:\n\"\"\"{text}\"\"\"\n\n"
         "Reply with ONLY a valid JSON object in this exact format: {\"is_real_transaction\": true/false, \"reason\": \"short explanation\"}"
     )
@@ -1250,10 +1259,10 @@ def classify_notification_with_llm(text):
     return True
 
 
-@app.route('/api/auto-track', methods=['POST'])
+@app.route('/api/auto-track', methods=['GET', 'POST'])
 @csrf.exempt
 def api_auto_track():
-    # 鉴权检查：仅支持 Header X-API-KEY 或 JSON/Form 中的 key (禁止使用 URL ?key= 参数以避免日志与历史记录泄露)
+    # 鉴权检查：优先 Header X-API-KEY，其次 JSON/Form key，最后回退 URL 参数 ?key=xxx 保持向后兼容性
     req_key = request.headers.get('X-API-KEY')
     data = {}
     if request.is_json:
@@ -1262,6 +1271,9 @@ def api_auto_track():
             req_key = data.get('key')
     else:
         req_key = req_key or request.form.get('key')
+
+    if not req_key:
+        req_key = request.args.get('key')
 
     if not AUTO_TRACK_KEY or req_key != AUTO_TRACK_KEY:
         return jsonify({'ok': False, 'message': 'API Key 无效或未在服务器配置，拒绝访问'}), 401
@@ -1329,7 +1341,19 @@ def api_auto_track():
                 print(f"[AUTO_TRACK DEBUG] Applied remembered merchant override: '{merchant_note}' -> '{override['category']}'")
 
     # Phase-2: 本地 LLM 营销广告二次校验（Fail-open 策略）
-    is_real = classify_notification_with_llm(text)
+    # 如果文本已经明确包含扣款动作与明确金额，直接判定为真实交易，避免末尾的卡券营销词被大模型误杀
+    lower_text = text.lower()
+    has_strong_payment_receipt = any(k in lower_text for k in [
+        'paid rm', 'paid to', 'payment of rm', 'payment of', 'spent rm', 'spent at',
+        'transfer of rm', 'transferred rm', 'transferred to', 'duitnow qr', 'duitnow transfer',
+        '付款 rm', '付款成功', '扣款 rm', '扣款成功', '转账给', '已支付', 'successfully paid'
+    ])
+
+    if has_strong_payment_receipt:
+        is_real = True
+    else:
+        is_real = classify_notification_with_llm(text)
+
     if not is_real:
         if AUTO_TRACK_DEBUG_LOG:
             print(f"[AUTO_TRACK DEBUG] Notification rejected by Phase-2 LLM as promotional: {repr(text)}")

@@ -17,16 +17,41 @@ object AppSelectionManager {
         "affin", "bankislam", "alliance"
     )
 
+    val DEFAULT_PACKAGES = setOf(
+        "my.com.tngdigital.ewallet",
+        "com.maybank2u.life",
+        "com.v2.cimb.malaysia",
+        "com.rhbgroup.rhbmobile",
+        "my.com.hongleongconnect.mobile",
+        "com.ambank.ambankconnect",
+        "my.com.affinonline.retail",
+        "my.com.bankislam.bizbridge",
+        "com.alliancedirect.mobile",
+        "com.publicbank.pbe",
+        "com.myboost",
+        "com.grabtaxi.passenger",
+        "com.shopee.my",
+        "my.bigpay.app"
+    )
+
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
     fun isAppMonitored(context: Context, pkgName: String): Boolean {
+        val lowerPkg = pkgName.lowercase()
+        val isDefaultBank = KNOWN_BANK_KEYWORDS.any { lowerPkg.contains(it) } || DEFAULT_PACKAGES.contains(pkgName)
+
         val prefs = getPrefs(context)
         if (!prefs.getBoolean(KEY_INITIALIZED, false)) {
             initDefaults(context)
+            if (isDefaultBank) return true
         }
         val enabledSet = prefs.getStringSet(KEY_ENABLED_PKGS, emptySet()) ?: emptySet()
+        if (enabledSet.isEmpty()) {
+            initDefaults(context)
+            return isDefaultBank
+        }
         return enabledSet.contains(pkgName)
     }
 
@@ -53,17 +78,18 @@ object AppSelectionManager {
     }
 
     private fun initDefaults(context: Context) {
-        val pm = context.packageManager
-        val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-        val defaultEnabled = mutableSetOf<String>()
-
-        for (app in installedApps) {
-            val pkg = app.packageName.lowercase()
-            val matchesKnownBank = KNOWN_BANK_KEYWORDS.any { pkg.contains(it) }
-            if (matchesKnownBank) {
-                defaultEnabled.add(app.packageName)
+        val defaultEnabled = DEFAULT_PACKAGES.toMutableSet()
+        try {
+            val pm = context.packageManager
+            val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            for (app in installedApps) {
+                val pkg = app.packageName.lowercase()
+                val matchesKnownBank = KNOWN_BANK_KEYWORDS.any { pkg.contains(it) }
+                if (matchesKnownBank) {
+                    defaultEnabled.add(app.packageName)
+                }
             }
-        }
+        } catch (_: Exception) {}
 
         getPrefs(context).edit()
             .putStringSet(KEY_ENABLED_PKGS, defaultEnabled)

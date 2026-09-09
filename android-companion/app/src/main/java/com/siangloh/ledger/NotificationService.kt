@@ -21,22 +21,22 @@ class NotificationService : NotificationListenerService() {
     companion object {
         private const val TAG = "LedgerNotifService"
 
-        // Phase-1 常见营销促销敏感词（排除掉含这类词汇的通知，即便包含 RM 也判定为广告）
-        val PROMO_KEYWORDS = listOf(
-            "cashback", "voucher", "promo", "promotion", "discount", "claim",
-            "top up now", "reload now", "limited time", "优惠", "红包", "抽奖",
-            "充值返", "限时", "领券", "立减"
+        // Phase-1 纯粹营销推广词汇（仅当完全不包含交易扣款动作或金额时才拦截）
+        val PURE_PROMO_KEYWORDS = listOf(
+            "top up now", "reload now", "limited time offer", "apply for loan", "cash loan",
+            "充值返", "立即充值", "申请贷款", "邀请好友", "分享领"
         )
 
         // 交易动作/动词与标识
         val TRANSACTION_VERBS = listOf(
             "paid", "spent", "transferred", "transfer", "debited", "payment",
-            "received", "credited", "付款", "扣款", "转账", "收款",
-            "duitnow", "qr pay", "to ", "from ", "successful", "completed"
+            "received", "credited", "付款", "扣款", "转账", "收款", "支付", "已支付",
+            "duitnow", "qr pay", "to ", "from ", "successful", "completed", "you have paid",
+            "you've paid", "sent to"
         )
 
-        // 严格金额格式正则：RM/MYR 紧跟数字且必须带有两位小数 (例如 RM 15.50 或 MYR20.00)
-        val STRICT_AMOUNT_REGEX = Regex("""(?:RM|MYR)\s*[0-9]+(?:\.[0-9]{2})""", RegexOption.IGNORE_CASE)
+        // 宽松金额格式正则：支持整数、单小数位、双小数位及千分位逗号 (例如 RM15, RM 15.5, RM 15.50, RM 1,250.00, MYR 20)
+        val AMOUNT_REGEX = Regex("""(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)""", RegexOption.IGNORE_CASE)
     }
 
     override fun onListenerConnected() {
@@ -82,10 +82,13 @@ class NotificationService : NotificationListenerService() {
         val lower = fullContent.lowercase()
         val db = AppDatabase.getInstance(this)
 
-        // 3. Phase-1 本地快速营销/广告过滤
-        val hasPromoWord = PROMO_KEYWORDS.any { lower.contains(it) }
-        if (hasPromoWord) {
-            Log.d(TAG, "Phase-1 Filtered: contains promo keywords -> $fullContent")
+        val hasVerb = TRANSACTION_VERBS.any { lower.contains(it) }
+        val hasAmount = AMOUNT_REGEX.containsMatchIn(fullContent)
+
+        // 3. Phase-1 纯营销/广告拦截：只有在消息是纯广告且完全缺少扣款动词或金额时才丢弃
+        val hasPurePromoWord = PURE_PROMO_KEYWORDS.any { lower.contains(it) }
+        if (hasPurePromoWord && (!hasVerb || !hasAmount)) {
+            Log.d(TAG, "Phase-1 Filtered: contains pure promo keywords without transaction -> $fullContent")
             serviceScope.launch {
                 db.notificationLogDao().insert(
                     NotificationLog(
@@ -101,11 +104,8 @@ class NotificationService : NotificationListenerService() {
         }
 
         // 4. Phase-1 交易关键词与金额验证
-        val hasVerb = TRANSACTION_VERBS.any { lower.contains(it) }
-        val hasStrictAmount = STRICT_AMOUNT_REGEX.containsMatchIn(fullContent)
-
-        if (!hasVerb || !hasStrictAmount) {
-            Log.d(TAG, "Phase-1 Filtered: lacks transaction verb or strict RM amount -> $fullContent")
+        if (!hasVerb || !hasAmount) {
+            Log.d(TAG, "Phase-1 Filtered: lacks transaction verb or valid RM amount -> $fullContent")
             serviceScope.launch {
                 db.notificationLogDao().insert(
                     NotificationLog(
