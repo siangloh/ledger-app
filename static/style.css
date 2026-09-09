@@ -159,8 +159,8 @@ body {
 }
 
 .desktop-nav-links a.active {
-  color: var(--navy);
-  background: var(--gold);
+  color: #0b1120 !important;
+  background: var(--gold) !important;
   font-weight: 600;
 }
 
@@ -655,7 +655,8 @@ button { font-family: var(--font-sans); cursor: pointer; }
 .btn-danger-solid:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -8px rgba(168, 71, 90, 0.6); filter: brightness(1.05); }
 .btn-danger-solid:active { transform: translateY(0); }
 
-.btn-link {
+.btn-link,
+.btn-link:visited {
   color: var(--navy);
   text-decoration: none;
   font-size: 13px;
@@ -1503,7 +1504,7 @@ canvas {
     --surface-soft: #19253d;
     --ink: #f1f5f9;
     --ink-soft: #cbd5e1;
-    --muted: #8e9bb0;
+    --muted: #94a3b8;
     --border: rgba(255, 255, 255, 0.12);
     --border-soft: rgba(255, 255, 255, 0.08);
 
@@ -1598,6 +1599,85 @@ canvas {
   .btn-ghost {
     color: var(--ink-soft);
     border-color: var(--border);
+  }
+
+  /* 链接高对比度 (防止浏览器默认 :visited 变深紫暗色) */
+  .btn-link,
+  .btn-link:visited {
+    color: #8cb4e6 !important;
+  }
+  .btn-link:hover {
+    color: #dfb552 !important;
+    border-color: #dfb552 !important;
+  }
+
+  /* 主按钮高对比度 (避免白字在浅蓝底上发虚) */
+  .btn-primary {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35) !important;
+  }
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+    color: #ffffff !important;
+  }
+
+  /* 快捷录入胶囊按钮高对比度 */
+  .chip-btn {
+    background: var(--surface-soft) !important;
+    color: #f1f5f9 !important;
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    font-weight: 500;
+  }
+  .chip-btn:hover {
+    background: rgba(140, 180, 230, 0.2) !important;
+    color: #93c5fd !important;
+    border-color: #93c5fd !important;
+  }
+  .chip-btn.chip-active {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    border-color: #2563eb !important;
+  }
+
+  /* 单选分段控制器选中态 (支出/收入/储蓄) */
+  .seg:has(input:checked),
+  .seg.seg-checked {
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+    color: #ffffff !important;
+    font-weight: 600;
+  }
+
+  /* 结余突出卡片暗色自适应 */
+  .card-highlight {
+    background: linear-gradient(160deg, #1e293b, #0f172a) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  }
+  .card-highlight .card-label {
+    color: #94a3b8 !important;
+  }
+  .card-highlight .amount {
+    color: #38bdf8 !important;
+  }
+  .card-highlight.negative .amount {
+    color: #fb7185 !important;
+  }
+
+  /* 环形图滚动图例文字与背景 */
+  .chart-legend-item {
+    background: rgba(255, 255, 255, 0.04) !important;
+  }
+  .chart-legend-item:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+  }
+  .chart-legend-name {
+    color: #f8fafc !important;
+    font-weight: 500;
+  }
+  .chart-legend-right {
+    color: #94a3b8 !important;
   }
 }
 

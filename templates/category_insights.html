@@ -153,6 +153,10 @@ function renderCategoryChart(idx) {
     _catChartInstances[idx].destroy();
   }
 
+  const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const tickColor = isDark ? '#94a3b8' : '#6f6c66';
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(27,27,31,0.06)';
+
   const ctx = canvas.getContext('2d');
   _catChartInstances[idx] = new Chart(ctx, {
     type: 'bar',
@@ -184,13 +188,13 @@ function renderCategoryChart(idx) {
       scales: {
         x: {
           grid: { display: false },
-          ticks: { color: '#8e9bb0', font: { size: 11 } }
+          ticks: { color: tickColor, font: { size: 11 } }
         },
         y: {
           beginAtZero: true,
-          grid: { color: 'rgba(255,255,255,0.06)' },
+          grid: { color: gridColor },
           ticks: {
-            color: '#8e9bb0',
+            color: tickColor,
             font: { size: 11 },
             callback: function(v) { return 'RM ' + v; }
           }

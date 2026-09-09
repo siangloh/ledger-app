@@ -954,11 +954,17 @@ var _ovIncomeChart = null;
 var _monthlyIncomeChart = null;
 var _monthlyExpenseChart = null;
 
-var CHARTJS_INCOME_COLOR = 'rgba(16, 33, 59, 0.88)';
-var CHARTJS_INCOME_HOVER = 'rgba(30, 63, 111, 0.95)';
-var CHARTJS_EXPENSE_COLOR = 'rgba(168, 71, 90, 0.88)';
-var CHARTJS_EXPENSE_HOVER = 'rgba(191, 83, 104, 0.95)';
-var CHARTJS_PALETTE = ['#10213b', '#b6902f', '#1e7a5c', '#7a5c8a', '#4d7ea8', '#a0522d', '#5c6b73', '#b04a56'];
+function isDarkModeActive() {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function getChartPalette() {
+  if (isDarkModeActive()) {
+    // 高对比度现代暗色主题调色盘，适配深蓝黑卡片底色
+    return ['#38bdf8', '#fbbf24', '#34d399', '#a78bfa', '#f87171', '#fb923c', '#818cf8', '#f472b6', '#2dd4bf', '#e879f9'];
+  }
+  return ['#10213b', '#b6902f', '#1e7a5c', '#7a5c8a', '#4d7ea8', '#a0522d', '#5c6b73', '#b04a56', '#2b6cb0', '#d69e2e'];
+}
 
 function destroyChart(instance) {
   if (instance) {
@@ -982,6 +988,19 @@ function drawOverviewBarChart(trendData) {
 
   if (!trendData || trendData.length === 0) return;
 
+  var isDark = isDarkModeActive();
+  var incomeColor = isDark ? 'rgba(56, 189, 248, 0.88)' : 'rgba(16, 33, 59, 0.88)';
+  var incomeHover = isDark ? 'rgba(56, 189, 248, 1)' : 'rgba(30, 63, 111, 0.95)';
+  var expenseColor = isDark ? 'rgba(248, 113, 113, 0.88)' : 'rgba(168, 71, 90, 0.88)';
+  var expenseHover = isDark ? 'rgba(248, 113, 113, 1)' : 'rgba(191, 83, 104, 0.95)';
+  var tickColor = isDark ? '#94a3b8' : '#6f6c66';
+  var gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(27, 27, 31, 0.06)';
+  var gridBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(27, 27, 31, 0.18)';
+  var tooltipBg = isDark ? 'rgba(19, 29, 49, 0.96)' : 'rgba(255, 255, 255, 0.97)';
+  var tooltipTitle = isDark ? '#f8fafc' : '#10213b';
+  var tooltipBody = isDark ? '#cbd5e1' : '#46453f';
+  var tooltipBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(27, 27, 31, 0.1)';
+
   var labels = trendData.map(function (d) {
     return d.month.slice(2).replace('-', '/');
   });
@@ -997,16 +1016,16 @@ function drawOverviewBarChart(trendData) {
         {
           label: '收入',
           data: incomeVals,
-          backgroundColor: CHARTJS_INCOME_COLOR,
-          hoverBackgroundColor: CHARTJS_INCOME_HOVER,
+          backgroundColor: incomeColor,
+          hoverBackgroundColor: incomeHover,
           borderRadius: 4,
           borderSkipped: 'bottom'
         },
         {
           label: '支出',
           data: expenseVals,
-          backgroundColor: CHARTJS_EXPENSE_COLOR,
-          hoverBackgroundColor: CHARTJS_EXPENSE_HOVER,
+          backgroundColor: expenseColor,
+          hoverBackgroundColor: expenseHover,
           borderRadius: 4,
           borderSkipped: 'bottom'
         }
@@ -1021,10 +1040,10 @@ function drawOverviewBarChart(trendData) {
           display: false
         },
         tooltip: {
-          backgroundColor: 'rgba(255,255,255,0.97)',
-          titleColor: '#10213b',
-          bodyColor: '#46453f',
-          borderColor: 'rgba(27,27,31,0.1)',
+          backgroundColor: tooltipBg,
+          titleColor: tooltipTitle,
+          bodyColor: tooltipBody,
+          borderColor: tooltipBorder,
           borderWidth: 1,
           padding: 12,
           titleFont: { family: 'ui-monospace, SFMono-Regular, Consolas, monospace', size: 13, weight: '700' },
@@ -1049,18 +1068,18 @@ function drawOverviewBarChart(trendData) {
         x: {
           grid: { display: false },
           ticks: {
-            color: '#6f6c66',
+            color: tickColor,
             font: { family: 'ui-monospace, SFMono-Regular, Consolas, monospace', size: 11 },
             maxRotation: 45
           }
         },
         y: {
           grid: {
-            color: 'rgba(27,27,31,0.06)',
-            borderColor: 'rgba(27,27,31,0.18)'
+            color: gridColor,
+            borderColor: gridBorder
           },
           ticks: {
-            color: '#8a877e',
+            color: tickColor,
             font: { family: 'ui-monospace, SFMono-Regular, Consolas, monospace', size: 11 },
             callback: function (value) { return rmMoneyFmt(value); }
           }
@@ -1081,6 +1100,13 @@ function drawOverviewDoughnut(canvasId, labels, values) {
   }
 
   var total = values.reduce(function (a, b) { return a + (b || 0); }, 0);
+  var isDark = isDarkModeActive();
+  var palette = getChartPalette();
+  var sliceBorder = isDark ? '#131d31' : '#ffffff';
+  var tooltipBg = isDark ? 'rgba(19, 29, 49, 0.96)' : 'rgba(255, 255, 255, 0.97)';
+  var tooltipTitle = isDark ? '#f8fafc' : '#10213b';
+  var tooltipBody = isDark ? '#cbd5e1' : '#46453f';
+  var tooltipBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(27, 27, 31, 0.1)';
 
   var instance = new Chart(canvas.getContext('2d'), {
     type: 'doughnut',
@@ -1088,11 +1114,11 @@ function drawOverviewDoughnut(canvasId, labels, values) {
       labels: labels,
       datasets: [{
         data: values,
-        backgroundColor: CHARTJS_PALETTE.slice(0, labels.length),
-        hoverBackgroundColor: CHARTJS_PALETTE.slice(0, labels.length).map(function (c) { return c; }),
+        backgroundColor: palette.slice(0, labels.length),
+        hoverBackgroundColor: palette.slice(0, labels.length),
         borderWidth: 2,
-        borderColor: '#ffffff',
-        hoverBorderColor: '#ffffff'
+        borderColor: sliceBorder,
+        hoverBorderColor: sliceBorder
       }]
     },
     options: {
@@ -1104,10 +1130,10 @@ function drawOverviewDoughnut(canvasId, labels, values) {
           display: false
         },
         tooltip: {
-          backgroundColor: 'rgba(255,255,255,0.97)',
-          titleColor: '#10213b',
-          bodyColor: '#46453f',
-          borderColor: 'rgba(27,27,31,0.1)',
+          backgroundColor: tooltipBg,
+          titleColor: tooltipTitle,
+          bodyColor: tooltipBody,
+          borderColor: tooltipBorder,
           borderWidth: 1,
           padding: 10,
           titleFont: { family: 'Segoe UI, sans-serif', size: 12, weight: '600' },
@@ -1132,7 +1158,7 @@ function drawOverviewDoughnut(canvasId, labels, values) {
       legendContainer.innerHTML = labels.map(function (lbl, i) {
         var val = values[i] || 0;
         var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
-        var color = CHARTJS_PALETTE[i % CHARTJS_PALETTE.length];
+        var color = palette[i % palette.length];
         return '<div class="chart-legend-item">' +
           '<div class="chart-legend-left">' +
             '<span class="chart-legend-dot" style="background-color:' + color + '"></span>' +
@@ -1168,8 +1194,17 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
   var total = values.reduce(function (a, b) { return a + (b || 0); }, 0);
   var isIncome = (canvasId === 'incomeChart');
   var centerTitle = isIncome ? '本月总收入' : '本月总支出';
+  var isDark = isDarkModeActive();
+  var palette = getChartPalette();
+  var sliceBorder = isDark ? '#131d31' : '#ffffff';
+  var centerTitleColor = isDark ? '#94a3b8' : '#6f6c66';
+  var centerAmountColor = isDark ? '#ffffff' : '#10213b';
+  var tooltipBg = isDark ? 'rgba(19, 29, 49, 0.96)' : 'rgba(255, 255, 255, 0.97)';
+  var tooltipTitle = isDark ? '#f8fafc' : '#10213b';
+  var tooltipBody = isDark ? '#cbd5e1' : '#46453f';
+  var tooltipBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(27, 27, 31, 0.1)';
 
-  // 自定义中心文字插件
+  // 自定义中心文字插件 (高对比度暗色适配)
   var centerTextPlugin = {
     id: 'centerText_' + canvasId,
     beforeDraw: function(chart) {
@@ -1185,12 +1220,12 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
 
       // 标题 (本月总收入 / 本月总支出)
       ctx.font = '500 12px "Segoe UI", sans-serif';
-      ctx.fillStyle = '#6f6c66';
+      ctx.fillStyle = centerTitleColor;
       ctx.fillText(centerTitle, centerX, centerY - 10);
 
       // 金额
-      ctx.font = '600 15px ui-monospace, SFMono-Regular, Consolas, monospace';
-      ctx.fillStyle = '#10213b';
+      ctx.font = '700 15.5px ui-monospace, SFMono-Regular, Consolas, monospace';
+      ctx.fillStyle = centerAmountColor;
       ctx.fillText(formatMoney(total), centerX, centerY + 10);
       ctx.restore();
     }
@@ -1202,10 +1237,10 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
       labels: labels,
       datasets: [{
         data: values.length > 0 && total > 0 ? values : [1],
-        backgroundColor: values.length > 0 && total > 0 ? CHARTJS_PALETTE.slice(0, labels.length) : ['#e0e0e0'],
+        backgroundColor: values.length > 0 && total > 0 ? palette.slice(0, labels.length) : (isDark ? ['#334155'] : ['#e0e0e0']),
         borderWidth: 2,
-        borderColor: '#ffffff',
-        hoverBorderColor: '#ffffff'
+        borderColor: sliceBorder,
+        hoverBorderColor: sliceBorder
       }]
     },
     options: {
@@ -1221,10 +1256,10 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
         },
         tooltip: {
           enabled: total > 0,
-          backgroundColor: 'rgba(255,255,255,0.97)',
-          titleColor: '#10213b',
-          bodyColor: '#46453f',
-          borderColor: 'rgba(27,27,31,0.1)',
+          backgroundColor: tooltipBg,
+          titleColor: tooltipTitle,
+          bodyColor: tooltipBody,
+          borderColor: tooltipBorder,
           borderWidth: 1,
           padding: 10,
           titleFont: { family: 'Segoe UI, sans-serif', size: 12, weight: '600' },
@@ -1250,7 +1285,7 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
       legendContainer.innerHTML = labels.map(function (lbl, i) {
         var val = values[i] || 0;
         var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
-        var color = CHARTJS_PALETTE[i % CHARTJS_PALETTE.length];
+        var color = palette[i % palette.length];
         return '<div class="chart-legend-item">' +
           '<div class="chart-legend-left">' +
             '<span class="chart-legend-dot" style="background-color:' + color + '"></span>' +
@@ -1476,14 +1511,25 @@ function attachTrendChartHover() {
 }
 
 window.addEventListener('resize', function () {
-  if (currentOverviewData && document.getElementById('overviewSection').style.display !== 'none') {
-    drawTrendBarChart('overviewTrendChart', currentOverviewData.trend || []);
-    const expCats = currentOverviewData.expense_categories || { labels: [], values: [] };
-    drawDonutChart('overviewExpenseChart', expCats.labels, expCats.values, CHART_PALETTE);
-    const incGrp = currentOverviewData.income_group || { main: 0, side: 0 };
-    drawDonutChart('overviewIncomeChart', ['主业收入', '副业收入'], [incGrp.main, incGrp.side], CHART_PALETTE);
+  if (currentOverviewData && document.getElementById('overviewSection') && document.getElementById('overviewSection').style.display !== 'none') {
+    renderOverview(currentOverviewData);
   }
 });
+
+// 监听系统/浏览器浅色与暗色模式切换，自动重新渲染图表与高对比度调色盘
+if (window.matchMedia) {
+  try {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+      if (window.CHART_DATA && document.getElementById('incomeChart') && (!document.getElementById('monthlySection') || document.getElementById('monthlySection').style.display !== 'none')) {
+        drawMonthlyDoughnut('incomeChart', window.CHART_DATA.income.labels, window.CHART_DATA.income.values);
+        drawMonthlyDoughnut('expenseChart', window.CHART_DATA.expense.labels, window.CHART_DATA.expense.values);
+      }
+      if (currentOverviewData && document.getElementById('overviewSection') && document.getElementById('overviewSection').style.display !== 'none') {
+        renderOverview(currentOverviewData);
+      }
+    });
+  } catch (e) {}
+}
 
 // 兼容 SPA 动态注入时 DOMContentLoaded 已过时的场景
 const _origDocAddEventListener = Document.prototype.addEventListener;
