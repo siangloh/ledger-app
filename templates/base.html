@@ -27,15 +27,21 @@
             <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}" data-nav="index">仪表盘</a>
             <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records">历史记录</a>
             <a href="{{ url_for('split_bill_page') }}" class="{{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill">小票AA分账</a>
-            <a href="{{ url_for('auto_track_page') }}" class="{{ 'active' if request.endpoint == 'auto_track_page' }}" data-nav="auto-track">自动记账</a>
             <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring">固定收支</a>
             <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories">分类管理</a>
             <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import">批量导入</a>
+            <span class="sync-badge desktop-sync-badge" id="desktopSyncStatusBadge">
+                <span class="online-dot" id="desktopSyncStatusDot"></span>
+                <span id="desktopSyncStatusText">云端在线</span>
+            </span>
             <a href="{{ url_for('logout') }}" style="color: rgba(255, 255, 255, 0.6); margin-left: 6px; font-size: 12.5px;" title="退出登录">登出</a>
         </nav>
         <!-- 移动端顶部状态指示 -->
         <div class="mobile-header-right">
-            <span class="sync-badge"><span class="online-dot"></span> 云端在线</span>
+            <span class="sync-badge" id="syncStatusBadge">
+                <span class="online-dot" id="syncStatusDot"></span>
+                <span id="syncStatusText">云端在线</span>
+            </span>
         </div>
     </div>
 </header>
@@ -53,10 +59,6 @@
     <a href="{{ url_for('split_bill_page') }}" class="bnav-item bnav-highlight {{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill">
         <div class="bnav-icon-highlight">🧾</div>
         <span class="bnav-label">AA分账</span>
-    </a>
-    <a href="{{ url_for('auto_track_page') }}" class="bnav-item {{ 'active' if request.endpoint == 'auto_track_page' }}" data-nav="auto-track">
-        <span class="bnav-icon">⚡</span>
-        <span class="bnav-label">自动记账</span>
     </a>
     <button type="button" class="bnav-item" id="btnMoreSheet" onclick="toggleMoreSheet()">
         <span class="bnav-icon">⚙️</span>

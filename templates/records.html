@@ -52,20 +52,20 @@
     </thead>
     <tbody>
       {% for r in rows %}
-      <tr class="record-row">
-        <td style="text-align: center;">
+      <tr class="record-row" id="row-{{ r.id }}">
+        <td data-col="checkbox" style="text-align: center;">
           <input type="checkbox" name="ids" value="{{ r.id }}" class="record-checkbox" onchange="updateBatchBar()">
         </td>
-        <td>{{ r.date }}</td>
-        <td>{{ '收入' if r.type=='income' else '支出' }}</td>
-        <td>{{ {'main':'主业','side':'副业'}.get(r.group_name, '') }}</td>
-        <td>{{ r.category }}</td>
-        <td class="amount-cell {{ 'income' if r.type=='income' else 'expense' }}">{{ r.amount|money }}</td>
-        <td>{{ r.note }}</td>
-        <td><span class="tag">{{ {'manual':'手动','nlp':'智能记账','import':'导入','recurring':'固定收支','auto_track':'自动记账','split_bill':'AA分账'}.get(r.source, r.source) }}</span></td>
-        <td class="actions">
+        <td data-col="date">{{ r.date }}</td>
+        <td data-col="type"><span class="tag {{ 'tag-income' if r.type=='income' else 'tag-expense' }}">{{ '收入' if r.type=='income' else '支出' }}</span></td>
+        <td data-col="group">{{ {'main':'主业','side':'副业'}.get(r.group_name, '') }}</td>
+        <td data-col="category"><strong>{{ r.category }}</strong></td>
+        <td data-col="amount" class="amount-cell {{ 'income' if r.type=='income' else 'expense' }}">{{ r.amount|money }}</td>
+        <td data-col="note">{{ r.note }}</td>
+        <td data-col="source"><span class="tag">{{ {'manual':'手动','nlp':'智能记账','import':'导入','recurring':'固定收支','auto_track':'自动记账','split_bill':'AA分账'}.get(r.source, r.source) }}</span></td>
+        <td data-col="actions" class="actions">
           <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link">编辑</a>
-          <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ '收入' if r.type=='income' else '支出' }} · {{ r.category }} · {{ r.amount|money }}')">删除</button>
+          <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ '收入' if r.type=='income' else '支出' }} · {{ r.category }} · {{ r.amount|money }}', this)">删除</button>
         </td>
       </tr>
       {% else %}
@@ -113,21 +113,27 @@ function updateBatchBar() {
 }
 
 function clearAllSelections() {
+  document.querySelectorAll('.record-checkbox').forEach(cb => {
+    cb.checked = false;
+    const row = cb.closest('tr');
+    if (row) row.classList.remove('selected-row');
+  });
   const selectAll = document.getElementById('selectAllCheckbox');
   if (selectAll) selectAll.checked = false;
-  toggleSelectAll({ checked: false });
+  updateBatchBar();
 }
 
 function confirmBatchDelete() {
   const selected = document.querySelectorAll('.record-checkbox:checked');
   if (selected.length === 0) return;
+  const count = selected.length;
 
   if (typeof Swal !== 'undefined') {
     Swal.fire({
       icon: 'warning',
       iconColor: '#a8475a',
       title: '批量删除确认',
-      html: '确认为选中的 <b>' + selected.length + '</b> 条记录进行删除操作吗？<br><span style="color:#8a877e;font-size:13px;">此操作不可撤销。</span>',
+      html: '确认为选中的 <b>' + count + '</b> 条记录进行删除操作吗？<br><span style="color:#8a877e;font-size:13px;">删除后提供 5 秒撤销恢复窗口。</span>',
       showCancelButton: true,
       reverseButtons: true,
       confirmButtonText: '确认删除',
@@ -143,7 +149,52 @@ function confirmBatchDelete() {
       }
     }).then(function (result) {
       if (result.isConfirmed) {
-        document.getElementById('batchForm').submit();
+        const rows = Array.from(selected).map(cb => cb.closest('tr')).filter(Boolean);
+        rows.forEach(r => {
+          r.style.opacity = '0.35';
+          r.style.filter = 'grayscale(1)';
+          r.style.pointerEvents = 'none';
+        });
+        const batchBar = document.getElementById('batchBar');
+        if (batchBar) batchBar.style.display = 'none';
+
+        let isUndone = false;
+        Swal.fire({
+          toast: true,
+          position: 'bottom-end',
+          icon: 'info',
+          title: '已删除 ' + count + ' 条记录',
+          html: '<span style="font-size:12px;color:var(--muted)">如需撤销请在 5 秒内点击</span>',
+          timer: 5000,
+          timerProgressBar: true,
+          showConfirmButton: true,
+          confirmButtonText: '撤销 (Undo)',
+          buttonsStyling: false,
+          customClass: {
+            popup: 'app-swal-toast app-swal-undo-toast',
+            confirmButton: 'btn-primary btn-sm'
+          }
+        }).then(function(res) {
+          if (res.isConfirmed) {
+            isUndone = true;
+            rows.forEach(r => {
+              r.style.opacity = '';
+              r.style.filter = '';
+              r.style.pointerEvents = '';
+            });
+            updateBatchBar();
+            Swal.fire({
+              toast: true,
+              position: 'top-end',
+              icon: 'success',
+              title: '已撤销删除，记录已保留',
+              showConfirmButton: false,
+              timer: 2000
+            });
+          } else if (res.dismiss === Swal.DismissReason.timer || !isUndone) {
+            document.getElementById('batchForm').submit();
+          }
+        });
       }
     });
   } else {
@@ -153,13 +204,15 @@ function confirmBatchDelete() {
   }
 }
 
-function confirmSingleDelete(actionUrl, detailText) {
+function confirmSingleDelete(actionUrl, detailText, btnEl) {
+  const row = btnEl ? btnEl.closest('tr') : null;
+
   if (typeof Swal !== 'undefined') {
     Swal.fire({
       icon: 'warning',
       iconColor: '#a8475a',
       title: '确认删除？',
-      html: detailText + '<br><span style="color:#8a877e;font-size:13px;">此操作不可撤销。</span>',
+      html: detailText + '<br><span style="color:#8a877e;font-size:13px;">删除后提供 5 秒撤销恢复窗口。</span>',
       showCancelButton: true,
       reverseButtons: true,
       confirmButtonText: '确认删除',
@@ -175,16 +228,57 @@ function confirmSingleDelete(actionUrl, detailText) {
       }
     }).then(function (result) {
       if (result.isConfirmed) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = actionUrl;
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = 'csrf_token';
-        csrfInput.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
-        form.appendChild(csrfInput);
-        document.body.appendChild(form);
-        form.submit();
+        if (row) {
+          row.style.opacity = '0.35';
+          row.style.filter = 'grayscale(1)';
+          row.style.pointerEvents = 'none';
+        }
+
+        let isUndone = false;
+        Swal.fire({
+          toast: true,
+          position: 'bottom-end',
+          icon: 'info',
+          title: '已删除 1 条记录',
+          html: '<span style="font-size:12px;color:var(--muted)">如需撤回请在 5 秒内点击撤销</span>',
+          timer: 5000,
+          timerProgressBar: true,
+          showConfirmButton: true,
+          confirmButtonText: '撤销 (Undo)',
+          buttonsStyling: false,
+          customClass: {
+            popup: 'app-swal-toast app-swal-undo-toast',
+            confirmButton: 'btn-primary btn-sm'
+          }
+        }).then(function(res) {
+          if (res.isConfirmed) {
+            isUndone = true;
+            if (row) {
+              row.style.opacity = '';
+              row.style.filter = '';
+              row.style.pointerEvents = '';
+            }
+            Swal.fire({
+              toast: true,
+              position: 'top-end',
+              icon: 'success',
+              title: '已撤销删除，记录已完整保留',
+              showConfirmButton: false,
+              timer: 2000
+            });
+          } else if (res.dismiss === Swal.DismissReason.timer || !isUndone) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = actionUrl;
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrf_token';
+            csrfInput.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+            form.appendChild(csrfInput);
+            document.body.appendChild(form);
+            form.submit();
+          }
+        });
       }
     });
   } else {

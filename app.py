@@ -63,10 +63,15 @@ def request_entity_too_large(error):
 
 
 
+@app.route('/health')
+def health():
+    return jsonify({'ok': True, 'status': 'online'})
+
+
 @app.before_request
 def require_login():
-    # 允许静态资源、登录/登出路由以及外部自动记账 Webhook 豁免 Session 检查
-    if request.endpoint in ('login', 'logout', 'static') or (request.path and request.path.startswith('/static/')):
+    # 允许静态资源、登录/登出路由、健康检查以及外部自动记账 Webhook 豁免 Session 检查
+    if request.endpoint in ('login', 'logout', 'static', 'health') or request.path == '/health' or (request.path and request.path.startswith('/static/')):
         return
     if request.path.startswith('/api/'):
         req_key = request.headers.get('X-API-KEY')

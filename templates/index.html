@@ -80,15 +80,17 @@
   <div class="panels">
     <section class="panel">
       <h3>收入构成（主业 vs 副业）</h3>
-      <div style="position:relative; height:280px;">
+      <div style="position:relative; height:190px;">
         <canvas id="incomeChart"></canvas>
       </div>
+      <div id="incomeChartLegend" class="chart-legend-list-scroll"></div>
     </section>
     <section class="panel">
       <h3>支出分类占比</h3>
-      <div style="position:relative; height:280px;">
+      <div style="position:relative; height:190px;">
         <canvas id="expenseChart"></canvas>
       </div>
+      <div id="expenseChartLegend" class="chart-legend-list-scroll"></div>
     </section>
   </div>
 </div>
@@ -171,14 +173,20 @@
     <div class="panels">
       <section class="panel">
         <h3>长期支出分类占比</h3>
-        <canvas id="overviewExpenseChart"></canvas>
+        <div style="position:relative; height:190px;">
+          <canvas id="overviewExpenseChart"></canvas>
+        </div>
+        <div id="overviewExpenseChartLegend" class="chart-legend-list-scroll"></div>
       </section>
       <section class="panel">
         <div class="panel-header-with-legend">
           <h3>主业 vs 副业累计占比</h3>
           <div class="side-badge" id="sideIncomeBadge">副业占比: 0.0%</div>
         </div>
-        <canvas id="overviewIncomeChart"></canvas>
+        <div style="position:relative; height:190px;">
+          <canvas id="overviewIncomeChart"></canvas>
+        </div>
+        <div id="overviewIncomeChartLegend" class="chart-legend-list-scroll"></div>
         <div class="side-ratio-card" id="sideRatioDesc">
           副业收入在累计收入中起到了良好的现金流补充作用。
         </div>

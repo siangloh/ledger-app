@@ -232,7 +232,7 @@ function attachDeleteConfirm() {
         icon: 'warning',
         iconColor: '#a8475a',
         title: form.dataset.confirmTitle || '确认删除？',
-        html: form.dataset.confirmText || '此操作不可撤销。',
+        html: (form.dataset.confirmText || '此操作不可撤销。') + '<br><span style="color:#8a877e;font-size:13px;">删除后提供 5 秒撤销恢复窗口。</span>',
         showCancelButton: true,
         reverseButtons: true,
         confirmButtonText: '确认删除',
@@ -248,7 +248,48 @@ function attachDeleteConfirm() {
         }
       }).then(function (result) {
         if (result.isConfirmed) {
-          HTMLFormElement.prototype.submit.call(form);
+          const row = form.closest('tr') || form.closest('.card') || form.closest('li');
+          if (row) {
+            row.style.opacity = '0.35';
+            row.style.filter = 'grayscale(1)';
+            row.style.pointerEvents = 'none';
+          }
+          let isUndone = false;
+          Swal.fire({
+            toast: true,
+            position: 'bottom-end',
+            icon: 'info',
+            title: '已删除项目',
+            html: '<span style="font-size:12px;color:var(--muted)">如需撤销请在 5 秒内点击</span>',
+            timer: 5000,
+            timerProgressBar: true,
+            showConfirmButton: true,
+            confirmButtonText: '撤销 (Undo)',
+            buttonsStyling: false,
+            customClass: {
+              popup: 'app-swal-toast app-swal-undo-toast',
+              confirmButton: 'btn-primary btn-sm'
+            }
+          }).then(function (res) {
+            if (res.isConfirmed) {
+              isUndone = true;
+              if (row) {
+                row.style.opacity = '';
+                row.style.filter = '';
+                row.style.pointerEvents = '';
+              }
+              Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: '已撤销删除',
+                showConfirmButton: false,
+                timer: 2000
+              });
+            } else if (res.dismiss === Swal.DismissReason.timer || !isUndone) {
+              HTMLFormElement.prototype.submit.call(form);
+            }
+          });
         }
       });
     });
@@ -461,7 +502,11 @@ function attachNlpForm() {
       errorAlert('请输入一句话，如「打车 32.5」。', '请先输入内容');
       return;
     }
-    fetch('/nlp/parse', { method: 'POST', body: new URLSearchParams({ text: text }) })
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || form.querySelector('input[name="csrf_token"]')?.value || '';
+    fetch('/nlp/parse', {
+      method: 'POST',
+      body: new URLSearchParams({ text: text, csrf_token: csrfToken })
+    })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data.ok) {
@@ -471,7 +516,7 @@ function attachNlpForm() {
         openNlpConfirmDialog(data.parsed, data.warnings);
       })
       .catch(function () {
-        errorAlert('无法连接到本地服务，请确认程序仍在运行。', '解析失败');
+        errorAlert('网络连接失败，请稍后重试。', '解析失败');
       });
   });
 }
@@ -792,29 +837,11 @@ function drawOverviewDoughnut(canvasId, labels, values) {
     },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
-      cutout: '58%',
+      maintainAspectRatio: false,
+      cutout: '65%',
       plugins: {
         legend: {
-          position: 'right',
-          labels: {
-            font: { family: 'Segoe UI, sans-serif', size: 12 },
-            color: '#3a3a40',
-            padding: 14,
-            generateLabels: function (chart) {
-              var data = chart.data;
-              return data.labels.map(function (lbl, i) {
-                var val = data.datasets[0].data[i] || 0;
-                var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
-                return {
-                  text: lbl + '  ' + formatMoney(val) + ' (' + pct + '%)',
-                  fillStyle: CHARTJS_PALETTE[i % CHARTJS_PALETTE.length],
-                  hidden: false,
-                  index: i
-                };
-              });
-            }
-          }
+          display: false
         },
         tooltip: {
           backgroundColor: 'rgba(255,255,255,0.97)',
@@ -836,6 +863,26 @@ function drawOverviewDoughnut(canvasId, labels, values) {
       }
     }
   });
+
+  var legendContainer = document.getElementById(canvasId + 'Legend');
+  if (legendContainer) {
+    if (!total || values.length === 0) {
+      legendContainer.innerHTML = '<div style="text-align:center; color:var(--muted); font-size:12px; padding:8px;">暂无数据</div>';
+    } else {
+      legendContainer.innerHTML = labels.map(function (lbl, i) {
+        var val = values[i] || 0;
+        var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
+        var color = CHARTJS_PALETTE[i % CHARTJS_PALETTE.length];
+        return '<div class="chart-legend-item">' +
+          '<div class="chart-legend-left">' +
+            '<span class="chart-legend-dot" style="background-color:' + color + '"></span>' +
+            '<span class="chart-legend-name" title="' + lbl + '">' + lbl + '</span>' +
+          '</div>' +
+          '<span class="chart-legend-right">' + formatMoney(val) + ' (' + pct + '%)</span>' +
+        '</div>';
+      }).join('');
+    }
+  }
 
   if (canvasId === 'overviewExpenseChart') {
     _ovExpenseChart = instance;
@@ -910,31 +957,7 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
       },
       plugins: {
         legend: {
-          position: 'bottom',
-          labels: {
-            font: { family: 'Segoe UI, sans-serif', size: 12 },
-            color: '#3a3a40',
-            padding: 16,
-            usePointStyle: true,
-            pointStyle: 'circle',
-            generateLabels: function (chart) {
-              if (!total || values.length === 0) {
-                return [{ text: '暂无数据', fillStyle: '#e0e0e0', hidden: false, index: 0 }];
-              }
-              var data = chart.data;
-              return data.labels.map(function (lbl, i) {
-                var val = values[i] || 0;
-                var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
-                return {
-                  text: lbl + ': ' + formatMoney(val) + ' (' + pct + '%)',
-                  fillStyle: CHARTJS_PALETTE[i % CHARTJS_PALETTE.length],
-                  strokeStyle: CHARTJS_PALETTE[i % CHARTJS_PALETTE.length],
-                  hidden: false,
-                  index: i
-                };
-              });
-            }
-          }
+          display: false
         },
         tooltip: {
           enabled: total > 0,
@@ -958,6 +981,26 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
     },
     plugins: [centerTextPlugin]
   });
+
+  var legendContainer = document.getElementById(canvasId + 'Legend');
+  if (legendContainer) {
+    if (!total || values.length === 0) {
+      legendContainer.innerHTML = '<div style="text-align:center; color:var(--muted); font-size:12px; padding:8px;">暂无数据</div>';
+    } else {
+      legendContainer.innerHTML = labels.map(function (lbl, i) {
+        var val = values[i] || 0;
+        var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
+        var color = CHARTJS_PALETTE[i % CHARTJS_PALETTE.length];
+        return '<div class="chart-legend-item">' +
+          '<div class="chart-legend-left">' +
+            '<span class="chart-legend-dot" style="background-color:' + color + '"></span>' +
+            '<span class="chart-legend-name" title="' + lbl + '">' + lbl + '</span>' +
+          '</div>' +
+          '<span class="chart-legend-right">' + formatMoney(val) + ' (' + pct + '%)</span>' +
+        '</div>';
+      }).join('');
+    }
+  }
 
   if (canvasId === 'incomeChart') {
     _monthlyIncomeChart = instance;
@@ -1196,6 +1239,118 @@ Document.prototype.addEventListener = function (type, listener, options) {
   return _origDocAddEventListener.call(this, type, listener, options);
 };
 
+// ---------- 实时网络与云端同步状态 (Live Sync Status) ----------
+
+let _healthCheckTimer = null;
+let _syncListenersAttached = false;
+
+function updateSyncBadge(state) {
+  const desktopBadge = document.getElementById('desktopSyncStatusBadge');
+  const desktopDot = document.getElementById('desktopSyncStatusDot');
+  const desktopText = document.getElementById('desktopSyncStatusText');
+
+  const mobileBadge = document.getElementById('syncStatusBadge');
+  const mobileDot = document.getElementById('syncStatusDot');
+  const mobileText = document.getElementById('syncStatusText');
+
+  const badges = [desktopBadge, mobileBadge].filter(Boolean);
+  const dots = [desktopDot, mobileDot].filter(Boolean);
+  const texts = [desktopText, mobileText].filter(Boolean);
+
+  if (state === 'online') {
+    badges.forEach(b => {
+      b.classList.remove('badge-offline', 'badge-unreachable');
+      b.title = '网络良好，已连接至云端服务';
+    });
+    dots.forEach(d => {
+      d.classList.remove('dot-offline', 'dot-unreachable');
+    });
+    texts.forEach(t => {
+      t.textContent = '云端在线';
+    });
+  } else if (state === 'offline') {
+    badges.forEach(b => {
+      b.classList.remove('badge-unreachable');
+      b.classList.add('badge-offline');
+      b.title = '当前设备处于离线状态，无法连接互联网';
+    });
+    dots.forEach(d => {
+      d.classList.remove('dot-unreachable');
+      d.classList.add('dot-offline');
+    });
+    texts.forEach(t => {
+      t.textContent = '网络离线';
+    });
+  } else if (state === 'unreachable') {
+    badges.forEach(b => {
+      b.classList.remove('badge-offline');
+      b.classList.add('badge-unreachable');
+      b.title = '无法连接到云端记账服务器';
+    });
+    dots.forEach(d => {
+      d.classList.remove('dot-offline');
+      d.classList.add('dot-unreachable');
+    });
+    texts.forEach(t => {
+      t.textContent = '连接中断';
+    });
+  }
+}
+
+function checkLiveHealth() {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    updateSyncBadge('offline');
+    return;
+  }
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 4000) : null;
+
+  fetch('/health', {
+    method: 'GET',
+    cache: 'no-store',
+    signal: controller ? controller.signal : undefined
+  })
+    .then(res => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (res.ok) {
+        updateSyncBadge('online');
+      } else {
+        updateSyncBadge('unreachable');
+      }
+    })
+    .catch(() => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        updateSyncBadge('offline');
+      } else {
+        updateSyncBadge('unreachable');
+      }
+    });
+}
+
+function initLiveSyncStatus() {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    updateSyncBadge('offline');
+  } else {
+    checkLiveHealth();
+  }
+
+  if (!_syncListenersAttached && typeof window !== 'undefined') {
+    _syncListenersAttached = true;
+    window.addEventListener('online', function () {
+      checkLiveHealth();
+    });
+    window.addEventListener('offline', function () {
+      updateSyncBadge('offline');
+    });
+  }
+
+  if (_healthCheckTimer) {
+    clearInterval(_healthCheckTimer);
+  }
+  _healthCheckTimer = setInterval(checkLiveHealth, 20000);
+}
+
 // 页面全局生命周期初始化函数
 function initPageLifecycle() {
   populateCategories();
@@ -1208,6 +1363,7 @@ function initPageLifecycle() {
   showSuccessToasts();
   showErrorAlerts();
   syncSegStyles();
+  initLiveSyncStatus();
 
   if (window.CHART_DATA && document.getElementById('incomeChart')) {
     drawMonthlyDoughnut('incomeChart', window.CHART_DATA.income.labels, window.CHART_DATA.income.values);
