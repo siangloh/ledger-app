@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends layout|default('base.html') %}
 {% block title %}历史记录 - 我的记账本{% endblock %}
 {% block content %}
 <h2>历史记录</h2>
@@ -66,7 +66,7 @@
         <td data-col="note">{{ r.note }}</td>
         <td data-col="source"><span class="tag">{{ {'manual':'手动','nlp':'智能记账','import':'导入','recurring':'固定收支','auto_track':'自动记账','split_bill':'AA分账'}.get(r.source, r.source) }}</span></td>
         <td data-col="actions" class="actions">
-          <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link">编辑</a>
+          <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link" hx-get="{{ url_for('edit_record', tx_id=r.id) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">编辑</a>
           <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }} · {{ r.category }} · {{ r.amount|money }}', this)">删除</button>
         </td>
       </tr>
@@ -161,50 +161,52 @@ function openBatchEditDialog() {
       }
     }).then(result => {
       if (result.isConfirmed && result.value) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '{{ url_for("batch_edit_records") }}';
-
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = 'csrf_token';
-        csrfInput.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
-        form.appendChild(csrfInput);
-
-        selected.forEach(cb => {
-          const idInput = document.createElement('input');
-          idInput.type = 'hidden';
-          idInput.name = 'ids';
-          idInput.value = cb.value;
-          form.appendChild(idInput);
-        });
-
+        if (typeof showProgressBar === 'function') showProgressBar();
+        const formData = new FormData();
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+        formData.append('csrf_token', csrfToken);
+        selected.forEach(cb => formData.append('ids', cb.value));
         if (result.value.type) {
-          const typeInput = document.createElement('input');
-          typeInput.type = 'hidden';
-          typeInput.name = 'type';
-          typeInput.value = result.value.type;
-          form.appendChild(typeInput);
-
+          formData.append('type', result.value.type);
           if (result.value.type === 'income' && result.value.group_name) {
-            const groupInput = document.createElement('input');
-            groupInput.type = 'hidden';
-            groupInput.name = 'group_name';
-            groupInput.value = result.value.group_name;
-            form.appendChild(groupInput);
+            formData.append('group_name', result.value.group_name);
           }
         }
-
         if (result.value.category) {
-          const catInput = document.createElement('input');
-          catInput.type = 'hidden';
-          catInput.name = 'category';
-          catInput.value = result.value.category;
-          form.appendChild(catInput);
+          formData.append('category', result.value.category);
         }
 
-        document.body.appendChild(form);
-        form.submit();
+        fetch('{{ url_for("batch_edit_records") }}', {
+          method: 'POST',
+          body: formData,
+          headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (typeof finishProgressBar === 'function') finishProgressBar();
+          if (data.ok) {
+            Swal.fire({
+              toast: true,
+              position: 'top-end',
+              icon: 'success',
+              title: data.message,
+              showConfirmButton: false,
+              timer: 2500,
+              customClass: { popup: 'app-swal-toast' }
+            });
+            if (typeof htmx !== 'undefined') {
+              htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
+            } else {
+              window.location.reload();
+            }
+          } else {
+            errorAlert(data.message || '批量修改失败');
+          }
+        })
+        .catch(() => {
+          if (typeof finishProgressBar === 'function') finishProgressBar();
+          errorAlert('网络连接异常，批量修改未完成');
+        });
       }
     });
   }
@@ -324,7 +326,49 @@ function confirmBatchDelete() {
               timer: 2000
             });
           } else if (res.dismiss === Swal.DismissReason.timer || !isUndone) {
-            document.getElementById('batchForm').submit();
+            if (typeof showProgressBar === 'function') showProgressBar();
+            const form = document.getElementById('batchForm');
+            const formData = new FormData(form);
+            fetch('{{ url_for("batch_delete_records") }}', {
+              method: 'POST',
+              body: formData,
+              headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(data => {
+              if (typeof finishProgressBar === 'function') finishProgressBar();
+              if (data.ok) {
+                rows.forEach(r => r.remove());
+                updateBatchBar();
+                Swal.fire({
+                  toast: true,
+                  position: 'top-end',
+                  icon: 'success',
+                  title: data.message,
+                  showConfirmButton: false,
+                  timer: 2500,
+                  customClass: { popup: 'app-swal-toast' }
+                });
+              } else {
+                rows.forEach(r => {
+                  r.style.opacity = '';
+                  r.style.filter = '';
+                  r.style.pointerEvents = '';
+                });
+                updateBatchBar();
+                errorAlert(data.message || '批量删除失败');
+              }
+            })
+            .catch(() => {
+              if (typeof finishProgressBar === 'function') finishProgressBar();
+              rows.forEach(r => {
+                r.style.opacity = '';
+                r.style.filter = '';
+                r.style.pointerEvents = '';
+              });
+              updateBatchBar();
+              errorAlert('网络连接异常，批量删除未完成');
+            });
           }
         });
       }
@@ -399,16 +443,46 @@ function confirmSingleDelete(actionUrl, detailText, btnEl) {
               timer: 2000
             });
           } else if (res.dismiss === Swal.DismissReason.timer || !isUndone) {
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = actionUrl;
-            const csrfInput = document.createElement('input');
-            csrfInput.type = 'hidden';
-            csrfInput.name = 'csrf_token';
-            csrfInput.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
-            form.appendChild(csrfInput);
-            document.body.appendChild(form);
-            form.submit();
+            if (typeof showProgressBar === 'function') showProgressBar();
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+            fetch(actionUrl, {
+              method: 'POST',
+              body: new URLSearchParams({ csrf_token: csrfToken }),
+              headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(data => {
+              if (typeof finishProgressBar === 'function') finishProgressBar();
+              if (data.ok) {
+                if (row) row.remove();
+                updateBatchBar();
+                Swal.fire({
+                  toast: true,
+                  position: 'top-end',
+                  icon: 'success',
+                  title: data.message || '记录已删除',
+                  showConfirmButton: false,
+                  timer: 2000,
+                  customClass: { popup: 'app-swal-toast' }
+                });
+              } else {
+                if (row) {
+                  row.style.opacity = '';
+                  row.style.filter = '';
+                  row.style.pointerEvents = '';
+                }
+                errorAlert(data.message || '删除失败');
+              }
+            })
+            .catch(() => {
+              if (typeof finishProgressBar === 'function') finishProgressBar();
+              if (row) {
+                row.style.opacity = '';
+                row.style.filter = '';
+                row.style.pointerEvents = '';
+              }
+              errorAlert('网络连接异常，删除未完成');
+            });
           }
         });
       }

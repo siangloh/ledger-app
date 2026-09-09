@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends layout|default('base.html') %}
 {% block title %}支出分类深度洞察 - 我的记账本{% endblock %}
 {% block content %}
 <div class="insights-page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
@@ -7,8 +7,8 @@
     <p class="hint" style="margin-top:4px;">精准对比各支出分类在当前月、上个月及历史月均的支出表现与波动趋势</p>
   </div>
   <div style="display:flex; gap:10px;">
-    <a href="{{ url_for('categories_page') }}" class="btn-ghost">管理分类</a>
-    <a href="{{ url_for('index') }}" class="btn-secondary">返回仪表盘</a>
+    <a href="{{ url_for('categories_page') }}" class="btn-ghost" hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">管理分类</a>
+    <a href="{{ url_for('index') }}" class="btn-secondary" hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">返回仪表盘</a>
   </div>
 </div>
 

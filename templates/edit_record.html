@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends layout|default('base.html') %}
 {% block title %}编辑记录 - 我的记账本{% endblock %}
 {% block content %}
 <h2>编辑记录</h2>
@@ -23,7 +23,7 @@
     <label>备注 <input type="text" name="note" value="{{ row.note }}"></label>
   </div>
   <button type="submit" class="btn-primary">保存修改</button>
-  <a href="{{ url_for('records') }}" class="btn-cancel">取消</a>
+  <a href="{{ url_for('records') }}" class="btn-cancel" hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">取消</a>
 </form>
 
 <script>

@@ -289,7 +289,46 @@ function attachDeleteConfirm() {
                 timer: 2000
               });
             } else if (res.dismiss === Swal.DismissReason.timer || !isUndone) {
-              HTMLFormElement.prototype.submit.call(form);
+              if (typeof showProgressBar === 'function') showProgressBar();
+              const formData = new FormData(form);
+              fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+              })
+              .then(r => r.json())
+              .then(data => {
+                if (typeof finishProgressBar === 'function') finishProgressBar();
+                if (data.ok) {
+                  if (row) row.remove();
+                  Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: data.message || '已删除',
+                    showConfirmButton: false,
+                    timer: 2000,
+                    customClass: { popup: 'app-swal-toast' }
+                  });
+                  if (typeof updateBatchBar === 'function') updateBatchBar();
+                } else {
+                  if (row) {
+                    row.style.opacity = '';
+                    row.style.filter = '';
+                    row.style.pointerEvents = '';
+                  }
+                  errorAlert(data.message || '删除失败');
+                }
+              })
+              .catch(() => {
+                if (typeof finishProgressBar === 'function') finishProgressBar();
+                if (row) {
+                  row.style.opacity = '';
+                  row.style.filter = '';
+                  row.style.pointerEvents = '';
+                }
+                errorAlert('网络连接异常，删除未完成');
+              });
             }
           });
         }
@@ -298,12 +337,12 @@ function attachDeleteConfirm() {
   });
 }
 
-// ---------- SweetAlert2：表单校验 ----------
+// ---------- SweetAlert2：AJAX 表单与校验 ----------
 
-function attachAmountFormValidation() {
+function attachQuickAddFormAjax() {
   const form = document.getElementById('quickAddForm');
-  if (!form || form.dataset.validateBound) return;
-  form.dataset.validateBound = '1';
+  if (!form || form.dataset.ajaxBound) return;
+  form.dataset.ajaxBound = '1';
   form.addEventListener('submit', function (e) {
     const amountInput = form.querySelector('input[name="amount"]');
     const categorySelect = form.querySelector('select[name="category"]');
@@ -322,20 +361,205 @@ function attachAmountFormValidation() {
     if (categorySelect && !categorySelect.value) {
       e.preventDefault();
       errorAlert('请先在「分类管理」里添加至少一个对应分类，再回来录入。', '缺少可选分类');
+      return;
     }
+
+    e.preventDefault();
+    if (typeof showProgressBar === 'function') showProgressBar();
+    const actionUrl = form.action || window.location.href;
+    const formData = new FormData(form);
+
+    fetch(actionUrl, {
+      method: 'POST',
+      body: formData,
+      headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (typeof finishProgressBar === 'function') finishProgressBar();
+      if (data.ok) {
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: data.message || '操作成功',
+          showConfirmButton: false,
+          timer: 2500,
+          timerProgressBar: true,
+          customClass: { popup: 'app-swal-toast' }
+        });
+
+        if (actionUrl.includes('/records/') && actionUrl.includes('/edit')) {
+          if (typeof htmx !== 'undefined') {
+            htmx.ajax('GET', '/records', { target: '#mainContainer', swap: 'innerHTML show:window:top' });
+            history.pushState({}, '', '/records');
+            if (typeof updateActiveNav === 'function') updateActiveNav('/records');
+          } else {
+            window.location.href = '/records';
+          }
+        } else {
+          if (amountInput) amountInput.value = '';
+          const noteInput = form.querySelector('input[name="note"]');
+          if (noteInput) noteInput.value = '';
+
+          if (typeof htmx !== 'undefined') {
+            htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
+          } else {
+            window.location.reload();
+          }
+        }
+      } else {
+        errorAlert(data.message || '提交失败', '提示');
+      }
+    })
+    .catch(() => {
+      if (typeof finishProgressBar === 'function') finishProgressBar();
+      errorAlert('网络连接异常，请重试。', '提交失败');
+    });
   });
 }
 
-function attachCategoryNameValidation() {
+function attachCategoryFormAjax() {
   document.querySelectorAll('form.js-validate-category').forEach(function (form) {
-    if (form.dataset.validateBound) return;
-    form.dataset.validateBound = '1';
+    if (form.dataset.ajaxBound) return;
+    form.dataset.ajaxBound = '1';
     form.addEventListener('submit', function (e) {
+      e.preventDefault();
       const nameInput = form.querySelector('input[name="name"]');
       if (!nameInput || nameInput.value.trim() === '') {
-        e.preventDefault();
         errorAlert('分类名称不能为空，也不能只是空格。', '请检查表单');
+        return;
       }
+
+      if (typeof showProgressBar === 'function') showProgressBar();
+      const formData = new FormData(form);
+      fetch(form.action || '/categories/add', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (typeof finishProgressBar === 'function') finishProgressBar();
+        if (data.ok) {
+          nameInput.value = '';
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: data.message || '分类已添加',
+            showConfirmButton: false,
+            timer: 2200,
+            timerProgressBar: true,
+            customClass: { popup: 'app-swal-toast' }
+          });
+          if (typeof htmx !== 'undefined') {
+            htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
+          } else {
+            window.location.reload();
+          }
+        } else {
+          errorAlert(data.message || '添加失败');
+        }
+      })
+      .catch(() => {
+        if (typeof finishProgressBar === 'function') finishProgressBar();
+        errorAlert('网络连接异常，添加分类未完成');
+      });
+    });
+  });
+}
+
+function attachRecurringFormsAjax() {
+  document.querySelectorAll('form[action*="/recurring/"]').forEach(function (form) {
+    const action = form.getAttribute('action') || '';
+    if (!action.includes('/toggle') && !action.includes('/generate')) return;
+    if (form.dataset.ajaxBound) return;
+    form.dataset.ajaxBound = '1';
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (typeof showProgressBar === 'function') showProgressBar();
+      const formData = new FormData(form);
+      fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (typeof finishProgressBar === 'function') finishProgressBar();
+        if (data.ok) {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: data.message || '操作已完成',
+            showConfirmButton: false,
+            timer: 2400,
+            timerProgressBar: true,
+            customClass: { popup: 'app-swal-toast' }
+          });
+          if (typeof htmx !== 'undefined') {
+            htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
+          } else {
+            window.location.reload();
+          }
+        } else {
+          errorAlert(data.message || '操作未成功');
+        }
+      })
+      .catch(() => {
+        if (typeof finishProgressBar === 'function') finishProgressBar();
+        errorAlert('网络连接异常，请重试');
+      });
+    });
+  });
+}
+
+function attachSplitBillFormAjax() {
+  document.querySelectorAll('form[action*="/split-bill/save-record"]').forEach(function (form) {
+    if (form.dataset.ajaxBound) return;
+    form.dataset.ajaxBound = '1';
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (typeof showProgressBar === 'function') showProgressBar();
+      const formData = new FormData(form);
+      fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (typeof finishProgressBar === 'function') finishProgressBar();
+        if (data.ok) {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: data.message || '已记入支出',
+            showConfirmButton: false,
+            timer: 2500,
+            timerProgressBar: true,
+            customClass: { popup: 'app-swal-toast' }
+          });
+          if (typeof htmx !== 'undefined') {
+            htmx.ajax('GET', '/records', { target: '#mainContainer', swap: 'innerHTML show:window:top' });
+            history.pushState({}, '', '/records');
+            if (typeof updateActiveNav === 'function') updateActiveNav('/records');
+          } else {
+            window.location.href = '/records';
+          }
+        } else {
+          errorAlert(data.message || '保存失败');
+        }
+      })
+      .catch(() => {
+        if (typeof finishProgressBar === 'function') finishProgressBar();
+        errorAlert('网络连接异常，请重试');
+      });
     });
   });
 }
@@ -482,13 +706,47 @@ function openNlpConfirmDialog(parsed, warnings) {
   }).then(function (result) {
     if (!result.isConfirmed) return;
     const v = result.value;
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     const body = new URLSearchParams({
       source: 'nlp', type: v.type, group_name: v.group_name, date: v.date,
-      amount: v.amount, category: v.category, note: v.note
+      amount: v.amount, category: v.category, note: v.note,
+      csrf_token: csrfToken
     });
-    fetch('/transactions/add', { method: 'POST', body: body })
-      .then(function () { window.location.reload(); })
-      .catch(function () { errorAlert('保存失败，请检查网络或重试。'); });
+    if (typeof showProgressBar === 'function') showProgressBar();
+    fetch('/transactions/add', {
+      method: 'POST',
+      body: body,
+      headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+    })
+      .then(r => r.json())
+      .then(function (data) {
+        if (typeof finishProgressBar === 'function') finishProgressBar();
+        if (data.ok) {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: data.message || '记录已添加',
+            showConfirmButton: false,
+            timer: 2600,
+            timerProgressBar: true,
+            customClass: { popup: 'app-swal-toast' }
+          });
+          const textInput = document.querySelector('#nlpForm input[name="text"]');
+          if (textInput) textInput.value = '';
+          if (typeof htmx !== 'undefined') {
+            htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
+          } else {
+            window.location.reload();
+          }
+        } else {
+          errorAlert(data.message || '保存失败');
+        }
+      })
+      .catch(function () {
+        if (typeof finishProgressBar === 'function') finishProgressBar();
+        errorAlert('保存失败，请检查网络或重试。');
+      });
   });
 }
 
@@ -1353,19 +1611,83 @@ function initLiveSyncStatus() {
   _healthCheckTimer = setInterval(checkLiveHealth, 20000);
 }
 
+// 进度条控制
+let _progressTimer = null;
+
+function showProgressBar() {
+  const bar = document.getElementById('appProgressBar');
+  if (!bar) return;
+  bar.classList.add('loading');
+  bar.style.width = '35%';
+  clearTimeout(_progressTimer);
+  _progressTimer = setTimeout(() => {
+    bar.style.width = '78%';
+  }, 120);
+}
+
+function finishProgressBar() {
+  const bar = document.getElementById('appProgressBar');
+  if (!bar) return;
+  clearTimeout(_progressTimer);
+  bar.style.width = '100%';
+  setTimeout(() => {
+    bar.classList.remove('loading');
+    bar.style.width = '0%';
+  }, 240);
+}
+
+// 导航高亮同步
+function updateActiveNav(urlStr) {
+  let path = urlStr || window.location.pathname;
+  try {
+    const url = new URL(urlStr, window.location.origin);
+    path = url.pathname;
+  } catch (e) {}
+
+  let navKey = 'index';
+  if (path === '/') navKey = 'index';
+  else if (path.startsWith('/records')) navKey = 'records';
+  else if (path.startsWith('/split-bill')) navKey = 'split-bill';
+  else if (path.startsWith('/auto-track')) navKey = 'auto-track';
+  else if (path.startsWith('/recurring')) navKey = 'recurring';
+  else if (path.startsWith('/categories/insights')) navKey = 'insights';
+  else if (path.startsWith('/categories')) navKey = 'categories';
+  else if (path.startsWith('/import')) navKey = 'import';
+
+  // 同步桌面端导航高亮
+  document.querySelectorAll('.desktop-nav-links a').forEach(a => {
+    a.classList.toggle('active', a.dataset.nav === navKey);
+  });
+
+  // 同步手机端底部导航高亮
+  document.querySelectorAll('.mobile-bottom-nav .bnav-item').forEach(btn => {
+    if (btn.dataset.nav) {
+      btn.classList.toggle('active', btn.dataset.nav === navKey);
+    }
+  });
+
+  // 同步手机端底部抽屉高亮
+  document.querySelectorAll('.sheet-tile').forEach(tile => {
+    tile.classList.toggle('active', tile.dataset.nav === navKey);
+  });
+}
+
 // 页面全局生命周期初始化函数
 function initPageLifecycle() {
   populateCategories();
   toggleTypeCol();
   attachDeleteConfirm();
-  attachAmountFormValidation();
-  attachCategoryNameValidation();
+  attachQuickAddFormAjax();
+  attachCategoryFormAjax();
+  attachRecurringFormsAjax();
+  attachSplitBillFormAjax();
   attachImportFormValidation();
   attachNlpForm();
   showSuccessToasts();
   showErrorAlerts();
   syncSegStyles();
   initLiveSyncStatus();
+  updateActiveNav(window.location.pathname);
 
   if (window.CHART_DATA && document.getElementById('incomeChart')) {
     drawMonthlyDoughnut('incomeChart', window.CHART_DATA.income.labels, window.CHART_DATA.income.values);
@@ -1398,214 +1720,71 @@ function initPageLifecycle() {
   }
 }
 
-// ---------- 零延迟即时换页引擎 (InstantNav SPA Engine) ----------
+// ---------- HTMX 页面平滑切换集成 (Smooth Navigation with HTMX) ----------
 
 const InstantNav = {
-  cache: new Map(),
-  isNavigating: false,
-  progressTimer: null,
-
-  init() {
-    // 1. 拦截站内内部链接点击，走局部无刷新秒开
-    document.addEventListener('click', (e) => {
-      const link = e.target.closest('a');
-      if (!link) return;
-
-      const href = link.getAttribute('href');
-      if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:') || link.target === '_blank' || link.hasAttribute('download')) {
-        return;
-      }
-
-      const url = new URL(href, window.location.origin);
-      if (url.origin !== window.location.origin) return;
-
-      e.preventDefault();
-      this.navigate(url.href, true);
-    });
-
-    // 2. 触控与鼠标悬停即时静默预加载 (Touch / Hover Preload)
-    const triggerPreload = (e) => {
-      const link = e.target.closest('a');
-      if (!link) return;
-      const href = link.getAttribute('href');
-      if (!href || href.startsWith('#') || href.startsWith('javascript:') || link.target === '_blank' || link.hasAttribute('download')) return;
-      const url = new URL(href, window.location.origin);
-      if (url.origin === window.location.origin) {
-        this.preload(url.href);
-      }
-    };
-
-    document.addEventListener('touchstart', triggerPreload, { passive: true });
-    document.addEventListener('mouseover', triggerPreload, { passive: true });
-
-    // 表单提交后清空页面缓存以保证数据最新
-    document.addEventListener('submit', () => {
-      this.cache.clear();
-    });
-
-    // 3. 浏览器与 Android 硬件返回/前进键无缝支持
-    window.addEventListener('popstate', () => {
-      this.navigate(window.location.href, false);
-    });
-  },
-
-  async preload(url) {
-    if (this.cache.has(url)) return this.cache.get(url);
-    try {
-      const promise = fetch(url, { headers: { 'X-Requested-With': 'InstantNav' } })
-        .then(res => {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.text();
-        });
-      this.cache.set(url, promise);
-      return promise;
-    } catch (err) {
-      return null;
-    }
-  },
-
-  showProgress() {
-    const bar = document.getElementById('appProgressBar');
-    if (!bar) return;
-    bar.classList.add('loading');
-    bar.style.width = '35%';
-    clearTimeout(this.progressTimer);
-    this.progressTimer = setTimeout(() => {
-      bar.style.width = '78%';
-    }, 120);
-  },
-
-  finishProgress() {
-    const bar = document.getElementById('appProgressBar');
-    if (!bar) return;
-    clearTimeout(this.progressTimer);
-    bar.style.width = '100%';
-    setTimeout(() => {
-      bar.classList.remove('loading');
-      bar.style.width = '0%';
-    }, 240);
-  },
-
-  updateActiveNav(urlStr) {
-    const url = new URL(urlStr, window.location.origin);
-    const path = url.pathname;
-
-    let navKey = 'index';
-    if (path === '/') navKey = 'index';
-    else if (path.startsWith('/records')) navKey = 'records';
-    else if (path.startsWith('/split-bill')) navKey = 'split-bill';
-    else if (path.startsWith('/auto-track')) navKey = 'auto-track';
-    else if (path.startsWith('/recurring')) navKey = 'recurring';
-    else if (path.startsWith('/categories')) navKey = 'categories';
-    else if (path.startsWith('/import')) navKey = 'import';
-
-    // 同步桌面端导航高亮
-    document.querySelectorAll('.desktop-nav-links a').forEach(a => {
-      a.classList.toggle('active', a.dataset.nav === navKey);
-    });
-
-    // 同步手机端底部导航高亮
-    document.querySelectorAll('.mobile-bottom-nav .bnav-item').forEach(btn => {
-      if (btn.dataset.nav) {
-        btn.classList.toggle('active', btn.dataset.nav === navKey);
-      }
-    });
-
-    // 同步手机端底部抽屉高亮
-    document.querySelectorAll('.sheet-tile').forEach(tile => {
-      tile.classList.toggle('active', tile.dataset.nav === navKey);
-    });
-  },
-
-  async navigate(url, pushState = true) {
-    if (this.isNavigating) return;
-    this.isNavigating = true;
-
-    // 0ms 瞬间反馈：立即高亮目标 Tab 并启动顶端极速进度条
-    this.updateActiveNav(url);
-    this.showProgress();
-
-    // 关闭打开的“更多”抽屉
-    if (typeof toggleMoreSheet === 'function') {
-      toggleMoreSheet(false);
-    }
-
-    try {
-      let htmlPromise = this.cache.get(url);
-      if (!htmlPromise) {
-        htmlPromise = this.preload(url);
-      }
-      const htmlText = await htmlPromise;
-      if (!htmlText) {
-        window.location.href = url;
-        return;
-      }
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlText, 'text/html');
-
-      if (doc.title) {
-        document.title = doc.title;
-      }
-
-      if (pushState && window.location.href !== url) {
-        window.history.pushState({ url }, '', url);
-      }
-
-      const currentContainer = document.getElementById('mainContainer');
-      const newContainer = doc.getElementById('mainContainer');
-
-      if (currentContainer && newContainer) {
-        currentContainer.classList.add('page-fade-out');
-
-        setTimeout(() => {
-          currentContainer.innerHTML = newContainer.innerHTML;
-          currentContainer.classList.remove('page-fade-out');
-          currentContainer.classList.add('page-fade-in');
-          setTimeout(() => currentContainer.classList.remove('page-fade-in'), 220);
-
-          // 提取并执行新容器内部与页面专属的 script
-          newContainer.querySelectorAll('script').forEach(s => {
-            const newScript = document.createElement('script');
-            Array.from(s.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
-            newScript.textContent = s.textContent;
-            document.body.appendChild(newScript);
-            newScript.remove();
-          });
-
-          // 执行可能在 head 或 body 底部的动态数据变量
-          doc.querySelectorAll('script').forEach(s => {
-            const txt = s.textContent;
-            if (txt.includes('window.FLASH_SUCCESS') || txt.includes('window.FLASH_ERROR') || txt.includes('window.CATEGORY_DATA') || txt.includes('window.CHART_DATA')) {
-              try {
-                eval(txt);
-              } catch (e) {
-                console.error(e);
-              }
-            }
-          });
-
-          window.scrollTo({ top: 0, behavior: 'instant' });
-          initPageLifecycle();
-
-          this.finishProgress();
-          this.isNavigating = false;
-        }, 60);
-      } else {
-        window.location.href = url;
-      }
-    } catch (err) {
-      console.error('Instant navigation error:', err);
-      this.finishProgress();
-      this.isNavigating = false;
+  showProgress: showProgressBar,
+  finishProgress: finishProgressBar,
+  updateActiveNav: updateActiveNav,
+  navigate(url) {
+    if (typeof htmx !== 'undefined') {
+      htmx.ajax('GET', url, { target: '#mainContainer', swap: 'innerHTML show:window:top' });
+      history.pushState({}, '', url);
+      updateActiveNav(url);
+    } else {
       window.location.href = url;
     }
   }
 };
 
 document.addEventListener('DOMContentLoaded', function () {
-  InstantNav.init();
   initPageLifecycle();
+
+  // HTMX 事件监听器：连接顶部加载条与生命周期重新水合
+  document.body.addEventListener('htmx:beforeRequest', function () {
+    showProgressBar();
+    if (typeof toggleMoreSheet === 'function') {
+      toggleMoreSheet(false);
+    }
+  });
+
+  document.body.addEventListener('htmx:afterRequest', function () {
+    finishProgressBar();
+  });
+
+  document.body.addEventListener('htmx:afterSwap', function (evt) {
+    const container = evt.detail.target;
+    if (container && container.id === 'mainContainer') {
+      // 执行内联数据脚本，确保 window.CATEGORY_DATA 等变量生效
+      container.querySelectorAll('script').forEach(s => {
+        try {
+          const fn = new Function(s.textContent);
+          fn();
+        } catch (e) {
+          console.error('Error executing partial script:', e);
+        }
+      });
+
+      const newPath = (evt.detail.pathInfo && evt.detail.pathInfo.requestPath) || window.location.pathname;
+      updateActiveNav(newPath);
+      initPageLifecycle();
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  });
+
+  document.body.addEventListener('htmx:historyRestore', function () {
+    const container = document.getElementById('mainContainer');
+    if (container) {
+      container.querySelectorAll('script').forEach(s => {
+        try {
+          const fn = new Function(s.textContent);
+          fn();
+        } catch (e) {}
+      });
+    }
+    updateActiveNav(window.location.pathname);
+    initPageLifecycle();
+  });
 });
 
 

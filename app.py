@@ -68,6 +68,23 @@ def health():
     return jsonify({'ok': True, 'status': 'online'})
 
 
+def is_ajax_request():
+    return (
+        request.is_json
+        or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        or 'application/json' in request.headers.get('Accept', '')
+    )
+
+
+@app.context_processor
+def inject_globals():
+    is_hx = bool(request.headers.get('HX-Request'))
+    return {
+        'layout': 'partial.html' if is_hx else 'base.html',
+        'is_hx': is_hx
+    }
+
+
 @app.before_request
 def require_login():
     # 允许静态资源、登录/登出路由、健康检查以及外部自动记账 Webhook 豁免 Session 检查
@@ -904,6 +921,8 @@ def add_transaction():
     except ValueError:
         amount = 0
     if amount <= 0:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '金额必须是大于 0 的数字'}), 400
         flash('金额必须是大于 0 的数字', 'error')
         return redirect(url_for('index'))
 
@@ -913,13 +932,29 @@ def add_transaction():
         group_name = None
 
     tx_date = f.get('date') or date.today().isoformat()
-    db.execute(
+    cur = db.execute(
         'INSERT INTO transactions (date, type, group_name, category, amount, note, source, created_at) '
         'VALUES (?,?,?,?,?,?,?,?)',
         (tx_date, tx_type, group_name, f.get('category'), amount, f.get('note', ''),
          f.get('source', 'manual'), datetime.now().isoformat())
     )
     db.commit()
+
+    if is_ajax_request():
+        return jsonify({
+            'ok': True,
+            'message': '记录已添加',
+            'transaction': {
+                'id': cur.lastrowid,
+                'date': tx_date,
+                'type': tx_type,
+                'group_name': group_name,
+                'category': f.get('category'),
+                'amount': amount,
+                'note': f.get('note', '')
+            }
+        })
+
     flash('记录已添加', 'success')
     return redirect(url_for('index', month=tx_date[:7]))
 
@@ -996,6 +1031,10 @@ def edit_record(tx_id):
             (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), tx_id)
         )
         db.commit()
+
+        if is_ajax_request():
+            return jsonify({'ok': True, 'message': '记录已更新'})
+
         flash('记录已更新', 'success')
         return redirect(url_for('records'))
 
@@ -1019,6 +1058,10 @@ def delete_record(tx_id):
     db = get_db()
     db.execute('DELETE FROM transactions WHERE id=?', (tx_id,))
     db.commit()
+
+    if is_ajax_request():
+        return jsonify({'ok': True, 'message': '记录已删除', 'id': tx_id})
+
     flash('记录已删除', 'success')
     return redirect(url_for('records'))
 
@@ -1028,6 +1071,8 @@ def batch_delete_records():
     db = get_db()
     ids = request.form.getlist('ids')
     if not ids:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '未选中任何记录'}), 400
         flash('未选中任何记录', 'error')
         return redirect(url_for('records'))
 
@@ -1043,8 +1088,14 @@ def batch_delete_records():
         placeholders = ','.join('?' * len(valid_ids))
         db.execute(f'DELETE FROM transactions WHERE id IN ({placeholders})', valid_ids)
         db.commit()
+
+        if is_ajax_request():
+            return jsonify({'ok': True, 'message': f'成功批量删除 {len(valid_ids)} 条记录', 'deleted_ids': valid_ids})
+
         flash(f'成功批量删除 {len(valid_ids)} 条记录', 'success')
     else:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '未选中有效的记录'}), 400
         flash('未选中有效的记录', 'error')
 
     return redirect(url_for('records'))
@@ -1062,6 +1113,8 @@ def batch_edit_records():
         group_name = None
 
     if not ids:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '未选中任何记录'}), 400
         flash('未选中任何记录', 'error')
         return redirect(url_for('records'))
 
@@ -1073,10 +1126,14 @@ def batch_edit_records():
             pass
 
     if not valid_ids:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '未选中有效的记录'}), 400
         flash('未选中有效的记录', 'error')
         return redirect(url_for('records'))
 
     if not new_type and not new_category:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '未指定需要修改的分类或类型'}), 400
         flash('未指定需要修改的分类或类型', 'warning')
         return redirect(url_for('records'))
 
@@ -1101,6 +1158,10 @@ def batch_edit_records():
 
     db.execute(f"UPDATE transactions SET {set_clause} WHERE id IN ({placeholders})", params)
     db.commit()
+
+    if is_ajax_request():
+        return jsonify({'ok': True, 'message': f'成功批量修改 {len(valid_ids)} 条记录', 'edited_ids': valid_ids})
+
     flash(f'成功批量修改 {len(valid_ids)} 条记录', 'success')
     return redirect(url_for('records'))
 
@@ -1386,13 +1447,19 @@ def add_category():
         group_name = None
     name = (f.get('name') or '').strip()
     if not name:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '分类名称不能为空'}), 400
         flash('分类名称不能为空', 'error')
         return redirect(url_for('categories_page'))
     try:
         db.execute('INSERT INTO categories (type, group_name, name) VALUES (?,?,?)', (type_, group_name, name))
         db.commit()
+        if is_ajax_request():
+            return jsonify({'ok': True, 'message': '分类已添加'})
         flash('分类已添加', 'success')
     except sqlite3.IntegrityError:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '该分类已存在'}), 400
         flash('该分类已存在', 'error')
     return redirect(url_for('categories_page'))
 
@@ -1402,6 +1469,8 @@ def delete_category(cat_id):
     db = get_db()
     db.execute('DELETE FROM categories WHERE id=?', (cat_id,))
     db.commit()
+    if is_ajax_request():
+        return jsonify({'ok': True, 'message': '分类已删除（历史记录中的旧数据不受影响）', 'id': cat_id})
     flash('分类已删除（历史记录中的旧数据不受影响）', 'success')
     return redirect(url_for('categories_page'))
 
@@ -1447,6 +1516,12 @@ def add_recurring():
     except ValueError:
         amount = 0
 
+    if amount <= 0:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '金额必须是大于 0 的数字'}), 400
+        flash('金额必须是大于 0 的数字', 'error')
+        return redirect(url_for('recurring_page'))
+
     db.execute(
         'INSERT INTO recurring_rules '
         '(type, group_name, category, amount, note, day_of_month, is_active, last_generated_month, created_at) '
@@ -1454,6 +1529,8 @@ def add_recurring():
         (tx_type, group_name, f.get('category'), amount, f.get('note', ''), day, datetime.now().isoformat())
     )
     db.commit()
+    if is_ajax_request():
+        return jsonify({'ok': True, 'message': '固定收支规则已添加'})
     flash('固定收支规则已添加', 'success')
     return redirect(url_for('recurring_page'))
 
@@ -1463,6 +1540,8 @@ def delete_recurring(rule_id):
     db = get_db()
     db.execute('DELETE FROM recurring_rules WHERE id=?', (rule_id,))
     db.commit()
+    if is_ajax_request():
+        return jsonify({'ok': True, 'message': '规则已删除', 'id': rule_id})
     flash('规则已删除', 'success')
     return redirect(url_for('recurring_page'))
 
@@ -1472,9 +1551,16 @@ def toggle_recurring(rule_id):
     db = get_db()
     row = db.execute('SELECT is_active FROM recurring_rules WHERE id=?', (rule_id,)).fetchone()
     if row:
-        db.execute('UPDATE recurring_rules SET is_active=? WHERE id=?', (0 if row['is_active'] else 1, rule_id))
+        new_active = 0 if row['is_active'] else 1
+        db.execute('UPDATE recurring_rules SET is_active=? WHERE id=?', (new_active, rule_id))
         db.commit()
-        flash('规则已停用' if row['is_active'] else '规则已启用', 'success')
+        msg = '规则已停用' if row['is_active'] else '规则已启用'
+        if is_ajax_request():
+            return jsonify({'ok': True, 'message': msg, 'id': rule_id, 'is_active': new_active})
+        flash(msg, 'success')
+    else:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '未找到对应规则'}), 404
     return redirect(url_for('recurring_page'))
 
 
@@ -1482,9 +1568,12 @@ def toggle_recurring(rule_id):
 def manual_generate_recurring():
     count = generate_due_recurring()
     if count:
-        flash(f'已生成 {count} 条本月固定收支记录', 'success')
+        msg = f'已生成 {count} 条本月固定收支记录'
     else:
-        flash('本月固定收支已全部生成，无需重复生成', 'success')
+        msg = '本月固定收支已全部生成，无需重复生成'
+    if is_ajax_request():
+        return jsonify({'ok': True, 'message': msg, 'count': count})
+    flash(msg, 'success')
     return redirect(url_for('recurring_page'))
 
 
@@ -1802,6 +1891,8 @@ def split_bill_save_record():
         amount = 0
 
     if amount <= 0:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '记账金额必须大于 0'}), 400
         flash('记账金额必须大于 0', 'error')
         return redirect(url_for('split_bill_page'))
 
@@ -1817,7 +1908,10 @@ def split_bill_save_record():
         (tx_date, 'expense', None, category, amount, note, 'split_bill', now)
     )
     db.commit()
-    flash(f'已成功记入支出：{note} {money_filter(amount)}', 'success')
+    msg = f'已成功记入支出：{note} {money_filter(amount)}'
+    if is_ajax_request():
+        return jsonify({'ok': True, 'message': msg})
+    flash(msg, 'success')
     return redirect(url_for('records'))
 
 

@@ -1,9 +1,9 @@
-{% extends 'base.html' %}
+{% extends layout|default('base.html') %}
 {% block title %}分类管理 - 我的记账本{% endblock %}
 {% block content %}
 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
   <h2 style="margin:0;">分类管理</h2>
-  <a href="{{ url_for('category_insights_page') }}" class="btn-primary btn-sm">📊 支出分类深度洞察报告</a>
+  <a href="{{ url_for('category_insights_page') }}" class="btn-primary btn-sm" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">📊 支出分类深度洞察报告</a>
 </div>
 
 <div class="panels">

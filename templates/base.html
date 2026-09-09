@@ -20,17 +20,17 @@
     <div class="header-inner">
         <div class="header-left">
             <span class="app-avatar-badge">💰</span>
-            <a href="{{ url_for('index') }}" class="brand-link"><span class="brand">我的账本</span></a>
+            <a href="{{ url_for('index') }}" class="brand-link" hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true"><span class="brand">我的账本</span></a>
         </div>
         <!-- 桌面端导航链接 -->
         <nav class="desktop-nav-links">
-            <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}" data-nav="index">仪表盘</a>
-            <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records">历史记录</a>
-            <a href="{{ url_for('split_bill_page') }}" class="{{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill">小票AA分账</a>
-            <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring">固定收支</a>
-            <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories">分类管理</a>
-            <a href="{{ url_for('category_insights_page') }}" class="{{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights">分类洞察</a>
-            <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import">批量导入</a>
+            <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}" data-nav="index" hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">仪表盘</a>
+            <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records" hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">历史记录</a>
+            <a href="{{ url_for('split_bill_page') }}" class="{{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill" hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">小票AA分账</a>
+            <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring" hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">固定收支</a>
+            <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories" hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">分类管理</a>
+            <a href="{{ url_for('category_insights_page') }}" class="{{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">分类洞察</a>
+            <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">批量导入</a>
             <span class="sync-badge desktop-sync-badge" id="desktopSyncStatusBadge">
                 <span class="online-dot" id="desktopSyncStatusDot"></span>
                 <span id="desktopSyncStatusText">云端在线</span>
@@ -49,15 +49,15 @@
 
 <!-- 手机端底部 App 导航栏 (原生移动应用体验) -->
 <nav class="mobile-bottom-nav" id="mobileBottomNav">
-    <a href="{{ url_for('index') }}" class="bnav-item {{ 'active' if request.endpoint == 'index' }}" data-nav="index">
+    <a href="{{ url_for('index') }}" class="bnav-item {{ 'active' if request.endpoint == 'index' }}" data-nav="index" hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
         <span class="bnav-icon">📊</span>
         <span class="bnav-label">概览</span>
     </a>
-    <a href="{{ url_for('records') }}" class="bnav-item {{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records">
+    <a href="{{ url_for('records') }}" class="bnav-item {{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records" hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
         <span class="bnav-icon">📑</span>
         <span class="bnav-label">明细</span>
     </a>
-    <a href="{{ url_for('split_bill_page') }}" class="bnav-item bnav-highlight {{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill">
+    <a href="{{ url_for('split_bill_page') }}" class="bnav-item bnav-highlight {{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill" hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
         <div class="bnav-icon-highlight">🧾</div>
         <span class="bnav-label">AA分账</span>
     </a>
@@ -76,22 +76,22 @@
         <button type="button" class="sheet-close-btn" onclick="toggleMoreSheet(false)">✕</button>
     </div>
     <div class="sheet-grid">
-        <a href="{{ url_for('category_insights_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights">
+        <a href="{{ url_for('category_insights_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
             <span class="sheet-icon">📊</span>
             <span class="sheet-title">分类洞察</span>
             <span class="sheet-desc">支出环比与走势图</span>
         </a>
-        <a href="{{ url_for('recurring_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring">
+        <a href="{{ url_for('recurring_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring" hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
             <span class="sheet-icon">🔄</span>
             <span class="sheet-title">固定收支</span>
             <span class="sheet-desc">房租工资每月自动</span>
         </a>
-        <a href="{{ url_for('categories_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories">
+        <a href="{{ url_for('categories_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories" hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
             <span class="sheet-icon">🏷️</span>
             <span class="sheet-title">分类管理</span>
             <span class="sheet-desc">自定义收支类别</span>
         </a>
-        <a href="{{ url_for('import_page') }}" class="sheet-tile {{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import">
+        <a href="{{ url_for('import_page') }}" class="sheet-tile {{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
             <span class="sheet-icon">📤</span>
             <span class="sheet-title">批量导入</span>
             <span class="sheet-desc">Excel/CSV 账单</span>
@@ -130,6 +130,7 @@
 {% if error_msgs %}
 <script>window.FLASH_ERROR = {{ error_msgs | tojson }};</script>
 {% endif %}
+<script src="{{ url_for('static', filename='vendor/htmx.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>

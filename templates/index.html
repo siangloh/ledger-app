@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends layout|default('base.html') %}
 {% block title %}仪表盘 - 我的记账本{% endblock %}
 {% block content %}
 
@@ -13,9 +13,9 @@
 <!-- ==================== 当月视图 ==================== -->
 <div id="monthlySection" class="dashboard-view">
   <div class="month-nav">
-    <a href="{{ url_for('index', month=prev_month) }}" class="month-nav-arrow">&larr; 上月</a>
+    <a href="{{ url_for('index', month=prev_month) }}" class="month-nav-arrow" hx-get="{{ url_for('index', month=prev_month) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">&larr; 上月</a>
     <strong class="month-nav-current">{{ month }}</strong>
-    <a href="{{ url_for('index', month=next_month) }}" class="month-nav-arrow">下月 &rarr;</a>
+    <a href="{{ url_for('index', month=next_month) }}" class="month-nav-arrow" hx-get="{{ url_for('index', month=next_month) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">下月 &rarr;</a>
   </div>
 
   <div class="cards cards-four">
