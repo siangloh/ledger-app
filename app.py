@@ -442,6 +442,8 @@ def generate_due_recurring():
         db.execute('UPDATE recurring_rules SET last_generated_month=? WHERE id=?', (current_month, r['id']))
         count += 1
     db.commit()
+    if count > 0:
+        bump_data_version('recurring_generate', {'count': count})
     return count
 
 
@@ -1867,6 +1869,7 @@ def add_recurring():
         (tx_type, group_name, f.get('category'), amount, f.get('note', ''), day, datetime.now().isoformat())
     )
     db.commit()
+    bump_data_version('recurring_add', {'type': tx_type, 'amount': amount, 'day_of_month': day, 'category': f.get('category')})
     if is_ajax_request():
         return jsonify({'ok': True, 'message': '固定收支规则已添加'})
     flash('固定收支规则已添加', 'success')
@@ -1908,6 +1911,7 @@ def toggle_recurring(rule_id):
 def manual_generate_recurring():
     count = generate_due_recurring()
     if count:
+        bump_data_version('recurring_generate', {'count': count})
         msg = f'已生成 {count} 条本月固定收支记录'
     else:
         msg = '本月固定收支已全部生成，无需重复生成'
