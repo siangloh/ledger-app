@@ -507,6 +507,16 @@ function attachQuickAddFormAjax() {
           const noteInput = form.querySelector('input[name="note"]');
           if (noteInput) noteInput.value = '';
 
+          if (data.chart_data) {
+            const curMonth = document.querySelector('.month-nav-current')?.textContent.trim() || '';
+            if (!curMonth || curMonth === data.chart_data.month) {
+              window.CHART_DATA = data.chart_data;
+              if (typeof renderDonutCharts === 'function') {
+                renderDonutCharts();
+              }
+            }
+          }
+
           // 局部平滑无刷新更新仪表盘卡片与图表，彻底避免整页/整容器重载闪烁
           if (typeof refreshDashboardPartials === 'function') {
             refreshDashboardPartials(data.transaction);
@@ -852,7 +862,14 @@ function openNlpConfirmDialog(parsed, warnings) {
           });
           const textInput = document.querySelector('#nlpForm input[name="text"]');
           if (textInput) textInput.value = '';
-          if (typeof htmx !== 'undefined') {
+          const isDashboard = document.getElementById('dashboardSummaryCardsWrap') !== null;
+          if (isDashboard && typeof refreshDashboardPartials === 'function') {
+            if (data.chart_data) {
+              window.CHART_DATA = data.chart_data;
+              if (typeof renderDonutCharts === 'function') renderDonutCharts();
+            }
+            refreshDashboardPartials(data.transaction);
+          } else if (typeof htmx !== 'undefined') {
             htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
           } else {
             window.location.reload();
@@ -934,9 +951,8 @@ function switchDashboardView(view) {
     }
     attachTrendChartHover();
   } else {
-    if (window.CHART_DATA) {
-      drawMonthlyDoughnut('incomeChart', window.CHART_DATA.income.labels, window.CHART_DATA.income.values);
-      drawMonthlyDoughnut('expenseChart', window.CHART_DATA.expense.labels, window.CHART_DATA.expense.values);
+    if (typeof renderDonutCharts === 'function') {
+      renderDonutCharts();
     }
   }
 }
@@ -1320,6 +1336,13 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
     _monthlyExpenseChart = destroyChart(_monthlyExpenseChart);
   }
 
+  if (typeof Chart !== 'undefined' && Chart.getChart) {
+    var existing = Chart.getChart(canvas);
+    if (existing) {
+      try { existing.destroy(); } catch (e) {}
+    }
+  }
+
   var total = values.reduce(function (a, b) { return a + (b || 0); }, 0);
   var isIncome = (canvasId === 'incomeChart');
   var centerTitle = isIncome ? '本月总收入' : '本月总支出';
@@ -1360,13 +1383,17 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
     }
   };
 
+  var sliceColors = values.length > 0 && total > 0
+    ? labels.map(function(_, idx) { return palette[idx % palette.length]; })
+    : (isDark ? ['#334155'] : ['#e0e0e0']);
+
   var instance = new Chart(canvas.getContext('2d'), {
     type: 'doughnut',
     data: {
       labels: labels,
       datasets: [{
         data: values.length > 0 && total > 0 ? values : [1],
-        backgroundColor: values.length > 0 && total > 0 ? palette.slice(0, labels.length) : (isDark ? ['#334155'] : ['#e0e0e0']),
+        backgroundColor: sliceColors,
         borderWidth: 2,
         borderColor: sliceBorder,
         hoverBorderColor: sliceBorder
@@ -1376,6 +1403,10 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
       responsive: true,
       maintainAspectRatio: false,
       cutout: '70%',
+      animation: {
+        duration: 500,
+        easing: 'easeOutQuart'
+      },
       layout: {
         padding: { top: 10, bottom: 10 }
       },
@@ -1430,6 +1461,19 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
     _monthlyIncomeChart = instance;
   } else {
     _monthlyExpenseChart = instance;
+  }
+}
+
+function renderDonutCharts() {
+  if (!window.CHART_DATA) return;
+  const isMonthlyVisible = !document.getElementById('monthlySection') || document.getElementById('monthlySection').style.display !== 'none';
+  if (!isMonthlyVisible) return;
+
+  if (document.getElementById('incomeChart') && window.CHART_DATA.income) {
+    drawMonthlyDoughnut('incomeChart', window.CHART_DATA.income.labels || [], window.CHART_DATA.income.values || []);
+  }
+  if (document.getElementById('expenseChart') && window.CHART_DATA.expense) {
+    drawMonthlyDoughnut('expenseChart', window.CHART_DATA.expense.labels || [], window.CHART_DATA.expense.values || []);
   }
 }
 
@@ -1784,20 +1828,29 @@ function refreshDashboardPartials(event) {
     .then(res => res.json())
     .then(data => {
       if (!data || !data.ok) return;
-      if (window.CHART_DATA) {
-        window.CHART_DATA.income = data.income;
-        window.CHART_DATA.expense = data.expense;
+      if (!window.CHART_DATA) {
+        window.CHART_DATA = { income: { labels: [], values: [] }, expense: { labels: [], values: [] } };
       }
+      window.CHART_DATA.income = data.income;
+      window.CHART_DATA.expense = data.expense;
       if (typeof renderDonutCharts === 'function') {
         renderDonutCharts();
       }
+      // 图表面板实时更新脉冲高亮动画
+      ['incomeChart', 'expenseChart'].forEach(id => {
+        const p = document.getElementById(id)?.closest('.panel');
+        if (p) {
+          p.classList.add('card-updated');
+          setTimeout(() => p.classList.remove('card-updated'), 2500);
+        }
+      });
     })
     .catch(console.error);
 
   // 3. 如果在总体概览 Tab，重新拉取概览数据
   const ovSec = document.getElementById('overviewSection');
-  if (ovSec && ovSec.style.display !== 'none' && typeof loadOverviewStats === 'function') {
-    loadOverviewStats();
+  if (ovSec && ovSec.style.display !== 'none' && typeof loadOverviewData === 'function') {
+    loadOverviewData(currentOverviewRange || 'all');
   }
 }
 
@@ -2044,9 +2097,8 @@ function initPageLifecycle() {
   initLiveSyncStatus();
   updateActiveNav(window.location.pathname);
 
-  if (window.CHART_DATA && document.getElementById('incomeChart')) {
-    drawMonthlyDoughnut('incomeChart', window.CHART_DATA.income.labels, window.CHART_DATA.income.values);
-    drawMonthlyDoughnut('expenseChart', window.CHART_DATA.expense.labels, window.CHART_DATA.expense.values);
+  if (typeof renderDonutCharts === 'function') {
+    renderDonutCharts();
   }
 
   // 全局事件代理：点击表格行任意位置快速勾选/取消勾选（批量删除、局部刷新后依然永久生效）

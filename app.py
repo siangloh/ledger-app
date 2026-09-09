@@ -7,7 +7,7 @@ from datetime import datetime, date
 
 import pandas as pd
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask import Flask, g, request, redirect, url_for, render_template, flash, jsonify, session, send_from_directory, make_response
+from flask import Flask, g, request, redirect, url_for, render_template, flash, jsonify, session, send_from_directory, make_response, has_request_context
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 数据存储目录
@@ -102,8 +102,10 @@ import time
 
 DATA_VERSION = int(time.time() * 1000)
 LATEST_EVENT = None
+USER_DATA_VERSIONS = {}
+USER_LATEST_EVENTS = {}
 
-def bump_data_version(event_type='update', data=None):
+def bump_data_version(event_type='update', data=None, user_id=None):
     global DATA_VERSION, LATEST_EVENT
     DATA_VERSION = int(time.time() * 1000)
     LATEST_EVENT = {
@@ -112,6 +114,13 @@ def bump_data_version(event_type='update', data=None):
         'timestamp': datetime.now().isoformat(),
         'data': data or {}
     }
+    if not user_id and data and isinstance(data, dict):
+        user_id = data.get('user_id')
+    if not user_id and has_request_context():
+        user_id = session.get('user_id')
+    if user_id:
+        USER_DATA_VERSIONS[user_id] = DATA_VERSION
+        USER_LATEST_EVENTS[user_id] = LATEST_EVENT
 
 # 本地单人使用的开发服务器：关闭静态文件缓存，避免浏览器缓存旧的 CSS/JS 导致改动看不到
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
@@ -959,15 +968,18 @@ def index():
 
 @app.route('/api/realtime/check')
 def api_realtime_check():
+    user_id = get_current_user_id()
     client_v = request.args.get('v', type=int)
+    current_v = USER_DATA_VERSIONS.get(user_id, DATA_VERSION)
+    latest_evt = USER_LATEST_EVENTS.get(user_id, LATEST_EVENT)
     has_update = False
-    if client_v is not None and client_v < DATA_VERSION:
+    if client_v is not None and client_v < current_v:
         has_update = True
     return jsonify({
         'ok': True,
-        'version': DATA_VERSION,
+        'version': current_v,
         'has_update': has_update,
-        'event': LATEST_EVENT if has_update else None
+        'event': latest_evt if has_update else None
     })
 
 
@@ -1451,6 +1463,26 @@ def add_transaction():
 
     if is_ajax_request():
         savings_pool, total_pool = get_savings_breakdown(db, user_id)
+        # 实时计算当月的最新收入构成与支出分类占比，供前端即时局部更新图表与图例
+        tx_month = tx_date[:7]
+        y, m = map(int, tx_month.split('-'))
+        ld = monthrange(y, m)[1]
+        m_start = f'{tx_month}-01'
+        m_end = f'{tx_month}-{ld:02d}'
+        m_rows = db.execute(
+            'SELECT type, group_name, category, amount FROM transactions WHERE user_id = ? AND date BETWEEN ? AND ?',
+            (user_id, m_start, m_end)
+        ).fetchall()
+        m_inc = {'main': 0.0, 'side': 0.0}
+        m_exp = {}
+        for r in m_rows:
+            if r['type'] == 'income':
+                gn = r['group_name'] or 'main'
+                m_inc[gn] = m_inc.get(gn, 0.0) + r['amount']
+            elif r['type'] == 'expense':
+                c = r['category'] or '其他'
+                m_exp[c] = m_exp.get(c, 0.0) + r['amount']
+
         return jsonify({
             'ok': True,
             'message': '记录已添加',
@@ -1466,7 +1498,18 @@ def add_transaction():
                 'from_savings_category': from_savings_category
             },
             'savings_pool': savings_pool,
-            'total_savings_pool': total_pool
+            'total_savings_pool': total_pool,
+            'chart_data': {
+                'month': tx_month,
+                'income': {
+                    'labels': ['主业收入', '副业收入'],
+                    'values': [round(m_inc.get('main', 0.0), 2), round(m_inc.get('side', 0.0), 2)]
+                },
+                'expense': {
+                    'labels': list(m_exp.keys()),
+                    'values': [round(v, 2) for v in m_exp.values()]
+                }
+            }
         })
 
     flash('记录已添加', 'success')
