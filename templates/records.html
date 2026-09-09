@@ -471,24 +471,20 @@ function confirmSingleDelete(actionUrl, detailText, btnEl) {
   }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  const tbody = document.querySelector('table tbody');
-  if (tbody) {
-    tbody.addEventListener('click', function(e) {
-      // 排除操作列（.actions）或直接点击在 checkbox / 链接 / 按钮 上的情况
-      if (e.target.closest('.actions') || e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.type === 'checkbox') {
-        return;
-      }
-      
-      const row = e.target.closest('tr.record-row');
-      if (!row) return;
+// 全局事件代理：点击表格行任意位置快速选中/取消选中（批量删除或无感刷新后依然 100% 有效）
+document.addEventListener('click', function(e) {
+  if (e.target.closest('.actions') || e.target.closest('a') || e.target.closest('button') || e.target.closest('input')) {
+    return;
+  }
+  
+  const row = e.target.closest('tr.record-row');
+  if (!row) return;
 
-      const checkbox = row.querySelector('.record-checkbox');
-      if (checkbox) {
-        checkbox.checked = !checkbox.checked;
-        updateBatchBar();
-      }
-    });
+  const checkbox = row.querySelector('.record-checkbox');
+  if (checkbox) {
+    checkbox.checked = !checkbox.checked;
+    row.classList.toggle('selected-row', checkbox.checked);
+    updateBatchBar();
   }
 });
 </script>

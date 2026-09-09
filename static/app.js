@@ -10,11 +10,63 @@ function syncSegStyles() {
   });
 }
 
-function toggleFromSavingsCategoryBox(checked) {
-  const box = document.getElementById('fromSavingsCategoryBox');
-  if (box) {
-    box.style.display = checked ? 'block' : 'none';
+// 手机/系统原生通知管理器
+function requestPhoneNotificationPermission() {
+  if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {});
   }
+}
+
+function sendPhoneNotification(title, body, options = {}) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+
+  const notify = () => {
+    const opts = {
+      body: body || '新交易入账成功',
+      icon: '/static/icons/icon-192.png',
+      badge: '/static/icons/icon-192.png',
+      vibrate: [200, 100, 200],
+      tag: 'ledger-tx-' + Date.now(),
+      renotify: true,
+      ...options
+    };
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification(title, opts);
+      }).catch(() => {
+        try { new Notification(title, opts); } catch (e) {}
+      });
+    } else {
+      try { new Notification(title, opts); } catch (e) {}
+    }
+  };
+
+  if (Notification.permission === 'granted') {
+    notify();
+  } else if (Notification.permission === 'default') {
+    Notification.requestPermission().then(perm => {
+      if (perm === 'granted') notify();
+    }).catch(() => {});
+  }
+}
+
+function onExpenseModeChange() {
+  const modeRadio = document.querySelector('input[name="expense_mode"]:checked');
+  const mode = modeRadio ? modeRadio.value : 'regular';
+  const fromSavingsInput = document.getElementById('fromSavingsInput');
+  const fromSavingsBox = document.getElementById('fromSavingsCategoryBox');
+  const quickChips = document.getElementById('quickChipsRow');
+
+  if (fromSavingsInput) {
+    fromSavingsInput.value = (mode === 'savings') ? '1' : '0';
+  }
+  if (fromSavingsBox) {
+    fromSavingsBox.style.display = (mode === 'savings') ? 'block' : 'none';
+  }
+  if (quickChips) {
+    quickChips.style.display = (mode === 'regular') ? 'flex' : 'none';
+  }
+  syncSegStyles();
 }
 
 function onTypeChange() {
@@ -22,21 +74,23 @@ function onTypeChange() {
   if (!checkedRadio) return;
   const type = checkedRadio.value;
   const groupRow = document.getElementById('groupRow');
+  const expenseSubRow = document.getElementById('expenseSubRow');
+  const fromSavingsBox = document.getElementById('fromSavingsCategoryBox');
+  const quickChips = document.getElementById('quickChipsRow');
+  const fromSavingsInput = document.getElementById('fromSavingsInput');
+
   if (groupRow) groupRow.style.display = (type === 'income') ? 'flex' : 'none';
-  const fromSavingsRow = document.getElementById('fromSavingsRow');
-  const fromSavingsCategoryBox = document.getElementById('fromSavingsCategoryBox');
-  if (fromSavingsRow) {
-    fromSavingsRow.style.display = (type === 'expense') ? 'flex' : 'none';
-    const chk = fromSavingsRow.querySelector('input[type="checkbox"]');
-    if (type !== 'expense') {
-      if (chk) chk.checked = false;
-      if (fromSavingsCategoryBox) fromSavingsCategoryBox.style.display = 'none';
-    } else {
-      if (fromSavingsCategoryBox) {
-        fromSavingsCategoryBox.style.display = (chk && chk.checked) ? 'block' : 'none';
-      }
-    }
+
+  if (type === 'expense') {
+    if (expenseSubRow) expenseSubRow.style.display = 'flex';
+    onExpenseModeChange();
+  } else {
+    if (expenseSubRow) expenseSubRow.style.display = 'none';
+    if (fromSavingsBox) fromSavingsBox.style.display = 'none';
+    if (quickChips) quickChips.style.display = 'none';
+    if (fromSavingsInput) fromSavingsInput.value = '0';
   }
+
   populateCategories();
   syncSegStyles();
 }
@@ -54,8 +108,12 @@ function quickFillForm(amount, category, note) {
   const typeRadio = document.querySelector('input[name="type"][value="expense"]');
   if (typeRadio) {
     typeRadio.checked = true;
-    onTypeChange();
   }
+  const modeRadio = document.querySelector('input[name="expense_mode"][value="regular"]');
+  if (modeRadio) {
+    modeRadio.checked = true;
+  }
+  onTypeChange();
   const amountInput = document.querySelector('input[name="amount"]');
   if (amountInput) {
     amountInput.value = Number(amount).toFixed(2);
@@ -415,6 +473,14 @@ function attachQuickAddFormAjax() {
     .then(data => {
       if (typeof finishProgressBar === 'function') finishProgressBar();
       if (data.ok) {
+        if (data.transaction) {
+          const tx = data.transaction;
+          const amt = tx.amount ? `RM ${Number(tx.amount).toFixed(2)}` : '';
+          const cat = tx.category ? `【${tx.category}】` : '';
+          const note = tx.note ? ` ${tx.note}` : '';
+          sendPhoneNotification('记账成功 📝', `${cat} ${amt}${note}`.trim());
+        }
+
         Swal.fire({
           toast: true,
           position: 'top-end',
@@ -1776,14 +1842,18 @@ function handleRealtimeUpdate(event) {
     }
   }
 
-  // 显示优雅的非侵入式 Toast 提示
+  // 显示优雅的非侵入式 Toast 提示并触发手机原生通知
   if (event && event.data) {
     const tx = event.data;
     const amountStr = tx.amount ? ' RM ' + Number(tx.amount).toFixed(2) : '';
     const noteStr = tx.note ? `【${tx.note}】` : '';
+    const catStr = tx.category ? `[${tx.category}] ` : '';
     const title = event.type === 'auto_track' 
-      ? `🎉 自动记账实时入账：${noteStr} ${amountStr}`
-      : `⚡ 账本数据已实时同步：${noteStr} ${amountStr}`;
+      ? `🎉 自动记账入账${amountStr}`
+      : `⚡ 实时记账成功${amountStr}`;
+    const bodyStr = `${catStr}${noteStr} 记账成功`.trim();
+
+    sendPhoneNotification(title, bodyStr);
 
     if (typeof Swal !== 'undefined') {
       Swal.fire({
@@ -1963,12 +2033,11 @@ function initPageLifecycle() {
     drawMonthlyDoughnut('expenseChart', window.CHART_DATA.expense.labels, window.CHART_DATA.expense.values);
   }
 
-  // 历史记录表格移动端快速勾选绑定
-  const tbody = document.querySelector('table tbody');
-  if (tbody && !tbody.dataset.spaBound) {
-    tbody.dataset.spaBound = 'true';
-    tbody.addEventListener('click', function (e) {
-      if (e.target.closest('.actions') || e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.type === 'checkbox') {
+  // 全局事件代理：点击表格行任意位置快速勾选/取消勾选（批量删除、局部刷新后依然永久生效）
+  if (typeof window !== 'undefined' && !window._recordRowSelectDelegated) {
+    window._recordRowSelectDelegated = true;
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('.actions') || e.target.closest('a') || e.target.closest('button') || e.target.closest('input')) {
         return;
       }
       const row = e.target.closest('tr.record-row');
@@ -1976,9 +2045,19 @@ function initPageLifecycle() {
       const checkbox = row.querySelector('.record-checkbox');
       if (checkbox) {
         checkbox.checked = !checkbox.checked;
+        row.classList.toggle('selected-row', checkbox.checked);
         if (typeof updateBatchBar === 'function') updateBatchBar();
       }
     });
+  }
+
+  // 首次用户交互时预请求手机原生系统通知权限
+  if (typeof window !== 'undefined' && !window._notifPrompted) {
+    window._notifPrompted = true;
+    document.addEventListener('click', function reqOnce() {
+      requestPhoneNotificationPermission();
+      document.removeEventListener('click', reqOnce);
+    }, { once: true });
   }
 
   // 检查 URL 是否指定了总体视图
