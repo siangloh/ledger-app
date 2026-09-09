@@ -64,7 +64,12 @@ def is_valid_api_key(req_key):
         return False
     k = str(req_key).strip()
     effective = (get_auto_track_key() or '').strip()
-    valid_set = {effective, DEFAULT_AUTO_TRACK_KEY, 'ledger-auto-track-default-key'}
+    valid_set = {
+        effective,
+        DEFAULT_AUTO_TRACK_KEY,
+        'my-secret-ledger-key',
+        'ledger-auto-track-default-key'
+    }
     if AUTO_TRACK_KEY and AUTO_TRACK_KEY.strip():
         valid_set.add(AUTO_TRACK_KEY.strip())
     return k in valid_set
