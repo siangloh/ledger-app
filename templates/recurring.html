@@ -11,28 +11,63 @@
   <button type="submit" class="btn-primary">生成本月固定收支</button>
 </form>
 
-<div class="table-wrap">
-<table>
+<div class="table-wrap" id="recurringTableWrap">
+<table class="recurring-table">
   <thead>
-    <tr><th>类型</th><th>分组</th><th>分类</th><th>金额</th><th>每月几号</th><th>备注</th><th>状态</th><th>上次生成月份</th><th>操作</th></tr>
+    <tr>
+      <th>类型</th>
+      <th>分组</th>
+      <th>分类</th>
+      <th>金额</th>
+      <th>每月几号</th>
+      <th>备注</th>
+      <th>状态</th>
+      <th>上次生成月份</th>
+      <th>操作</th>
+    </tr>
   </thead>
   <tbody>
     {% for r in rules %}
-    <tr>
-      <td>{{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }}</td>
-      <td>{{ {'main':'主业','side':'副业'}.get(r.group_name, '') }}</td>
-      <td>{{ r.category }}</td>
-      <td class="amount-cell {{ 'income' if r.type=='income' else ('savings' if r.type=='savings' else 'expense') }}">{{ r.amount|money }}</td>
-      <td>{{ r.day_of_month }}</td>
-      <td>{{ r.note }}</td>
-      <td><span class="tag {{ 'tag-active' if r.is_active else 'tag-muted' }}">{{ '启用' if r.is_active else '已停用' }}</span></td>
-      <td>{{ r.last_generated_month or '—' }}</td>
-      <td class="actions">
-        <form method="post" action="{{ url_for('toggle_recurring', rule_id=r.id) }}">
+    <tr class="recurring-row">
+      <td data-col="type">
+        <span class="tag {{ 'tag-income' if r.type=='income' else ('tag-savings' if r.type=='savings' else 'tag-expense') }}">
+          {{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }}
+        </span>
+        {% if r.group_name %}
+          <span class="tag tag-muted mobile-only-tag">{{ {'main':'主业','side':'副业'}.get(r.group_name, r.group_name) }}</span>
+        {% endif %}
+      </td>
+      <td data-col="group">
+        {% if r.group_name %}
+          <span class="tag tag-muted">{{ {'main':'主业','side':'副业'}.get(r.group_name, r.group_name) }}</span>
+        {% else %}
+          <span style="color: var(--muted);">—</span>
+        {% endif %}
+      </td>
+      <td data-col="category"><strong>{{ r.category }}</strong></td>
+      <td data-col="amount" class="amount-cell {{ 'income' if r.type=='income' else ('savings' if r.type=='savings' else 'expense') }}">
+        {{ r.amount|money }}
+      </td>
+      <td data-col="day">每月 <strong>{{ r.day_of_month }}</strong> 号</td>
+      <td data-col="note" class="{{ 'has-note' if r.note else 'no-note' }}">
+        {% if r.note %}
+          <span class="recurring-note-text">{{ r.note }}</span>
+        {% else %}
+          <span style="color: var(--muted);">—</span>
+        {% endif %}
+      </td>
+      <td data-col="status">
+        <span class="tag {{ 'tag-active' if r.is_active else 'tag-muted' }}">{{ '启用' if r.is_active else '已停用' }}</span>
+      </td>
+      <td data-col="last">
+        <span style="color: var(--muted); font-size: 12px;">{{ r.last_generated_month or '尚未生成' }}</span>
+      </td>
+      <td data-col="actions" class="actions">
+        <form method="post" action="{{ url_for('toggle_recurring', rule_id=r.id) }}" style="display:inline;">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn-ghost">{{ '停用' if r.is_active else '启用' }}</button>
         </form>
-        <form method="post" action="{{ url_for('delete_recurring', rule_id=r.id) }}" class="js-delete-confirm"
+        <form method="post" action="{{ url_for('delete_recurring', rule_id=r.id) }}" class="js-delete-confirm" style="display:inline;"
               data-confirm-title="删除这条固定收支规则？"
               data-confirm-text="{{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }} · {{ r.category }} · {{ r.amount|money }} · 每月{{ r.day_of_month }}号<br>删除后每月将不再自动生成，此操作不可撤销。">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -41,7 +76,7 @@
       </td>
     </tr>
     {% else %}
-    <tr><td colspan="9">暂无规则</td></tr>
+    <tr class="empty-row"><td colspan="9">暂无规则</td></tr>
     {% endfor %}
   </tbody>
 </table>

@@ -631,6 +631,55 @@ input:focus, select:focus {
   box-shadow: 0 0 0 3px var(--gold-soft);
 }
 
+select option {
+  background-color: var(--surface);
+  color: var(--ink);
+  padding: 8px 12px;
+}
+
+/* 从储蓄资金扣除专项面板 */
+.from-savings-box {
+  margin: 0 0 14px 0;
+  padding: 11px 14px;
+  background: rgba(182, 144, 47, 0.08);
+  border: 1px solid rgba(182, 144, 47, 0.32);
+  border-radius: var(--radius-sm);
+}
+.from-savings-label {
+  font-size: 12px;
+  color: var(--gold);
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.from-savings-select {
+  width: 100%;
+  font-size: 13.5px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(182, 144, 47, 0.35);
+  background-color: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.from-savings-select:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+.from-savings-select option {
+  background-color: var(--surface);
+  color: var(--ink);
+  padding: 8px 12px;
+}
+
+/* 桌面端默认隐藏纯移动端标签 */
+.mobile-only-tag {
+  display: none;
+}
+
 button { font-family: var(--font-sans); cursor: pointer; }
 
 .btn-primary {
@@ -1171,6 +1220,124 @@ canvas {
   table.records-table tr.record-row td[data-col="actions"] .btn-danger-ghost {
     padding: 5px 12px !important;
     font-size: 12.5px !important;
+    border-radius: 8px !important;
+  }
+
+  /* 移动端固定收支卡片化布局，彻底消除横向滚动与字段截断 */
+  #recurringTableWrap {
+    overflow-x: visible !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin-bottom: 20px;
+  }
+  table.recurring-table {
+    display: block !important;
+    width: 100% !important;
+    background: transparent !important;
+    border: none !important;
+  }
+  table.recurring-table thead {
+    display: none !important;
+  }
+  table.recurring-table tbody {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    width: 100% !important;
+  }
+  table.recurring-table tbody tr.empty-row {
+    display: block !important;
+    text-align: center !important;
+    padding: 24px !important;
+    background: var(--surface) !important;
+    border-radius: 14px !important;
+    border: 1px solid var(--border) !important;
+    color: var(--muted) !important;
+  }
+  table.recurring-table tr.recurring-row {
+    display: grid !important;
+    grid-template-columns: auto 1fr auto !important;
+    grid-template-areas:
+      "type  cat   amt"
+      "day   day   stat"
+      "note  note  note"
+      "last  act   act" !important;
+    row-gap: 8px !important;
+    column-gap: 10px !important;
+    align-items: center !important;
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 14px !important;
+    padding: 14px 16px !important;
+    box-shadow: var(--shadow-card) !important;
+  }
+  table.recurring-table tr.recurring-row td {
+    border: none !important;
+    padding: 0 !important;
+  }
+  table.recurring-table tr.recurring-row td[data-col="type"] {
+    grid-area: type !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+  }
+  table.recurring-table tr.recurring-row td[data-col="type"] .mobile-only-tag {
+    display: inline-block !important;
+  }
+  table.recurring-table tr.recurring-row td[data-col="group"] {
+    display: none !important;
+  }
+  table.recurring-table tr.recurring-row td[data-col="category"] {
+    grid-area: cat !important;
+    font-size: 14.5px !important;
+    font-weight: 600 !important;
+    color: var(--navy) !important;
+  }
+  table.recurring-table tr.recurring-row td[data-col="amount"] {
+    grid-area: amt !important;
+    text-align: right !important;
+    font-size: 16.5px !important;
+    font-weight: 700 !important;
+    font-family: var(--font-mono) !important;
+    white-space: nowrap !important;
+  }
+  table.recurring-table tr.recurring-row td[data-col="day"] {
+    grid-area: day !important;
+    font-size: 12.5px !important;
+    color: var(--muted) !important;
+  }
+  table.recurring-table tr.recurring-row td[data-col="status"] {
+    grid-area: stat !important;
+    text-align: right !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+  }
+  table.recurring-table tr.recurring-row td[data-col="note"] {
+    grid-area: note !important;
+    font-size: 13px !important;
+    color: var(--ink-soft) !important;
+    word-break: break-word !important;
+  }
+  table.recurring-table tr.recurring-row td[data-col="note"].no-note {
+    display: none !important;
+  }
+  table.recurring-table tr.recurring-row td[data-col="last"] {
+    grid-area: last !important;
+    font-size: 11.5px !important;
+    color: var(--muted) !important;
+  }
+  table.recurring-table tr.recurring-row td[data-col="actions"] {
+    grid-area: act !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+  }
+  table.recurring-table tr.recurring-row td[data-col="actions"] .btn-ghost,
+  table.recurring-table tr.recurring-row td[data-col="actions"] .btn-danger-ghost {
+    padding: 5px 12px !important;
+    font-size: 12px !important;
     border-radius: 8px !important;
   }
 
@@ -1749,6 +1916,45 @@ canvas {
   }
   input::placeholder, textarea::placeholder {
     color: var(--muted);
+  }
+
+  /* 原生下拉菜单选项高对比度暗色适配，彻底杜绝文字泛白或看不清 */
+  select option {
+    background-color: #131d31 !important;
+    color: #f1f5f9 !important;
+  }
+  select option:checked {
+    background-color: #243b61 !important;
+    color: #dfb552 !important;
+    font-weight: 600;
+  }
+
+  /* 从储蓄资金扣除专项暗色面板 */
+  .from-savings-box {
+    background: rgba(223, 181, 82, 0.12) !important;
+    border-color: rgba(223, 181, 82, 0.4) !important;
+  }
+  .from-savings-label {
+    color: #dfb552 !important;
+  }
+  .from-savings-select {
+    background-color: #19253d !important;
+    color: #f1f5f9 !important;
+    border-color: rgba(223, 181, 82, 0.45) !important;
+  }
+  .from-savings-select option {
+    background-color: #131d31 !important;
+    color: #f1f5f9 !important;
+  }
+  .from-savings-select option:checked {
+    background-color: #243b61 !important;
+    color: #dfb552 !important;
+  }
+
+  /* 标签暗色增强 */
+  .tag-muted {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--muted) !important;
   }
 
   /* 表格悬停与边框 */
