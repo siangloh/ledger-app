@@ -56,8 +56,8 @@
 </div>
 
 <!-- 分类对比与走势主列表 -->
-<div class="panel" style="padding:0; overflow:hidden;">
-  <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+<div class="panel insights-table-panel" style="padding:0; overflow:hidden;">
+  <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
     <h3 style="margin:0;">分类支出明细与月度环比</h3>
     <span class="hint" style="margin:0; font-size:12.5px;">💡 点击分类行可展开/收起该分类在选定范围内的月度消费走势柱状图</span>
   </div>
@@ -104,13 +104,17 @@
           </td>
         </tr>
         <!-- 展开的柱状图容器行 -->
-        <tr id="chart-row-{{ loop.index0 }}" class="chart-expand-row" style="display:none; background:var(--surface-soft);">
-          <td colspan="8" style="padding:16px 24px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-              <span style="font-size:13px; font-weight:600; color:var(--ink);">「{{ cat.category }}」月度支出走势</span>
-              <span style="font-size:12px; color:var(--muted);">月均: {{ cat.avg_monthly|money }} · 累计: {{ cat.total_amt|money }}</span>
+        <tr id="chart-row-{{ loop.index0 }}" class="chart-expand-row" onclick="event.stopPropagation();">
+          <td colspan="8" class="chart-expand-td">
+            <div class="chart-expand-header">
+              <span class="chart-expand-title">「{{ cat.category }}」月度支出走势</span>
+              <div class="chart-expand-stats">
+                <span class="stat-pill">月均 {{ cat.avg_monthly|money }}</span>
+                <span class="stat-pill">累计 {{ cat.total_amt|money }}</span>
+                <button type="button" class="btn-close-chart" onclick="toggleCategoryChart({{ loop.index0 }})" title="收起图表">✕ 收起</button>
+              </div>
             </div>
-            <div style="position:relative; height:180px; width:100%;">
+            <div class="chart-canvas-box">
               <canvas id="chart-canvas-{{ loop.index0 }}"></canvas>
             </div>
           </td>
@@ -134,12 +138,14 @@ function toggleCategoryChart(idx) {
   const icon = document.getElementById('toggle-icon-' + idx);
   if (!row) return;
 
-  const isHidden = (row.style.display === 'none');
-  row.style.display = isHidden ? 'table-row' : 'none';
-  if (icon) icon.textContent = isHidden ? '▼' : '▶';
+  const isOpening = !row.classList.contains('is-open');
+  row.classList.toggle('is-open', isOpening);
+  if (icon) icon.textContent = isOpening ? '▼' : '▶';
 
-  if (isHidden) {
-    renderCategoryChart(idx);
+  if (isOpening) {
+    setTimeout(function() {
+      renderCategoryChart(idx);
+    }, 25);
   }
 }
 
@@ -175,6 +181,14 @@ function renderCategoryChart(idx) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: {
+        padding: {
+          left: 2,
+          right: 6,
+          top: 6,
+          bottom: 2
+        }
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -188,15 +202,18 @@ function renderCategoryChart(idx) {
       scales: {
         x: {
           grid: { display: false },
-          ticks: { color: tickColor, font: { size: 11 } }
+          ticks: { color: tickColor, font: { size: 10 } }
         },
         y: {
           beginAtZero: true,
           grid: { color: gridColor },
           ticks: {
             color: tickColor,
-            font: { size: 11 },
-            callback: function(v) { return 'RM ' + v; }
+            font: { size: 10 },
+            callback: function(v) {
+              if (v >= 1000) return 'RM ' + (v / 1000).toFixed(1) + 'k';
+              return 'RM ' + v;
+            }
           }
         }
       }

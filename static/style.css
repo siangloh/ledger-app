@@ -1266,7 +1266,11 @@ canvas {
     color: var(--muted) !important;
     font-family: var(--font-mono) !important;
   }
+  /* 移动端展开图表行：默认隐藏，仅在 is-open 时展示为块级卡片，彻底杜绝关不回去的问题 */
   table.insights-table tr.chart-expand-row {
+    display: none !important;
+  }
+  table.insights-table tr.chart-expand-row.is-open {
     display: block !important;
     width: 100% !important;
     box-sizing: border-box !important;
@@ -1275,10 +1279,42 @@ canvas {
     border: 1px solid var(--border) !important;
     margin-top: -4px !important;
     margin-bottom: 6px !important;
+    overflow: hidden !important;
   }
-  table.insights-table tr.chart-expand-row td {
+  table.insights-table tr.chart-expand-row td.chart-expand-td {
     display: block !important;
-    padding: 12px 14px !important;
+    padding: 10px 12px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .chart-expand-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+  .chart-expand-title {
+    font-size: 13px !important;
+    line-height: 1.35 !important;
+  }
+  .chart-expand-stats {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+  .chart-canvas-box {
+    height: 160px !important;
+    width: 100% !important;
+  }
+
+  /* 彻底消除分类洞察列表在手机端的任何横向滑动可能 */
+  .insights-table-panel,
+  .insights-table-panel .table-wrap {
+    overflow-x: hidden !important;
+    width: 100% !important;
     box-sizing: border-box !important;
   }
 
@@ -1910,10 +1946,78 @@ canvas {
   background: rgba(255, 255, 255, 0.04);
 }
 .chart-expand-row {
+  display: none !important;
   transition: all 0.2s ease;
+}
+.chart-expand-row.is-open {
+  display: table-row !important;
 }
 .chart-expand-row td {
   border-top: none !important;
+}
+.chart-expand-td {
+  padding: 14px 20px;
+  background: var(--surface-soft);
+  box-sizing: border-box;
+}
+.chart-expand-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.chart-expand-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: normal;
+  word-break: break-word;
+}
+.chart-expand-stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.chart-expand-stats .stat-pill {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+.btn-close-chart {
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  color: var(--muted);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.btn-close-chart:hover, .btn-close-chart:active {
+  background: var(--surface);
+  color: var(--ink);
+}
+.chart-canvas-box {
+  position: relative;
+  height: 180px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.chart-canvas-box canvas {
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 /* ---------- 实时无刷新局部更新动态反馈 ---------- */
