@@ -1970,18 +1970,7 @@ canvas {
   color: var(--ink-soft);
 }
 .btn-close-chart {
-  background: transparent;
-  border: 1px solid var(--border-soft);
-  color: var(--muted);
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-.btn-close-chart:hover, .btn-close-chart:active {
-  background: var(--surface);
-  color: var(--ink);
+  display: none !important;
 }
 .chart-canvas-box {
   position: relative;

@@ -111,7 +111,6 @@
               <div class="chart-expand-stats">
                 <span class="stat-pill">月均 {{ cat.avg_monthly|money }}</span>
                 <span class="stat-pill">累计 {{ cat.total_amt|money }}</span>
-                <button type="button" class="btn-close-chart" onclick="toggleCategoryChart({{ loop.index0 }})" title="收起图表">✕ 收起</button>
               </div>
             </div>
             <div class="chart-canvas-box">
