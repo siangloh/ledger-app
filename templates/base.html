@@ -96,6 +96,11 @@
             <span class="sheet-title">安装为应用</span>
             <span class="sheet-desc">添加到主屏幕，免开浏览器</span>
         </button>
+        <a href="{{ url_for('download_apk') }}" class="sheet-tile" style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08);" download="我的账本-伴侣版.apk">
+            <span class="sheet-icon">🤖</span>
+            <span class="sheet-title" style="color: #059669; font-weight: 600;">下载原生伴侣 App</span>
+            <span class="sheet-desc">内置通知监听 (免第三方工具)</span>
+        </a>
         <a href="{{ url_for('auto_track_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'auto_track_page' }}" data-nav="auto-track" hx-get="{{ url_for('auto_track_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
             <span class="sheet-icon">⚡</span>
             <span class="sheet-title">自动记账</span>

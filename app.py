@@ -221,8 +221,8 @@ def get_current_user_id():
 def require_login():
     # 允许静态资源、登录/注册/登出路由、健康检查、PWA 核心资源以及外部自动记账 Webhook 豁免 Session 检查
     if (
-        request.endpoint in ('login', 'register', 'logout', 'static', 'health', 'api_realtime_check', 'manifest', 'service_worker', 'offline_page', 'api_check_username')
-        or request.path in ('/login', '/register', '/logout', '/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html', '/api/check-username')
+        request.endpoint in ('login', 'register', 'logout', 'static', 'health', 'api_realtime_check', 'manifest', 'service_worker', 'offline_page', 'api_check_username', 'download_apk')
+        or request.path in ('/login', '/register', '/logout', '/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html', '/api/check-username', '/download/apk')
         or (request.path and request.path.startswith('/static/'))
     ):
         return
@@ -2566,6 +2566,13 @@ def api_sync_transactions():
 
     db.commit()
     return jsonify({'ok': True, 'synced_count': len(synced_ids), 'synced_ids': synced_ids})
+
+
+@app.route('/download/apk')
+def download_apk():
+    """下载 100% 原生专属 Android 伴侣 App 安装包 (免 MacroDroid / 零第三方工具)"""
+    download_dir = os.path.join(app.root_path, 'static', 'download')
+    return send_from_directory(download_dir, 'ledger-app.apk', as_attachment=True, download_name='我的账本-伴侣版.apk')
 
 
 @app.route('/auto-track')

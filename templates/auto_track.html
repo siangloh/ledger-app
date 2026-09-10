@@ -66,8 +66,29 @@
     <p class="hint">只需在 Android 手机上配合常见的自动化工具，每次扣款通知弹出，手机就会自动发给上面这个接口，你甚至不需要手动打开任何网页！</p>
 
     <div class="step-guide" style="font-size: 13.5px; line-height: 1.7; color: var(--ink-soft);">
+      <div style="background: rgba(16, 185, 129, 0.08); border: 1.5px solid rgba(16, 185, 129, 0.4); padding: 16px; border-radius: var(--radius-sm); margin-bottom: 18px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #059669; font-size: 15px; margin-bottom: 6px;">
+          <span>🤖 方案 0：专属 Android 原生伴侣 App（100% 自研、零第三方工具、免配置）</span>
+        </div>
+        <p style="margin: 4px 0 10px 0; font-size: 13px; color: var(--ink);">
+          如果你<strong>不想安装任何第三方工具（如 MacroDroid / Tasker）</strong>，可以直接在手机上下载并安装我们的专属官方 Android 伴侣应用。应用内置了银行通知监听服务，安装后授予通知权限即可自动入账！
+        </p>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <a href="{{ url_for('download_apk') }}" class="btn-primary" style="text-decoration: none; padding: 9px 18px; font-size: 13.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;" download="我的账本-伴侣版.apk">
+            📥 一键下载原生伴侣 App (.apk 6.3MB)
+          </a>
+          <span style="font-size: 12px; color: var(--muted);">✓ 支持 Android 7.0 ~ 14+</span>
+        </div>
+        <ol style="padding-left: 20px; margin: 10px 0 0 0; font-size: 12.5px; color: var(--ink-soft); line-height: 1.6;">
+          <li>点击上方按钮在手机下载并安装 APK。</li>
+          <li>首次打开时，按照提示允许<strong>「通知使用权」</strong>和<strong>「忽略电池优化」</strong>。</li>
+          <li>点击右上角菜单可自定义选择要监听的银行应用（默认已包含 TnG、Maybank MAE、CIMB 等全部主流银行）。</li>
+          <li>之后每当银行扣款通知弹出，App 就会在后台自动识别入账，完全零打扰！</li>
+        </ol>
+      </div>
+
       <div style="margin-bottom: 14px;">
-        <strong style="color: var(--navy);">方案 A：MacroDroid（推荐：免开 App，后台静默记账并直接弹出手机原生通知）</strong>
+        <strong style="color: var(--navy);">方案 A：备选方案（通过 MacroDroid 等第三方工具）</strong>
         <ol style="padding-left: 20px; margin: 6px 0;">
           <li>在手机上打开 <strong>MacroDroid</strong>。</li>
           <li>新建宏，触发器 (Trigger) 选择：<strong>通知 (Notification)</strong> &rarr; <strong>已收到通知</strong> &rarr; 勾选 <code>Touch 'n Go eWallet</code>、<code>MAE</code> 等银行/钱包。</li>
