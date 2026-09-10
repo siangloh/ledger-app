@@ -160,9 +160,10 @@
   <section class="panel" style="margin-bottom: 24px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
       <h3 style="margin: 0;">第 1 步：录入小票信息</h3>
-      <div class="tab-options" style="display: flex; gap: 8px;">
-        <button type="button" class="btn-secondary btn-sm" onclick="openReviewModalWithSample()">🧾 打开预填核对演示</button>
-        <button type="button" class="btn-secondary btn-sm" onclick="loadSampleReceipt()">加载示例小票</button>
+      <div class="tab-options" style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button type="button" class="btn-secondary btn-sm" onclick="openReviewModalWithGoodMoodSample()">🧾 演示：槟城餐厅小票 (RM 26.80)</button>
+        <button type="button" class="btn-secondary btn-sm" onclick="openReviewModalWithSample()">🧾 演示：星巴克小票 (RM 15.39)</button>
+        <button type="button" class="btn-secondary btn-sm" onclick="loadSampleReceipt()">加载通用示例</button>
       </div>
     </div>
 
@@ -561,15 +562,22 @@ function compressAndPreprocessImage(file) {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, w, h);
 
-        // 适度灰度与对比度增强
+        // 针对热敏纸小票的核心图像转换：局部对比度拉伸 + 底色漂白 + 墨迹加深
         try {
           const imgData = ctx.getImageData(0, 0, w, h);
           const d = imgData.data;
           for (let i = 0; i < d.length; i += 4) {
+            // 人眼感知加权灰度
             const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-            const contrast = 1.15;
-            const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
-            const enhanced = Math.min(255, Math.max(0, factor * (gray - 128) + 128));
+            
+            // S型底色漂白与墨迹强化曲线：
+            // 灰度 > 135 的纸张底色提升 25% 彻底漂白；灰度 <= 135 的文字线条压暗 18% 变浓黑
+            let enhanced;
+            if (gray > 135) {
+              enhanced = Math.min(255, gray * 1.25);
+            } else {
+              enhanced = Math.max(0, gray * 0.82);
+            }
             d[i] = enhanced;
             d[i + 1] = enhanced;
             d[i + 2] = enhanced;
@@ -580,7 +588,7 @@ function compressAndPreprocessImage(file) {
         }
 
         resolve({
-          dataUrl: canvas.toDataURL('image/jpeg', 0.85),
+          dataUrl: canvas.toDataURL('image/jpeg', 0.88),
           width: w,
           height: h
         });
@@ -593,17 +601,31 @@ function compressAndPreprocessImage(file) {
   });
 }
 
-// 离线端侧 OCR 推理实现（Worker 异步线程，绝不阻塞 UI 主线程）
+// 离线端侧 OCR 推理实现（Worker 异步线程，支持中英双语与优雅降级）
 async function runClientSideOCR(imageDataUrl) {
   if (typeof Tesseract !== 'undefined') {
-    const worker = await Tesseract.createWorker('eng', 1, {
-      logger: m => {
-        if (m.status === 'recognizing text') {
-          const p = Math.round((m.progress || 0) * 100);
-          updateOcrProgress(50 + Math.round(p * 0.38), `② 正在进行离线 OCR 文本识别 (${p}%)...`);
+    let worker;
+    try {
+      // 优先尝试中英双语识别模式（适应东南亚及中文菜品小票）
+      worker = await Tesseract.createWorker(['eng', 'chi_sim'], 1, {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            const p = Math.round((m.progress || 0) * 100);
+            updateOcrProgress(50 + Math.round(p * 0.38), `② 正在进行端侧中英 OCR 识别 (${p}%)...`);
+          }
         }
-      }
-    });
+      });
+    } catch (langErr) {
+      console.warn('Dual-lang worker init failed, fallback to eng:', langErr);
+      worker = await Tesseract.createWorker('eng', 1, {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            const p = Math.round((m.progress || 0) * 100);
+            updateOcrProgress(50 + Math.round(p * 0.38), `② 正在进行端侧英文 OCR 识别 (${p}%)...`);
+          }
+        }
+      });
+    }
     const ret = await worker.recognize(imageDataUrl);
     await worker.terminate();
     return ret.data.text || '';
@@ -766,6 +788,27 @@ Chocolate Croissant 3.85
 Subtotal 14.25
 Tax 1.14
 Total 15.39`;
+  const parsed = parseReceiptTextClientSide(sampleText);
+  openReviewModal(parsed, sampleText);
+}
+
+function openReviewModalWithGoodMoodSample() {
+  const sampleText = `GOOD MOOD KITCHEN
+REG NO: 202603068078 (MA0343696-P)
+NO.43, JALAN VERVEA 9, 14110, SIMPANG AMPAT, PULAU PINANG
+Invoice no: 1559 ORDER #TA067
+Date: 09/09/2026 17:56
+Qty Item Price (MYR)
+1 Lemon Chicken Rice Set 柠檬鸡丁饭套餐 (Takeaway) (14.90/ea) 14.90
+• TA
+1 Luncheon Meat Fried Rice 午餐肉炒饭 (Takeaway) (11.90/ea) 11.90
+• TA
+2 Qty
+Subtotal 26.80
+Bill rounding 0.00
+Total (MYR) 26.80
+DUIT NOW 26.80
+Change 0.00`;
   const parsed = parseReceiptTextClientSide(sampleText);
   openReviewModal(parsed, sampleText);
 }
