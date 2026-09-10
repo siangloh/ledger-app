@@ -104,6 +104,9 @@ function toggleMoreSheet(force) {
   const isShow = typeof force === 'boolean' ? force : !sheet.classList.contains('show');
   sheet.classList.toggle('show', isShow);
   backdrop.classList.toggle('show', isShow);
+  if (isShow) {
+    updateAppDownloadStatus();
+  }
 }
 
 function quickFillForm(amount, category, note) {
@@ -2589,10 +2592,101 @@ window.dismissPwaBanner = function () {
   sessionStorage.setItem('pwa_banner_closed', 'true');
 };
 
-// 页面加载及 HTMX 切换后主动检查 PWA 入口
-window.addEventListener('load', checkPwaUi);
-document.addEventListener('DOMContentLoaded', checkPwaUi);
-document.body.addEventListener('htmx:afterSwap', checkPwaUi);
+// 页面加载及 HTMX 切换后主动检查 PWA 入口与 App 下载状态
+function runDeviceAppChecks() {
+  if (typeof checkPwaUi === 'function') checkPwaUi();
+  updateAppDownloadStatus();
+}
+
+window.addEventListener('load', runDeviceAppChecks);
+document.addEventListener('DOMContentLoaded', runDeviceAppChecks);
+document.body.addEventListener('htmx:afterSwap', runDeviceAppChecks);
+
+// 智能检测当前设备是否已下载或运行原生 App
+function updateAppDownloadStatus() {
+  const tile = document.getElementById('appDownloadTile');
+  if (!tile) return;
+
+  const icon = document.getElementById('appDownloadIcon');
+  const title = document.getElementById('appDownloadTitle');
+  const desc = document.getElementById('appDownloadDesc');
+  const badge = document.getElementById('appDownloadBadge');
+
+  const isNativeApp = (typeof window.LedgerNativeBridge !== 'undefined') ||
+                      (navigator.userAgent && navigator.userAgent.includes('LedgerAppNative'));
+  const isDownloaded = localStorage.getItem('ledger_app_downloaded') === 'true';
+
+  if (isNativeApp) {
+    if (icon) icon.textContent = '🚀';
+    if (title) title.textContent = '下载应用';
+    if (desc) desc.textContent = '当前正在原生应用内运行';
+    if (badge) {
+      badge.textContent = '运行中';
+      badge.style.display = 'inline-block';
+      badge.style.background = 'rgba(16, 185, 129, 0.2)';
+      badge.style.color = '#10b981';
+    }
+  } else if (isDownloaded) {
+    if (icon) icon.textContent = '✅';
+    if (title) title.textContent = '下载应用';
+    if (desc) desc.textContent = '本机已下载 (点击重新下载更新)';
+    if (badge) {
+      badge.textContent = '已下载';
+      badge.style.display = 'inline-block';
+      badge.style.background = 'rgba(16, 185, 129, 0.2)';
+      badge.style.color = '#10b981';
+    }
+  } else {
+    if (icon) icon.textContent = '📱';
+    if (title) title.textContent = '下载应用';
+    if (desc) desc.textContent = '点击下载 Android 原生应用包';
+    if (badge) {
+      badge.style.display = 'none';
+    }
+  }
+}
+
+window.handleAppDownloadClick = function (e) {
+  const isNativeApp = (typeof window.LedgerNativeBridge !== 'undefined') ||
+                      (navigator.userAgent && navigator.userAgent.includes('LedgerAppNative'));
+
+  if (isNativeApp && typeof Swal !== 'undefined') {
+    e.preventDefault();
+    Swal.fire({
+      title: '📱 当前已在应用内',
+      text: '您当前已在原生 App 中运行，如需重新下载最新版本安装包，请点击确认。',
+      icon: 'info',
+      showCancelButton: true,
+      confirmButtonText: '重新下载',
+      cancelButtonText: '取消'
+    }).then((res) => {
+      if (res.isConfirmed) {
+        localStorage.setItem('ledger_app_downloaded', 'true');
+        localStorage.setItem('ledger_app_download_time', new Date().toISOString());
+        updateAppDownloadStatus();
+        window.location.href = '/download/apk';
+      }
+    });
+    return;
+  }
+
+  // 记录本机已下载状态
+  localStorage.setItem('ledger_app_downloaded', 'true');
+  localStorage.setItem('ledger_app_download_time', new Date().toISOString());
+  updateAppDownloadStatus();
+
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      toast: true,
+      position: 'top',
+      icon: 'success',
+      title: '正在下载「我的账本」安装包...',
+      text: '下载后请点击通知栏或文件管理进行安装',
+      showConfirmButton: false,
+      timer: 3500
+    });
+  }
+};
 
 
 

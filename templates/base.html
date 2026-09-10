@@ -32,7 +32,6 @@
             <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records" hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">历史记录</a>
             <a href="{{ url_for('split_bill_page') }}" class="{{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill" hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">小票AA分账</a>
             <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring" hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">固定收支</a>
-            <a href="{{ url_for('auto_track_page') }}" class="{{ 'active' if request.endpoint == 'auto_track_page' }}" data-nav="auto-track" hx-get="{{ url_for('auto_track_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">自动记账</a>
             <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories" hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">分类管理</a>
             <a href="{{ url_for('category_insights_page') }}" class="{{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">分类洞察</a>
             <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">批量导入</a>
@@ -91,20 +90,13 @@
         <button type="button" class="sheet-close-btn" onclick="toggleMoreSheet(false)">✕</button>
     </div>
     <div class="sheet-grid">
-        <button type="button" class="sheet-tile" id="pwaSheetInstallBtn" onclick="installPwaApp()" style="display: flex; background: none; border: 1px solid var(--border); width: 100%; text-align: left; cursor: pointer;">
-            <span class="sheet-icon">📲</span>
-            <span class="sheet-title">安装为应用</span>
-            <span class="sheet-desc">添加到主屏幕，免开浏览器</span>
-        </button>
-        <a href="{{ url_for('download_apk') }}" class="sheet-tile" style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08);" download="我的账本-伴侣版.apk">
-            <span class="sheet-icon">🤖</span>
-            <span class="sheet-title" style="color: #059669; font-weight: 600;">下载原生伴侣 App</span>
-            <span class="sheet-desc">内置通知监听 (免第三方工具)</span>
-        </a>
-        <a href="{{ url_for('auto_track_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'auto_track_page' }}" data-nav="auto-track" hx-get="{{ url_for('auto_track_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-            <span class="sheet-icon">⚡</span>
-            <span class="sheet-title">自动记账</span>
-            <span class="sheet-desc">手机银行通知自动入账</span>
+        <a href="{{ url_for('download_apk') }}" id="appDownloadTile" class="sheet-tile" onclick="handleAppDownloadClick(event)" download="我的账本.apk" style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08);">
+            <span class="sheet-icon" id="appDownloadIcon">📱</span>
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                <span class="sheet-title" id="appDownloadTitle" style="font-weight: 600;">下载应用</span>
+                <span id="appDownloadBadge" style="display: none; font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 600;"></span>
+            </div>
+            <span class="sheet-desc" id="appDownloadDesc">点击下载 Android 原生应用包</span>
         </a>
         <a href="{{ url_for('category_insights_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
             <span class="sheet-icon">📊</span>
@@ -162,7 +154,7 @@
 <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-<script src="{{ url_for('static', filename='app.js') }}?v=20260910_v2"></script>
+<script src="{{ url_for('static', filename='app.js') }}?v=20260910_v3"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

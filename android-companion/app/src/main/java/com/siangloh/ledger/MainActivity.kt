@@ -131,6 +131,14 @@ class MainActivity : AppCompatActivity() {
         settings.loadWithOverviewMode = true
         settings.setSupportZoom(false)
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        settings.userAgentString = "${settings.userAgentString} LedgerAppNative/1.0"
+
+        webView.addJavascriptInterface(object {
+            @JavascriptInterface
+            fun isNativeApp(): Boolean = true
+            @JavascriptInterface
+            fun getVersion(): String = "1.0.0"
+        }, "LedgerNativeBridge")
 
         swipeRefreshLayout.setColorSchemeResources(R.color.gold_accent, R.color.navy_primary)
         swipeRefreshLayout.setOnRefreshListener {

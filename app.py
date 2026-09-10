@@ -2572,7 +2572,7 @@ def api_sync_transactions():
 def download_apk():
     """下载 100% 原生专属 Android 伴侣 App 安装包 (免 MacroDroid / 零第三方工具)"""
     download_dir = os.path.join(app.root_path, 'static', 'download')
-    return send_from_directory(download_dir, 'ledger-app.apk', as_attachment=True, download_name='我的账本-伴侣版.apk')
+    return send_from_directory(download_dir, 'ledger-app.apk', as_attachment=True, download_name='我的账本.apk')
 
 
 @app.route('/auto-track')
