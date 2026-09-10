@@ -70,4 +70,9 @@ dependencies {
     // Coroutines & Lifecycle
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.7.0"
+
+    // ML Kit 文字识别 (小票拍照识别，完全在手机本地离线运行，不经过任何服务器/外部 API)
+    // 目前只用拉丁文识别器；若日后需要识别中文小票内容，需额外加入
+    // com.google.mlkit:text-recognition-chinese 并改用 ChineseTextRecognizerOptions。
+    implementation 'com.google.mlkit:text-recognition:16.0.1'
 }

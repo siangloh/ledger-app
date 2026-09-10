@@ -1,11 +1,7 @@
 FROM python:3.11-slim
 
-# 安装系统级 Tesseract OCR 引擎及中英语言包 (不包含多余的 libgl1)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    tesseract-ocr \
-    tesseract-ocr-eng \
-    tesseract-ocr-chi-sim \
-    && rm -rf /var/lib/apt/lists/*
+# 注意: 小票 OCR 已改为在 Android App 端用 Google ML Kit 本地识别，
+# server 端不再需要 Tesseract 系统引擎，故不再安装 tesseract-ocr 相关 apt 包。
 
 # 创建非特权运行用户 appuser (UID 1000)
 RUN useradd -m -u 1000 appuser

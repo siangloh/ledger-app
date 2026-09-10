@@ -1,6 +1,7 @@
 package com.siangloh.ledger
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -9,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.provider.MediaStore
 import android.provider.Settings
 import android.view.Menu
 import android.view.MenuItem
@@ -24,10 +26,14 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.AppSelectionActivity
 import com.siangloh.ledger.ui.NotificationLogActivity
 import com.siangloh.ledger.ui.QuickAddActivity
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
 
@@ -42,6 +48,8 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val FILE_CHOOSER_REQUEST_CODE = 1001
+        private const val RECEIPT_CAMERA_REQUEST_CODE = 1002
+        private const val RECEIPT_GALLERY_REQUEST_CODE = 1003
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -141,6 +149,12 @@ class MainActivity : AppCompatActivity() {
             fun isNativeApp(): Boolean = true
             @JavascriptInterface
             fun getVersion(): String = "1.0.0"
+            // 小票拍照识别入口：由 split_bill.html 侦测到自己跑在原生 App 内时调用。
+            // 识别完全在手机本地用 ML Kit 完成，不会把照片传去任何服务器。
+            @JavascriptInterface
+            fun scanReceipt() {
+                runOnUiThread { showReceiptScanChooser() }
+            }
         }, "LedgerNativeBridge")
 
         swipeRefreshLayout.setColorSchemeResources(R.color.gold_accent, R.color.navy_primary)
@@ -306,6 +320,61 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    // ---------------------------------------------------------------------
+    // 小票拍照识别 (Google ML Kit，完全离线，本地处理，不上传图片)
+    // ---------------------------------------------------------------------
+
+    private fun showReceiptScanChooser() {
+        val options = arrayOf("📷 拍照识别小票", "🖼️ 从相册选择小票照片")
+        AlertDialog.Builder(this)
+            .setTitle("小票拍照识别")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> {
+                        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                        if (intent.resolveActivity(packageManager) != null) {
+                            startActivityForResult(intent, RECEIPT_CAMERA_REQUEST_CODE)
+                        } else {
+                            Toast.makeText(this, "未找到可用的相机应用", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    1 -> {
+                        val intent = Intent(Intent.ACTION_GET_CONTENT).apply { type = "image/*" }
+                        startActivityForResult(intent, RECEIPT_GALLERY_REQUEST_CODE)
+                    }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun recognizeReceiptText(bitmap: Bitmap) {
+        Toast.makeText(this, "正在本地识别小票文字...", Toast.LENGTH_SHORT).show()
+        val image = InputImage.fromBitmap(bitmap, 0)
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        recognizer.process(image)
+            .addOnSuccessListener { visionText ->
+                if (visionText.text.isBlank()) {
+                    Toast.makeText(this, "未识别到文字，请换一张更清晰的照片再试", Toast.LENGTH_LONG).show()
+                } else {
+                    sendRecognizedTextToWebView(visionText.text)
+                }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "识别失败：${e.message}", Toast.LENGTH_LONG).show()
+            }
+    }
+
+    private fun sendRecognizedTextToWebView(text: String) {
+        // JSONObject.quote() 会把字符串安全地转成带引号、已转义的 JS 字符串字面量，
+        // 避免小票文字里如果含有引号/换行导致注入到页面的 JS 语法出错。
+        val jsSafeText = JSONObject.quote(text)
+        val js = "javascript:(function(){ " +
+            "if (typeof receiveScannedReceiptText === 'function') { receiveScannedReceiptText($jsSafeText); } " +
+            "})();"
+        webView.evaluateJavascript(js, null)
+    }
+
     private fun setupBackNavigation() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -321,11 +390,45 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
-            if (fileChooserCallback != null) {
-                val results = WebChromeClient.FileChooserParams.parseResult(resultCode, data)
-                fileChooserCallback?.onReceiveValue(results)
-                fileChooserCallback = null
+        when (requestCode) {
+            FILE_CHOOSER_REQUEST_CODE -> {
+                if (fileChooserCallback != null) {
+                    val results = WebChromeClient.FileChooserParams.parseResult(resultCode, data)
+                    fileChooserCallback?.onReceiveValue(results)
+                    fileChooserCallback = null
+                }
+            }
+            RECEIPT_CAMERA_REQUEST_CODE -> {
+                if (resultCode == Activity.RESULT_OK) {
+                    @Suppress("DEPRECATION")
+                    val bitmap = data?.extras?.get("data") as? Bitmap
+                    if (bitmap != null) {
+                        recognizeReceiptText(bitmap)
+                    } else {
+                        Toast.makeText(this, "拍照失败，请重试", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            RECEIPT_GALLERY_REQUEST_CODE -> {
+                if (resultCode == Activity.RESULT_OK) {
+                    val uri = data?.data
+                    if (uri != null) {
+                        try {
+                            val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                val source = android.graphics.ImageDecoder.createSource(contentResolver, uri)
+                                android.graphics.ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                                    decoder.isMutableRequired = true
+                                }
+                            } else {
+                                @Suppress("DEPRECATION")
+                                MediaStore.Images.Media.getBitmap(contentResolver, uri)
+                            }
+                            recognizeReceiptText(bitmap)
+                        } catch (e: Exception) {
+                            Toast.makeText(this, "读取图片失败：${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
             }
         }
     }

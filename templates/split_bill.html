@@ -20,14 +20,13 @@
     </div>
 
     <div class="receipt-input-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
-      <!-- 图片上传卡片 -->
-      <div style="border: 2px dashed var(--border); border-radius: var(--radius-md); padding: 20px; text-align: center; background: var(--surface-soft);">
-        <div style="font-size: 32px; margin-bottom: 8px;">📷</div>
-        <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">手机拍照 / 上传小票图片</div>
-        <p style="font-size: 12px; color: var(--muted); margin-bottom: 12px;">点击调起相机拍照或从相册选择小票</p>
-        <input type="file" id="receiptImageInput" accept="image/*" capture="camera" style="display: none;" onchange="handleImageUpload(event)">
-        <button type="button" class="btn-primary btn-sm" onclick="document.getElementById('receiptImageInput').click()">拍照 / 选取照片</button>
-        <div id="imageUploadStatus" style="font-size: 12px; margin-top: 8px; color: var(--navy); display: none;"></div>
+      <!-- 拍照识别卡片：在原生 App(WebView) 内会显示可用的拍照按钮(本地 ML Kit 识别，不上传图片)；
+           在一般浏览器打开网页版时，没有这个原生桥接，改显示提示改用手机 App 或文本粘贴 -->
+      <div id="receiptScanCard" style="border: 2px dashed var(--border); border-radius: var(--radius-md); padding: 20px; text-align: center; background: var(--surface-soft);">
+        <div style="font-size: 32px; margin-bottom: 8px;">📱</div>
+        <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">拍照识别小票</div>
+        <p id="receiptScanHint" style="font-size: 12px; color: var(--muted); margin-bottom: 12px;">网页版暂不支持拍照识别，请下载「我的账本」手机 App，App 内可直接拍照自动识别小票文字（识别在手机本地完成，图片不会上传）。网页版可使用右侧的文本粘贴方式录入。</p>
+        <button type="button" id="btnScanReceipt" class="btn-primary btn-sm" style="display:none;" onclick="triggerNativeReceiptScan()">拍照 / 选取相册照片</button>
       </div>
 
       <!-- 文本粘贴卡片 -->
@@ -155,7 +154,44 @@ document.addEventListener('DOMContentLoaded', () => {
   renderPeople();
   renderItemsTable();
   calculateSplit();
+  setupReceiptScanEntry();
 });
+
+// 小票拍照识别：仅在原生 App 的 WebView 内可用(由 MainActivity.kt 注入 LedgerNativeBridge)。
+// 一般浏览器打开网页版时 window.LedgerNativeBridge 不存在，维持原本"请使用手机 App"的提示文案。
+function setupReceiptScanEntry() {
+  const btn = document.getElementById('btnScanReceipt');
+  const hint = document.getElementById('receiptScanHint');
+  if (window.LedgerNativeBridge && typeof window.LedgerNativeBridge.scanReceipt === 'function') {
+    if (btn) btn.style.display = 'inline-block';
+    if (hint) hint.textContent = '点击下方按钮拍照或从相册选取小票照片，识别完全在手机本地完成，不会上传图片到服务器。';
+  }
+}
+
+function triggerNativeReceiptScan() {
+  if (window.LedgerNativeBridge && typeof window.LedgerNativeBridge.scanReceipt === 'function') {
+    window.LedgerNativeBridge.scanReceipt();
+  }
+}
+
+// 由 MainActivity.kt 的 ML Kit 识别流程回调：识别出来的文字会以此函数交回网页，
+// 复用现有的文本解析流程(parseTextReceipt)，不需要另外写一套识别结果处理逻辑。
+function receiveScannedReceiptText(text) {
+  const textarea = document.getElementById('receiptTextInput');
+  if (textarea) {
+    textarea.value = text;
+  }
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      icon: 'success',
+      title: '识别完成',
+      text: '已将识别出的文字填入下方文本框，正在自动解析...',
+      timer: 1400,
+      showConfirmButton: false
+    });
+  }
+  parseTextReceipt();
+}
 
 function renderPeople() {
   const container = document.getElementById('peopleChips');
@@ -565,113 +601,6 @@ async function parseTextReceipt() {
     } else {
       alert('请求出错：' + err.message);
     }
-  }
-}
-
-async function handleImageUpload(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  // 居中弹出智能识别小票模态框 (Prompt-out Loading Modal)
-  if (typeof Swal !== 'undefined') {
-    Swal.fire({
-      title: '正在智能识别小票照片',
-      html: `
-        <div style="padding: 16px 0;">
-          <div style="font-size: 48px; margin-bottom: 12px;">🧾</div>
-          <div style="color: var(--navy); font-weight: 600; font-size: 15px; margin-bottom: 8px;">
-            AI 图像预处理与文字识别中...
-          </div>
-          <div style="font-size: 12.5px; color: var(--muted); line-height: 1.6;">
-            正在深度提取小票单品、金额与税费，请稍候约 2~4 秒
-          </div>
-        </div>
-      `,
-      allowOutsideClick: false,
-      allowEscapeKey: false,
-      showConfirmButton: false,
-      didOpen: () => {
-        Swal.showLoading();
-      }
-    });
-  }
-
-  const formData = new FormData();
-  formData.append('csrf_token', document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}');
-  formData.append('file', file);
-
-  try {
-    const res = await fetch('/split-bill/ocr-upload', {
-      method: 'POST',
-      body: formData
-    });
-    const responseText = await res.text();
-    let result;
-    try {
-      result = JSON.parse(responseText);
-    } catch (parseErr) {
-      if (res.status === 502 || res.status === 503 || res.status === 504) {
-        throw new Error('服务器正在部署构建或唤醒中 (HTTP ' + res.status + ')，请等待 1 分钟后再试。');
-      } else if (res.status === 413) {
-        throw new Error('上传的图片体积过大，请在手机相册中适当缩减后重试。');
-      } else {
-        throw new Error('服务器响应异常 (HTTP ' + res.status + ')，请稍后刷新重试。');
-      }
-    }
-    if (typeof Swal !== 'undefined') Swal.close();
-
-    if (result.raw_text) {
-      document.getElementById('receiptTextInput').value = result.raw_text;
-    }
-
-    if (result.ok && result.data) {
-      applyParsedReceiptData(result.data);
-      if (result.data.items && result.data.items.length > 0) {
-        if (typeof Swal !== 'undefined') {
-          Swal.fire({
-            icon: 'success',
-            title: '小票识别成功！',
-            html: `已从小票中自动提取并填充 <b>${result.data.items.length}</b> 个消费项目与金额。`,
-            timer: 2200,
-            showConfirmButton: false
-          });
-        }
-      } else {
-        if (typeof Swal !== 'undefined') {
-          Swal.fire({
-            icon: 'info',
-            title: '小票文本已提取',
-            html: `小票文字已自动填入下方文本框中。<br><span style="font-size:12.5px; color:var(--muted);">未能直接区分菜品行，请核对文本后点击「智能解析明细」进行二次解析。</span>`,
-            confirmButtonText: '查看文本'
-          });
-        }
-      }
-    } else {
-      if (typeof Swal !== 'undefined') {
-        Swal.fire({
-          icon: 'warning',
-          title: '识别提示',
-          text: result.message || '未识别到清晰文字，已为你开启手动输入模式。',
-          confirmButtonText: '确定'
-        });
-      } else {
-        alert(result.message || '识别未完成');
-      }
-    }
-  } catch (err) {
-    if (typeof Swal !== 'undefined') {
-      Swal.close();
-      Swal.fire({
-        icon: 'error',
-        title: '上传识别失败',
-        text: err.message,
-        confirmButtonText: '确定'
-      });
-    } else {
-      alert('上传失败：' + err.message);
-    }
-  } finally {
-    e.target.value = '';
   }
 }
 
