@@ -495,22 +495,45 @@ async function handleReceiptFileSelect(files) {
   }
 
   try {
-    // 2. Canvas 压缩预处理
-    const processedImg = await compressAndPreprocessImage(file);
-    updateOcrProgress(50, '② 启动端侧 WebAssembly / Web Worker 离线文本识别...');
+    // 2. 优先调用本地 RapidOCR (PP-OCR) 深度学习引擎（耗时仅 0.3s，字迹与同行横向对齐极其精准）
+    let parsedData = null;
+    let recognizedText = '';
+    
+    updateOcrProgress(40, '② 启动本地 RapidOCR (PP-OCR) 深度学习引擎识别...');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/split-bill/ocr-upload', {
+        method: 'POST',
+        body: formData
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.ok && json.data) {
+          parsedData = json.data;
+          recognizedText = json.raw_text || '';
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Local RapidOCR unavailable, fallback to client WASM:', apiErr);
+    }
 
-    // 3. 执行端侧离线 OCR
-    const recognizedText = await runClientSideOCR(processedImg.dataUrl);
-    updateOcrProgress(90, '③ 智能规则匹配单品与金额...');
+    // 若本地接口未开启，优雅降级为纯浏览器端 Canvas + WASM 离线提取
+    if (!parsedData) {
+      updateOcrProgress(60, '② 切换至浏览器端 Canvas + 离线 WASM 文本提取...');
+      const processedImg = await compressAndPreprocessImage(file);
+      recognizedText = await runClientSideOCR(processedImg.dataUrl);
+      parsedData = parseReceiptTextClientSide(recognizedText);
+    }
 
+    updateOcrProgress(95, '③ 智能匹配单品、税费与金额...');
     if (typeof Swal !== 'undefined') Swal.close();
 
-    // 4. 将识别文本填入页面文本框
+    // 将识别出的文本填入文本框
     const textarea = document.getElementById('receiptTextInput');
     if (textarea) textarea.value = recognizedText;
 
-    // 5. 纯前端解析规则并立即唤起“预填弹窗 + 大字号金额确认”
-    const parsedData = parseReceiptTextClientSide(recognizedText);
+    // 唤起“预填弹窗 + 大字号金额确认”
     openReviewModal(parsedData, recognizedText);
 
   } catch (err) {
@@ -714,6 +737,9 @@ function parseReceiptTextClientSide(rawText) {
     if (itemMatch) {
       let nameRaw = (itemMatch[1] || '').trim().replace(/^[\s\-:#$*¥“"'|.,;]+|[\s\-:#$*¥“"'|.,;]+$/g, '');
       nameRaw = nameRaw.replace(/^[^\w\u4e00-\u9fa5]+/, '').trim();
+      nameRaw = nameRaw.replace(/^[（(]?(?:Takeaway|TA|Dine[- ]in)[)）]?\s*(?:\([0-9.]+\/ea\))?\s*/i, '');
+      nameRaw = nameRaw.replace(/^[（(]?[0-9.]+\/ea[)）]?\s*/i, '');
+      nameRaw = nameRaw.replace(/^[\s\-:#$*¥“"'|.,;]+|[\s\-:#$*¥“"'|.,;]+$/g, '').trim();
       const priceStr = itemMatch[2] || itemMatch[3];
       const priceVal = priceStr ? parseFloat(priceStr) : 0;
 

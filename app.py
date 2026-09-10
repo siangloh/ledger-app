@@ -261,8 +261,8 @@ def get_current_user_id():
 def require_login():
     # 允许静态资源、登录/注册/登出路由、健康检查、PWA 核心资源以及外部自动记账 Webhook 豁免 Session 检查
     if (
-        request.endpoint in ('login', 'register', 'logout', 'static', 'health', 'api_realtime_check', 'manifest', 'service_worker', 'offline_page', 'api_check_username', 'download_apk')
-        or request.path in ('/login', '/register', '/logout', '/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html', '/api/check-username', '/download/apk')
+        request.endpoint in ('login', 'register', 'logout', 'static', 'health', 'api_realtime_check', 'manifest', 'service_worker', 'offline_page', 'api_check_username', 'download_apk', 'split_bill_ocr_upload', 'split_bill_parse_text')
+        or request.path in ('/login', '/register', '/logout', '/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html', '/api/check-username', '/download/apk', '/split-bill/ocr-upload', '/split-bill/parse-text')
         or (request.path and request.path.startswith('/static/'))
     ):
         return
@@ -3107,6 +3107,9 @@ def parse_receipt_text_to_items(raw_text):
         if m_item:
             name_raw = m_item.group(1).strip(' -:\t#$*¥“"\'|.,;')
             name_raw = re.sub(r'^[^\w\u4e00-\u9fa5]+', '', name_raw).strip()
+            name_raw = re.sub(r'^[（(]?(?:Takeaway|TA|Dine[- ]in)[)）]?\s*(?:\([0-9.]+/ea\))?\s*', '', name_raw, flags=re.IGNORECASE)
+            name_raw = re.sub(r'^[（(]?[0-9.]+/ea[)）]?\s*', '', name_raw, flags=re.IGNORECASE)
+            name_raw = name_raw.strip(' -:\t#$*¥“"\'|.,;')
             price_str = m_item.group(2) or m_item.group(3)
             price_val = float(price_str) if price_str else 0.0
             # 过滤名称过短或纯数字的情况
@@ -3162,6 +3165,74 @@ def split_bill_parse_text():
 
     parsed = parse_receipt_text_to_items(text)
     return jsonify({'ok': True, 'data': parsed})
+
+
+_rapid_ocr_engine = None
+
+def get_rapid_ocr():
+    global _rapid_ocr_engine
+    if _rapid_ocr_engine is None:
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+            _rapid_ocr_engine = RapidOCR()
+            app.logger.info("RapidOCR engine initialized successfully")
+        except Exception as e:
+            app.logger.warning("RapidOCR engine unavailable: %s", e)
+            _rapid_ocr_engine = False
+    return _rapid_ocr_engine if _rapid_ocr_engine is not False else None
+
+
+@app.route('/split-bill/ocr-upload', methods=['POST'])
+@csrf.exempt
+def split_bill_ocr_upload():
+    """本地 RapidOCR 深度学习小票识别接口（零云端依赖，支持中英双语与同行对齐）"""
+    file = request.files.get('file') or request.files.get('receipt_image')
+    if not file or not file.filename:
+        return jsonify({'ok': False, 'message': '未检测到上传的小票照片'}), 400
+
+    engine = get_rapid_ocr()
+    if not engine:
+        return jsonify({'ok': False, 'message': '本地 RapidOCR 引擎未安装或初始化失败'}), 500
+
+    try:
+        img_bytes = file.read()
+        result, elapse = engine(img_bytes)
+        if not result:
+            return jsonify({'ok': False, 'message': '未能识别出文字，请确保小票清晰平整'}), 200
+
+        # 按垂直坐标和水平坐标对齐同一行文本（品名在左，单价在右）
+        blocks = []
+        for box, text, score in result:
+            cy = (box[0][1] + box[2][1]) / 2
+            cx = (box[0][0] + box[1][0]) / 2
+            h = abs(box[2][1] - box[0][1])
+            blocks.append({'cx': cx, 'cy': cy, 'h': h, 'text': text.strip()})
+
+        blocks.sort(key=lambda b: b['cy'])
+        rows = []
+        for b in blocks:
+            merged = False
+            for r in rows:
+                avg_cy = sum(item['cy'] for item in r) / len(r)
+                avg_h = sum(item['h'] for item in r) / len(r)
+                if abs(b['cy'] - avg_cy) < max(12.0, avg_h * 0.7):
+                    r.append(b)
+                    merged = True
+                    break
+            if not merged:
+                rows.append([b])
+
+        merged_lines = []
+        for r in rows:
+            r.sort(key=lambda item: item['cx'])
+            merged_lines.append(' '.join(item['text'] for item in r))
+
+        raw_text = '\n'.join(merged_lines)
+        parsed = parse_receipt_text_to_items(raw_text)
+        return jsonify({'ok': True, 'data': parsed, 'raw_text': raw_text})
+    except Exception as e:
+        app.logger.error("RapidOCR recognition failed: %s", e)
+        return jsonify({'ok': False, 'message': f'小票识别失败: {str(e)}'}), 500
 
 
 @app.route('/split-bill/save-record', methods=['POST'])
