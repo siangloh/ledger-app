@@ -218,6 +218,38 @@
     text-align: right;
   }
 
+  /* 密码规则检查清单 */
+  .pwd-rules-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .pwd-rule-item {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface-soft);
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+  .pwd-rule-item.rule-valid {
+    border-color: rgba(52, 211, 153, 0.4);
+    background: rgba(52, 211, 153, 0.1);
+    color: #34d399;
+    font-weight: 500;
+  }
+  .pwd-rule-item.rule-invalid {
+    border-color: rgba(248, 113, 113, 0.35);
+    background: rgba(248, 113, 113, 0.08);
+    color: #f87171;
+  }
+
   /* 提交按钮 */
   .btn-login {
     background: linear-gradient(135deg, var(--navy), var(--navy-2));
@@ -321,13 +353,23 @@
       <div class="form-group" id="groupPassword">
         <label for="passwordInput">
           设置密码
-          <span class="label-hint">至少 6 位字符</span>
+          <span class="label-hint">需包含大小写、数字及符号</span>
         </label>
         <div class="input-wrap">
-          <input type="password" id="passwordInput" name="password" placeholder="设置登录密码（至少 6 位）" required autocomplete="new-password" minlength="6">
+          <input type="password" id="passwordInput" name="password" placeholder="至少 6 位，含大写/小写/数字/符号" required autocomplete="new-password" minlength="6">
           <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('passwordInput', this)" aria-label="查看密码" tabindex="-1">👁️</button>
         </div>
-        <div class="pwd-strength-wrap" id="pwdStrengthWrap" style="display:none;">
+
+        <!-- 密码 5 项规则实时状态指示器 -->
+        <div class="pwd-rules-list" id="pwdRulesList">
+          <span class="pwd-rule-item" id="ruleLen"><span class="rule-icon">○</span> 至少 6 位</span>
+          <span class="pwd-rule-item" id="ruleUpper"><span class="rule-icon">○</span> 大写字母 (A-Z)</span>
+          <span class="pwd-rule-item" id="ruleLower"><span class="rule-icon">○</span> 小写字母 (a-z)</span>
+          <span class="pwd-rule-item" id="ruleNum"><span class="rule-icon">○</span> 数字 (0-9)</span>
+          <span class="pwd-rule-item" id="ruleSym"><span class="rule-icon">○</span> 特殊符号 (!@#$)</span>
+        </div>
+
+        <div class="pwd-strength-wrap" id="pwdStrengthWrap" style="display:none; margin-top:8px;">
           <div class="strength-track">
             <div class="strength-fill" id="pwdStrengthFill"></div>
           </div>
@@ -491,6 +533,36 @@ function togglePasswordVisibility(inputId, btn) {
   // 2. 密码实时校验与强度计算
   function validatePassword(isBlur = false) {
     const pwd = pInput.value;
+    const ruleLen = document.getElementById('ruleLen');
+    const ruleUpper = document.getElementById('ruleUpper');
+    const ruleLower = document.getElementById('ruleLower');
+    const ruleNum = document.getElementById('ruleNum');
+    const ruleSym = document.getElementById('ruleSym');
+
+    const hasLen = pwd.length >= 6;
+    const hasUpper = /[A-Z]/.test(pwd);
+    const hasLower = /[a-z]/.test(pwd);
+    const hasNum = /[0-9]/.test(pwd);
+    const hasSym = /[^a-zA-Z0-9]/.test(pwd);
+
+    function updateRuleItem(el, valid) {
+      if (!el) return;
+      const icon = el.querySelector('.rule-icon');
+      if (valid) {
+        el.className = 'pwd-rule-item rule-valid';
+        if (icon) icon.textContent = '✓';
+      } else {
+        el.className = (pwd.length > 0 && isBlur) ? 'pwd-rule-item rule-invalid' : 'pwd-rule-item';
+        if (icon) icon.textContent = '○';
+      }
+    }
+
+    updateRuleItem(ruleLen, hasLen);
+    updateRuleItem(ruleUpper, hasUpper);
+    updateRuleItem(ruleLower, hasLower);
+    updateRuleItem(ruleNum, hasNum);
+    updateRuleItem(ruleSym, hasSym);
+
     if (!pwd) {
       pwdStrengthWrap.style.display = 'none';
       if (isBlur) {
@@ -503,21 +575,15 @@ function togglePasswordVisibility(inputId, btn) {
 
     // 显示强度指示条
     pwdStrengthWrap.style.display = 'flex';
-    let strengthScore = 0;
-    if (pwd.length >= 6) strengthScore += 1;
-    if (pwd.length >= 9) strengthScore += 1;
-    if (/[A-Z]/.test(pwd) || /[^a-zA-Z0-9]/.test(pwd)) strengthScore += 1;
-    if (/\d/.test(pwd) && /[a-zA-Z]/.test(pwd)) strengthScore += 1;
+    const passedCount = [hasLen, hasUpper, hasLower, hasNum, hasSym].filter(Boolean).length;
 
-    if (pwd.length < 6) {
-      pwdStrengthFill.style.width = '25%';
+    if (passedCount <= 2) {
+      pwdStrengthFill.style.width = '30%';
       pwdStrengthFill.style.backgroundColor = '#f87171';
-      pwdStrengthText.textContent = '过短';
+      pwdStrengthText.textContent = '弱';
       pwdStrengthText.style.color = '#f87171';
-      setFeedback(pFeedback, pInput, `⚠️ 密码太短，至少需要 6 位字符（当前 ${pwd.length} 位）`, 'error');
-      return false;
-    } else if (strengthScore <= 2) {
-      pwdStrengthFill.style.width = '50%';
+    } else if (passedCount <= 4) {
+      pwdStrengthFill.style.width = '65%';
       pwdStrengthFill.style.backgroundColor = '#fbbf24';
       pwdStrengthText.textContent = '中等';
       pwdStrengthText.style.color = '#fbbf24';
@@ -528,7 +594,19 @@ function togglePasswordVisibility(inputId, btn) {
       pwdStrengthText.style.color = '#34d399';
     }
 
-    setFeedback(pFeedback, pInput, '✓ 密码长度合规', 'success');
+    const missing = [];
+    if (!hasLen) missing.push('至少 6 位');
+    if (!hasUpper) missing.push('大写字母 (A-Z)');
+    if (!hasLower) missing.push('小写字母 (a-z)');
+    if (!hasNum) missing.push('数字 (0-9)');
+    if (!hasSym) missing.push('特殊符号 (!@#$ 等)');
+
+    if (missing.length > 0) {
+      setFeedback(pFeedback, pInput, `⚠️ 密码缺少：${missing.join('、')}`, 'error');
+      return false;
+    }
+
+    setFeedback(pFeedback, pInput, '✓ 密码符合所有安全要求', 'success');
 
     // 若确认密码框已有输入，顺便联动重新校验确认密码
     if (cpInput.value) {
@@ -552,13 +630,21 @@ function togglePasswordVisibility(inputId, btn) {
       return false;
     }
 
-    if (cpwd !== pwd) {
-      setFeedback(cpFeedback, cpInput, '⚠️ 两次输入的密码不一致，请检查', 'error');
+    const isParentPwdValid = (
+      pwd.length >= 6 &&
+      /[A-Z]/.test(pwd) &&
+      /[a-z]/.test(pwd) &&
+      /[0-9]/.test(pwd) &&
+      /[^a-zA-Z0-9]/.test(pwd)
+    );
+
+    if (!isParentPwdValid) {
+      setFeedback(cpFeedback, cpInput, '⚠️ 请先使上方密码满足全部复杂度要求', 'error');
       return false;
     }
 
-    if (pwd.length < 6) {
-      setFeedback(cpFeedback, cpInput, '⚠️ 请先将上方密码设置至少 6 位', 'error');
+    if (cpwd !== pwd) {
+      setFeedback(cpFeedback, cpInput, '⚠️ 两次输入的密码不一致，请检查', 'error');
       return false;
     }
 

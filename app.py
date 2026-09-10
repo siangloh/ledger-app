@@ -257,6 +257,18 @@ def register():
         if not password or len(password) < 6:
             flash('密码长度至少需要 6 个字符', 'error')
             return render_template('register.html')
+        if not re.search(r'[A-Z]', password):
+            flash('密码需包含至少一个大写字母 (A-Z)', 'error')
+            return render_template('register.html')
+        if not re.search(r'[a-z]', password):
+            flash('密码需包含至少一个小写字母 (a-z)', 'error')
+            return render_template('register.html')
+        if not re.search(r'[0-9]', password):
+            flash('密码需包含至少一个数字 (0-9)', 'error')
+            return render_template('register.html')
+        if not re.search(r'[^a-zA-Z0-9]', password):
+            flash('密码需包含至少一个特殊符号（如 !@#$%^&* 等）', 'error')
+            return render_template('register.html')
         if password != confirm_password:
             flash('两次输入的密码不一致', 'error')
             return render_template('register.html')
