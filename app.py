@@ -167,6 +167,16 @@ def request_entity_too_large(error):
     return redirect(request.referrer or url_for('index'))
 
 
+@app.errorhandler(500)
+def internal_server_error(error):
+    """确保 /split-bill/ 路由的 500 错误以 JSON 形式返回，而不是 HTML 错误页"""
+    import traceback
+    traceback.print_exc()
+    if request.path.startswith('/split-bill/'):
+        return jsonify({'ok': False, 'message': f'服务器内部错误，请稍后重试。({str(error)})'}), 200
+    return error
+
+
 @app.errorhandler(CSRFError)
 def handle_csrf_error(error):
     """拦截 CSRF 令牌过期或丢失错误，以友好方式提示/重定向，不再展示原生生硬的 400 Bad Request 页面"""
@@ -3142,6 +3152,34 @@ def split_bill_page():
     return render_template('split_bill.html', today=date.today().isoformat())
 
 
+@app.route('/split-bill/ocr-status')
+def split_bill_ocr_status():
+    """诊断端点：返回 Tesseract OCR 引擎安装状态与版本，用于排查部署问题"""
+    import subprocess
+    result = {'ok': False, 'tesseract_path': None, 'version': None, 'pytesseract_ok': False, 'error': None}
+    try:
+        tess_bin = get_tesseract_cmd()
+        result['tesseract_path'] = tess_bin
+        if tess_bin:
+            try:
+                ver = subprocess.check_output([tess_bin, '--version'], stderr=subprocess.STDOUT, timeout=5).decode('utf-8', errors='ignore').strip()
+                result['version'] = ver
+            except Exception as ve:
+                result['version_error'] = str(ve)
+            try:
+                import pytesseract
+                pytesseract.pytesseract.tesseract_cmd = tess_bin
+                result['pytesseract_ok'] = True
+                result['ok'] = True
+            except Exception as pe:
+                result['pytesseract_error'] = str(pe)
+        else:
+            result['error'] = 'Tesseract binary not found in PATH or common locations'
+    except Exception as e:
+        result['error'] = str(e)
+    return jsonify(result)
+
+
 @app.route('/split-bill/parse-text', methods=['POST'])
 @csrf.exempt
 def split_bill_parse_text():
@@ -3279,7 +3317,11 @@ def split_bill_ocr_upload():
                         try:
                             curr_text = pytesseract.image_to_string(processed_img, lang='eng', config=tess_config)
                         except Exception:
-                            curr_text = pytesseract.image_to_string(processed_img, lang='eng')
+                            try:
+                                curr_text = pytesseract.image_to_string(processed_img, lang='eng')
+                            except Exception as tess_final_err:
+                                ocr_error_reason = str(tess_final_err)
+                                curr_text = ""
 
                     if curr_text and curr_text.strip():
                         norm = re.sub(r'\bRN\b', 'RM', curr_text)
@@ -3314,7 +3356,8 @@ def split_bill_ocr_upload():
         })
     except Exception as top_err:
         import traceback
-        traceback.print_exc()
+        err_detail = traceback.format_exc()
+        print(f'[OCR Upload Error] {err_detail}')
         return jsonify({
             'ok': False,
             'message': f'处理小票发生错误：{str(top_err)}'
