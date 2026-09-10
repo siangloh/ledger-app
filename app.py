@@ -3035,64 +3035,70 @@ def parse_receipt_text_to_items(raw_text):
         r'\b(?:total|grand total|net total|amount due)\b',
         r'\b(?:tax|sst|gst|service charge|svc charge|svc fee|service tax)\b',
         r'\b(?:cash|change|change due|rounding|round adj)\b',
-        r'\b(?:card|cards|visa|mastercard|amex|mydebit|debit|credit|sbux)\b',
+        r'\b(?:card|cards|visa|mastercard|amex|mydebit|debit|credit|sbux|saux)\b',
         r'\b(?:balance|new balance|prev balance)\b',
-        r'\b(?:invoice|receipt|bill no|table|date|tel|phone|drawer|reg:|chk |check closed)\b',
-        r'\b(?:terminal|merchant|auth|approval|ref:|tng|grabpay|boost|alipay|wechat)\b',
+        r'\b(?:invoice|receipt|bill\s*no|table|date|tel|phone|drawer|draper|reg|cashier|server|chk|check\s*closed)\b',
+        r'\b(?:terminal|merchant|auth|approval|ref|tng|grabpay|boost|alipay|wechat)\b',
+        r'\b(?:items?\s*count|item\s*count|total\s*qty|qty\s*total)\b',
         r'^[x*\-_=+#\s\d]+$',
         r'\b[x*]{4,}\b'
     ]
 
     for line in lines:
-        # 先对金额中的逗号小数点进行规范化 (例如 4,95 -> 4.95)
-        clean_line = re.sub(r'(?<=\d),(?=\d{2}\b)', '.', line)
+        # 1. 规范化常见 OCR 混淆: 字符间的数字空格与逗号 (例如 4 .95 -> 4.95, 4 , 95 -> 4.95, 4,95 -> 4.95)
+        clean_line = re.sub(r'(\d+)\s*[.,]\s*(\d+)', r'\1.\2', line)
+        # 针对热敏纸英文小票中误将 V 识别为 ¥ (如 ¥t -> Vt)
+        clean_line = re.sub(r'¥([A-Za-z])', r'V\1', clean_line)
         lower = clean_line.lower()
 
         # 匹配服务费 Service Charge / SVC
         if any(k in lower for k in ['service charge', 'svc charge', 'svc chg', 'service fee']):
-            m = re.search(r'(?:RM|MYR|\$|€|£|¥)?\s*([0-9]+\.[0-9]{2})', clean_line, re.IGNORECASE)
-            if m:
-                service_charge = float(m.group(1))
             m_pct = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*%', clean_line)
             if m_pct:
                 service_rate = float(m_pct.group(1))
+            amounts = re.findall(r'([0-9]+\.[0-9]{1,2})\b', clean_line)
+            if amounts:
+                service_charge = float(amounts[-1])
             continue
 
         # 匹配政府税 / SST / GST / TAX
         if any(k in lower for k in ['sst', 'gst', 'service tax', 'gov tax', 'tax']):
-            # 排除非税总行
             if 'total' not in lower and 'subtotal' not in lower:
-                m = re.search(r'(?:RM|MYR|\$|€|£|¥)?\s*([0-9]+\.[0-9]{2})', clean_line, re.IGNORECASE)
-                if m:
-                    tax = float(m.group(1))
                 m_pct = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*%', clean_line)
                 if m_pct:
                     tax_rate = float(m_pct.group(1))
+                amounts = re.findall(r'([0-9]+\.[0-9]{1,2})\b', clean_line)
+                if amounts:
+                    tax = float(amounts[-1])
                 continue
 
         # 匹配小计 Subtotal
         if 'subtotal' in lower or 'sub-total' in lower:
-            m = re.search(r'(?:RM|MYR|\$|€|£|¥)?\s*([0-9]+\.[0-9]{2})', clean_line, re.IGNORECASE)
-            if m:
-                subtotal = float(m.group(1))
+            amounts = re.findall(r'([0-9]+\.[0-9]{1,2})\b', clean_line)
+            if amounts:
+                subtotal = float(amounts[-1])
             continue
 
         # 匹配总计 Total / Grand Total / Net Total / Amount Due
         if any(k in lower for k in ['grand total', 'net total', 'total amount', 'total', 'amount due']):
-            m = re.search(r'(?:RM|MYR|\$|€|£|¥)?\s*([0-9]+\.[0-9]{2})', clean_line, re.IGNORECASE)
-            if m:
-                total = float(m.group(1))
+            amounts = re.findall(r'([0-9]+\.[0-9]{1,2})\b', clean_line)
+            if amounts:
+                total = float(amounts[-1])
             continue
 
         # 排除干扰行：支付方式、找零、余额、交易流水、银行卡掩码等
         if any(re.search(pat, lower) for pat in exclude_patterns):
             continue
 
-        # 提取常规菜品/消费条目：允许货币符号如 RM, $, €, £, ¥ 以及可选的小数点
-        m_item = re.search(r'^(.*?)(?:RM|MYR|\$|€|£|¥)?\s*([0-9]+\.[0-9]{2})\s*$', clean_line, re.IGNORECASE)
+        # 提取常规菜品/消费条目：
+        # 1) 带货币符号 (如 RM 10, $4.95, RM12.50)
+        # 2) 或以带小数点的价格结尾 (如 "Latte 12.00", "Vt Pap Mocha 4.95")
+        m_item = re.search(r'^(.*?)(?:(?:RM|MYR|\$|€|£|¥)\s*([0-9]+(?:\.[0-9]{1,2})?)|(?<=\s)([0-9]+\.[0-9]{1,2}))\s*[:*#BTA-Za-z"?\.\-\s]*$', clean_line, re.IGNORECASE)
         if m_item:
-            name_raw = m_item.group(1).strip(' -:\t#$*')
-            price_val = float(m_item.group(2))
+            name_raw = m_item.group(1).strip(' -:\t#$*¥“"\'|.,;')
+            name_raw = re.sub(r'^[^\w\u4e00-\u9fa5]+', '', name_raw).strip()
+            price_str = m_item.group(2) or m_item.group(3)
+            price_val = float(price_str) if price_str else 0.0
             # 过滤名称过短或纯数字的情况
             if name_raw and len(name_raw) >= 2 and price_val > 0:
                 # 检查是否有数量前缀（如 "2x " 或 "1 "）

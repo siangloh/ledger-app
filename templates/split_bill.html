@@ -145,17 +145,11 @@ Total 75.21"></textarea>
 
 {% block scripts %}
 <script>
-// 基础状态
-let people = ['我', '小明', '小华'];
-let items = [
-  { name: 'Chicken Chop', price: 24.00, assignedTo: ['我'] },
-  { name: 'Fish & Chips', price: 26.00, assignedTo: ['小明'] },
-  { name: 'Pasta Carbonara', price: 22.00, assignedTo: ['小华'] },
-  { name: 'Mushroom Soup (共享)', price: 12.00, assignedTo: ['我', '小明', '小华'] },
-  { name: 'Iced Lemon Tea x3', price: 18.00, assignedTo: ['我', '小明', '小华'] }
-];
-let serviceCharge = 10.20;
-let tax = 6.12;
+// 基础状态：默认清空模拟数据，仅保留“我”作为默认参与人
+let people = ['我'];
+let items = [];
+let serviceCharge = 0.00;
+let tax = 0.00;
 
 document.addEventListener('DOMContentLoaded', () => {
   renderPeople();
@@ -178,7 +172,11 @@ function addPerson() {
   const name = input.value.trim();
   if (!name) return;
   if (people.includes(name)) {
-    alert('该人员已存在');
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({ icon: 'warning', title: '提示', text: '该人员已存在', timer: 1500, showConfirmButton: false });
+    } else {
+      alert('该人员已存在');
+    }
     return;
   }
   people.push(name);
@@ -205,6 +203,20 @@ function removePerson(idx) {
 
 function renderItemsTable() {
   const tbody = document.getElementById('itemsTableBody');
+  if (!items || items.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="3" style="text-align: center; color: var(--muted); padding: 36px 16px;">
+          <div style="font-size: 32px; margin-bottom: 8px;">🧾</div>
+          <div style="font-size: 14px; font-weight: 600; color: var(--ink-soft); margin-bottom: 4px;">暂无消费项目</div>
+          <div style="font-size: 12.5px; color: var(--muted); margin-bottom: 14px;">请通过上方拍照/上传小票、粘贴文本后点击「智能解析明细」，或直接手动添加</div>
+          <button type="button" class="btn-secondary btn-sm" onclick="addNewItemRow()">+ 手动加一道菜/项目</button>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
   tbody.innerHTML = items.map((item, idx) => {
     const peopleCheckboxes = people.map(p => {
       const isChecked = item.assignedTo.includes(p);
@@ -272,7 +284,7 @@ function removeItemRow(idx) {
 function addNewItemRow() {
   items.push({
     name: '新增菜品/项目',
-    price: 10.00,
+    price: 0.00,
     assignedTo: ['我']
   });
   renderItemsTable();
@@ -287,6 +299,34 @@ function calculateSplit() {
 
   document.getElementById('displaySubtotal').innerText = 'RM ' + subtotal.toFixed(2);
   document.getElementById('displayGrandTotal').innerText = 'RM ' + grandTotal.toFixed(2);
+
+  const cardsContainer = document.getElementById('resultsCards');
+  const btnSave = document.getElementById('btnSaveToLedger');
+
+  if (!items || items.length === 0) {
+    document.getElementById('saveMyAmount').value = '0.00';
+    if (btnSave) {
+      btnSave.innerText = '一键记入主账本 (RM 0.00)';
+      btnSave.disabled = true;
+      btnSave.style.opacity = '0.6';
+      btnSave.style.cursor = 'not-allowed';
+    }
+    cardsContainer.innerHTML = `
+      <div class="card" style="padding: 24px; text-align: center; grid-column: 1 / -1; color: var(--muted); border: 1px dashed var(--border);">
+        <div style="font-size: 28px; margin-bottom: 6px;">👥</div>
+        <div style="font-size: 13.5px; color: var(--ink-soft);">请先录入或解析小票消费项目，系统将自动在此生成每位参与人的分摊账单</div>
+      </div>
+    `;
+    const claimBox = document.getElementById('claimMessageText');
+    if (claimBox) claimBox.value = '（等待录入消费菜品后自动生成微信/WhatsApp催款清单...）';
+    return;
+  }
+
+  if (btnSave) {
+    btnSave.disabled = false;
+    btnSave.style.opacity = '1';
+    btnSave.style.cursor = 'pointer';
+  }
 
   // 计算每人净额（按分配人头平摊每道菜）
   const personNet = {};
@@ -324,7 +364,6 @@ function calculateSplit() {
   });
 
   // 渲染结果卡片
-  const cardsContainer = document.getElementById('resultsCards');
   cardsContainer.innerHTML = people.map(p => {
     const finalAmount = personFinal[p] || 0;
     const netAmount = personNet[p] || 0;
@@ -396,6 +435,7 @@ function copyClaimMessage() {
 }
 
 function loadSampleReceipt() {
+  people = ['我', '小明', '小华'];
   items = [
     { name: 'Nasi Lemak Ayam Goreng', price: 18.90, assignedTo: ['我'] },
     { name: 'Char Kuey Teow Special', price: 16.50, assignedTo: ['小明'] },
@@ -405,15 +445,55 @@ function loadSampleReceipt() {
   ];
   document.getElementById('inputServiceCharge').value = "8.34";
   document.getElementById('inputTax').value = "5.00";
+  renderPeople();
   renderItemsTable();
   calculateSplit();
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      icon: 'success',
+      title: '示例小票已加载',
+      text: '已为你填入 5 道示例菜品与分摊人员，你可以直接尝试调整或计算。',
+      timer: 1800,
+      showConfirmButton: false
+    });
+  }
 }
 
 async function parseTextReceipt() {
   const text = document.getElementById('receiptTextInput').value.trim();
   if (!text) {
-    alert('请先输入或粘贴小票内容');
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        icon: 'warning',
+        title: '提示',
+        text: '请先输入或粘贴小票文本内容',
+        confirmButtonText: '好的'
+      });
+    } else {
+      alert('请先输入或粘贴小票文本内容');
+    }
     return;
+  }
+
+  // 居中弹出解析中加载框
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: '正在智能解析明细...',
+      html: `
+        <div style="padding: 12px 0;">
+          <div style="font-size: 40px; margin-bottom: 12px;">🔍</div>
+          <div style="font-size: 13.5px; color: var(--ink-soft); line-height: 1.6;">
+            系统正在逐行提取菜品名称、单价、服务费与税额...
+          </div>
+        </div>
+      `,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
   }
 
   try {
@@ -425,13 +505,54 @@ async function parseTextReceipt() {
       body: formData
     });
     const result = await res.json();
+    if (typeof Swal !== 'undefined') Swal.close();
+
     if (result.ok && result.data) {
       applyParsedReceiptData(result.data);
+      if (result.data.items && result.data.items.length > 0) {
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            icon: 'success',
+            title: '解析成功！',
+            html: `成功提取 <b>${result.data.items.length}</b> 道消费项目，已更新至下方第 2 步。`,
+            timer: 2000,
+            showConfirmButton: false
+          });
+        }
+      } else {
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            icon: 'warning',
+            title: '未匹配到菜品/金额行',
+            html: `系统未能从文本中匹配到符合格式的单品与金额行。<br><br><span style="font-size:12.5px; color:var(--muted);">提示：请检查每行末尾是否带有金额数字（例如：<code>Latte 12.00</code>），或点击下方按钮手动添加。</span>`,
+            confirmButtonText: '我知道了'
+          });
+        }
+      }
     } else {
-      alert('解析失败：' + (result.message || '未知原因'));
+      if (typeof Swal !== 'undefined') {
+        Swal.fire({
+          icon: 'error',
+          title: '解析失败',
+          text: result.message || '未知原因',
+          confirmButtonText: '确定'
+        });
+      } else {
+        alert('解析失败：' + (result.message || '未知原因'));
+      }
     }
   } catch (err) {
-    alert('请求出错：' + err.message);
+    if (typeof Swal !== 'undefined') {
+      Swal.close();
+      Swal.fire({
+        icon: 'error',
+        title: '请求出错',
+        text: err.message,
+        confirmButtonText: '确定'
+      });
+    } else {
+      alert('请求出错：' + err.message);
+    }
   }
 }
 
@@ -439,9 +560,29 @@ async function handleImageUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
 
-  const status = document.getElementById('imageUploadStatus');
-  status.style.display = 'block';
-  status.innerText = '正在上传并分析小票照片...';
+  // 居中弹出智能识别小票模态框 (Prompt-out Loading Modal)
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: '正在智能识别小票照片',
+      html: `
+        <div style="padding: 16px 0;">
+          <div style="font-size: 48px; margin-bottom: 12px;">🧾</div>
+          <div style="color: var(--navy); font-weight: 600; font-size: 15px; margin-bottom: 8px;">
+            AI 图像预处理与文字识别中...
+          </div>
+          <div style="font-size: 12.5px; color: var(--muted); line-height: 1.6;">
+            正在深度提取小票单品、金额与税费，请稍候约 2~4 秒
+          </div>
+        </div>
+      `,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+  }
 
   const formData = new FormData();
   formData.append('csrf_token', document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}');
@@ -453,20 +594,60 @@ async function handleImageUpload(e) {
       body: formData
     });
     const result = await res.json();
+    if (typeof Swal !== 'undefined') Swal.close();
+
+    if (result.raw_text) {
+      document.getElementById('receiptTextInput').value = result.raw_text;
+    }
+
     if (result.ok && result.data) {
-      status.innerText = '✓ 小票分析成功！已提取明细菜品。';
-      if (result.raw_text) {
-        document.getElementById('receiptTextInput').value = result.raw_text;
-      }
       applyParsedReceiptData(result.data);
+      if (result.data.items && result.data.items.length > 0) {
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            icon: 'success',
+            title: '小票识别成功！',
+            html: `已从小票中自动提取并填充 <b>${result.data.items.length}</b> 个消费项目与金额。`,
+            timer: 2200,
+            showConfirmButton: false
+          });
+        }
+      } else {
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            icon: 'info',
+            title: '小票文本已提取',
+            html: `小票文字已自动填入下方文本框中。<br><span style="font-size:12.5px; color:var(--muted);">未能直接区分菜品行，请核对文本后点击「智能解析明细」进行二次解析。</span>`,
+            confirmButtonText: '查看文本'
+          });
+        }
+      }
     } else {
-      status.innerText = result.message || '识别完成，请在下方文本框微调。';
-      if (result.raw_text) {
-        document.getElementById('receiptTextInput').value = result.raw_text;
+      if (typeof Swal !== 'undefined') {
+        Swal.fire({
+          icon: 'warning',
+          title: '识别提示',
+          text: result.message || '未识别到清晰文字，已为你开启手动输入模式。',
+          confirmButtonText: '确定'
+        });
+      } else {
+        alert(result.message || '识别未完成');
       }
     }
   } catch (err) {
-    status.innerText = '上传失败：' + err.message;
+    if (typeof Swal !== 'undefined') {
+      Swal.close();
+      Swal.fire({
+        icon: 'error',
+        title: '上传识别失败',
+        text: err.message,
+        confirmButtonText: '确定'
+      });
+    } else {
+      alert('上传失败：' + err.message);
+    }
+  } finally {
+    e.target.value = '';
   }
 }
 
@@ -482,6 +663,19 @@ function applyParsedReceiptData(data) {
   document.getElementById('inputTax').value = (data.tax || 0).toFixed(2);
   renderItemsTable();
   calculateSplit();
+
+  // 扫描/解析完成后直接平滑跳转并聚焦至第 2 步 (Step 2)
+  setTimeout(() => {
+    const step2 = document.getElementById('splitSection');
+    if (step2) {
+      step2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      step2.style.transition = 'box-shadow 0.35s ease, border-color 0.35s ease';
+      step2.style.boxShadow = '0 0 0 2px var(--navy), 0 8px 24px rgba(0,0,0,0.12)';
+      setTimeout(() => {
+        step2.style.boxShadow = '';
+      }, 1600);
+    }
+  }, 120);
 }
 </script>
 {% endblock %}
