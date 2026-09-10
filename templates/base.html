@@ -13,7 +13,7 @@
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
 <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260909_v5">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260910_v2">
 </head>
 <body>
 <!-- 极速页面加载指示条 -->
@@ -144,13 +144,14 @@
     <script>
         window.FLASH_SUCCESS = {{ success_msgs | tojson }};
         window.FLASH_ERROR = {{ error_msgs | tojson }};
+        window.INITIAL_DATA_VERSION = {{ data_version | tojson }};
     </script>
     {% block content %}{% endblock %}
 </main>
 <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-<script src="{{ url_for('static', filename='app.js') }}?v=20260909_v5"></script>
+<script src="{{ url_for('static', filename='app.js') }}?v=20260910_v2"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

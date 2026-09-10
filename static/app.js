@@ -507,6 +507,10 @@ function attachQuickAddFormAjax() {
           const noteInput = form.querySelector('input[name="note"]');
           if (noteInput) noteInput.value = '';
 
+          if (data.version) {
+            _currentDataVersion = data.version;
+          }
+
           if (data.chart_data) {
             const curMonth = document.querySelector('.month-nav-current')?.textContent.trim() || '';
             if (!curMonth || curMonth === data.chart_data.month) {
@@ -1330,21 +1334,8 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
   var canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  if (canvasId === 'incomeChart') {
-    _monthlyIncomeChart = destroyChart(_monthlyIncomeChart);
-  } else {
-    _monthlyExpenseChart = destroyChart(_monthlyExpenseChart);
-  }
-
-  if (typeof Chart !== 'undefined' && Chart.getChart) {
-    var existing = Chart.getChart(canvas);
-    if (existing) {
-      try { existing.destroy(); } catch (e) {}
-    }
-  }
-
-  var total = values.reduce(function (a, b) { return a + (b || 0); }, 0);
   var isIncome = (canvasId === 'incomeChart');
+  var total = values.reduce(function (a, b) { return a + (Number(b) || 0); }, 0);
   var centerTitle = isIncome ? '本月总收入' : '本月总支出';
   var isDark = isDarkModeActive();
   var palette = getChartPalette();
@@ -1356,12 +1347,72 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
   var tooltipBody = isDark ? '#cbd5e1' : '#46453f';
   var tooltipBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(27, 27, 31, 0.1)';
 
+  var sliceColors = values.length > 0 && total > 0
+    ? labels.map(function(_, idx) { return palette[idx % palette.length]; })
+    : (isDark ? ['#334155'] : ['#e0e0e0']);
+
+  // 1. 实时更新下方图例列表 HTML
+  var legendContainer = document.getElementById(canvasId + 'Legend');
+  if (legendContainer) {
+    if (!total || values.length === 0) {
+      legendContainer.innerHTML = '<div style="text-align:center; color:var(--muted); font-size:12px; padding:8px;">暂无数据</div>';
+    } else {
+      legendContainer.innerHTML = labels.map(function (lbl, i) {
+        var val = Number(values[i]) || 0;
+        var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
+        var color = palette[i % palette.length];
+        return '<div class="chart-legend-item">' +
+          '<div class="chart-legend-left">' +
+            '<span class="chart-legend-dot" style="background-color:' + color + '"></span>' +
+            '<span class="chart-legend-name" title="' + lbl + '">' + lbl + '</span>' +
+          '</div>' +
+          '<span class="chart-legend-right">' + formatMoney(val) + ' (' + pct + '%)</span>' +
+        '</div>';
+      }).join('');
+    }
+  }
+
+  // 2. 获取已有 Chart.js 实例
+  var existingChart = isIncome ? _monthlyIncomeChart : _monthlyExpenseChart;
+  if (!existingChart && typeof Chart !== 'undefined' && Chart.getChart) {
+    existingChart = Chart.getChart(canvas);
+  }
+
+  // 3. 如果已有可用图表实例，平滑更新数据与中心文本，避免闪烁
+  if (existingChart && existingChart.ctx && existingChart.canvas === canvas) {
+    existingChart._customCenterTotal = total;
+    existingChart.data.labels = labels;
+    if (!existingChart.data.datasets || existingChart.data.datasets.length === 0) {
+      existingChart.data.datasets = [{}];
+    }
+    existingChart.data.datasets[0].data = values.length > 0 && total > 0 ? values : [1];
+    existingChart.data.datasets[0].backgroundColor = sliceColors;
+    existingChart.data.datasets[0].borderColor = sliceBorder;
+    if (existingChart.options && existingChart.options.plugins && existingChart.options.plugins.tooltip) {
+      existingChart.options.plugins.tooltip.enabled = total > 0;
+    }
+    existingChart.update();
+    if (isIncome) _monthlyIncomeChart = existingChart;
+    else _monthlyExpenseChart = existingChart;
+    return;
+  }
+
+  // 4. 清理旧图表并重新创建
+  if (existingChart) {
+    try { existingChart.destroy(); } catch (e) {}
+  }
+  if (typeof Chart !== 'undefined' && Chart.getChart) {
+    var residual = Chart.getChart(canvas);
+    if (residual) {
+      try { residual.destroy(); } catch (e) {}
+    }
+  }
+
   // 自定义中心文字插件 (高对比度暗色适配)
   var centerTextPlugin = {
     id: 'centerText_' + canvasId,
     beforeDraw: function(chart) {
-      var width = chart.width;
-      var height = chart.height;
+      if (!chart.chartArea) return;
       var ctx = chart.ctx;
       ctx.save();
       ctx.textAlign = 'center';
@@ -1369,6 +1420,8 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
       
       var centerX = (chart.chartArea.left + chart.chartArea.right) / 2;
       var centerY = (chart.chartArea.top + chart.chartArea.bottom) / 2;
+
+      var currentTotal = chart._customCenterTotal !== undefined ? chart._customCenterTotal : total;
 
       // 标题 (本月总收入 / 本月总支出)
       ctx.font = '500 12px "Segoe UI", sans-serif';
@@ -1378,14 +1431,10 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
       // 金额
       ctx.font = '700 15.5px ui-monospace, SFMono-Regular, Consolas, monospace';
       ctx.fillStyle = centerAmountColor;
-      ctx.fillText(formatMoney(total), centerX, centerY + 10);
+      ctx.fillText(formatMoney(currentTotal), centerX, centerY + 10);
       ctx.restore();
     }
   };
-
-  var sliceColors = values.length > 0 && total > 0
-    ? labels.map(function(_, idx) { return palette[idx % palette.length]; })
-    : (isDark ? ['#334155'] : ['#e0e0e0']);
 
   var instance = new Chart(canvas.getContext('2d'), {
     type: 'doughnut',
@@ -1437,25 +1486,7 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
     plugins: [centerTextPlugin]
   });
 
-  var legendContainer = document.getElementById(canvasId + 'Legend');
-  if (legendContainer) {
-    if (!total || values.length === 0) {
-      legendContainer.innerHTML = '<div style="text-align:center; color:var(--muted); font-size:12px; padding:8px;">暂无数据</div>';
-    } else {
-      legendContainer.innerHTML = labels.map(function (lbl, i) {
-        var val = values[i] || 0;
-        var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
-        var color = palette[i % palette.length];
-        return '<div class="chart-legend-item">' +
-          '<div class="chart-legend-left">' +
-            '<span class="chart-legend-dot" style="background-color:' + color + '"></span>' +
-            '<span class="chart-legend-name" title="' + lbl + '">' + lbl + '</span>' +
-          '</div>' +
-          '<span class="chart-legend-right">' + formatMoney(val) + ' (' + pct + '%)</span>' +
-        '</div>';
-      }).join('');
-    }
-  }
+  instance._customCenterTotal = total;
 
   if (canvasId === 'incomeChart') {
     _monthlyIncomeChart = instance;
@@ -1776,7 +1807,7 @@ function updateSyncBadge(state) {
   }
 }
 
-let _currentDataVersion = null;
+let _currentDataVersion = (typeof window !== 'undefined' && window.INITIAL_DATA_VERSION) ? window.INITIAL_DATA_VERSION : null;
 let _isPollingActive = false;
 
 function flashSyncBadgeUpdated() {

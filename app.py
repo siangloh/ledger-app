@@ -965,6 +965,9 @@ def index():
             c = r['category'] or '其他'
             expense_by_category[c] = expense_by_category.get(c, 0.0) + r['amount']
 
+    # 支出分类按金额从高到低排序，确保图表与图例视觉统一且突出重点
+    expense_by_category = dict(sorted(expense_by_category.items(), key=lambda x: x[1], reverse=True))
+
     income_categories = {
         'main': get_categories(db, 'income', 'main', user_id),
         'side': get_categories(db, 'income', 'side', user_id),
@@ -1055,10 +1058,19 @@ def partial_dashboard_cards():
 @app.route('/api/dashboard-charts')
 def api_dashboard_charts():
     user_id = get_current_user_id()
-    month = request.args.get('month') or date.today().strftime('%Y-%m')
+    month = (request.args.get('month') or '').strip()
+    if not month or len(month.split('-')) != 2:
+        month = date.today().strftime('%Y-%m')
+    try:
+        year, mon = map(int, month.split('-'))
+        last_day = monthrange(year, mon)[1]
+    except Exception:
+        today = date.today()
+        year, mon = today.year, today.month
+        month = today.strftime('%Y-%m')
+        last_day = monthrange(year, mon)[1]
+
     db = get_db()
-    year, mon = map(int, month.split('-'))
-    last_day = monthrange(year, mon)[1]
     start = f'{month}-01'
     end = f'{month}-{last_day:02d}'
 
@@ -1077,16 +1089,18 @@ def api_dashboard_charts():
             c = r['category'] or '其他'
             expense_by_category[c] = expense_by_category.get(c, 0.0) + r['amount']
 
+    sorted_expenses = sorted(expense_by_category.items(), key=lambda x: x[1], reverse=True)
+
     return jsonify({
         'ok': True,
         'month': month,
         'income': {
             'labels': ['主业收入', '副业收入'],
-            'values': [income_group.get('main', 0.0), income_group.get('side', 0.0)]
+            'values': [round(income_group.get('main', 0.0), 2), round(income_group.get('side', 0.0), 2)]
         },
         'expense': {
-            'labels': list(expense_by_category.keys()),
-            'values': list(expense_by_category.values())
+            'labels': [k for k, _ in sorted_expenses],
+            'values': [round(v, 2) for _, v in sorted_expenses]
         }
     })
 
@@ -1516,6 +1530,7 @@ def add_transaction():
         return jsonify({
             'ok': True,
             'message': '记录已添加',
+            'version': DATA_VERSION,
             'transaction': {
                 'id': cur.lastrowid,
                 'date': tx_date,
@@ -1536,8 +1551,8 @@ def add_transaction():
                     'values': [round(m_inc.get('main', 0.0), 2), round(m_inc.get('side', 0.0), 2)]
                 },
                 'expense': {
-                    'labels': list(m_exp.keys()),
-                    'values': [round(v, 2) for v in m_exp.values()]
+                    'labels': [k for k, _ in sorted(m_exp.items(), key=lambda x: x[1], reverse=True)],
+                    'values': [round(v, 2) for _, v in sorted(m_exp.items(), key=lambda x: x[1], reverse=True)]
                 }
             }
         })

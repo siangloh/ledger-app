@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ledger-pwa-v5';
+const CACHE_NAME = 'ledger-pwa-v6';
 const PRECACHE_ASSETS = [
   '/static/manifest.json',
   '/static/style.css',
@@ -76,7 +76,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 4. 静态资源 (/static/ 路径)：采用 Stale-While-Revalidate 策略
+  // 4. 关键脚本与样式 (.js, .css)：采用 Network-First 策略，确保实时获取最新功能
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
+    event.respondWith(
+      fetch(request).then(async (networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const cache = await caches.open(CACHE_NAME);
+          cache.put(request, networkResponse.clone());
+        }
+        return networkResponse;
+      }).catch(async () => {
+        const cache = await caches.open(CACHE_NAME);
+        return await cache.match(request);
+      })
+    );
+    return;
+  }
+
+  // 5. 其它静态资源 (图片、字体、manifest等)：采用 Stale-While-Revalidate 策略
   if (url.pathname.startsWith('/static/')) {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
@@ -88,7 +105,6 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         }).catch(() => null);
 
-        // 如果本地有缓存先返回缓存，同时后台异步更新；否则等待网络
         return cachedResponse || networkFetch;
       })
     );

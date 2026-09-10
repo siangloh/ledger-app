@@ -106,6 +106,20 @@
     margin-top: 20px;
     line-height: 1.5;
   }
+  .btn-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(244, 234, 208, 0.35);
+    border-top-color: #f4ead0;
+    border-radius: 50%;
+    animation: btn-spin 0.65s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  @keyframes btn-spin {
+    to { transform: rotate(360deg); }
+  }
 </style>
 </head>
 <body>
@@ -138,7 +152,7 @@
     </div>
     {% endif %}
 
-    <form method="post" action="{{ url_for('login', next=next) }}" class="login-form">
+    <form method="post" action="{{ url_for('login', next=next) }}" class="login-form" id="loginForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>
         用户名 / 账号
@@ -151,17 +165,27 @@
       {% if next %}
       <input type="hidden" name="next" value="{{ next }}">
       {% endif %}
-      <button type="submit" class="btn-login">安全登录</button>
+      <button type="submit" class="btn-login" id="btnLoginSubmit">安全登录</button>
     </form>
 
     <div style="margin-top: 20px; font-size: 13px; color: var(--muted);">
       还没有账号？<a href="{{ url_for('register') }}" style="color: var(--gold); text-decoration: none; font-weight: 600;">立即注册新账号 &rarr;</a>
     </div>
-
-    <p class="login-hint">🔒 每个账号采用安全 UUID 隔离，数据完全独立私密。</p>
   </div>
 </div>
 <script>
+  (function() {
+    const loginForm = document.getElementById('loginForm');
+    const btnLogin = document.getElementById('btnLoginSubmit');
+    if (loginForm && btnLogin) {
+      loginForm.addEventListener('submit', function(e) {
+        if (!loginForm.checkValidity()) return;
+        btnLogin.innerHTML = '<span class="btn-spinner"></span> 正在安全登录...';
+        setTimeout(() => { btnLogin.disabled = true; }, 0);
+      });
+    }
+  })();
+
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
       navigator.serviceWorker.register('/sw.js', { scope: '/' })

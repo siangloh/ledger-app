@@ -270,6 +270,20 @@
     opacity: 0.6;
     cursor: not-allowed;
   }
+  .btn-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(244, 234, 208, 0.35);
+    border-top-color: #f4ead0;
+    border-radius: 50%;
+    animation: btn-spin 0.65s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  @keyframes btn-spin {
+    to { transform: rotate(360deg); }
+  }
 
   .login-bottom-links {
     margin-top: 20px;
@@ -688,6 +702,10 @@ function togglePasswordVisibility(inputId, btn) {
       cpInput.focus();
       return;
     }
+
+    // 表单验证全部通过，触发防重复提交与动效加载中状态
+    btnSubmit.innerHTML = '<span class="btn-spinner"></span> 正在创建账本并进入...';
+    setTimeout(() => { btnSubmit.disabled = true; }, 0);
   });
 
   function triggerShake(groupId) {
