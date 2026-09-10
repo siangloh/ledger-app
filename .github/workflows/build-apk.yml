@@ -3,7 +3,14 @@ name: Build Android APK
 on:
   push:
     branches: [ main ]
+    # 排除只改了 static/download/ 的 push（就是这个 workflow 自己发布新 APK 那次 commit），
+    # 不然发布完新 APK 又会触发一次新的 build，无限循环下去。
+    paths-ignore:
+      - 'static/download/**'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -37,3 +44,29 @@ jobs:
           name: MyLedger-App-Debug
           path: android-companion/app/build/outputs/apk/debug/*.apk
           retention-days: 30
+
+      # 之前这个 workflow 只把编译好的 APK 丢进 GitHub Actions 自己的 artifact，
+      # 网站上「下载应用」那个连结指向的 static/download/ledger-app.apk 从来没被
+      # 自动更新过——导致不管代码改了多少次，手机上装的永远是最早那个旧版本。
+      # 这一步把刚编译好的 APK 直接发布到网站会用到的那个路径，并且 push 回 main。
+      - name: Publish freshly-built APK to the website's download path
+        run: |
+          set -e
+          mkdir -p static/download
+          BUILT_APK=$(find android-companion/app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' | head -n 1)
+          if [ -z "$BUILT_APK" ]; then
+            echo "No built APK found, aborting publish step." >&2
+            exit 1
+          fi
+          cp "$BUILT_APK" static/download/ledger-app.apk
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- static/download/ledger-app.apk; then
+            echo "APK unchanged, nothing to publish."
+          else
+            git add static/download/ledger-app.apk
+            git commit -m "chore(apk): publish freshly-built APK to website download path [skip ci]"
+            git push
+          fi
