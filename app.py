@@ -30,6 +30,10 @@ from flask_wtf.csrf import CSRFProtect
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(24).hex()
 
+# 支持 Render 等反向代理正确识别 https 协议与客户端 IP
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 # CSRF 保护 (全局启用，自动化 Webhook 使用 @csrf.exempt 排除)
 csrf = CSRFProtect(app)
 
@@ -2324,7 +2328,10 @@ def api_auto_track():
     if not req_key:
         req_key = request.args.get('key')
 
+    print(f"[AUTO_TRACK] Request from {request.remote_addr}, Method={request.method}, KeyProvided={'YES' if req_key else 'NO'}, ContentType={request.content_type}")
+
     if not is_valid_api_key(req_key):
+        print(f"[AUTO_TRACK] Rejected: Invalid API Key")
         return jsonify({'ok': False, 'message': 'API Key 无效或未在服务器配置，拒绝访问'}), 401
 
     # 获取通知文本：优先从 Query 参数获取，再从 JSON / 表单 / Raw Payload 获取
@@ -2346,7 +2353,17 @@ def api_auto_track():
 
     # 3. 尝试从 Raw Payload 提取 (过滤无意义的空或极短字符)
     if not text and raw_payload and len(raw_payload.strip()) > 3:
-        text = raw_payload
+        # 如果是 JSON 字符串但含换行导致 get_json 失败，做宽容正则提取
+        if raw_payload.strip().startswith('{'):
+            try:
+                import re
+                m = re.search(r'"(?:text|body|message)"\s*:\s*"(.*?)"(?:\s*,\s*"|\s*})', raw_payload, re.DOTALL)
+                if m:
+                    text = m.group(1).replace('\\"', '"').replace('\\n', '\n')
+            except Exception:
+                pass
+        if not text:
+            text = raw_payload
 
     text = (text or "").strip()
     # 如果 payload 是类似 text=... 的 urlencoded 形式，自动解出
@@ -2354,8 +2371,7 @@ def api_auto_track():
         from urllib.parse import unquote
         text = unquote(text[5:]).strip()
 
-    if AUTO_TRACK_DEBUG_LOG:
-        print(f"[AUTO_TRACK DEBUG] Final Extracted text: {repr(text)}")
+    print(f"[AUTO_TRACK] Extracted text: {repr(text[:120])}")
 
     if not text or text == "None" or text == "null":
         return jsonify({
@@ -2555,14 +2571,20 @@ def api_sync_transactions():
 @app.route('/auto-track')
 def auto_track_page():
     """Auto Track 配置与测试页面"""
-    base_url = request.host_url.rstrip('/')
+    scheme = request.headers.get('X-Forwarded-Proto', request.scheme)
+    if 'onrender.com' in request.host:
+        scheme = 'https'
+    base_url = f"{scheme}://{request.host}".rstrip('/')
+    api_key = get_auto_track_key()
     webhook_url = f"{base_url}/api/auto-track"
+    webhook_url_with_key = f"{base_url}/api/auto-track?key={api_key}"
     db = get_db()
     samples = db.execute("SELECT * FROM llm_learning_samples ORDER BY id ASC").fetchall()
     return render_template(
         'auto_track.html',
-        api_key=get_auto_track_key(),
+        api_key=api_key,
         webhook_url=webhook_url,
+        webhook_url_with_key=webhook_url_with_key,
         llm_info=get_active_llm_provider(),
         samples=samples
     )
