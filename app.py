@@ -1,11 +1,24 @@
 import os
 import re
+import sys
 import json
 import uuid
 import sqlite3
 import requests
 from calendar import monthrange
 from datetime import datetime, date
+
+# 确保在 Windows 控制台环境下输出中文不发生 charmap 编码崩溃
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+if hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
 
 import pandas as pd
 from werkzeug.security import generate_password_hash, check_password_hash
