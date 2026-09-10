@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#10213b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>登录 - 我的记账本</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/static/style.css?v=20260910_v3">
+<style>
+  .login-page-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card-hover);
+    border-radius: 20px;
+    padding: 36px 32px;
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+  }
+  .login-logo {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, var(--navy), var(--navy-2));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    margin: 0 auto 16px;
+    box-shadow: 0 6px 18px rgba(16, 33, 59, 0.2);
+    border: 2px solid rgba(182, 144, 47, 0.4);
+  }
+  .login-title {
+    font-family: var(--font-serif);
+    font-size: 22px;
+    color: var(--navy);
+    margin: 0 0 6px;
+    font-weight: 600;
+  }
+  .login-subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 26px;
+  }
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    text-align: left;
+  }
+  .login-form label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .login-form input[type="text"],
+  .login-form input[type="password"] {
+    font-size: 14.5px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-soft);
+    color: var(--ink);
+    width: 100%;
+  }
+  .login-form input:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px var(--gold-soft);
+  }
+  .btn-login {
+    background: linear-gradient(135deg, var(--navy), var(--navy-2));
+    color: #f4ead0;
+    border: none;
+    padding: 13px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s ease, filter 0.15s ease;
+    margin-top: 6px;
+  }
+  .btn-login:active {
+    transform: scale(0.98);
+  }
+  .login-hint {
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 20px;
+    line-height: 1.5;
+  }
+  .btn-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(244, 234, 208, 0.35);
+    border-top-color: #f4ead0;
+    border-radius: 50%;
+    animation: btn-spin 0.65s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  @keyframes btn-spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+<div class="login-page-wrapper">
+  <div class="login-card">
+    <div class="login-logo">💰</div>
+    <h1 class="login-title">我的记账本</h1>
+    <p class="login-subtitle">私密个人财务管理系统</p>
+
+    
+    
+    
+    
+    
+    
+    
+
+    <form method="post" action="/login?next=/split-bill/ocr-upload?" class="login-form" id="loginForm">
+      <input type="hidden" name="csrf_token" value="IjM1Zjk4NWJlN2JjOWY5MGY3NGFjMTI2MGQzYTRjOGU4OTRiYWIxNzQi.aqI1DA.Ft3H_nBa0jQs_LxtGSDActtYQAc">
+      <label>
+        用户名 / 账号
+        <input type="text" name="username" value="admin" placeholder="请输入用户名（默认：admin）" required autofocus autocomplete="username">
+      </label>
+      <label>
+        登录密码
+        <input type="password" name="password" placeholder="请输入密码（默认：admin123）" required autocomplete="current-password">
+      </label>
+      
+      <input type="hidden" name="next" value="/split-bill/ocr-upload?">
+      
+      <button type="submit" class="btn-login" id="btnLoginSubmit">安全登录</button>
+    </form>
+
+    <div style="margin-top: 20px; font-size: 13px; color: var(--muted);">
+      还没有账号？<a href="/register" style="color: var(--gold); text-decoration: none; font-weight: 600;">立即注册新账号 &rarr;</a>
+    </div>
+  </div>
+</div>
+<script>
+  (function() {
+    const loginForm = document.getElementById('loginForm');
+    const btnLogin = document.getElementById('btnLoginSubmit');
+    if (loginForm && btnLogin) {
+      loginForm.addEventListener('submit', function(e) {
+        if (!loginForm.checkValidity()) return;
+        btnLogin.innerHTML = '<span class="btn-spinner"></span> 正在安全登录...';
+        setTimeout(() => { btnLogin.disabled = true; }, 0);
+      });
+    }
+  })();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then(function(reg) {
+          console.log('[PWA] ServiceWorker registered on login page:', reg.scope);
+        })
+        .catch(function(err) {
+          console.warn('[PWA] ServiceWorker registration failed:', err);
+        });
+    });
+  }
+</script>
+</body>
+</html>

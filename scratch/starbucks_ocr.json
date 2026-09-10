@@ -1,0 +1,22 @@
+{
+  "data": {
+    "items": [
+      {
+        "name": "Sbux Card",
+        "price": 4.95,
+        "quantity": 1
+      },
+      {
+        "name": "BUX Card x3228 New Balance",
+        "price": 37.45,
+        "quantity": 1
+      }
+    ],
+    "service_charge": 0.0,
+    "subtotal": 4.95,
+    "tax": 0.0,
+    "total": 4.95
+  },
+  "ok": true,
+  "raw_text": "STARBUCKS Store #19208\n11302 Euclid Avenue\nCleveland, 0H (216) 229- fas\n\nCHK 664290\n12/07/2014 06:43 PH\n区 1 aot Drawer: 2. Reg: 2\n\nvi Pap Mocha 4,95\nSbux Card 4.95\nRXXKX PEASE\n\nSubtotal - $4.95\nTotal $4.95\nChange Oue BO.\n\n12/07/2014 06:43 PM\n\nBUX Card x3228 New Balance: 37.45\nard is registernd\n"
+}
