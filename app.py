@@ -25,10 +25,36 @@ import turso_db
 TURSO_URL = turso_db.TURSO_URL
 TURSO_AUTH_TOKEN = turso_db.TURSO_AUTH_TOKEN
 
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
+from datetime import timedelta
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(24).hex()
+
+# 稳定 Session 密钥机制（杜绝 Render 每次重启、闲置唤醒或多 Worker 导致密钥漂移与 CSRF session token missing）
+def _resolve_stable_secret_key():
+    env_key = os.environ.get('FLASK_SECRET_KEY') or os.environ.get('SECRET_KEY')
+    if env_key and env_key.strip():
+        return env_key.strip()
+    data_dir = os.environ.get('DATA_DIR', '/var/data')
+    for dir_candidate in [data_dir, os.path.dirname(os.path.abspath(__file__))]:
+        if dir_candidate and os.path.isdir(dir_candidate):
+            key_file = os.path.join(dir_candidate, '.flask_secret_key')
+            try:
+                if os.path.isfile(key_file):
+                    with open(key_file, 'r', encoding='utf-8') as f:
+                        k = f.read().strip()
+                        if k:
+                            return k
+                k = os.urandom(32).hex()
+                with open(key_file, 'w', encoding='utf-8') as f:
+                    f.write(k)
+                return k
+            except Exception:
+                pass
+    return 'ledger-app-stable-session-secret-key-prod-2026'
+
+app.secret_key = _resolve_stable_secret_key()
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
 # 支持 Render 等反向代理正确识别 https 协议与客户端 IP
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -156,6 +182,18 @@ def request_entity_too_large(error):
     if request.is_json or request.path.startswith('/split-bill/ocr-upload'):
         return jsonify({'ok': False, 'message': '上传文件大小超出限制（最大允许 20MB）'}), 413
     flash('上传文件大小超出限制（最大允许 20MB）', 'error')
+    return redirect(request.referrer or url_for('index'))
+
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(error):
+    """拦截 CSRF 令牌过期或丢失错误，以友好方式提示/重定向，不再展示原生生硬的 400 Bad Request 页面"""
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.path.startswith('/api/') or request.path.startswith('/split-bill/'):
+        return jsonify({
+            'ok': False,
+            'message': '页面会话已超时失效，请下拉刷新当前网页后重试。'
+        }), 400
+    flash('页面停顿时间较长或服务刚更新，会话已自动重置，请重试提交。', 'warning')
     return redirect(request.referrer or url_for('index'))
 
 

@@ -13,3 +13,4 @@ android-companion/app/build/
 .idea/
 local.properties
 android-companion/local.properties
+.flask_secret_key
