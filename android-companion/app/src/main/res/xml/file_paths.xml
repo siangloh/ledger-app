@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 供 FileProvider 使用：拍照小票时，相机 app 需要把全尺寸照片写到这个 cache 目录，
+     而不是只回传一张画质很差的缩略图给我们 (缩略图会导致 ML Kit 认不出字)。 -->
+<paths xmlns:android="http://schemas.android.com/apk/res-auto">
+    <cache-path name="receipt_photos" path="receipt_photos/" />
+</paths>

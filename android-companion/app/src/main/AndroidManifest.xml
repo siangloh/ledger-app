@@ -85,6 +85,18 @@
             </intent-filter>
         </service>
 
+        <!-- FileProvider：拍小票时让相机把全尺寸照片写到我们自己的 cache 目录，
+             而不是只回传一张画质很差的缩略图 (缩略图会导致 ML Kit 认不出字)。 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
     </application>
 
 </manifest>
