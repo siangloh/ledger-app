@@ -3291,10 +3291,147 @@ def get_rapid_ocr():
     return _rapid_ocr_engine if _rapid_ocr_engine is not False else None
 
 
+def cluster_ocr_blocks_to_lines(ocr_result):
+    """按垂直坐标与水平坐标几何对齐同一行文本（品名在左，单价在右）"""
+    if not ocr_result:
+        return ""
+    blocks = []
+    for box, text, score in ocr_result:
+        cy = (box[0][1] + box[2][1]) / 2
+        cx = (box[0][0] + box[1][0]) / 2
+        h = abs(box[2][1] - box[0][1])
+        blocks.append({'cx': cx, 'cy': cy, 'h': h, 'text': text.strip()})
+
+    blocks.sort(key=lambda b: b['cy'])
+    rows = []
+    for b in blocks:
+        merged = False
+        for r in rows:
+            avg_cy = sum(item['cy'] for item in r) / len(r)
+            avg_h = sum(item['h'] for item in r) / len(r)
+            if abs(b['cy'] - avg_cy) < max(12.0, avg_h * 0.7):
+                r.append(b)
+                merged = True
+                break
+        if not merged:
+            rows.append([b])
+
+    merged_lines = []
+    for r in rows:
+        r.sort(key=lambda item: item['cx'])
+        merged_lines.append(' '.join(item['text'] for item in r))
+
+    return '\n'.join(merged_lines)
+
+
+def get_ocr_orientation_stats(ocr_res, img_h):
+    """分析 OCR 识别框的长宽比与底部结算关键词位置，评估当前图片的朝向是否为正立"""
+    if not ocr_res:
+        return {'horiz': 0, 'vert': 0, 'footer_bottom': 0, 'footer_top': 0, 'count': 0}
+    horiz = 0
+    vert = 0
+    footer_bottom = 0
+    footer_top = 0
+    footer_keywords = [
+        'total', 'subtotal', 'sub-total', 'grand total', 'net total', 'change', 'rounding',
+        'duitnow', 'cash', 'card', 'visa', 'mastercard', 'thank', 'scan', 'pos', 'powered',
+        'feedme', 'tax', 'service', 'balance', '合计', '总计', '小计', '实收', '找零', '谢谢',
+        'お会計', '合計', '합계'
+    ]
+    import numpy as np
+
+    for box, text, score in ocr_res:
+        w = np.linalg.norm(np.array(box[1]) - np.array(box[0]))
+        h = np.linalg.norm(np.array(box[3]) - np.array(box[0]))
+        cy = (box[0][1] + box[2][1]) / 2
+        if w > h * 1.15:
+            horiz += 1
+        elif h > w * 1.15:
+            vert += 1
+
+        t_lower = text.lower()
+        if any(k in t_lower for k in footer_keywords):
+            if cy > img_h * 0.45:
+                footer_bottom += 1
+            else:
+                footer_top += 1
+
+    return {
+        'horiz': horiz,
+        'vert': vert,
+        'footer_bottom': footer_bottom,
+        'footer_top': footer_top,
+        'count': len(ocr_res)
+    }
+
+
+def smart_orient_receipt_ocr(pil_img, engine):
+    """
+    智能自动方向校正 OCR：
+    应对用户横拍、侧向（90°/270°）或颠倒（180°）上传的各类小票（包括无 EXIF 信息的 WhatsApp 压缩图），
+    通过文字框横纵几何比率与小票底部结算关键词加权评分，自动纠正至正立方向后再进行文本行聚类和语义解析。
+    """
+    import numpy as np
+
+    # 1. 初始角度 (0°) 测试识别
+    res0, _ = engine(np.array(pil_img))
+    if not res0:
+        return res0, "", {'items': [], 'subtotal': 0.0, 'total': 0.0, 'service_charge': 0.0, 'tax': 0.0, 'discount': 0.0, 'rounding': 0.0, 'currency_symbol': '$'}, 0
+
+    stats0 = get_ocr_orientation_stats(res0, pil_img.height)
+    raw_text0 = cluster_ocr_blocks_to_lines(res0)
+    parsed0 = parse_receipt_text_to_items(raw_text0)
+
+    # 快速直出条件：如果横向文字框远多于纵向框，且底部关键词位于下半部分或已成功解析出多个商品
+    if stats0['horiz'] > max(5, stats0['vert'] * 1.5) and (stats0['footer_bottom'] >= stats0['footer_top'] or len(parsed0['items']) > 0):
+        return res0, raw_text0, parsed0, 0
+
+    # 候选角度判断：
+    # 若纵向文字框占优，说明用户侧向手机拍照（90° 或 270°）
+    # 若横向多但底部关键词在上半部分，说明用户把小票倒过来拍了（180°）
+    if stats0['vert'] >= stats0['horiz']:
+        test_angles = [90, 270]
+    else:
+        test_angles = [180, 90, 270]
+
+    score0 = (
+        (stats0['horiz'] - stats0['vert'] * 2) +
+        (stats0['footer_bottom'] - stats0['footer_top']) * 6 +
+        len(parsed0['items']) * 15 +
+        (20 if parsed0['total'] > 0 else 0)
+    )
+
+    candidates = []
+    for angle in test_angles:
+        rot_img = pil_img.rotate(angle, expand=True)
+        r_res, _ = engine(np.array(rot_img))
+        if not r_res:
+            continue
+        r_stats = get_ocr_orientation_stats(r_res, rot_img.height)
+        r_text = cluster_ocr_blocks_to_lines(r_res)
+        r_parsed = parse_receipt_text_to_items(r_text)
+        score = (
+            (r_stats['horiz'] - r_stats['vert'] * 2) +
+            (r_stats['footer_bottom'] - r_stats['footer_top']) * 6 +
+            len(r_parsed['items']) * 15 +
+            (20 if r_parsed['total'] > 0 else 0)
+        )
+        candidates.append((score, angle, r_res, r_text, r_parsed))
+
+    if candidates:
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        best = candidates[0]
+        if best[0] > score0:
+            app.logger.info("Auto-corrected receipt orientation by %d° (score %d vs original %d)", best[1], best[0], score0)
+            return best[2], best[3], best[4], best[1]
+
+    return res0, raw_text0, parsed0, 0
+
+
 @app.route('/split-bill/ocr-upload', methods=['POST'])
 @csrf.exempt
 def split_bill_ocr_upload():
-    """本地 RapidOCR 深度学习小票识别接口（零云端依赖，支持中英双语与同行对齐）"""
+    """本地 RapidOCR 深度学习小票识别接口（零云端依赖，支持全方向自适应纠偏与同行对齐）"""
     file = request.files.get('file') or request.files.get('receipt_image')
     if not file or not file.filename:
         return jsonify({'ok': False, 'message': '未检测到上传的小票照片'}), 400
@@ -3305,53 +3442,23 @@ def split_bill_ocr_upload():
 
     try:
         img_bytes = file.read()
-        # 自动纠正手机拍摄小票照片的 EXIF 旋转方向 (Orientation 6/8 等逆向或侧向拍摄)
+        import io
+        from PIL import Image, ImageOps
+        pil_img = Image.open(io.BytesIO(img_bytes))
+        # 优先读取 EXIF 标签纠正旋转
         try:
-            import io
-            import numpy as np
-            from PIL import Image, ImageOps
-            pil_img = Image.open(io.BytesIO(img_bytes))
             pil_img = ImageOps.exif_transpose(pil_img)
-            if pil_img.mode != 'RGB':
-                pil_img = pil_img.convert('RGB')
-            img_input = np.array(pil_img)
         except Exception:
-            img_input = img_bytes
+            pass
+        if pil_img.mode != 'RGB':
+            pil_img = pil_img.convert('RGB')
 
-        result, elapse = engine(img_input)
-        if not result:
+        # 核心：即使无 EXIF 标签（如 WhatsApp 压缩图），也能依据文字框几何与小票布局自动旋转纠正
+        result, raw_text, parsed, rot = smart_orient_receipt_ocr(pil_img, engine)
+        if not result or not raw_text:
             return jsonify({'ok': False, 'message': '未能识别出文字，请确保小票清晰平整'}), 200
 
-        # 按垂直坐标和水平坐标对齐同一行文本（品名在左，单价在右）
-        blocks = []
-        for box, text, score in result:
-            cy = (box[0][1] + box[2][1]) / 2
-            cx = (box[0][0] + box[1][0]) / 2
-            h = abs(box[2][1] - box[0][1])
-            blocks.append({'cx': cx, 'cy': cy, 'h': h, 'text': text.strip()})
-
-        blocks.sort(key=lambda b: b['cy'])
-        rows = []
-        for b in blocks:
-            merged = False
-            for r in rows:
-                avg_cy = sum(item['cy'] for item in r) / len(r)
-                avg_h = sum(item['h'] for item in r) / len(r)
-                if abs(b['cy'] - avg_cy) < max(12.0, avg_h * 0.7):
-                    r.append(b)
-                    merged = True
-                    break
-            if not merged:
-                rows.append([b])
-
-        merged_lines = []
-        for r in rows:
-            r.sort(key=lambda item: item['cx'])
-            merged_lines.append(' '.join(item['text'] for item in r))
-
-        raw_text = '\n'.join(merged_lines)
-        parsed = parse_receipt_text_to_items(raw_text)
-        return jsonify({'ok': True, 'data': parsed, 'raw_text': raw_text})
+        return jsonify({'ok': True, 'data': parsed, 'raw_text': raw_text, 'rotation_applied': rot})
     except Exception as e:
         app.logger.error("RapidOCR recognition failed: %s", e)
         return jsonify({'ok': False, 'message': f'小票识别失败: {str(e)}'}), 500
