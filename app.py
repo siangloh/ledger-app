@@ -3226,6 +3226,17 @@ def parse_receipt_text_to_items(raw_text):
                     qty = int(m_qty_suffix.group(2))
                     name_raw = m_qty_suffix.group(1).strip(' -:\t#$*')
 
+                # 常见"数量 + 品名 + 单价 + 小计"同一行的排版（如 "2 Roti Canai 1.10 2.20"），
+                # 上面已经把最后一个数字(小计)抓成 price，但单价可能还残留在 name_raw 尾部，
+                # 例如 name_raw 会变成 "Roti Canai 1.10"。这里把这种残留的单价数字去掉，
+                # 不然品名会被误黏上一个价钱。
+                name_raw = re.sub(
+                    r'\s+(?:RM|MYR|\$|S\$|€|£|¥|円|₩)?\s*[0-9]+\.[0-9]{2}\s*$',
+                    '',
+                    name_raw,
+                    flags=re.IGNORECASE
+                ).strip(' -:\t#$*')
+
                 items.append({
                     'name': name_raw,
                     'price': price_val,
