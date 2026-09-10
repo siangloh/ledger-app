@@ -356,35 +356,44 @@ body {
 .mobile-sheet-backdrop {
   display: none;
   position: fixed;
-  inset: 0;
-  background: rgba(16, 33, 59, 0.48);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(16, 33, 59, 0.45);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   z-index: 1001;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.25s ease;
 }
 
 .mobile-sheet-backdrop.show {
   display: block;
   opacity: 1;
+  pointer-events: auto;
 }
 
 .mobile-bottom-sheet {
+  display: none; /* 桌面端默认彻底隐藏，杜绝泄漏 */
   position: fixed;
-  bottom: -360px;
+  bottom: 0;
   left: 0;
   right: 0;
+  transform: translateY(100%); /* 无论高度增加多少，均完整隐藏在视口下方 */
   background: var(--surface);
   border-radius: 22px 22px 0 0;
   box-shadow: 0 -10px 40px rgba(16, 33, 59, 0.25);
   z-index: 1002;
   padding: 14px 20px calc(24px + env(safe-area-inset-bottom, 0px));
-  transition: bottom 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 85vh;
+  overflow-y: auto;
 }
 
 .mobile-bottom-sheet.show {
-  bottom: 0;
+  transform: translateY(0);
 }
 
 .sheet-drag-handle {
@@ -995,6 +1004,7 @@ canvas {
   .desktop-nav-links { display: none !important; }
   .mobile-header-right { display: flex !important; }
   .mobile-bottom-nav { display: flex !important; }
+  .mobile-bottom-sheet { display: block !important; }
 
   /* 留出底部导航栏的安全距离并杜绝全局横向溢出 */
   html, body {
@@ -2409,4 +2419,18 @@ canvas {
 .card-updated {
   animation: card-realtime-pulse 1.8s ease-out !important;
 }
+
+/* 桌面端大屏防溢出防护：彻底严禁移动端导航栏与底部抽屉在桌面端任何情况下渲染 */
+@media (min-width: 769px) {
+  .mobile-bottom-nav,
+  .mobile-bottom-sheet,
+  .mobile-sheet-backdrop,
+  .pwa-install-banner {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transform: translateY(100%) !important;
+  }
+}
+
 
