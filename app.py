@@ -3307,6 +3307,17 @@ def split_bill_ocr_upload():
 
                 tess_config = '--psm 6'
 
+                def _looks_like_receipt_text(text):
+                    """粗略判断这段文字'像不像小票'，用来提前判断某个旋转角度已经足够可用，
+                    不必等到脆弱的正则条目解析成功才停手（避免每张横拍照片都白白多跑 2 次完整 OCR）。"""
+                    if not text or len(text.strip()) < 8:
+                        return False
+                    return bool(re.search(r'\d+[.,]\d{2}', text)) or bool(re.search(r'\bRM\b|\bMYR\b', text, re.IGNORECASE))
+
+                best_score = -1
+                best_text = ""
+                best_parsed = None
+
                 for rot in rotations:
                     curr_img = oriented_img if rot == 0 else oriented_img.rotate(rot, expand=True)
                     processed_img = preprocess_receipt_image_for_ocr(curr_img)
@@ -3326,11 +3337,22 @@ def split_bill_ocr_upload():
                     if curr_text and curr_text.strip():
                         norm = re.sub(r'\bRN\b', 'RM', curr_text)
                         candidate_parsed = parse_receipt_text_to_items(norm)
-                        extracted_text = curr_text
-                        parsed_data = candidate_parsed
-                        # 一旦匹配到商品条目，立即锁定当前旋转结果
-                        if candidate_parsed and candidate_parsed.get('items'):
+                        item_count = len(candidate_parsed.get('items') or []) if candidate_parsed else 0
+                        # 评分：条目数量优先，其次是抓到的文字长度（避免只认一两个字就误判为最佳结果）
+                        score = item_count * 1000 + len(norm.strip())
+
+                        if score > best_score:
+                            best_score = score
+                            best_text = curr_text
+                            best_parsed = candidate_parsed
+
+                        # 只要已经解析出条目，或者这段文字看起来就像小票内容（含金额/RM字样），
+                        # 就提前锁定，不必把剩下的旋转角度也跑一遍完整 OCR
+                        if item_count > 0 or _looks_like_receipt_text(norm):
                             break
+
+                extracted_text = best_text
+                parsed_data = best_parsed
 
         except ImportError:
             ocr_error_reason = "pytesseract 依赖库未安装"
