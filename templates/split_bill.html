@@ -205,6 +205,22 @@ Total 75.21"></textarea>
         </div>
       </div>
     </div>
+
+    <!-- 🌍 全球多国小票实测体验预设 -->
+    <div style="margin-top: 16px; background: var(--surface-soft); padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+      <div style="font-size: 12px; font-weight: 700; color: var(--navy); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+        <span>🌍 全球小票实测体验预设（一键载入不同国家小票版式与货币）：</span>
+        <span style="font-size: 11px; color: var(--muted); font-weight: normal;">自动识别 $, €, ¥, S$, RM, 逗号小数与税费</span>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('my')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">🇲🇾 马来西亚 (SST+抹零)</button>
+        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('us')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">🇺🇸 美国 (Tax+18% Tip)</button>
+        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('jp')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">🇯🇵 日本 (円+10% 消費税)</button>
+        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('eu')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">🇪🇺 欧洲 (€ 逗号小数)</button>
+        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('sg')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">🇸🇬 新加坡 (10% SC+GST)</button>
+        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('cn')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">🇨🇳 中国餐饮 (满减优惠)</button>
+      </div>
+    </div>
   </section>
 
   <!-- 步骤 2：参与人管理与点选分摊 -->
@@ -229,7 +245,7 @@ Total 75.21"></textarea>
         <thead>
           <tr>
             <th style="width: 45%;">消费项目 (Item)</th>
-            <th style="width: 20%;">单价 (RM)</th>
+            <th style="width: 20%;">单价 (<span class="dyn-curr">RM</span>)</th>
             <th style="width: 35%;">分摊给谁 (Split With)</th>
           </tr>
         </thead>
@@ -247,19 +263,19 @@ Total 75.21"></textarea>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; background: var(--surface-soft); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 20px;">
       <div>
         <label style="font-size: 12px; color: var(--muted); display: block;">菜品小计 (Subtotal)</label>
-        <strong id="displaySubtotal" style="font-family: var(--font-mono); font-size: 16px; color: var(--navy);">RM 0.00</strong>
+        <strong id="displaySubtotal" style="font-family: var(--font-mono); font-size: 16px; color: var(--navy);"><span class="dyn-curr">RM</span> 0.00</strong>
       </div>
       <div>
-        <label style="font-size: 12px; color: var(--muted); display: block;">服务费 Service Charge (RM)</label>
+        <label style="font-size: 12px; color: var(--muted); display: block;">服务费 / 小费 (<span class="dyn-curr">RM</span>)</label>
         <input type="number" step="0.01" min="0" id="inputServiceCharge" value="0.00" onchange="calculateSplit()" style="width: 100%; font-size: 14px; padding: 6px;">
       </div>
       <div>
-        <label style="font-size: 12px; color: var(--muted); display: block;">政府税 SST / Tax (RM)</label>
+        <label style="font-size: 12px; color: var(--muted); display: block;">税费 SST / Tax / VAT (<span class="dyn-curr">RM</span>)</label>
         <input type="number" step="0.01" min="0" id="inputTax" value="0.00" onchange="calculateSplit()" style="width: 100%; font-size: 14px; padding: 6px;">
       </div>
       <div>
         <label style="font-size: 12px; color: var(--muted); display: block;">账单实付总额 (Total)</label>
-        <strong id="displayGrandTotal" style="font-family: var(--font-mono); font-size: 18px; color: var(--rose);">RM 0.00</strong>
+        <strong id="displayGrandTotal" style="font-family: var(--font-mono); font-size: 18px; color: var(--rose);"><span class="dyn-curr">RM</span> 0.00</strong>
       </div>
     </div>
   </section>
@@ -326,7 +342,7 @@ Total 75.21"></textarea>
           <div>
             <div style="font-size: 12px; color: rgba(255,255,255,0.78); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">小票实付总金额 (Grand Total)</div>
             <div class="hero-amount-val">
-              <span style="font-size: 22px; opacity: 0.85;">RM</span>
+              <span style="font-size: 22px; opacity: 0.85;" id="reviewModalCurrency">RM</span>
               <input type="number" step="0.01" min="0" id="reviewGrandTotal" oninput="onReviewAmountChanged()" style="background: rgba(255,255,255,0.18); border: 1.5px solid rgba(255,255,255,0.35); color: #fff; font-size: 28px; font-weight: 800; font-family: var(--font-mono); width: 160px; padding: 2px 8px; border-radius: var(--radius-sm); outline: none;">
             </div>
           </div>
@@ -343,13 +359,13 @@ Total 75.21"></textarea>
             <strong id="reviewSubtotalText">RM 0.00</strong>
           </div>
           <div class="hero-stat-item">
-            <span>服务费:</span>
-            <span style="font-size: 11px;">RM</span>
+            <span>服务费 / Tip:</span>
+            <span style="font-size: 11px;" class="review-curr-symbol">RM</span>
             <input type="number" step="0.01" min="0" id="reviewServiceCharge" oninput="onReviewAmountChanged()" style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.25); color: #fff; width: 68px; padding: 2px 4px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px;">
           </div>
           <div class="hero-stat-item">
-            <span>消费税 SST:</span>
-            <span style="font-size: 11px;">RM</span>
+            <span>税费 (Tax/VAT):</span>
+            <span style="font-size: 11px;" class="review-curr-symbol">RM</span>
             <input type="number" step="0.01" min="0" id="reviewTax" oninput="onReviewAmountChanged()" style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.25); color: #fff; width: 68px; padding: 2px 4px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px;">
           </div>
         </div>
@@ -372,7 +388,7 @@ Total 75.21"></textarea>
             <thead style="background: var(--surface-soft); position: sticky; top: 0; z-index: 1;">
               <tr style="border-bottom: 1px solid var(--border);">
                 <th style="padding: 8px 12px; text-align: left; width: 55%;">消费单品名称 (点击可修正)</th>
-                <th style="padding: 8px 12px; text-align: right; width: 30%;">单价 (RM)</th>
+                <th style="padding: 8px 12px; text-align: right; width: 30%;">单价 (<span class="review-curr-symbol">RM</span>)</th>
                 <th style="padding: 8px 12px; text-align: center; width: 15%;">操作</th>
               </tr>
             </thead>
@@ -656,15 +672,31 @@ async function runClientSideOCR(imageDataUrl) {
 
   // 兜底若网络离线且未缓存 Tesseract 库
   throw new Error('离线 OCR 组件正在就绪中，请先使用右侧输入框粘贴小票文字。');
-}
+// ============================================================
+// 全球通用 JavaScript 小票规则解析器（支持全球多国货币、国际数字与税制）
+// ============================================================
+let currentCurrency = 'RM';
 
-// ============================================================
-// 纯前端 JavaScript 小票正则规则解析器（100% 纯离线运行，无需请求后端服务）
-// 移植自核心 Python 正则与常见 OCR 混淆字符矫正
-// ============================================================
 function parseReceiptTextClientSide(rawText) {
-  if (!rawText) return { items: [], subtotal: 0, service_charge: 0, tax: 0, total: 0 };
-  
+  if (!rawText) return { items: [], subtotal: 0, service_charge: 0, tax: 0, discount: 0, rounding: 0, total: 0, currency_symbol: 'RM' };
+
+  let currency_symbol = 'RM';
+  if (/\b(?:RM|MYR)\b/i.test(rawText)) currency_symbol = 'RM';
+  else if (/(?:S\$|\bSGD\b|GST\s*REG)/i.test(rawText)) currency_symbol = 'S$';
+  else if (/(?:€|\bEUR\b|TTC|TVA|HT\b)/.test(rawText)) currency_symbol = '€';
+  else if (/(?:£|\bGBP\b)/.test(rawText)) currency_symbol = '£';
+  else if (/(?:¥|円|\bJPY\b|お会計|消費税)/.test(rawText)) currency_symbol = '¥';
+  else if (/(?:₩|원|\bKRW\b|결제|부가세)/.test(rawText)) currency_symbol = '₩';
+  else if (/(?:฿|\bTHB\b)/.test(rawText)) currency_symbol = '฿';
+  else if (/(?:Rp|\bIDR\b)/.test(rawText)) currency_symbol = 'Rp';
+  else if (/(?:₫|\bVND\b)/.test(rawText)) currency_symbol = '₫';
+  else if (/(?:NT\$|\bTWD\b)/.test(rawText)) currency_symbol = 'NT$';
+  else if (/(?:HK\$|\bHKD\b)/.test(rawText)) currency_symbol = 'HK$';
+  else if (/\$/.test(rawText)) currency_symbol = '$';
+  else if (/[\u4e00-\u9fa5]/.test(rawText)) {
+    currency_symbol = (rawText.includes('¥') || rawText.includes('元') || rawText.includes('微信') || rawText.includes('支付宝')) ? '¥' : 'RM';
+  }
+
   const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const items = [];
   let subtotal = 0.0;
@@ -672,83 +704,138 @@ function parseReceiptTextClientSide(rawText) {
   let service_rate = 0.0;
   let tax = 0.0;
   let tax_rate = 0.0;
+  let discount = 0.0;
+  let rounding = 0.0;
   let total = 0.0;
 
-  const excludePatterns = [
-    /\b(?:subtotal|sub-total)\b/i,
-    /\b(?:total|grand total|net total|amount due)\b/i,
-    /\b(?:tax|sst|gst|service charge|svc charge|svc fee|service tax)\b/i,
-    /\b(?:cash|change|change due|rounding|round adj)\b/i,
-    /\b(?:card|cards|visa|mastercard|amex|mydebit|debit|credit|sbux|saux)\b/i,
-    /\b(?:balance|new balance|prev balance)\b/i,
-    /\b(?:invoice|receipt|bill\s*no|table|date|tel|phone|drawer|draper|reg|cashier|server|chk|check\s*closed)\b/i,
-    /\b(?:terminal|merchant|auth|approval|ref|tng|grabpay|boost|alipay|wechat|duit\s*now|duitnow|touch\s*['’]?n\s*go)\b/i,
-    /\b(?:items?\s*count|item\s*count|total\s*qty|qty\s*total)\b/i,
-    /^[x*\-_=+#\s\d]+$/,
+  const excludePaymentPatterns = [
+    /\b(?:cash|change|change\s*due|tendered|due)\b/i,
+    /\b(?:card|cards|visa|mastercard|amex|mydebit|debit|credit|nets|eftpos)\b/i,
+    /\b(?:tng|touch\s*['’]?n\s*go|grabpay|boost|alipay|wechat|duit\s*now|duitnow|paypay|line\s*pay|kakaopay|promptpay)\b/i,
+    /\b(?:carte\s*bancaire|rendu|barzahlung|kartenzahlung|r[uü]ckgeld|efectivo|cambio|contanti|resto)\b/i,
+    /(?:现金|找零|实收|找回|微信支付|支付宝|扫码支付|刷卡|お釣り|預り|クレジット|電子マネー|決済|현금|거스름돈|신용카드|tunai|baki|kembalian)/i
+  ];
+
+  const excludeHeaderNoise = [
+    /\b(?:invoice|receipt|bill\s*no|table|date|time|tel|phone|drawer|reg|cashier|server|chk|check\s*closed)\b/i,
+    /\b(?:terminal|merchant|auth|approval|ref|pax|order|order\s*#|siret|gst\s*reg|gst\s*no|co\s*no)\b/i,
+    /\b(?:items?\s*count|item\s*count|total\s*qty|qty\s*total|qty\s*item|price\s*\(myr\))\b/i,
+    /\b(?:thank\s*you|please\s*come|merci|danke|terima\s*kasih|arigato|grazia)\b/i,
+    /(?:单号|台号|客数|收银员|时间|品名|数量|金额|谢谢惠顾|欢迎再次光临|毎度ありがとうございます|またのお越しを|감사합니다|テーブル|人数|レジ|レシート)/i,
+    /^[x*\-_=+#\s\d|.:/]+$/,
     /\b[x*]{4,}\b/
   ];
 
+  const addressKeywords = [
+    'road', 'street', 'avenue', 'boulevard', 'jalan', 'lorong', 'lane', 'park', 'block',
+    'blvd', 'ave', 'st.', 'rd.', 'singapore', 'new york', 'penang', 'paris', 'tokyo',
+    '区', '路', '街', '号', '巷', '道', '市', '省'
+  ];
+
+  function normalizeNumbers(str) {
+    let s = str;
+    s = s.replace(/(\d+),(\d{2})(?:\s*(?:€|EUR|\b))/g, '$1.$2');
+    s = s.replace(/(\d+),(\d{3})\b/g, '$1$2');
+    s = s.replace(/(\d+)\s*\.\s*(\d+)/g, '$1.$2');
+    s = s.replace(/¥([A-Za-z])/g, 'V$1');
+    return s;
+  }
+
   for (let line of lines) {
-    let cleanLine = line.replace(/(\d+)\s*[.,]\s*(\d+)/g, '$1.$2');
-    cleanLine = cleanLine.replace(/¥([A-Za-z])/g, 'V$1');
+    const cleanLine = normalizeNumbers(line);
     const lower = cleanLine.toLowerCase();
 
-    // 匹配服务费
-    if (['service charge', 'svc charge', 'svc chg', 'service fee'].some(k => lower.includes(k))) {
+    // 1. 服务费 / 小费
+    const isSc = (['tip', 'gratuity', 'pourboire', 'trinkgeld', 'service charge', 'svc charge', 'svc chg', 'service fee', 'sc'].some(k => lower.includes(k)) ||
+                  ['服务费', '服務費', 'お通し', '席料', '봉사료'].some(k => cleanLine.includes(k)));
+    if (isSc && !['茶位', '调料'].some(k => cleanLine.includes(k))) {
       const mPct = cleanLine.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
       if (mPct) service_rate = parseFloat(mPct[1]);
-      const amounts = cleanLine.match(/([0-9]+\.[0-9]{1,2})\b/g);
+      const amounts = cleanLine.match(/([0-9]+(?:\.[0-9]{1,2})?)\b/g);
       if (amounts) service_charge = parseFloat(amounts[amounts.length - 1]);
       continue;
     }
 
-    // 匹配消费税 SST / GST / TAX
-    if (['sst', 'gst', 'service tax', 'gov tax', 'tax'].some(k => lower.includes(k))) {
-      if (!lower.includes('total') && !lower.includes('subtotal')) {
+    // 2. 政府税 / 增值税 / VAT / GST / SST / 消费税
+    if (['sst', 'gst', 'service tax', 'gov tax', 'sales tax', 'vat', 'tva', 'mwst', 'ust', 'iva', 'tax'].some(k => lower.includes(k)) ||
+        ['消费税', '消費税', '增值税', '税费', '税额', '内税', '外税', '부가세'].some(k => cleanLine.includes(k))) {
+      if (!lower.includes('total') && !lower.includes('subtotal') && !cleanLine.includes('合计') && !cleanLine.includes('小计') && !cleanLine.includes('小計')) {
         const mPct = cleanLine.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
         if (mPct) tax_rate = parseFloat(mPct[1]);
-        const amounts = cleanLine.match(/([0-9]+\.[0-9]{1,2})\b/g);
+        const amounts = cleanLine.match(/([0-9]+(?:\.[0-9]{1,2})?)\b/g);
         if (amounts) tax = parseFloat(amounts[amounts.length - 1]);
         continue;
       }
     }
 
-    // 匹配小计 Subtotal
-    if (lower.includes('subtotal') || lower.includes('sub-total')) {
-      const amounts = cleanLine.match(/([0-9]+\.[0-9]{1,2})\b/g);
+    // 3. 抹零 / 舍入
+    if (['rounding', 'bill rounding', 'round adj', 'rnd'].some(k => lower.includes(k)) || cleanLine.includes('抹零') || cleanLine.includes('舍入')) {
+      const mRnd = cleanLine.match(/([-+]?\s*[0-9]+(?:\.[0-9]{1,2})?)\b/);
+      if (mRnd) rounding = parseFloat(mRnd[1].replace(/\s+/g, ''));
+      continue;
+    }
+
+    // 4. 优惠 / 折扣
+    if (['discount', 'promo', 'voucher', 'rebate', 'remise', 'rabatt', 'descuento'].some(k => lower.includes(k)) ||
+        ['优惠', '折扣', '满减', '抵扣', '割引', '値引', '할인'].some(k => cleanLine.includes(k))) {
+      const amounts = cleanLine.match(/([0-9]+(?:\.[0-9]{1,2})?)\b/g);
+      if (amounts) discount = parseFloat(amounts[amounts.length - 1]);
+      continue;
+    }
+
+    // 5. 小计 Subtotal
+    if (['subtotal', 'sub-total', 'total ht', 'zwischensumme', 'sous-total', 'net amount'].some(k => lower.includes(k)) ||
+        ['小计', '小計', '消费小计'].some(k => cleanLine.includes(k))) {
+      const amounts = cleanLine.match(/([0-9]+(?:\.[0-9]{1,2})?)\b/g);
       if (amounts) subtotal = parseFloat(amounts[amounts.length - 1]);
       continue;
     }
 
-    // 匹配总计 Total
-    if (['grand total', 'net total', 'total amount', 'total', 'amount due'].some(k => lower.includes(k))) {
-      const amounts = cleanLine.match(/([0-9]+\.[0-9]{1,2})\b/g);
-      if (amounts) total = parseFloat(amounts[amounts.length - 1]);
-      continue;
+    // 6. 总金额 Total
+    if (['grand total', 'net total', 'total amount', 'amount due', 'total payable', 'amount payable', 'total ttc', 'gesamtbetrag', 'endbetrag', 'importe total', 'totale', 'total', 'jumlah'].some(k => lower.includes(k)) ||
+        ['合计', '总计', '实付', '实收', '应收', '结算', 'お会計', '合計金額', '合計', '합계', '결제금액', '총금액'].some(k => cleanLine.includes(k))) {
+      if (!lower.includes('total ht') && !lower.includes('subtotal') && !cleanLine.includes('消费小计')) {
+        const amounts = cleanLine.match(/([0-9]+(?:\.[0-9]{1,2})?)\b/g);
+        if (amounts) total = parseFloat(amounts[amounts.length - 1]);
+        continue;
+      }
     }
 
-    // 排除干扰行
-    if (excludePatterns.some(pat => pat.test(lower))) {
-      continue;
+    // 7. 排除干扰行
+    if (excludePaymentPatterns.some(pat => pat.test(cleanLine))) continue;
+    if (excludeHeaderNoise.some(pat => pat.test(cleanLine))) continue;
+
+    // 8. 排除地址与邮编
+    if (addressKeywords.some(kw => lower.includes(kw))) {
+      if (/\b\d{4,6}\b\s*$/.test(cleanLine)) continue;
     }
 
-    // 提取常规单品/菜品行
-    const itemMatch = cleanLine.match(/^(.*?)(?:(?:RM|MYR|\$|€|£|¥)\s*([0-9]+(?:\.[0-9]{1,2})?)|(?<=\s)([0-9]+\.[0-9]{1,2}))\s*[:*#BTA-Za-z"?\.\-\s]*$/i);
+    // 9. 提取常规单品行
+    const itemMatch = cleanLine.match(/^(.*?)(?:(?:RM|MYR|\$|S\$|€|EUR|£|GBP|¥|円|₩|원|฿|Rp|₫)\s*([0-9]+(?:\.[0-9]{1,2})?)|(?<=\s)([0-9]+(?:\.[0-9]{1,2})?))\s*(?:€|EUR|円|¥|원|฿|Rp|₫|B|TA|Takeaway|\(?\d+\.?\d*\/ea\)?|[#*.,;:\-\s])*$/i);
     if (itemMatch) {
-      let nameRaw = (itemMatch[1] || '').trim().replace(/^[\s\-:#$*¥“"'|.,;]+|[\s\-:#$*¥“"'|.,;]+$/g, '');
-      nameRaw = nameRaw.replace(/^[^\w\u4e00-\u9fa5]+/, '').trim();
+      let nameRaw = (itemMatch[1] || '').trim().replace(/^[\s\-:#$*¥€£“"'|.,;]+|[\s\-:#$*¥€£“"'|.,;]+$/g, '');
+      nameRaw = nameRaw.replace(/^(?:RM|MYR|\$|S\$|€|£|¥|円|₩)\s*/i, '');
+      nameRaw = nameRaw.replace(/\s*(?:RM|MYR|\$|S\$|€|£|¥|円|₩)\s*$/i, '');
       nameRaw = nameRaw.replace(/^[（(]?(?:Takeaway|TA|Dine[- ]in)[)）]?\s*(?:\([0-9.]+\/ea\))?\s*/i, '');
       nameRaw = nameRaw.replace(/^[（(]?[0-9.]+\/ea[)）]?\s*/i, '');
       nameRaw = nameRaw.replace(/^[\s\-:#$*¥“"'|.,;]+|[\s\-:#$*¥“"'|.,;]+$/g, '').trim();
       const priceStr = itemMatch[2] || itemMatch[3];
       const priceVal = priceStr ? parseFloat(priceStr) : 0;
 
+      if (['$', '€', '£', 'RM', 'S$'].includes(currency_symbol) && priceVal > 5000) {
+        continue;
+      }
+
       if (nameRaw && nameRaw.length >= 2 && priceVal > 0) {
         let qty = 1;
-        const qtyMatch = nameRaw.match(/^(\d+)\s*[xX*]?\s+(.*)$/);
-        if (qtyMatch) {
-          qty = parseInt(qtyMatch[1], 10);
-          nameRaw = qtyMatch[2].trim();
+        const qtyPrefix = nameRaw.match(/^(\d+)\s*[xX*]?\s+(.*)$/);
+        const qtySuffix = nameRaw.match(/^(.*?)\s+(\d+)\s*$/);
+        if (qtyPrefix) {
+          qty = parseInt(qtyPrefix[1], 10);
+          nameRaw = qtyPrefix[2].trim();
+        } else if (qtySuffix && qtySuffix[1].length >= 2) {
+          qty = parseInt(qtySuffix[2], 10);
+          nameRaw = qtySuffix[1].trim();
         }
         items.push({
           name: nameRaw,
@@ -768,7 +855,7 @@ function parseReceiptTextClientSide(rawText) {
     tax = parseFloat(((subtotal + service_charge) * (tax_rate / 100)).toFixed(2));
   }
   if (total === 0) {
-    total = parseFloat((subtotal + service_charge + tax).toFixed(2));
+    total = parseFloat((subtotal - discount + service_charge + tax + rounding).toFixed(2));
   }
 
   return {
@@ -776,15 +863,25 @@ function parseReceiptTextClientSide(rawText) {
     subtotal,
     service_charge,
     tax,
-    total
+    discount,
+    rounding,
+    total,
+    currency_symbol
   };
 }
 
 // ============================================================
 // 核心 UI 功能：“预填弹窗 + 大字号金额确认与核验” (Review Modal)
-// 允许用户快速点选、直接修改单价、一键补平差额，彻底杜绝账目对不齐！
 // ============================================================
 function openReviewModal(parsed, rawText) {
+  currentCurrency = parsed.currency_symbol || 'RM';
+  
+  // 更新弹窗及界面上的货币符号
+  const modalCurr = document.getElementById('reviewModalCurrency');
+  if (modalCurr) modalCurr.textContent = currentCurrency;
+  document.querySelectorAll('.review-curr-symbol').forEach(el => el.textContent = currentCurrency);
+  document.querySelectorAll('.dyn-curr').forEach(el => el.textContent = currentCurrency);
+
   reviewItems = (parsed.items || []).map(it => ({
     name: it.name,
     price: it.price
@@ -802,41 +899,140 @@ function openReviewModal(parsed, rawText) {
   if (modal) modal.style.display = 'flex';
 }
 
+const GLOBAL_PRESETS = {
+  my: {
+    name: '马来西亚 (SST 6% + 抹零)',
+    text: `GOOD MOOD KITCHEN
+NO.43, JALAN VERVEA 9, SIMPANG AMPAT, PULAU PINANG
+REG NO: 202603068078 (MA0343696-P)
+Date: 09/09/2026 17:56  Invoice no: 1559  Cashier: Admin
+Table: 12  Pax: 2
+----------------------------------------
+Qty  Item                             Price (MYR)
+1    Lemon Chicken Rice Set 柠檬鸡丁饭  14.90
+     ·TA 套餐 (Takeaway) (14.90/ea)
+1    Luncheon Meat Fried Rice 午餐肉炒饭 11.90
+     ·TA (Takeaway) (11.90/ea)
+----------------------------------------
+Subtotal                              26.80
+Service Tax (6%)                       1.61
+Bill Rounding                         -0.01
+Total (MYR)                           28.40
+DUITNOW QR                           28.40
+Change                                 0.00`
+  },
+  us: {
+    name: '美国纽约 (Sales Tax + 18% Tip)',
+    text: `SHAKE SHACK #102
+MADISON SQUARE PARK, NEW YORK, NY 10010
+TEL: (212) 889-6600
+Server: Michael M.   Table: 04   09/10/2026 12:30 PM
+Order: #4421 - Dine In
+----------------------------------------
+2x ShackBurger Double                 $ 18.50
+1x Bacon Cheese Fries                  $  5.99
+2x Classic Hand-Spun Shake             $ 12.00
+----------------------------------------
+SUBTOTAL                               $ 36.49
+Sales Tax 8.875%                       $  3.24
+Tip / Gratuity (18%)                   $  6.57
+AMOUNT DUE                             $ 46.30
+VISA ENDING IN 4921                    $ 46.30
+CHANGE DUE                             $  0.00`
+  },
+  jp: {
+    name: '日本东京 (円整数 + 10% 消費税)',
+    text: `鳥貴族 新宿東口店
+東京都新宿区新宿3-24-1
+TEL: 03-5369-1234
+レシート No. 8923  2026/09/10 19:45  レジ: 01
+テーブル: 15  人数: 2名
+----------------------------------------
+2 プレミアムモルツ生ビール              ¥ 740
+4 もも貴族焼（たれ）                  ¥ 1,480
+1 キャベツ盛（おかわり無料）            ¥ 370
+2 お通し（席料）                       ¥ 600
+----------------------------------------
+小計                                   ¥ 3,190
+消費税 (10%)                           ¥ 319
+合計金額                               ¥ 3,509
+PayPay決済                             ¥ 3,509
+お釣り                                 ¥ 0`
+  },
+  eu: {
+    name: '欧洲法国 (€ 逗号小数 + 10% TVA)',
+    text: `CAFE DE FLORE
+172 BOULEVARD SAINT-GERMAIN, 75006 PARIS
+SIRET: 784 214 569 00012
+Date: 10/09/2026 14:15  Table: 8  Serveur: Pierre
+----------------------------------------
+2 Croissant pur beurre                 6,40 €
+2 Cafe Creme                           11,00 €
+1 Tarte Tatin Maison                   8,50 €
+----------------------------------------
+Total HT                              23,55 €
+TVA 10,0%                              2,35 €
+TOTAL TTC                             25,90 €
+Carte Bancaire                        25,90 €
+Rendu                                  0,00 €`
+  },
+  sg: {
+    name: '新加坡 (10% SC + 9% GST)',
+    text: `BOON TONG HEE (BALESTIER)
+399/401/403 BALESTIER ROAD, SINGAPORE 329801
+GST REG NO: M2-0043921-9
+Date: 10/09/2026 13:10  Receipt: #0821  Cashier: Siti
+----------------------------------------
+1 Signature Boiled Chicken (Half)     S$ 22.00
+2 Chicken Rice (Fragrant)              S$  3.00
+1 Poached Chinese Spinach              S$ 14.00
+2 Iced Lemon Barley                    S$  5.60
+----------------------------------------
+SUBTOTAL                               S$ 44.60
+10% Service Charge                     S$  4.46
+9% GST                                 S$  4.42
+TOTAL PAYABLE                          S$ 53.48
+NETS FlashPay                          S$ 53.48
+Change Due                             S$  0.00`
+  },
+  cn: {
+    name: '中国餐饮 (满减优惠 + 微信支付)',
+    text: `蜀大侠火锅（春熙路店）
+成都市锦江区春熙路88号
+单号: 202609100892  台号: B06  客数: 3
+收银员: 003  时间: 2026-09-10 20:15
+----------------------------------------
+品名                      数量    金额
+经典牛油红锅               1    ¥ 68.00
+精品水牛毛肚               1    ¥ 48.00
+大侠上上签牛肉             2    ¥ 64.00
+功夫土豆片                 1    ¥ 16.00
+自助调料+茶位              3    ¥ 24.00
+----------------------------------------
+消费小计                         ¥ 220.00
+会员专享优惠                     -¥ 20.00
+服务费                            ¥ 0.00
+实付金额                         ¥ 200.00
+微信支付                         ¥ 200.00
+找零                              ¥ 0.00`
+  }
+};
+
+function loadGlobalPreset(k) {
+  const p = GLOBAL_PRESETS[k];
+  if (!p) return;
+  const textarea = document.getElementById('receiptTextInput');
+  if (textarea) textarea.value = p.text;
+  const parsed = parseReceiptTextClientSide(p.text);
+  openReviewModal(parsed, p.text);
+}
+
 function openReviewModalWithSample() {
-  const sampleText = `STARBUCKS Store #19208
-11302 Euclid Avenue
-Cleveland, OH (216) 229-0700
-CHK 664290
-12/07/2014 06:43 PM
-Vt Pap Mocha 4.95
-Caramel Macchiato 5.45
-Chocolate Croissant 3.85
-Subtotal 14.25
-Tax 1.14
-Total 15.39`;
-  const parsed = parseReceiptTextClientSide(sampleText);
-  openReviewModal(parsed, sampleText);
+  loadGlobalPreset('us');
 }
 
 function openReviewModalWithGoodMoodSample() {
-  const sampleText = `GOOD MOOD KITCHEN
-REG NO: 202603068078 (MA0343696-P)
-NO.43, JALAN VERVEA 9, 14110, SIMPANG AMPAT, PULAU PINANG
-Invoice no: 1559 ORDER #TA067
-Date: 09/09/2026 17:56
-Qty Item Price (MYR)
-1 Lemon Chicken Rice Set 柠檬鸡丁饭套餐 (Takeaway) (14.90/ea) 14.90
-• TA
-1 Luncheon Meat Fried Rice 午餐肉炒饭 (Takeaway) (11.90/ea) 11.90
-• TA
-2 Qty
-Subtotal 26.80
-Bill rounding 0.00
-Total (MYR) 26.80
-DUIT NOW 26.80
-Change 0.00`;
-  const parsed = parseReceiptTextClientSide(sampleText);
-  openReviewModal(parsed, sampleText);
+  loadGlobalPreset('my');
 }
 
 function closeReviewModal() {
@@ -866,7 +1062,7 @@ function renderReviewTable() {
       </td>
       <td style="padding: 6px 10px; text-align: right;">
         <div style="display: inline-flex; align-items: center; gap: 4px;">
-          <span style="font-size: 12px; color: var(--muted);">RM</span>
+          <span style="font-size: 12px; color: var(--muted);">${currentCurrency}</span>
           <input type="number" step="0.01" min="0" value="${(item.price || 0).toFixed(2)}" oninput="updateReviewItemPrice(${idx}, this.value)" style="width: 80px; text-align: right; font-family: var(--font-mono); font-size: 13px; font-weight: 600; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px;">
         </div>
       </td>
@@ -916,7 +1112,7 @@ function updateReviewBalance() {
   const taxVal = parseFloat(document.getElementById('reviewTax').value) || 0;
   const grandTotal = parseFloat(document.getElementById('reviewGrandTotal').value) || 0;
 
-  document.getElementById('reviewSubtotalText').textContent = 'RM ' + subtotal.toFixed(2);
+  document.getElementById('reviewSubtotalText').textContent = currentCurrency + ' ' + subtotal.toFixed(2);
 
   const calculatedTotal = subtotal + svc + taxVal;
   const diff = Math.abs(calculatedTotal - grandTotal);
@@ -929,7 +1125,7 @@ function updateReviewBalance() {
         <span style="font-size: 16px;">✅</span>
         <div>
           <strong>账目完全平衡 (100% 吻合)</strong>
-          <div style="font-size: 11.5px; opacity: 0.85;">单品合计 (RM ${subtotal.toFixed(2)}) + 服务费 (RM ${svc.toFixed(2)}) + 税费 (RM ${taxVal.toFixed(2)}) = 实付总额 (RM ${grandTotal.toFixed(2)})</div>
+          <div style="font-size: 11.5px; opacity: 0.85;">单品合计 (${currentCurrency} ${subtotal.toFixed(2)}) + 服务/小费 (${currentCurrency} ${svc.toFixed(2)}) + 税费 (${currentCurrency} ${taxVal.toFixed(2)}) = 实付总额 (${currentCurrency} ${grandTotal.toFixed(2)})</div>
         </div>
       </div>
       <span style="font-size: 12px; font-weight: 600; background: rgba(30,122,92,0.15); padding: 3px 8px; border-radius: 4px;">无差额</span>
@@ -944,9 +1140,9 @@ function updateReviewBalance() {
       <div style="display: flex; align-items: center; gap: 8px;">
         <span style="font-size: 16px;">⚠</span>
         <div>
-          <strong>检测到账目差额：RM ${diffAbs}</strong>
+          <strong>检测到账目差额：${currentCurrency} ${diffAbs}</strong>
           <div style="font-size: 11.5px; opacity: 0.85;">
-            各单品+税费之和 (RM ${calculatedTotal.toFixed(2)}) 与 实付总额 (RM ${grandTotal.toFixed(2)}) 相差 RM ${diffAbs}
+            各单品+税费之和 (${currentCurrency} ${calculatedTotal.toFixed(2)}) 与 实付总额 (${currentCurrency} ${grandTotal.toFixed(2)}) 相差 ${currentCurrency} ${diffAbs}
             (${isUnder ? '单品少计或抹零' : '单品多计'})
           </div>
         </div>
@@ -960,7 +1156,7 @@ function updateReviewBalance() {
 
 // 一键自动消除差额（补齐抹零或舍入）
 function fixReviewBalanceGap(signedDiff) {
-  const gap = -signedDiff; // 若少算 0.05 则补 0.05
+  const gap = -signedDiff;
   if (Math.abs(gap) >= 0.01) {
     reviewItems.push({
       name: gap > 0 ? '小票抹零/舍入补齐' : '小票折扣/折让',
@@ -972,7 +1168,7 @@ function fixReviewBalanceGap(signedDiff) {
       Swal.fire({
         icon: 'success',
         title: '已自动补平',
-        text: `已为你添加调账项 RM ${gap.toFixed(2)}，账目现已完全平衡！`,
+        text: `已为你添加调账项 ${currentCurrency} ${gap.toFixed(2)}，账目现已完全平衡！`,
         timer: 1400,
         showConfirmButton: false
       });
@@ -984,12 +1180,7 @@ function reparseFromReviewRawText() {
   const text = document.getElementById('reviewRawTextArea').value.trim();
   if (!text) return;
   const parsed = parseReceiptTextClientSide(text);
-  reviewItems = (parsed.items || []).map(it => ({ name: it.name, price: it.price }));
-  document.getElementById('reviewGrandTotal').value = (parsed.total || 0).toFixed(2);
-  document.getElementById('reviewServiceCharge').value = (parsed.service_charge || 0).toFixed(2);
-  document.getElementById('reviewTax').value = (parsed.tax || 0).toFixed(2);
-  renderReviewTable();
-  updateReviewBalance();
+  openReviewModal(parsed, text);
 }
 
 // 确认并同步到第 2 步 (Step 2)
@@ -1015,6 +1206,7 @@ function confirmReceiptToStep2() {
 
   document.getElementById('inputServiceCharge').value = serviceCharge.toFixed(2);
   document.getElementById('inputTax').value = tax.toFixed(2);
+  document.querySelectorAll('.dyn-curr').forEach(el => el.textContent = currentCurrency);
 
   closeReviewModal();
   renderItemsTable();
@@ -1233,8 +1425,8 @@ function calculateSplit() {
   tax = parseFloat(document.getElementById('inputTax').value) || 0;
   const grandTotal = subtotal + serviceCharge + tax;
 
-  document.getElementById('displaySubtotal').textContent = `RM ${subtotal.toFixed(2)}`;
-  document.getElementById('displayGrandTotal').textContent = `RM ${grandTotal.toFixed(2)}`;
+  document.getElementById('displaySubtotal').textContent = `${currentCurrency} ${subtotal.toFixed(2)}`;
+  document.getElementById('displayGrandTotal').textContent = `${currentCurrency} ${grandTotal.toFixed(2)}`;
 
   const personSubtotals = {};
   people.forEach(p => personSubtotals[p] = 0);
@@ -1276,11 +1468,11 @@ function renderResults(totals, subtotals, grandTotal) {
         ${isMe ? '<span style="position: absolute; top: 12px; right: 12px; background: var(--navy); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 12px;">我的账目</span>' : ''}
         <div style="font-size: 14px; font-weight: 600; margin-bottom: 6px; color: var(--navy);">${escapeHtml(p)}</div>
         <div style="font-size: 24px; font-weight: bold; font-family: var(--font-mono); color: var(--ink); margin-bottom: 8px;">
-          RM ${totalAmount.toFixed(2)}
+          ${currentCurrency} ${totalAmount.toFixed(2)}
         </div>
         <div style="font-size: 12px; color: var(--muted); line-height: 1.5;">
-          <div>单品自付：RM ${subAmount.toFixed(2)}</div>
-          <div>税费分摊：RM ${extraAmount.toFixed(2)}</div>
+          <div>单品自付：${currentCurrency} ${subAmount.toFixed(2)}</div>
+          <div>税费分摊：${currentCurrency} ${extraAmount.toFixed(2)}</div>
         </div>
       </div>
     `;
@@ -1297,11 +1489,11 @@ function generateClaimMessage(totals, grandTotal) {
   msg += `━━━━━━━━━━━━━━━━━\n`;
   people.forEach(p => {
     const amt = totals[p] || 0;
-    msg += `👤 ${p}：RM ${amt.toFixed(2)}\n`;
+    msg += `👤 ${p}：${currentCurrency} ${amt.toFixed(2)}\n`;
   });
   msg += `━━━━━━━━━━━━━━━━━\n`;
-  msg += `实付总额：RM ${grandTotal.toFixed(2)}\n`;
-  msg += `（请直接 DuitNow / TNG 转账给我，转完留个言，谢谢大家！）`;
+  msg += `实付总额：${currentCurrency} ${grandTotal.toFixed(2)}\n`;
+  msg += `（请直接转账给我，转完留个言，谢谢大家！）`;
 
   document.getElementById('claimMessageText').value = msg;
 }
