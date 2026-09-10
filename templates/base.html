@@ -32,6 +32,7 @@
             <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records" hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">历史记录</a>
             <a href="{{ url_for('split_bill_page') }}" class="{{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill" hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">小票AA分账</a>
             <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring" hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">固定收支</a>
+            <a href="{{ url_for('auto_track_page') }}" class="{{ 'active' if request.endpoint == 'auto_track_page' }}" data-nav="auto-track" hx-get="{{ url_for('auto_track_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">自动记账</a>
             <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories" hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">分类管理</a>
             <a href="{{ url_for('category_insights_page') }}" class="{{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">分类洞察</a>
             <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">批量导入</a>
@@ -95,6 +96,11 @@
             <span class="sheet-title">安装为应用</span>
             <span class="sheet-desc">添加到主屏幕，免开浏览器</span>
         </button>
+        <a href="{{ url_for('auto_track_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'auto_track_page' }}" data-nav="auto-track" hx-get="{{ url_for('auto_track_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+            <span class="sheet-icon">⚡</span>
+            <span class="sheet-title">自动记账</span>
+            <span class="sheet-desc">手机银行通知自动入账</span>
+        </a>
         <a href="{{ url_for('category_insights_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
             <span class="sheet-icon">📊</span>
             <span class="sheet-title">分类洞察</span>
