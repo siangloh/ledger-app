@@ -1,26 +1,32 @@
 {% extends layout|default('base.html') %}
 {% block title %}支出分类深度洞察 - 我的记账本{% endblock %}
 {% block content %}
-<div class="insights-page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+<div class="insights-page-header"
+  style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
   <div>
     <h2>📊 支出分类深度洞察</h2>
     <p class="hint" style="margin-top:4px;">精准对比各支出分类在当前月、上个月及历史月均的支出表现与波动趋势</p>
   </div>
   <div style="display:flex; gap:10px;">
-    <a href="{{ url_for('categories_page') }}" class="btn-ghost" hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">管理分类</a>
-    <a href="{{ url_for('index') }}" class="btn-secondary" hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">&larr; 返回仪表盘</a>
+    <a href="{{ url_for('categories_page') }}" class="btn-ghost" hx-get="{{ url_for('categories_page') }}"
+      hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">管理分类</a>
   </div>
 </div>
 
 <!-- 时间范围筛选工具栏 (与概览视图完全统一的交互体验) -->
 <div class="overview-toolbar" style="margin-bottom:20px;">
   <div class="filter-pills" role="tablist">
-    <button type="button" class="pill-btn {{ 'active' if insights.range=='all' }}" data-range="all" onclick="selectInsightsRange('all')">全部 (All Time)</button>
-    <button type="button" class="pill-btn {{ 'active' if insights.range=='12m' }}" data-range="12m" onclick="selectInsightsRange('12m')">近 12 个月 (12M)</button>
-    <button type="button" class="pill-btn {{ 'active' if insights.range=='ytd' }}" data-range="ytd" onclick="selectInsightsRange('ytd')">本年度 (YTD)</button>
-    <button type="button" class="pill-btn {{ 'active' if insights.range=='custom' }}" data-range="custom" onclick="selectInsightsRange('custom')">自定义范围</button>
+    <button type="button" class="pill-btn {{ 'active' if insights.range=='all' }}" data-range="all"
+      onclick="selectInsightsRange('all')">全部 (All Time)</button>
+    <button type="button" class="pill-btn {{ 'active' if insights.range=='12m' }}" data-range="12m"
+      onclick="selectInsightsRange('12m')">近 12 个月 (12M)</button>
+    <button type="button" class="pill-btn {{ 'active' if insights.range=='ytd' }}" data-range="ytd"
+      onclick="selectInsightsRange('ytd')">本年度 (YTD)</button>
+    <button type="button" class="pill-btn {{ 'active' if insights.range=='custom' }}" data-range="custom"
+      onclick="selectInsightsRange('custom')">自定义范围</button>
   </div>
-  <div id="customDateBox" class="custom-date-box" style="{{ 'display:flex' if insights.range=='custom' else 'display:none' }};">
+  <div id="customDateBox" class="custom-date-box"
+    style="{{ 'display:flex' if insights.range=='custom' else 'display:none' }};">
     <input type="date" id="insightsStartDate" value="{{ insights.start_date or '' }}" aria-label="开始日期">
     <span class="date-sep">至</span>
     <input type="date" id="insightsEndDate" value="{{ insights.end_date or today }}" aria-label="结束日期">
@@ -43,11 +49,13 @@
   </div>
   <div class="card">
     <span class="card-label">本月支出 ({{ insights.current_month }})</span>
-    <span class="amount expense" id="kpiThisMonth">{{ (insights.categories|map(attribute='this_month')|sum)|money }}</span>
+    <span class="amount expense" id="kpiThisMonth">{{ (insights.categories|map(attribute='this_month')|sum)|money
+      }}</span>
   </div>
   <div class="card">
     <span class="card-label">上月支出 ({{ insights.prev_month }})</span>
-    <span class="amount" style="color:var(--ink-soft);" id="kpiLastMonth">{{ (insights.categories|map(attribute='last_month')|sum)|money }}</span>
+    <span class="amount" style="color:var(--ink-soft);" id="kpiLastMonth">{{
+      (insights.categories|map(attribute='last_month')|sum)|money }}</span>
   </div>
   <div class="card card-highlight">
     <span class="card-label">活跃支出分类</span>
@@ -57,7 +65,8 @@
 
 <!-- 分类对比与走势主列表 -->
 <div class="panel insights-table-panel" style="padding:0; overflow:hidden;">
-  <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+  <div
+    style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
     <h3 style="margin:0;">分类支出明细与月度环比</h3>
     <span class="hint" style="margin:0; font-size:12.5px;">💡 点击分类行可展开/收起该分类在选定范围内的月度消费走势柱状图</span>
   </div>
@@ -78,18 +87,26 @@
       </thead>
       <tbody id="insightsTableBody">
         {% for cat in insights.categories %}
-        <tr class="insights-row" data-cat-idx="{{ loop.index0 }}" onclick="toggleCategoryChart({{ loop.index0 }})" style="cursor:pointer;">
-          <td class="col-toggle" style="text-align:center; color:var(--muted);" id="toggle-icon-{{ loop.index0 }}">▶</td>
+        <tr class="insights-row" data-cat-idx="{{ loop.index0 }}" onclick="toggleCategoryChart({{ loop.index0 }})"
+          style="cursor:pointer;">
+          <td class="col-toggle" style="text-align:center; color:var(--muted);" id="toggle-icon-{{ loop.index0 }}">▶
+          </td>
           <td class="col-name">
             <div style="display:flex; align-items:center; gap:8px;">
-              <span class="chart-legend-dot" style="background-color: var(--navy); width:9px; height:9px; border-radius:50%;"></span>
+              <span class="chart-legend-dot"
+                style="background-color: var(--navy); width:9px; height:9px; border-radius:50%;"></span>
               <strong style="font-size:14px; color:var(--ink);">{{ cat.category }}</strong>
             </div>
           </td>
-          <td class="col-this-month" style="text-align:right; font-family:var(--font-mono); font-weight:600; color:var(--rose);">{{ cat.this_month|money }}</td>
-          <td class="col-last-month" style="text-align:right; font-family:var(--font-mono); color:var(--muted);">{{ cat.last_month|money }}</td>
-          <td class="col-avg" style="text-align:right; font-family:var(--font-mono); color:var(--ink-soft);">{{ cat.avg_monthly|money }}</td>
-          <td class="col-total" style="text-align:right; font-family:var(--font-mono); color:var(--ink);">{{ cat.total_amt|money }}</td>
+          <td class="col-this-month"
+            style="text-align:right; font-family:var(--font-mono); font-weight:600; color:var(--rose);">{{
+            cat.this_month|money }}</td>
+          <td class="col-last-month" style="text-align:right; font-family:var(--font-mono); color:var(--muted);">{{
+            cat.last_month|money }}</td>
+          <td class="col-avg" style="text-align:right; font-family:var(--font-mono); color:var(--ink-soft);">{{
+            cat.avg_monthly|money }}</td>
+          <td class="col-total" style="text-align:right; font-family:var(--font-mono); color:var(--ink);">{{
+            cat.total_amt|money }}</td>
           <td class="col-trend" style="text-align:center;">
             {% if cat.trend_dir == 'up' %}
             <span class="tag tag-expense" style="font-weight:600;">↑ {{ cat.trend_text }}</span>
@@ -129,174 +146,174 @@
 </div>
 
 <script>
-window.INSIGHTS_DATA = {{ insights | tojson }};
-const _catChartInstances = {};
+  window.INSIGHTS_DATA = {{ insights | tojson }};
+  const _catChartInstances = {};
 
-function toggleCategoryChart(idx) {
-  const row = document.getElementById('chart-row-' + idx);
-  const icon = document.getElementById('toggle-icon-' + idx);
-  if (!row) return;
+  function toggleCategoryChart(idx) {
+    const row = document.getElementById('chart-row-' + idx);
+    const icon = document.getElementById('toggle-icon-' + idx);
+    if (!row) return;
 
-  const isOpening = !row.classList.contains('is-open');
-  row.classList.toggle('is-open', isOpening);
-  if (icon) icon.textContent = isOpening ? '▼' : '▶';
+    const isOpening = !row.classList.contains('is-open');
+    row.classList.toggle('is-open', isOpening);
+    if (icon) icon.textContent = isOpening ? '▼' : '▶';
 
-  if (isOpening) {
-    setTimeout(function() {
-      renderCategoryChart(idx);
-    }, 25);
-  }
-}
-
-function renderCategoryChart(idx) {
-  const cat = window.INSIGHTS_DATA.categories[idx];
-  if (!cat) return;
-  const canvas = document.getElementById('chart-canvas-' + idx);
-  if (!canvas) return;
-
-  if (_catChartInstances[idx]) {
-    _catChartInstances[idx].destroy();
+    if (isOpening) {
+      setTimeout(function () {
+        renderCategoryChart(idx);
+      }, 25);
+    }
   }
 
-  const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const tickColor = isDark ? '#94a3b8' : '#6f6c66';
-  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(27,27,31,0.06)';
+  function renderCategoryChart(idx) {
+    const cat = window.INSIGHTS_DATA.categories[idx];
+    if (!cat) return;
+    const canvas = document.getElementById('chart-canvas-' + idx);
+    if (!canvas) return;
 
-  const ctx = canvas.getContext('2d');
-  _catChartInstances[idx] = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: cat.months,
-      datasets: [{
-        label: cat.category + ' 支出 (RM)',
-        data: cat.monthly_values,
-        backgroundColor: 'rgba(251, 113, 133, 0.75)',
-        borderColor: '#fb7185',
-        borderWidth: 1.5,
-        borderRadius: 4,
-        maxBarThickness: 36
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      layout: {
-        padding: {
-          left: 2,
-          right: 6,
-          top: 6,
-          bottom: 2
-        }
+    if (_catChartInstances[idx]) {
+      _catChartInstances[idx].destroy();
+    }
+
+    const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const tickColor = isDark ? '#94a3b8' : '#6f6c66';
+    const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(27,27,31,0.06)';
+
+    const ctx = canvas.getContext('2d');
+    _catChartInstances[idx] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: cat.months,
+        datasets: [{
+          label: cat.category + ' 支出 (RM)',
+          data: cat.monthly_values,
+          backgroundColor: 'rgba(251, 113, 133, 0.75)',
+          borderColor: '#fb7185',
+          borderWidth: 1.5,
+          borderRadius: 4,
+          maxBarThickness: 36
+        }]
       },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: function(c) {
-              return ' 支出: ' + formatMoney(c.parsed.y);
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+          padding: {
+            left: 2,
+            right: 6,
+            top: 6,
+            bottom: 2
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function (c) {
+                return ' 支出: ' + formatMoney(c.parsed.y);
+              }
             }
           }
-        }
-      },
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: { color: tickColor, font: { size: 10 } }
         },
-        y: {
-          beginAtZero: true,
-          grid: { color: gridColor },
-          ticks: {
-            color: tickColor,
-            font: { size: 10 },
-            callback: function(v) {
-              if (v >= 1000) return 'RM ' + (v / 1000).toFixed(1) + 'k';
-              return 'RM ' + v;
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: tickColor, font: { size: 10 } }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: gridColor },
+            ticks: {
+              color: tickColor,
+              font: { size: 10 },
+              callback: function (v) {
+                if (v >= 1000) return 'RM ' + (v / 1000).toFixed(1) + 'k';
+                return 'RM ' + v;
+              }
             }
           }
         }
       }
-    }
-  });
-}
-
-function selectInsightsRange(rangeKey) {
-  // 1. 立即给选中的药丸按钮添加 active 高亮，给用户即时视觉反馈
-  document.querySelectorAll('.overview-toolbar .filter-pills .pill-btn').forEach(function(btn) {
-    btn.classList.toggle('active', btn.dataset.range === rangeKey);
-  });
-
-  const box = document.getElementById('customDateBox');
-  if (rangeKey === 'custom') {
-    if (box) box.style.display = 'flex';
-    return;
-  }
-  if (box) box.style.display = 'none';
-
-  // 2. 构造目标 URL
-  const url = new URL(window.location.href);
-  url.pathname = '/categories/insights';
-  url.searchParams.set('range', rangeKey);
-  url.searchParams.delete('start');
-  url.searchParams.delete('end');
-
-  // 3. 优先使用 HTMX 进行无感极速局部刷新，避免整页白屏重载
-  if (typeof htmx !== 'undefined') {
-    const badge = document.getElementById('insightsRangeBadge');
-    if (badge) {
-      badge.innerHTML = '<span class="skeleton-shimmer" style="display:inline-block; width:160px; height:15px; border-radius:4px; vertical-align:middle;"></span>';
-    }
-    htmx.ajax('GET', url.toString(), {
-      target: '#mainContainer',
-      swap: 'innerHTML show:window:top',
-      headers: { 'HX-Request': 'true' }
     });
-    history.pushState({}, '', url.toString());
-  } else {
-    window.location.href = url.toString();
-  }
-}
-
-function applyCustomInsightsFilter() {
-  const start = document.getElementById('insightsStartDate').value;
-  const end = document.getElementById('insightsEndDate').value;
-  if (!start || !end) {
-    if (typeof errorAlert === 'function') {
-      errorAlert('请选择完整的开始与结束日期', '筛选提示');
-    } else {
-      alert('请选择完整的开始与结束日期');
-    }
-    return;
-  }
-  if (start > end) {
-    if (typeof errorAlert === 'function') {
-      errorAlert('开始日期不能晚于结束日期', '筛选提示');
-    } else {
-      alert('开始日期不能晚于结束日期');
-    }
-    return;
   }
 
-  const url = new URL(window.location.href);
-  url.pathname = '/categories/insights';
-  url.searchParams.set('range', 'custom');
-  url.searchParams.set('start', start);
-  url.searchParams.set('end', end);
-
-  if (typeof htmx !== 'undefined') {
-    const badge = document.getElementById('insightsRangeBadge');
-    if (badge) {
-      badge.innerHTML = '<span class="skeleton-shimmer" style="display:inline-block; width:160px; height:15px; border-radius:4px; vertical-align:middle;"></span>';
-    }
-    htmx.ajax('GET', url.toString(), {
-      target: '#mainContainer',
-      swap: 'innerHTML show:window:top',
-      headers: { 'HX-Request': 'true' }
+  function selectInsightsRange(rangeKey) {
+    // 1. 立即给选中的药丸按钮添加 active 高亮，给用户即时视觉反馈
+    document.querySelectorAll('.overview-toolbar .filter-pills .pill-btn').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.range === rangeKey);
     });
-    history.pushState({}, '', url.toString());
-  } else {
-    window.location.href = url.toString();
+
+    const box = document.getElementById('customDateBox');
+    if (rangeKey === 'custom') {
+      if (box) box.style.display = 'flex';
+      return;
+    }
+    if (box) box.style.display = 'none';
+
+    // 2. 构造目标 URL
+    const url = new URL(window.location.href);
+    url.pathname = '/categories/insights';
+    url.searchParams.set('range', rangeKey);
+    url.searchParams.delete('start');
+    url.searchParams.delete('end');
+
+    // 3. 优先使用 HTMX 进行无感极速局部刷新，避免整页白屏重载
+    if (typeof htmx !== 'undefined') {
+      const badge = document.getElementById('insightsRangeBadge');
+      if (badge) {
+        badge.innerHTML = '<span class="skeleton-shimmer" style="display:inline-block; width:160px; height:15px; border-radius:4px; vertical-align:middle;"></span>';
+      }
+      htmx.ajax('GET', url.toString(), {
+        target: '#mainContainer',
+        swap: 'innerHTML show:window:top',
+        headers: { 'HX-Request': 'true' }
+      });
+      history.pushState({}, '', url.toString());
+    } else {
+      window.location.href = url.toString();
+    }
   }
-}
+
+  function applyCustomInsightsFilter() {
+    const start = document.getElementById('insightsStartDate').value;
+    const end = document.getElementById('insightsEndDate').value;
+    if (!start || !end) {
+      if (typeof errorAlert === 'function') {
+        errorAlert('请选择完整的开始与结束日期', '筛选提示');
+      } else {
+        alert('请选择完整的开始与结束日期');
+      }
+      return;
+    }
+    if (start > end) {
+      if (typeof errorAlert === 'function') {
+        errorAlert('开始日期不能晚于结束日期', '筛选提示');
+      } else {
+        alert('开始日期不能晚于结束日期');
+      }
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    url.pathname = '/categories/insights';
+    url.searchParams.set('range', 'custom');
+    url.searchParams.set('start', start);
+    url.searchParams.set('end', end);
+
+    if (typeof htmx !== 'undefined') {
+      const badge = document.getElementById('insightsRangeBadge');
+      if (badge) {
+        badge.innerHTML = '<span class="skeleton-shimmer" style="display:inline-block; width:160px; height:15px; border-radius:4px; vertical-align:middle;"></span>';
+      }
+      htmx.ajax('GET', url.toString(), {
+        target: '#mainContainer',
+        swap: 'innerHTML show:window:top',
+        headers: { 'HX-Request': 'true' }
+      });
+      history.pushState({}, '', url.toString());
+    } else {
+      window.location.href = url.toString();
+    }
+  }
 </script>
 {% endblock %}

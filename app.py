@@ -3029,16 +3029,31 @@ def parse_receipt_text_to_items(raw_text):
     tax_rate = 0.0
     total = 0.0
 
-    # 常见行匹配：比如 "1 Chicken Rice 12.50" 或 "Latte  RM 14.00"
+    # 常见非商品/结算干扰行正则黑名单（严格使用词边界 \b，避免 tel 误伤 telur 等正常菜品）
+    exclude_patterns = [
+        r'\b(?:subtotal|sub-total)\b',
+        r'\b(?:total|grand total|net total|amount due)\b',
+        r'\b(?:tax|sst|gst|service charge|svc charge|svc fee|service tax)\b',
+        r'\b(?:cash|change|change due|rounding|round adj)\b',
+        r'\b(?:card|cards|visa|mastercard|amex|mydebit|debit|credit|sbux)\b',
+        r'\b(?:balance|new balance|prev balance)\b',
+        r'\b(?:invoice|receipt|bill no|table|date|tel|phone|drawer|reg:|chk |check closed)\b',
+        r'\b(?:terminal|merchant|auth|approval|ref:|tng|grabpay|boost|alipay|wechat)\b',
+        r'^[x*\-_=+#\s\d]+$',
+        r'\b[x*]{4,}\b'
+    ]
+
     for line in lines:
-        lower = line.lower()
+        # 先对金额中的逗号小数点进行规范化 (例如 4,95 -> 4.95)
+        clean_line = re.sub(r'(?<=\d),(?=\d{2}\b)', '.', line)
+        lower = clean_line.lower()
 
         # 匹配服务费 Service Charge / SVC
         if any(k in lower for k in ['service charge', 'svc charge', 'svc chg', 'service fee']):
-            m = re.search(r'(?:RM|MYR)?\s*([0-9]+\.[0-9]{2})', line, re.IGNORECASE)
+            m = re.search(r'(?:RM|MYR|\$|€|£|¥)?\s*([0-9]+\.[0-9]{2})', clean_line, re.IGNORECASE)
             if m:
                 service_charge = float(m.group(1))
-            m_pct = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*%', line)
+            m_pct = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*%', clean_line)
             if m_pct:
                 service_rate = float(m_pct.group(1))
             continue
@@ -3047,36 +3062,36 @@ def parse_receipt_text_to_items(raw_text):
         if any(k in lower for k in ['sst', 'gst', 'service tax', 'gov tax', 'tax']):
             # 排除非税总行
             if 'total' not in lower and 'subtotal' not in lower:
-                m = re.search(r'(?:RM|MYR)?\s*([0-9]+\.[0-9]{2})', line, re.IGNORECASE)
+                m = re.search(r'(?:RM|MYR|\$|€|£|¥)?\s*([0-9]+\.[0-9]{2})', clean_line, re.IGNORECASE)
                 if m:
                     tax = float(m.group(1))
-                m_pct = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*%', line)
+                m_pct = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*%', clean_line)
                 if m_pct:
                     tax_rate = float(m_pct.group(1))
                 continue
 
         # 匹配小计 Subtotal
         if 'subtotal' in lower or 'sub-total' in lower:
-            m = re.search(r'(?:RM|MYR)?\s*([0-9]+\.[0-9]{2})', line, re.IGNORECASE)
+            m = re.search(r'(?:RM|MYR|\$|€|£|¥)?\s*([0-9]+\.[0-9]{2})', clean_line, re.IGNORECASE)
             if m:
                 subtotal = float(m.group(1))
             continue
 
         # 匹配总计 Total / Grand Total / Net Total / Amount Due
         if any(k in lower for k in ['grand total', 'net total', 'total amount', 'total', 'amount due']):
-            m = re.search(r'(?:RM|MYR)?\s*([0-9]+\.[0-9]{2})', line, re.IGNORECASE)
+            m = re.search(r'(?:RM|MYR|\$|€|£|¥)?\s*([0-9]+\.[0-9]{2})', clean_line, re.IGNORECASE)
             if m:
                 total = float(m.group(1))
             continue
 
-        # 排除其他干扰行（如日期、电话、找零、银行卡号等，避免 tel 误伤 telur）
-        if any(k in lower for k in ['cash', 'change', 'visa', 'mastercard', 'mydebit', 'invoice', 'receipt', 'bill no']) or re.search(r'\b(?:table|date|tel|phone)\b', lower):
+        # 排除干扰行：支付方式、找零、余额、交易流水、银行卡掩码等
+        if any(re.search(pat, lower) for pat in exclude_patterns):
             continue
 
-        # 提取常规菜品/消费条目：要求末尾有金额
-        m_item = re.search(r'^(.*?)(?:RM|MYR)?\s*([0-9]+\.[0-9]{2})$', line, re.IGNORECASE)
+        # 提取常规菜品/消费条目：允许货币符号如 RM, $, €, £, ¥ 以及可选的小数点
+        m_item = re.search(r'^(.*?)(?:RM|MYR|\$|€|£|¥)?\s*([0-9]+\.[0-9]{2})\s*$', clean_line, re.IGNORECASE)
         if m_item:
-            name_raw = m_item.group(1).strip(' -:\t')
+            name_raw = m_item.group(1).strip(' -:\t#$*')
             price_val = float(m_item.group(2))
             # 过滤名称过短或纯数字的情况
             if name_raw and len(name_raw) >= 2 and price_val > 0:
@@ -3085,7 +3100,7 @@ def parse_receipt_text_to_items(raw_text):
                 m_qty = re.match(r'^(\d+)\s*[xX*]?\s+(.*)$', name_raw)
                 if m_qty:
                     qty = int(m_qty.group(1))
-                    name_raw = m_qty.group(2).strip()
+                    name_raw = m_qty.group(2).strip(' -:\t#$*')
                 items.append({
                     'name': name_raw,
                     'price': price_val,
@@ -3189,8 +3204,8 @@ def preprocess_receipt_image_for_ocr(img):
         if max(w, h) > max_side:
             scale = max_side / max(w, h)
             img = img.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
-        elif min(w, h) < 700:
-            scale = 700 / max(1, min(w, h))
+        elif min(w, h) < 900:
+            scale = 900 / max(1, min(w, h))
             img = img.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
 
     # 转灰度
@@ -3198,7 +3213,7 @@ def preprocess_receipt_image_for_ocr(img):
     # 自动色阶拉伸，消除泛白反光
     autocontrast_img = ImageOps.autocontrast(gray, cutoff=1)
     # 适度对比度与锐化
-    enhanced = ImageEnhance.Contrast(autocontrast_img).enhance(1.6)
+    enhanced = ImageEnhance.Contrast(autocontrast_img).enhance(1.5)
     sharpened = ImageEnhance.Sharpness(enhanced).enhance(1.4)
     return sharpened
 
@@ -3231,11 +3246,15 @@ def split_bill_ocr_upload():
 
         with Image.open(img_path) as raw_img:
             processed_img = preprocess_receipt_image_for_ocr(raw_img)
-            # 优先使用中英双语识别，若中文字库缺失则回退为英文
+            # 优先使用中英双语识别与按行单块排版模式 (--psm 6)，大幅提升小票条目识别率
+            tess_config = '--psm 6'
             try:
-                extracted_text = pytesseract.image_to_string(processed_img, lang='eng+chi_sim')
+                extracted_text = pytesseract.image_to_string(processed_img, lang='eng+chi_sim', config=tess_config)
             except Exception:
-                extracted_text = pytesseract.image_to_string(processed_img, lang='eng')
+                try:
+                    extracted_text = pytesseract.image_to_string(processed_img, lang='eng', config=tess_config)
+                except Exception:
+                    extracted_text = pytesseract.image_to_string(processed_img, lang='eng')
     except ImportError:
         ocr_error_reason = "pytesseract 依赖库未安装"
     except Exception as e:

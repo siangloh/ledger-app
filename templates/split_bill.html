@@ -455,6 +455,9 @@ async function handleImageUpload(e) {
     const result = await res.json();
     if (result.ok && result.data) {
       status.innerText = '✓ 小票分析成功！已提取明细菜品。';
+      if (result.raw_text) {
+        document.getElementById('receiptTextInput').value = result.raw_text;
+      }
       applyParsedReceiptData(result.data);
     } else {
       status.innerText = result.message || '识别完成，请在下方文本框微调。';
