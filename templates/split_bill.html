@@ -773,7 +773,12 @@ function parseReceiptTextClientSide(rawText) {
     // 3. 抹零 / 舍入
     if (['rounding', 'bill rounding', 'round adj', 'rnd'].some(k => lower.includes(k)) || cleanLine.includes('抹零') || cleanLine.includes('舍入')) {
       const mRnd = cleanLine.match(/([-+]?\s*[0-9]+(?:\.[0-9]{1,2})?)\b/);
-      if (mRnd) rounding = parseFloat(mRnd[1].replace(/\s+/g, ''));
+      if (mRnd) {
+        const rndVal = parseFloat(mRnd[1].replace(/\s+/g, ''));
+        // 抹零金额本质上只会是很小的调整，OCR 把这行认错成离谱大数字时，宁可当作没认出来。
+        // (跟 app.py 的同一段逻辑保持一致)
+        if (Math.abs(rndVal) <= 1.0) rounding = rndVal;
+      }
       continue;
     }
 
@@ -812,17 +817,30 @@ function parseReceiptTextClientSide(rawText) {
       if (/\b\d{4,6}\b\s*$/.test(cleanLine)) continue;
     }
 
-    // 9. 提取常规单品行
-    const itemMatch = cleanLine.match(/^(.*?)(?:(?:RM|MYR|\$|S\$|€|EUR|£|GBP|¥|円|₩|원|฿|Rp|₫)\s*([0-9]+(?:\.[0-9]{1,2})?)|(?<=\s)([0-9]+(?:\.[0-9]{1,2})?))\s*(?:€|EUR|円|¥|원|฿|Rp|₫|B|TA|Takeaway|\(?\d+\.?\d*\/ea\)?|[#*.,;:\-\s])*$/i);
-    if (itemMatch) {
-      let nameRaw = (itemMatch[1] || '').trim().replace(/^[\s\-:#$*¥€£“"'|.,;]+|[\s\-:#$*¥€£“"'|.,;]+$/g, '');
+    // 8.5 排除"单价/份"标注的延续行 (如 "(Takeaway) (14.90/ea)")
+    // 有些收银系统会把品项拆成好几个原始行输出：第一行是"数量 品名 ... 价格"，
+    // 接下来还会有一行专门重复标注 "(单价/ea)"。这种延续行不是新的品项，如果不排除，
+    // 会被误判成一笔新的、品名乱七八糟的品项。(跟 app.py 的 parse_receipt_text_to_items 保持一致)
+    if (/[0-9]+\.?[0-9]*\s*\/\s*ea\b/.test(lower)) continue;
+
+    // 9. 提取常规单品行：找这一行里"最后一个长得像价格的数字"，价格前面当品名，
+    // 价格后面不管是什么内容一律丢弃，不要求行尾必须精确符合某个允许字符白名单——
+    // 真实拍照识别出来的文字，行尾常常会带一两个杂讯符号，只要求"精确匹配到行尾"
+    // 很容易被这类杂讯拖累到整行都抓不到。(跟 app.py 的同一段逻辑保持一致)
+    const pricePattern = /(?:RM|MYR|\$|S\$|€|EUR|£|GBP|¥|円|₩|원|฿|Rp|₫)\s*[0-9]+(?:\.[0-9]{1,2})?|(?<![0-9.])[0-9]+\.[0-9]{1,2}(?![0-9])/gi;
+    const priceMatches = [...cleanLine.matchAll(pricePattern)];
+    const lastMatch = priceMatches.length ? priceMatches[priceMatches.length - 1] : null;
+    if (lastMatch) {
+      let nameRaw = cleanLine.slice(0, lastMatch.index).trim()
+        .replace(/^[\s\-:#$*¥€£“"'|.,;，、]+|[\s\-:#$*¥€£“"'|.,;，、]+$/g, '');
       nameRaw = nameRaw.replace(/^(?:RM|MYR|\$|S\$|€|£|¥|円|₩)\s*/i, '');
       nameRaw = nameRaw.replace(/\s*(?:RM|MYR|\$|S\$|€|£|¥|円|₩)\s*$/i, '');
       nameRaw = nameRaw.replace(/^[（(]?(?:Takeaway|TA|Dine[- ]in)[)）]?\s*(?:\([0-9.]+\/ea\))?\s*/i, '');
       nameRaw = nameRaw.replace(/^[（(]?[0-9.]+\/ea[)）]?\s*/i, '');
-      nameRaw = nameRaw.replace(/^[\s\-:#$*¥“"'|.,;]+|[\s\-:#$*¥“"'|.,;]+$/g, '').trim();
-      const priceStr = itemMatch[2] || itemMatch[3];
-      const priceVal = priceStr ? parseFloat(priceStr) : 0;
+      nameRaw = nameRaw.replace(/^[\s\-:#$*¥“"'|.,;，、]+|[\s\-:#$*¥“"'|.,;，、]+$/g, '').trim();
+
+      const numMatch = lastMatch[0].match(/[0-9]+(?:\.[0-9]{1,2})?/);
+      const priceVal = numMatch ? parseFloat(numMatch[0]) : 0;
 
       if (['$', '€', '£', 'RM', 'S$'].includes(currency_symbol) && priceVal > 5000) {
         continue;
@@ -839,6 +857,12 @@ function parseReceiptTextClientSide(rawText) {
           qty = parseInt(qtySuffix[2], 10);
           nameRaw = qtySuffix[1].trim();
         }
+
+        // 常见"数量 + 品名 + 单价 + 小计"同一行的排版，上面已经把最后一个数字(小计)
+        // 抓成 price，但单价可能还残留在 nameRaw 尾部，这里把它去掉。
+        // (跟 app.py 的同一段逻辑保持一致)
+        nameRaw = nameRaw.replace(/\s+(?:RM|MYR|\$|S\$|€|£|¥|円|₩)?\s*[0-9]+\.[0-9]{2}\s*$/i, '').trim();
+
         items.push({
           name: nameRaw,
           price: priceVal,

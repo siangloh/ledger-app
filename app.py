@@ -3158,7 +3158,12 @@ def parse_receipt_text_to_items(raw_text):
         if any(k in lower for k in ['rounding', 'bill rounding', 'round adj', 'rnd']) or '抹零' in clean_line or '舍入' in clean_line:
             m_rnd = re.search(r'([-+]?\s*[0-9]+(?:\.[0-9]{1,2})?)\b', clean_line)
             if m_rnd:
-                rounding = float(m_rnd.group(1).replace(' ', ''))
+                rnd_val = float(m_rnd.group(1).replace(' ', ''))
+                # 抹零金额本质上只会是很小的调整（通常在 -1 到 +1 之间），如果 OCR 把这行
+                # 认错成一个离谱的大数字（比如把 "0.00" 认成 "8"），与其照单全收一个明显不
+                # 合理的抹零金额，不如直接当作没认出来，维持默认的 0.00。
+                if abs(rnd_val) <= 1.0:
+                    rounding = rnd_val
             continue
 
         # 4. 匹配优惠与折扣 (Discount, Promo, Voucher, Rebate, 优惠, 折扣, 满减, 割引, 할인)
