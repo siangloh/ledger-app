@@ -3038,7 +3038,7 @@ def parse_receipt_text_to_items(raw_text):
         r'\b(?:card|cards|visa|mastercard|amex|mydebit|debit|credit|sbux|saux)\b',
         r'\b(?:balance|new balance|prev balance)\b',
         r'\b(?:invoice|receipt|bill\s*no|table|date|tel|phone|drawer|draper|reg|cashier|server|chk|check\s*closed)\b',
-        r'\b(?:terminal|merchant|auth|approval|ref|tng|grabpay|boost|alipay|wechat)\b',
+        r'\b(?:terminal|merchant|auth|approval|ref|tng|grabpay|boost|alipay|wechat|duit\s*now|duitnow|touch\s*[\'’]?n\s*go)\b',
         r'\b(?:items?\s*count|item\s*count|total\s*qty|qty\s*total)\b',
         r'^[x*\-_=+#\s\d]+$',
         r'\b[x*]{4,}\b'
@@ -3227,68 +3227,98 @@ def preprocess_receipt_image_for_ocr(img):
 @app.route('/split-bill/ocr-upload', methods=['POST'])
 @csrf.exempt
 def split_bill_ocr_upload():
-    """上传小票图片进行本地 Tesseract OCR 提取 (零外部 API 调用)"""
-    file = request.files.get('file')
-    if not file or file.filename == '':
-        return jsonify({'ok': False, 'message': '请选择小票图片'}), 400
-
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in ('.jpg', '.jpeg', '.png', '.webp', '.bmp'):
-        return jsonify({'ok': False, 'message': '仅支持常见图片格式 (.jpg, .png, .webp)'}), 400
-
-    token = uuid.uuid4().hex
-    img_path = os.path.join(UPLOAD_DIR, token + ext)
-    file.save(img_path)
-
-    extracted_text = ""
-    ocr_error_reason = None
+    """上传小票图片进行本地 Tesseract OCR 提取 (零外部 API 调用，全内存流转，免磁盘权限依赖)"""
     try:
-        import pytesseract
-        from PIL import Image
+        file = request.files.get('file')
+        if not file or file.filename == '':
+            return jsonify({'ok': False, 'message': '请选择小票图片'}), 400
 
-        tess_bin = get_tesseract_cmd()
-        if tess_bin:
-            pytesseract.pytesseract.tesseract_cmd = tess_bin
+        ext = os.path.splitext(file.filename)[1].lower()
+        if ext not in ('.jpg', '.jpeg', '.png', '.webp', '.bmp'):
+            return jsonify({'ok': False, 'message': '仅支持常见图片格式 (.jpg, .png, .webp)'}), 400
 
-        with Image.open(img_path) as raw_img:
-            processed_img = preprocess_receipt_image_for_ocr(raw_img)
-            # 优先使用中英双语识别与按行单块排版模式 (--psm 6)，大幅提升小票条目识别率
-            tess_config = '--psm 6'
-            try:
-                extracted_text = pytesseract.image_to_string(processed_img, lang='eng+chi_sim', config=tess_config)
-            except Exception:
-                try:
-                    extracted_text = pytesseract.image_to_string(processed_img, lang='eng', config=tess_config)
-                except Exception:
-                    extracted_text = pytesseract.image_to_string(processed_img, lang='eng')
-    except ImportError:
-        ocr_error_reason = "pytesseract 依赖库未安装"
-    except Exception as e:
-        ocr_error_reason = str(e)
-    finally:
-        # 确保 100% 清除服务器端临时图片
+        file_bytes = file.read()
+        if not file_bytes:
+            return jsonify({'ok': False, 'message': '上传的图片内容为空'}), 400
+
+        import io
+        from PIL import Image, ImageOps
+
+        extracted_text = ""
+        ocr_error_reason = None
+        parsed_data = None
+
         try:
-            if os.path.exists(img_path):
-                os.remove(img_path)
-        except OSError:
-            pass
+            import pytesseract
 
-    if extracted_text and extracted_text.strip():
-        # 兼容性预处理: 热敏纸常见 OCR 混淆字符 (例如 RN 误读为 RM)
-        normalized_text = re.sub(r'\bRN\b', 'RM', extracted_text)
-        parsed = parse_receipt_text_to_items(normalized_text)
-        return jsonify({'ok': True, 'raw_text': extracted_text, 'data': parsed})
+            tess_bin = get_tesseract_cmd()
+            if tess_bin:
+                pytesseract.pytesseract.tesseract_cmd = tess_bin
 
-    # 无法解析或引擎异常时的友好降级
-    msg = '未识别到清晰小票文本，请改用「文字粘贴模式」或尝试更清晰平整的照片。'
-    if ocr_error_reason and 'tesseract is not installed' in ocr_error_reason.lower():
-        msg = '当前运行环境未检测到 Tesseract OCR 引擎，已为你开启小票手动录入/粘贴模式。'
+            with Image.open(io.BytesIO(file_bytes)) as raw_img:
+                # 自动纠正手机拍摄 EXIF 方向
+                oriented_img = ImageOps.exif_transpose(raw_img)
+                if oriented_img.mode != 'RGB':
+                    oriented_img = oriented_img.convert('RGB')
 
-    return jsonify({
-        'ok': False,
-        'ocr_engine_ready': bool(get_tesseract_cmd()),
-        'message': msg
-    })
+                # 若用户横屏拍摄了纵向小票 (宽度大于高度 1.15 倍)，生成旋转候选自适应校正
+                w, h = oriented_img.size
+                rotations = [0]
+                if w > h * 1.15:
+                    rotations = [270, 90, 0]  # 优先尝试顺时针 90 度 (rotate 270) 与逆时针 90 度
+
+                tess_config = '--psm 6'
+
+                for rot in rotations:
+                    curr_img = oriented_img if rot == 0 else oriented_img.rotate(rot, expand=True)
+                    processed_img = preprocess_receipt_image_for_ocr(curr_img)
+                    curr_text = ""
+                    try:
+                        curr_text = pytesseract.image_to_string(processed_img, lang='eng+chi_sim', config=tess_config)
+                    except Exception:
+                        try:
+                            curr_text = pytesseract.image_to_string(processed_img, lang='eng', config=tess_config)
+                        except Exception:
+                            curr_text = pytesseract.image_to_string(processed_img, lang='eng')
+
+                    if curr_text and curr_text.strip():
+                        norm = re.sub(r'\bRN\b', 'RM', curr_text)
+                        candidate_parsed = parse_receipt_text_to_items(norm)
+                        extracted_text = curr_text
+                        parsed_data = candidate_parsed
+                        # 一旦匹配到商品条目，立即锁定当前旋转结果
+                        if candidate_parsed and candidate_parsed.get('items'):
+                            break
+
+        except ImportError:
+            ocr_error_reason = "pytesseract 依赖库未安装"
+        except Exception as e:
+            ocr_error_reason = str(e)
+
+        if parsed_data and parsed_data.get('items'):
+            return jsonify({'ok': True, 'raw_text': extracted_text, 'data': parsed_data})
+
+        if extracted_text and extracted_text.strip():
+            norm = re.sub(r'\bRN\b', 'RM', extracted_text)
+            parsed_data = parse_receipt_text_to_items(norm)
+            return jsonify({'ok': True, 'raw_text': extracted_text, 'data': parsed_data})
+
+        msg = '未识别到清晰小票文本，请改用「文字粘贴模式」或尝试更清晰平整的照片。'
+        if ocr_error_reason and 'tesseract is not installed' in ocr_error_reason.lower():
+            msg = '当前运行环境未检测到 Tesseract OCR 引擎，已为你开启小票手动录入/粘贴模式。'
+
+        return jsonify({
+            'ok': False,
+            'ocr_engine_ready': bool(get_tesseract_cmd()),
+            'message': msg
+        })
+    except Exception as top_err:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'ok': False,
+            'message': f'处理小票发生错误：{str(top_err)}'
+        }), 200
 
 
 @app.route('/split-bill/save-record', methods=['POST'])

@@ -504,7 +504,19 @@ async function parseTextReceipt() {
       method: 'POST',
       body: formData
     });
-    const result = await res.json();
+    const responseText = await res.text();
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseErr) {
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        throw new Error('服务器正在部署构建中 (HTTP ' + res.status + ')，请等待 1 分钟后再试。');
+      } else if (res.status === 413) {
+        throw new Error('文本内容过大，请适当缩减后重试。');
+      } else {
+        throw new Error('服务器响应异常 (HTTP ' + res.status + ')，请稍后刷新重试。');
+      }
+    }
     if (typeof Swal !== 'undefined') Swal.close();
 
     if (result.ok && result.data) {
@@ -593,7 +605,19 @@ async function handleImageUpload(e) {
       method: 'POST',
       body: formData
     });
-    const result = await res.json();
+    const responseText = await res.text();
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseErr) {
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        throw new Error('服务器正在部署构建或唤醒中 (HTTP ' + res.status + ')，请等待 1 分钟后再试。');
+      } else if (res.status === 413) {
+        throw new Error('上传的图片体积过大，请在手机相册中适当缩减后重试。');
+      } else {
+        throw new Error('服务器响应异常 (HTTP ' + res.status + ')，请稍后刷新重试。');
+      }
+    }
     if (typeof Swal !== 'undefined') Swal.close();
 
     if (result.raw_text) {
