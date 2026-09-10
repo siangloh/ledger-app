@@ -435,6 +435,139 @@ def init_user_default_categories(db, user_id):
         db.commit()
 
 
+DEFAULT_LEARNING_SAMPLES = [
+    {
+        'text': 'Double Cashback! Apply & Get additional RM50 Cash Back ... Not a PB Credit Cardmember yet? Apply online for PB Credit Card to get a 4-in-1 Barry Smith Luggage Set or RM300 Cash Back...',
+        'label_type': 'promo',
+        'is_real_transaction': 0,
+        'sample_amount': None,
+        'sample_merchant': 'Public Bank',
+        'sample_category': None,
+        'notes': '银行信用卡开卡活动营销广告，非动账通知'
+    },
+    {
+        'text': 'Exclusive for you! Need extra cash? Apply for Maybank Personal Loan from 5.88% p.a. and get instant approval today. T&Cs apply.',
+        'label_type': 'promo',
+        'is_real_transaction': 0,
+        'sample_amount': None,
+        'sample_merchant': 'Maybank',
+        'sample_category': None,
+        'notes': '银行个人贷款推销广告'
+    },
+    {
+        'text': "Touch 'n Go eWallet: Stand a chance to win a Proton eMas 7 and RM50,000 cash prizes! Spend RM10 with DuitNow QR to earn entries. Promo ends 30 Sept.",
+        'label_type': 'promo',
+        'is_real_transaction': 0,
+        'sample_amount': None,
+        'sample_merchant': "Touch 'n Go",
+        'sample_category': None,
+        'notes': '抽奖活动与消费达标竞赛宣传，非实际消费'
+    },
+    {
+        'text': 'PB Alert: Your OTP is 582910 for First-Time Login. Do not reveal this OTP to anyone, including bank staff.',
+        'label_type': 'otp_notice',
+        'is_real_transaction': 0,
+        'sample_amount': None,
+        'sample_merchant': 'Public Bank',
+        'sample_category': None,
+        'notes': '一次性登录验证码 / 安全提醒'
+    },
+    {
+        'text': "Touch 'n Go eWallet: You have successfully paid RM 15.50 to FamilyMart SS15 on 10/09/2026. Ref: TNG8892182. Claim your cashback voucher now!",
+        'label_type': 'expense',
+        'is_real_transaction': 1,
+        'sample_amount': 15.50,
+        'sample_merchant': 'FamilyMart SS15',
+        'sample_category': '餐饮',
+        'notes': '便利店扫码消费，末尾带营销卡券奖励，应判定为真实消费'
+    },
+    {
+        'text': 'PB Payment Alert: You have paid RM 45.00 to PETRONAS SOLARIS on 10/09/2026 via debit card. Ref: PB491823.',
+        'label_type': 'expense',
+        'is_real_transaction': 1,
+        'sample_amount': 45.00,
+        'sample_merchant': 'PETRONAS SOLARIS',
+        'sample_category': '交通',
+        'notes': '油站加油消费支出'
+    },
+    {
+        'text': 'Payment of RM 28.00 to GrabCar completed via GrabPay on 10 Sep 2026.',
+        'label_type': 'expense',
+        'is_real_transaction': 1,
+        'sample_amount': 28.00,
+        'sample_merchant': 'GrabCar',
+        'sample_category': '交通',
+        'notes': '网约车打车出行支出'
+    },
+    {
+        'text': 'MAE: RM 36.40 debited for payment at 99 SPEEDMART - 1482 on 10 Sep 2026.',
+        'label_type': 'expense',
+        'is_real_transaction': 1,
+        'sample_amount': 36.40,
+        'sample_merchant': '99 SPEEDMART',
+        'sample_category': '购物',
+        'notes': '连锁超市日常用品消费支出'
+    },
+    {
+        'text': 'Transfer Successful. RM 120.00 has been successfully transferred to Tan Ah Kow via DuitNow Transfer. Ref: 20260910001.',
+        'label_type': 'expense_transfer',
+        'is_real_transaction': 1,
+        'sample_amount': 120.00,
+        'sample_merchant': 'Tan Ah Kow',
+        'sample_category': '其他',
+        'notes': '向他人转账付款 / 支出'
+    },
+    {
+        'text': 'DuitNow Transfer: You have received RM 250.00 from Wong Mei Ling on 10 Sep 2026. Ref: DN982187.',
+        'label_type': 'income_transfer',
+        'is_real_transaction': 1,
+        'sample_amount': 250.00,
+        'sample_merchant': 'Wong Mei Ling',
+        'sample_category': '其他',
+        'notes': '收到他人 DuitNow 转账进账，记为收入'
+    },
+    {
+        'text': 'Salary Credit: RM 8,500.00 credited into your account from ABC TECH SDN BHD on 28/08/2026. Salary payment.',
+        'label_type': 'income_transfer',
+        'is_real_transaction': 1,
+        'sample_amount': 8500.00,
+        'sample_merchant': 'ABC TECH SDN BHD',
+        'sample_category': '工资',
+        'notes': '公司薪资代发，主业收入入账'
+    },
+    {
+        'text': 'JomPAY: RM 142.50 paid to Tenaga Nasional Berhad (TNB) via Maybank MAE on 05 Sep 2026.',
+        'label_type': 'expense',
+        'is_real_transaction': 1,
+        'sample_amount': 142.50,
+        'sample_merchant': 'Tenaga Nasional Berhad (TNB)',
+        'sample_category': '通讯',
+        'notes': '水电缴费支出'
+    }
+]
+
+
+def seed_learning_samples(db):
+    """将默认预设语料样本灌入数据库"""
+    now = datetime.now().isoformat()
+    for s in DEFAULT_LEARNING_SAMPLES:
+        db.execute('''
+            INSERT INTO llm_learning_samples (user_id, text, label_type, is_real_transaction, sample_amount, sample_merchant, sample_category, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            None,
+            s['text'],
+            s['label_type'],
+            s['is_real_transaction'],
+            s['sample_amount'],
+            s['sample_merchant'],
+            s['sample_category'],
+            s['notes'],
+            now
+        ))
+    db.commit()
+
+
 def init_db():
     if TURSO_URL and TURSO_AUTH_TOKEN:
         db = turso_db.TursoConnection(TURSO_URL, TURSO_AUTH_TOKEN)
@@ -607,6 +740,32 @@ def init_db():
         db.commit()
     except Exception:
         pass
+
+    # 6. LLM 学习样本表 (Few-Shot Datasheet)
+    try:
+        db.execute('''
+        CREATE TABLE IF NOT EXISTS llm_learning_samples (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            text TEXT NOT NULL,
+            label_type TEXT NOT NULL,
+            is_real_transaction INTEGER NOT NULL DEFAULT 0,
+            sample_amount REAL,
+            sample_merchant TEXT,
+            sample_category TEXT,
+            notes TEXT,
+            created_at TEXT NOT NULL
+        );
+        ''')
+        db.commit()
+
+        sample_count = db.execute("SELECT COUNT(*) as cnt FROM llm_learning_samples").fetchone()
+        cnt = sample_count['cnt'] if sample_count else 0
+        if cnt == 0:
+            seed_learning_samples(db)
+    except Exception as e:
+        if AUTO_TRACK_DEBUG_LOG:
+            print(f"[INIT_DB] llm_learning_samples init error: {e}")
 
     # 确保 admin 用户具备默认分类
     init_user_default_categories(db, admin_id)
@@ -1986,6 +2145,44 @@ def call_llm_json(prompt, system_instruction=None, timeout=None):
     return None
 
 
+def get_llm_learning_samples_prompt(user_id=None, limit=12):
+    """从 llm_learning_samples 数据库读取样本，构造提供给 LLM 提示词的动态参考案例库"""
+    try:
+        db = get_db()
+        rows = db.execute('''
+            SELECT text, label_type, is_real_transaction, sample_amount, sample_merchant, sample_category, notes
+            FROM llm_learning_samples
+            ORDER BY id ASC LIMIT ?
+        ''', (limit,)).fetchall()
+        if not rows:
+            return ""
+
+        lines = [
+            "[LEARNING SAMPLES & REFERENCE DATASHEET / 语言学习样本库与判定示范]:",
+            "Refer closely to the following labeled real-world samples when evaluating notifications:"
+        ]
+        for idx, r in enumerate(rows, 1):
+            is_real = bool(r['is_real_transaction'])
+            tx_type = None
+            if is_real:
+                tx_type = 'income' if 'income' in r['label_type'] else 'expense'
+            item = {
+                "is_real_transaction": is_real,
+                "label_type": r['label_type'],
+                "type": tx_type,
+                "amount": r['sample_amount'],
+                "merchant": r['sample_merchant'],
+                "category": r['sample_category'],
+                "reason": r['notes'] or r['label_type']
+            }
+            lines.append(f"Sample {idx}: \"{r['text']}\" -> {json.dumps(item, ensure_ascii=False)}")
+        return "\n".join(lines) + "\n\n"
+    except Exception as e:
+        if AUTO_TRACK_DEBUG_LOG:
+            print(f"[LLM SAMPLES DEBUG] Error loading samples: {e}")
+        return ""
+
+
 def classify_notification_with_llm(text):
     """
     智能营销/广告过滤与关键要素提取：
@@ -2010,6 +2207,7 @@ def classify_notification_with_llm(text):
         "5. Standard income categories: 工资, 奖金, 投资, 自由职业, 其他.\n"
         "Reply with ONLY valid JSON: {\n"
         "  \"is_real_transaction\": true/false,\n"
+        "  \"label_type\": \"promo\"|\"expense\"|\"income_transfer\"|\"expense_transfer\"|\"otp_notice\",\n"
         "  \"reason\": \"short reason\",\n"
         "  \"amount\": float or null,\n"
         "  \"type\": \"expense\"|\"income\"|null,\n"
@@ -2017,8 +2215,12 @@ def classify_notification_with_llm(text):
         "  \"category\": \"standard category name\" or null\n"
         "}"
     )
-    prompt = f"Notification text to evaluate:\n\"\"\"{text}\"\"\""
-    res = call_llm_json(prompt, system_instruction=system_instruction, timeout=3.5)
+    samples_block = get_llm_learning_samples_prompt()
+    prompt = (
+        f"{samples_block}"
+        f"Notification text to evaluate:\n\"\"\"{text}\"\"\""
+    )
+    res = call_llm_json(prompt, system_instruction=system_instruction, timeout=4.5)
     if isinstance(res, dict) and 'is_real_transaction' in res:
         is_real = bool(res['is_real_transaction'])
         return is_real, res
@@ -2212,8 +2414,17 @@ def api_auto_track():
             'raw_text': text
         }), 200
 
-    # 智能增强：如果 LLM 提取到了更精准的分类或商户名称，且本地解析为缺省值，进行补充
+    # 智能增强：如果 LLM 提取到了更精准的分类、商户名称或转账进账方向
     if llm_data and isinstance(llm_data, dict):
+        label_type = llm_data.get('label_type')
+        if label_type == 'income_transfer':
+            parsed['type'] = 'income'
+            if not parsed.get('group_name'):
+                parsed['group_name'] = 'main' if any(k in text.lower() for k in ['salary', 'payroll', '工资', '薪资', '薪水']) else 'side'
+        elif label_type in ('expense', 'expense_transfer'):
+            parsed['type'] = 'expense'
+            parsed['group_name'] = None
+
         if parsed.get('category') == '其他' and llm_data.get('category') and llm_data['category'] != '其他':
             parsed['category'] = str(llm_data['category']).strip()
         if parsed.get('note') in ('自动追踪消费', '自动追踪入账') and llm_data.get('merchant'):
@@ -2346,12 +2557,86 @@ def auto_track_page():
     """Auto Track 配置与测试页面"""
     base_url = request.host_url.rstrip('/')
     webhook_url = f"{base_url}/api/auto-track"
+    db = get_db()
+    samples = db.execute("SELECT * FROM llm_learning_samples ORDER BY id ASC").fetchall()
     return render_template(
         'auto_track.html',
         api_key=get_auto_track_key(),
         webhook_url=webhook_url,
-        llm_info=get_active_llm_provider()
+        llm_info=get_active_llm_provider(),
+        samples=samples
     )
+
+
+# ---------------------------------------------------------------------------
+# LLM 语言学习样本库 (Few-Shot Datasheet 管理接口)
+# ---------------------------------------------------------------------------
+
+@app.route('/api/llm-samples', methods=['GET'])
+def api_llm_samples_list():
+    db = get_db()
+    rows = db.execute("SELECT * FROM llm_learning_samples ORDER BY id ASC").fetchall()
+    return jsonify({'ok': True, 'samples': [dict(r) for r in rows]})
+
+
+@app.route('/api/llm-samples/add', methods=['POST'])
+@csrf.exempt
+def api_llm_samples_add():
+    if not session.get('logged_in'):
+        return jsonify({'ok': False, 'message': '请先登录后再添加样本'}), 401
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+    text = (data.get('text') or '').strip()
+    if not text:
+        return jsonify({'ok': False, 'message': '样本通知文本不能为空'}), 400
+
+    label_type = (data.get('label_type') or 'expense').strip()
+    is_real = 1 if data.get('is_real_transaction') in (True, 1, '1', 'true', 'True') else 0
+    if label_type in ('promo', 'otp_notice'):
+        is_real = 0
+
+    amount = data.get('sample_amount')
+    try:
+        amount = float(amount) if amount not in (None, '', 'null') else None
+    except Exception:
+        amount = None
+
+    merchant = (data.get('sample_merchant') or '').strip() or None
+    category = (data.get('sample_category') or '').strip() or None
+    notes = (data.get('notes') or '').strip() or None
+    now = datetime.now().isoformat()
+    user_id = session.get('user_id')
+
+    db.execute('''
+        INSERT INTO llm_learning_samples (user_id, text, label_type, is_real_transaction, sample_amount, sample_merchant, sample_category, notes, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (user_id, text, label_type, is_real, amount, merchant, category, notes, now))
+    db.commit()
+
+    return jsonify({'ok': True, 'message': '成功录入学习样本库！大模型下次遇到类似通知将照此学习。'})
+
+
+@app.route('/api/llm-samples/delete/<int:sample_id>', methods=['POST'])
+@csrf.exempt
+def api_llm_samples_delete(sample_id):
+    if not session.get('logged_in'):
+        return jsonify({'ok': False, 'message': '请先登录'}), 401
+    db = get_db()
+    db.execute("DELETE FROM llm_learning_samples WHERE id = ?", (sample_id,))
+    db.commit()
+    return jsonify({'ok': True, 'message': '样本已成功删除'})
+
+
+@app.route('/api/llm-samples/reset', methods=['POST'])
+@csrf.exempt
+def api_llm_samples_reset():
+    if not session.get('logged_in'):
+        return jsonify({'ok': False, 'message': '请先登录'}), 401
+    db = get_db()
+    db.execute("DELETE FROM llm_learning_samples")
+    db.commit()
+    seed_learning_samples(db)
+    return jsonify({'ok': True, 'message': '已成功将学习样本库恢复为官方预设语料库！'})
 
 
 # ---------------------------------------------------------------------------

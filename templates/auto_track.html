@@ -95,10 +95,84 @@
   </section>
 </div>
 
+<!-- 下方：AI 语言学习样本库 (Few-Shot Learning Datasheet) -->
+<div class="panel" style="margin-top: 24px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+    <div>
+      <h3 style="margin: 0 0 4px; display: flex; align-items: center; gap: 8px;">
+        🧠 AI 语言学习样本库 (Few-Shot Datasheet)
+        <span class="tag" style="background: var(--surface-soft); font-weight: normal; font-size: 11px;">共 {{ samples|length }} 条已学样本</span>
+      </h3>
+      <p class="hint" style="margin: 0;">大语言模型每次分析通知时，都会参考下方的标准样本库。你可以直接在下方新增、修改或纠正样本，AI 遇到类似格式将自动照着学习！</p>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button type="button" class="btn-ghost btn-sm" onclick="resetLlmSamples()">恢复官方预设语料</button>
+      <button type="button" class="btn-primary btn-sm" onclick="openAddSampleModal()">+ 添加学习样本</button>
+    </div>
+  </div>
+
+  <div class="table-responsive" style="max-height: 480px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+    <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+      <thead>
+        <tr style="background: var(--surface-soft); position: sticky; top: 0; z-index: 1;">
+          <th style="width: 45px; text-align: center;">#</th>
+          <th style="width: 130px;">判定类型 (Label)</th>
+          <th>标准通知原文 (Notification Text)</th>
+          <th style="width: 160px;">示范要素提取</th>
+          <th style="width: 170px;">学习说明 / 逻辑</th>
+          <th style="width: 65px; text-align: center;">操作</th>
+        </tr>
+      </thead>
+      <tbody id="llmSamplesTbody">
+        {% for s in samples %}
+        <tr id="sample-row-{{ s.id }}">
+          <td style="text-align: center; color: var(--muted); font-size: 12px;">{{ s.id }}</td>
+          <td>
+            {% if s.label_type == 'promo' %}
+              <span class="tag" style="background: rgba(239, 68, 68, 0.12); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.25); font-weight: 600;">营销推广 ❌</span>
+            {% elif s.label_type == 'expense' %}
+              <span class="tag" style="background: rgba(59, 130, 246, 0.12); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.25); font-weight: 600;">消费支出 ✅</span>
+            {% elif s.label_type == 'income_transfer' %}
+              <span class="tag" style="background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.25); font-weight: 600;">转账进账 💰</span>
+            {% elif s.label_type == 'expense_transfer' %}
+              <span class="tag" style="background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.25); font-weight: 600;">转账支出 ↗️</span>
+            {% elif s.label_type == 'otp_notice' %}
+              <span class="tag" style="background: rgba(107, 114, 128, 0.12); color: #4b5563; border: 1px solid rgba(107, 114, 128, 0.25); font-weight: 600;">验证码/安全 🛡️</span>
+            {% else %}
+              <span class="tag">{{ s.label_type }}</span>
+            {% endif %}
+          </td>
+          <td style="word-break: break-word; font-family: var(--font-mono); font-size: 12px; line-height: 1.5;">
+            {{ s.text }}
+          </td>
+          <td style="font-size: 12px;">
+            {% if s.is_real_transaction %}
+              <div style="color: var(--navy); font-weight: 600;">RM {{ "%.2f"|format(s.sample_amount or 0) }}</div>
+              <div style="color: var(--ink-soft);">{{ s.sample_merchant or '未知商户' }}</div>
+              <div style="font-size: 11px; color: var(--muted);">分类: {{ s.sample_category or '其他' }}</div>
+            {% else %}
+              <span style="color: var(--muted); font-style: italic;">非动账 / 无金额</span>
+            {% endif %}
+          </td>
+          <td style="font-size: 12px; color: var(--ink-soft);">
+            {{ s.notes or '-' }}
+          </td>
+          <td style="text-align: center;">
+            <button type="button" class="btn-ghost btn-sm" style="color: var(--danger); padding: 2px 6px;" onclick="deleteLlmSample({{ s.id }})" title="删除此条样本">✕</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
+let lastTestedNotificationData = null;
+
 function copyWebhookUrl() {
   const input = document.getElementById('webhookInput');
   input.select();
@@ -158,12 +232,14 @@ async function submitTestAutoTrack(e) {
     });
     const data = await res.json();
     resultBox.style.display = 'block';
+    lastTestedNotificationData = { text: text, data: data };
 
+    let contentHtml = '';
     if (res.ok && data.ok) {
       resultBox.style.background = 'var(--green-soft)';
       resultBox.style.border = '1px solid var(--green)';
       resultBox.style.color = 'var(--green)';
-      resultBox.innerHTML = `
+      contentHtml = `
         <strong>🎉 自动入账成功！</strong><br>
         • 商户备注：${data.parsed.note}<br>
         • 金额：RM ${data.parsed.amount.toFixed(2)}<br>
@@ -177,7 +253,7 @@ async function submitTestAutoTrack(e) {
       resultBox.style.background = 'rgba(234, 179, 8, 0.12)';
       resultBox.style.border = '1px solid #eab308';
       resultBox.style.color = '#854d0e';
-      resultBox.innerHTML = `
+      contentHtml = `
         <strong>🛡️ AI 智能安全拦截成功！</strong><br>
         • 提示：${data.message}<br>
         • 详情：大模型检测到该通知为银行促销活动、信用卡营销或非真实完成的财务支出，已自动安全过滤，不会入账扰乱账本。
@@ -186,11 +262,20 @@ async function submitTestAutoTrack(e) {
       resultBox.style.background = 'var(--rose-soft)';
       resultBox.style.border = '1px solid var(--rose)';
       resultBox.style.color = 'var(--rose)';
-      resultBox.innerHTML = `
+      contentHtml = `
         <strong>⚠️ 未能入账：</strong> ${data.message || '未知错误'}<br>
         请检查测试文本中是否包含类似 "RM 15.00" 的金额格式。
       `;
     }
+
+    contentHtml += `
+      <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,0.15); display: flex; justify-content: flex-end;">
+        <button type="button" class="btn-ghost btn-sm" style="font-size: 12px;" onclick="addCurrentTestAsSample()">
+          📌 将此条存入学习样本库 (Teach AI)
+        </button>
+      </div>
+    `;
+    resultBox.innerHTML = contentHtml;
   } catch (err) {
     resultBox.style.display = 'block';
     resultBox.style.background = 'var(--rose-soft)';
@@ -201,6 +286,212 @@ async function submitTestAutoTrack(e) {
     btn.disabled = false;
     btn.innerText = '发送测试入库';
   }
+}
+
+function addCurrentTestAsSample() {
+  if (!lastTestedNotificationData) return;
+  const t = lastTestedNotificationData.text;
+  const d = lastTestedNotificationData.data;
+
+  let label_type = 'expense';
+  if (d.verdict === 'rejected_promo') {
+    label_type = 'promo';
+  } else if (d.parsed && d.parsed.type === 'income') {
+    label_type = 'income_transfer';
+  }
+
+  openAddSampleModal({
+    text: t,
+    label_type: label_type,
+    sample_amount: d.parsed ? d.parsed.amount : '',
+    sample_merchant: d.parsed ? d.parsed.note : '',
+    sample_category: d.parsed ? d.parsed.category : '',
+    notes: d.message || ''
+  });
+}
+
+function openAddSampleModal(prefill = {}) {
+  const defaultText = prefill.text || '';
+  const defaultType = prefill.label_type || 'expense';
+  const defaultAmount = prefill.sample_amount || '';
+  const defaultMerchant = prefill.sample_merchant || '';
+  const defaultCategory = prefill.sample_category || '餐饮';
+  const defaultNotes = prefill.notes || '';
+
+  Swal.fire({
+    title: '录入 AI 语言学习样本',
+    html: `
+      <div style="text-align: left; font-size: 13px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 4px;">通知/短信文本内容 (Text):</label>
+        <textarea id="sampleInputText" rows="3" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; font-family: var(--font-mono); margin-bottom: 10px;" placeholder="例如：DuitNow Transfer: You have received RM 50.00 from Ali...">${defaultText}</textarea>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+          <div style="flex: 1;">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">判定类型 (Label):</label>
+            <select id="sampleInputType" style="width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;">
+              <option value="promo" ${defaultType === 'promo' ? 'selected' : ''}>营销广告 / 信用卡活动 (拦截)</option>
+              <option value="expense" ${defaultType === 'expense' ? 'selected' : ''}>消费支出 (扫码/刷卡)</option>
+              <option value="income_transfer" ${defaultType === 'income_transfer' ? 'selected' : ''}>转账进账 / 收到收款 (记收入)</option>
+              <option value="expense_transfer" ${defaultType === 'expense_transfer' ? 'selected' : ''}>转账支出 / 朋友转账 (记支出)</option>
+              <option value="otp_notice" ${defaultType === 'otp_notice' ? 'selected' : ''}>验证码 / 银行安全提醒 (拦截)</option>
+            </select>
+          </div>
+          <div style="flex: 1;">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">金额 (RM):</label>
+            <input type="number" step="0.01" id="sampleInputAmount" value="${defaultAmount}" style="width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;" placeholder="如 15.50">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+          <div style="flex: 1;">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">商户/交易方:</label>
+            <input type="text" id="sampleInputMerchant" value="${defaultMerchant}" style="width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;" placeholder="如 FamilyMart / Ali">
+          </div>
+          <div style="flex: 1;">
+            <label style="display: block; font-weight: 600; margin-bottom: 4px;">归类分类:</label>
+            <input type="text" id="sampleInputCategory" value="${defaultCategory}" style="width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;" placeholder="如 餐饮 / 交通 / 购物 / 工资">
+          </div>
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 600; margin-bottom: 4px;">学习备注 / 判定逻辑说明:</label>
+          <input type="text" id="sampleInputNotes" value="${defaultNotes}" style="width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;" placeholder="如：此为收到他人 DuitNow 转账进账，应记为收入">
+        </div>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: '保存并加入学习库',
+    cancelButtonText: '取消',
+    focusConfirm: false,
+    customClass: {
+      popup: 'app-swal-popup app-swal-popup-wide',
+      confirmButton: 'btn-primary',
+      cancelButton: 'btn-ghost'
+    },
+    preConfirm: () => {
+      const text = document.getElementById('sampleInputText').value.trim();
+      const label_type = document.getElementById('sampleInputType').value;
+      const amount = document.getElementById('sampleInputAmount').value.trim();
+      const merchant = document.getElementById('sampleInputMerchant').value.trim();
+      const category = document.getElementById('sampleInputCategory').value.trim();
+      const notes = document.getElementById('sampleInputNotes').value.trim();
+
+      if (!text) {
+        Swal.showValidationMessage('通知/短信文本不能为空！');
+        return false;
+      }
+      return {
+        text: text,
+        label_type: label_type,
+        is_real_transaction: (label_type !== 'promo' && label_type !== 'otp_notice') ? 1 : 0,
+        sample_amount: amount || null,
+        sample_merchant: merchant || null,
+        sample_category: category || null,
+        notes: notes || null
+      };
+    }
+  }).then((res) => {
+    if (res.isConfirmed && res.value) {
+      saveSampleToServer(res.value);
+    }
+  });
+}
+
+async function saveSampleToServer(payload) {
+  try {
+    const r = await fetch('/api/llm-samples/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await r.json();
+    if (data.ok) {
+      Swal.fire({
+        icon: 'success',
+        title: '已存入 AI 学习库',
+        text: data.message,
+        timer: 1800,
+        showConfirmButton: false
+      }).then(() => {
+        window.location.reload();
+      });
+    } else {
+      Swal.fire('保存失败', data.message || '未知错误', 'error');
+    }
+  } catch (err) {
+    Swal.fire('网络错误', err.message, 'error');
+  }
+}
+
+function deleteLlmSample(id) {
+  Swal.fire({
+    title: '确认删除此条学习样本？',
+    text: '删除后，大模型分析时将不再参考本条样本。',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: '确认删除',
+    cancelButtonText: '取消',
+    customClass: {
+      confirmButton: 'btn-danger',
+      cancelButton: 'btn-ghost'
+    }
+  }).then(async (res) => {
+    if (res.isConfirmed) {
+      try {
+        const r = await fetch(`/api/llm-samples/delete/${id}`, { method: 'POST' });
+        const data = await r.json();
+        if (data.ok) {
+          const row = document.getElementById(`sample-row-${id}`);
+          if (row) row.remove();
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: '样本已删除',
+            showConfirmButton: false,
+            timer: 1500
+          });
+        } else {
+          Swal.fire('删除失败', data.message, 'error');
+        }
+      } catch (err) {
+        Swal.fire('请求失败', err.message, 'error');
+      }
+    }
+  });
+}
+
+function resetLlmSamples() {
+  Swal.fire({
+    title: '重置样本库为官方预设？',
+    text: '此操作将重置包含 Public Bank、Maybank、TnG、DuitNow 转账等 12 条马来西亚标准学习语料。',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: '确认重置',
+    cancelButtonText: '取消',
+    customClass: {
+      confirmButton: 'btn-primary',
+      cancelButton: 'btn-ghost'
+    }
+  }).then(async (res) => {
+    if (res.isConfirmed) {
+      try {
+        const r = await fetch('/api/llm-samples/reset', { method: 'POST' });
+        const data = await r.json();
+        if (data.ok) {
+          Swal.fire({
+            icon: 'success',
+            title: '已重置为官方语料库',
+            text: data.message,
+            timer: 1500,
+            showConfirmButton: false
+          }).then(() => window.location.reload());
+        }
+      } catch (err) {
+        Swal.fire('重置失败', err.message, 'error');
+      }
+    }
+  });
 }
 </script>
 {% endblock %}
