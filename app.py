@@ -3194,22 +3194,36 @@ def parse_receipt_text_to_items(raw_text):
             if re.search(r'\b\d{4,6}\b\s*$', clean_line):
                 continue
 
-        # 9. 提取常规单品行
-        m_item = re.search(
-            r'^(.*?)(?:(?:RM|MYR|\$|S\$|€|EUR|£|GBP|¥|円|₩|원|฿|Rp|₫)\s*([0-9]+(?:\.[0-9]{1,2})?)|(?<=\s)([0-9]+(?:\.[0-9]{1,2})?))\s*(?:€|EUR|円|¥|원|฿|Rp|₫|B|TA|Takeaway|\(?\d+\.?\d*/ea\)?|[#*.,;:\-\s])*$',
-            clean_line,
+        # 8.5 排除"单价/份"标注的延续行 (如 "(Takeaway) (14.90/ea)")
+        # 有些收银系统 (如 FEEDME SMART POS) 会把品项拆成好几个原始行输出：第一行是
+        # "数量 品名 ... 价格"，接下来还会有一行专门重复标注 "(单价/ea)"。这种延续行本身
+        # 不是新的品项，只是把已经在第一行抓到的价格再讲一次，如果不排除掉，会被误判成
+        # 一笔新的、品名乱七八糟的品项 (比如把 "(Takeaway)" 这几个字当成品名)。
+        if re.search(r'[0-9]+\.?[0-9]*\s*/\s*ea\b', lower):
+            continue
+
+        # 9. 提取常规单品行：找这一行里"最后一个长得像价格的数字"，价格前面当品名，
+        # 价格后面不管是什么内容（行尾常见的 OCR 乱码符号、单位标注、多余空白等）一律丢弃，
+        # 不要求行尾必须精确符合某个允许字符的白名单——真实拍照识别出来的文字，行尾常常会
+        # 带一两个杂讯符号（比如全形逗号、竖线），只要求"精确匹配到行尾"很容易被这类杂讯拖累
+        # 到整行都抓不到，这里改成只找价格本身，价格后面的东西直接忽略。
+        price_pattern = re.compile(
+            r'(?:RM|MYR|\$|S\$|€|EUR|£|GBP|¥|円|₩|원|฿|Rp|₫)\s*[0-9]+(?:\.[0-9]{1,2})?'
+            r'|(?<![0-9.])[0-9]+\.[0-9]{1,2}(?![0-9])',
             re.IGNORECASE
         )
+        price_matches = list(price_pattern.finditer(clean_line))
+        m_item = price_matches[-1] if price_matches else None
         if m_item:
-            name_raw = m_item.group(1).strip(' -:\t#$*¥€£“"\'|.,;')
+            name_raw = clean_line[:m_item.start()].strip(' -:\t#$*¥€£“"\'|.,;，、')
             name_raw = re.sub(r'^(?:RM|MYR|\$|S\$|€|£|¥|円|₩)\s*', '', name_raw, flags=re.IGNORECASE)
             name_raw = re.sub(r'\s*(?:RM|MYR|\$|S\$|€|£|¥|円|₩)\s*$', '', name_raw, flags=re.IGNORECASE)
             name_raw = re.sub(r'^[（(]?(?:Takeaway|TA|Dine[- ]in)[)）]?\s*(?:\([0-9.]+/ea\))?\s*', '', name_raw, flags=re.IGNORECASE)
             name_raw = re.sub(r'^[（(]?[0-9.]+/ea[)）]?\s*', '', name_raw, flags=re.IGNORECASE)
-            name_raw = name_raw.strip(' -:\t#$*¥“"\'|.,;')
+            name_raw = name_raw.strip(' -:\t#$*¥“"\'|.,;，、')
 
-            price_str = m_item.group(2) or m_item.group(3)
-            price_val = float(price_str) if price_str else 0.0
+            num_match = re.search(r'[0-9]+(?:\.[0-9]{1,2})?', m_item.group())
+            price_val = float(num_match.group()) if num_match else 0.0
 
             # 过滤非商品的邮编或过大非单品数字 (非 JPY/KRW/VND/IDR 币种时，单品价格通常不会超过 5000)
             if currency_symbol in ['$', '€', '£', 'RM', 'S$'] and price_val > 5000:
