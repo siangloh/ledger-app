@@ -901,6 +901,12 @@ function attachNlpForm() {
       errorAlert('请输入一句话，如「打车 32.5」。', '请先输入内容');
       return;
     }
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="btn-spinner"></span> 智能解析中...';
+    }
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || form.querySelector('input[name="csrf_token"]')?.value || '';
     fetch('/nlp/parse', {
       method: 'POST',
@@ -916,6 +922,12 @@ function attachNlpForm() {
       })
       .catch(function () {
         errorAlert('网络连接失败，请稍后重试。', '解析失败');
+      })
+      .finally(function () {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalBtnHtml;
+        }
       });
   });
 }

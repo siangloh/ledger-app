@@ -1,7 +1,9 @@
 import os
 import re
+import json
 import uuid
 import sqlite3
+import requests
 from calendar import monthrange
 from datetime import datetime, date
 
@@ -75,9 +77,28 @@ def is_valid_api_key(req_key):
         valid_set.add(AUTO_TRACK_KEY.strip())
     return k in valid_set
 
-# 本地 LLM (Ollama) 配置用于过滤营销推广假通知 (Phase-2)
-OLLAMA_URL = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
-OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'qwen2.5')
+# LLM 智能服务配置 (优先 Google Gemini，其次 OpenAI/DeepSeek，再回退本地 Ollama 与快速规则引擎)
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-flash-lite-latest').strip()
+GEMINI_FALLBACK_MODELS = ['gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash']
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '').strip()
+OPENAI_BASE_URL = os.environ.get('OPENAI_BASE_URL', 'https://api.openai.com/v1').rstrip('/')
+OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4o-mini').strip()
+DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '').strip()
+OLLAMA_URL = os.environ.get('OLLAMA_URL', 'http://localhost:11434').rstrip('/')
+OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'qwen2.5').strip()
+LLM_TIMEOUT = float(os.environ.get('LLM_TIMEOUT', '4.5'))
+
+
+def get_active_llm_provider():
+    """返回当前优先启用的 LLM 供应商名称与模型"""
+    if GEMINI_API_KEY:
+        return {'provider': 'gemini', 'name': f'Google Gemini ({GEMINI_MODEL})', 'available': True}
+    if DEEPSEEK_API_KEY:
+        return {'provider': 'deepseek', 'name': 'DeepSeek (deepseek-chat)', 'available': True}
+    if OPENAI_API_KEY:
+        return {'provider': 'openai', 'name': f'OpenAI ({OPENAI_MODEL})', 'available': True}
+    return {'provider': 'ollama', 'name': f'Local Ollama ({OLLAMA_MODEL})', 'available': False}
 
 # 单用户访问密码 (优先环境变量，次选数据库 system_settings，保底 admin123)
 def get_app_password():
@@ -780,7 +801,7 @@ def parse_auto_track_notification(raw_text):
         'your password', 'reset password', 'login alert', 'new login'
     ]
     if any(k in lower_text for k in PROMO_AND_AD_KEYWORDS):
-        return None
+        return {'is_promo': True, 'reason': '命中营销推广活动或非动账安全词库'}
 
     # 1. 动账行为动词硬性检查（必须具备明确真实的财务收支动作，杜绝普通资讯/广告被误记账）
     is_expense = any(k in lower_text for k in [
@@ -1827,70 +1848,262 @@ def batch_edit_records():
 # 自然语言快速记账
 # ---------------------------------------------------------------------------
 
+def clean_and_parse_json(raw_str):
+    """从 LLM 返回的文本中稳健提取并解析 JSON 对象"""
+    if not raw_str or not isinstance(raw_str, str):
+        return None
+    s = raw_str.strip()
+    if s.startswith('```'):
+        lines = s.split('\n')
+        if lines[0].startswith('```'):
+            lines = lines[1:]
+        if lines and lines[-1].startswith('```'):
+            lines = lines[:-1]
+        s = '\n'.join(lines).strip()
+    start = s.find('{')
+    end = s.rfind('}')
+    if start != -1 and end != -1 and end > start:
+        s = s[start:end+1]
+    try:
+        return json.loads(s)
+    except Exception:
+        return None
+
+
+def call_llm_json(prompt, system_instruction=None, timeout=None):
+    """
+    通用多源 LLM JSON 接口：
+    1. 优先 Google Gemini 2.5 Flash
+    2. 次选 DeepSeek / OpenAI
+    3. 次选 本地 Ollama
+    4. 失败返回 None，调用方自动降级到规则引擎
+    """
+    t = timeout or LLM_TIMEOUT
+
+    # 1. Google Gemini
+    if GEMINI_API_KEY:
+        for model in GEMINI_FALLBACK_MODELS:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "temperature": 0.1,
+                    "maxOutputTokens": 250
+                }
+            }
+            if system_instruction:
+                payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
+            try:
+                resp = requests.post(url, json=payload, timeout=t)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidates = data.get('candidates') or []
+                    if candidates:
+                        part = candidates[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                        parsed = clean_and_parse_json(part)
+                        if parsed:
+                            return parsed
+                elif resp.status_code in (404, 429, 503):
+                    continue
+            except Exception as e:
+                if AUTO_TRACK_DEBUG_LOG:
+                    print(f"[LLM DEBUG] Gemini {model} error: {e}")
+
+    # 2. DeepSeek
+    if DEEPSEEK_API_KEY:
+        try:
+            resp = requests.post(
+                "https://api.deepseek.com/chat/completions",
+                headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"},
+                json={
+                    "model": "deepseek-chat",
+                    "messages": [
+                        *([{"role": "system", "content": system_instruction}] if system_instruction else []),
+                        {"role": "user", "content": prompt}
+                    ],
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0.1
+                },
+                timeout=t
+            )
+            if resp.status_code == 200:
+                content = resp.json()['choices'][0]['message']['content']
+                parsed = clean_and_parse_json(content)
+                if parsed:
+                    return parsed
+        except Exception as e:
+            if AUTO_TRACK_DEBUG_LOG:
+                print(f"[LLM DEBUG] DeepSeek error: {e}")
+
+    # 3. OpenAI
+    if OPENAI_API_KEY:
+        try:
+            resp = requests.post(
+                f"{OPENAI_BASE_URL}/chat/completions",
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
+                json={
+                    "model": OPENAI_MODEL,
+                    "messages": [
+                        *([{"role": "system", "content": system_instruction}] if system_instruction else []),
+                        {"role": "user", "content": prompt}
+                    ],
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0.1
+                },
+                timeout=t
+            )
+            if resp.status_code == 200:
+                content = resp.json()['choices'][0]['message']['content']
+                parsed = clean_and_parse_json(content)
+                if parsed:
+                    return parsed
+        except Exception as e:
+            if AUTO_TRACK_DEBUG_LOG:
+                print(f"[LLM DEBUG] OpenAI error: {e}")
+
+    # 4. Local Ollama
+    if OLLAMA_URL:
+        try:
+            resp = requests.post(
+                f"{OLLAMA_URL}/api/generate",
+                json={
+                    "model": OLLAMA_MODEL,
+                    "prompt": (f"{system_instruction}\n\n{prompt}") if system_instruction else prompt,
+                    "stream": False,
+                    "format": "json"
+                },
+                timeout=t
+            )
+            if resp.status_code == 200:
+                raw_response = resp.json().get('response', '{}')
+                parsed = clean_and_parse_json(raw_response)
+                if parsed:
+                    return parsed
+        except Exception as e:
+            pass
+
+    return None
+
+
+def classify_notification_with_llm(text):
+    """
+    智能营销/广告过滤与关键要素提取：
+    通过 LLM 深度校验通知是否为真实发生的交易（扣款/入账），还是营销推广、抽奖、信用卡办卡推广、返现活动或OTP验证码。
+    返回: (is_real: bool, llm_data: dict or None)
+    采用 Fail-open 策略：若 LLM 离线或超时，放行并返回 (True, None)，确保不漏记真实交易。
+    """
+    system_instruction = (
+        "You are an expert financial transaction validator and parser for Malaysian banking and e-wallets "
+        "(Touch 'n Go eWallet, MAE Maybank, Public Bank / MyPB, CIMB Octo, RHB, Hong Leong, GrabPay, Boost, BigPay, etc.).\n"
+        "Your task: Decide whether the mobile notification describes an ACTUAL COMPLETED financial transaction "
+        "(payment, transfer, debit, credit) or is a PROMOTIONAL MARKETING AD / LOAN OFFER / CREDIT CARD PROMOTION / OTP / SYSTEM NOTICE.\n\n"
+        "Rules:\n"
+        "1. Genuine Malaysian e-wallet transaction receipts frequently append marketing rewards at the end "
+        "(e.g. 'Paid RM 15.00 to FamilyMart. Claim your RM2 voucher!'). If money was ACTUALLY spent, transferred, or received, "
+        "is_real_transaction MUST BE TRUE.\n"
+        "2. If the message is a promotional campaign inviting the user to apply for cards/loans, join a contest, win prizes, "
+        "earn cash back on future spends, or an advertisement (e.g. 'Apply online for PB Credit Card to get RM300 Cash Back'), "
+        "is_real_transaction MUST BE FALSE.\n"
+        "3. If it is an OTP, verification code, login alert, or system downtime notice, is_real_transaction MUST BE FALSE.\n"
+        "4. Standard expense categories: 餐饮, 交通, 购物, 娱乐, 居住, 医疗, 教育, 通讯, 旅行, 人情, 其他.\n"
+        "5. Standard income categories: 工资, 奖金, 投资, 自由职业, 其他.\n"
+        "Reply with ONLY valid JSON: {\n"
+        "  \"is_real_transaction\": true/false,\n"
+        "  \"reason\": \"short reason\",\n"
+        "  \"amount\": float or null,\n"
+        "  \"type\": \"expense\"|\"income\"|null,\n"
+        "  \"merchant\": \"clean merchant or recipient/sender name\" or null,\n"
+        "  \"category\": \"standard category name\" or null\n"
+        "}"
+    )
+    prompt = f"Notification text to evaluate:\n\"\"\"{text}\"\"\""
+    res = call_llm_json(prompt, system_instruction=system_instruction, timeout=3.5)
+    if isinstance(res, dict) and 'is_real_transaction' in res:
+        is_real = bool(res['is_real_transaction'])
+        return is_real, res
+
+    # 无法通过 LLM 判定时，执行 Fail-open，放行真实交易
+    return True, None
+
+
+def parse_nlp_with_llm(text):
+    """
+    通过 LLM 将口语化自然语言文本解析为标准记账对象。
+    返回 dict 或 None
+    """
+    system_instruction = (
+        "You are an intelligent accounting parser for a personal ledger app in Malaysia.\n"
+        "Parse colloquial natural language entries (in Chinese or English or Malay) into a structured ledger transaction.\n"
+        "Categories allowed:\n"
+        "- expense: 餐饮, 交通, 购物, 娱乐, 居住, 医疗, 教育, 通讯, 旅行, 人情, 其他\n"
+        "- income: 工资, 奖金, 投资, 自由职业, 其他 (group_name is 'main' for salary/main job, 'side' for side gig/investment)\n"
+        "- savings: 应急金, 养老, 旅游, 心愿, 其他\n"
+        f"- Assume today is {date.today().isoformat()}. Parse relative dates like '昨天', '前天', 'yesterday' correctly.\n"
+        "Return ONLY a JSON object: {\n"
+        "  \"amount\": positive float,\n"
+        "  \"type\": \"expense\" | \"income\" | \"savings\",\n"
+        "  \"group_name\": \"main\" | \"side\" | null,\n"
+        "  \"category\": \"category name\",\n"
+        "  \"note\": \"short descriptive summary of merchant or item\",\n"
+        "  \"date\": \"YYYY-MM-DD\"\n"
+        "}"
+    )
+    prompt = f"Ledger entry:\n\"{text}\""
+    res = call_llm_json(prompt, system_instruction=system_instruction, timeout=3.5)
+    if isinstance(res, dict) and res.get('amount'):
+        try:
+            amt = float(res['amount'])
+            if amt > 0:
+                tx_type = res.get('type')
+                if tx_type not in ('expense', 'income', 'savings'):
+                    tx_type = 'expense'
+                group_name = res.get('group_name')
+                if tx_type != 'income':
+                    group_name = None
+                elif group_name not in ('main', 'side'):
+                    group_name = 'main'
+
+                parsed_date = res.get('date') or date.today().isoformat()
+                if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(parsed_date)):
+                    parsed_date = date.today().isoformat()
+
+                return {
+                    'date': str(parsed_date),
+                    'type': tx_type,
+                    'group_name': group_name,
+                    'category': str(res.get('category') or '其他'),
+                    'amount': amt,
+                    'note': str(res.get('note') or text).strip()
+                }
+        except Exception:
+            pass
+    return None
+
+
 @app.route('/nlp/parse', methods=['POST'])
 def nlp_parse():
     text = request.form.get('text', '').strip()
     if not text:
         return {'ok': False, 'message': '请输入内容后再点智能解析'}
 
+    # 1. 优先调用 LLM 深度智能解析
+    llm_parsed = parse_nlp_with_llm(text)
+    if llm_parsed and llm_parsed.get('amount'):
+        return {
+            'ok': True,
+            'parsed': llm_parsed,
+            'source': 'llm',
+            'warnings': [],
+            'original_text': text
+        }
+
+    # 2. 回退到本地规则解析器
     parsed, warnings = parse_nlp_text(text)
     if parsed is None:
         return {'ok': False, 'message': '解析失败：' + '；'.join(warnings) + '。请改用下方快速录入表单手动填写。'}
 
-    return {'ok': True, 'parsed': parsed, 'warnings': warnings, 'original_text': text}
-
-
-# ---------------------------------------------------------------------------
-# Auto Track 自动记账网关 (接收来自手机通知/Webhook)
-# ---------------------------------------------------------------------------
-
-def classify_notification_with_llm(text):
-    """
-    Phase-2 智能营销/广告过滤：
-    调用本地 Ollama LLM 二次校验通知是否为真实完成的扣款/入账交易，还是营销促销广告。
-    采用 Fail-open 策略：若 Ollama 无法连接、超时或返回异常，打印警告并放行作为真实交易，
-    确保不因本地 LLM 服务不可用而影响正常记账。
-    返回: True (真实交易) 或 False (营销广告)
-    """
-    import json as py_json
-    import requests
-
-    endpoint = f"{OLLAMA_URL.rstrip('/')}/api/generate"
-    prompt = (
-        "You are an expert financial transaction validator for Malaysian e-wallets (Touch 'n Go, MAE, GrabPay, Boost). "
-        "Analyze the following mobile notification text and decide whether it describes an ACTUAL COMPLETED "
-        "financial transaction (payment, transfer, debit, credit), OR if it is PURELY a promotional marketing message.\n\n"
-        "NOTE: Genuine Malaysian e-wallet transaction receipts frequently append reward promotions at the end "
-        "(e.g., 'You have paid RM 15.00 to FamilyMart. Claim your cashback voucher!'). If money was actually spent or transferred, "
-        "it IS a real transaction (is_real_transaction: true). Only return false if NO actual transaction took place.\n\n"
-        f"Notification text:\n\"\"\"{text}\"\"\"\n\n"
-        "Reply with ONLY a valid JSON object in this exact format: {\"is_real_transaction\": true/false, \"reason\": \"short explanation\"}"
-    )
-
-    try:
-        resp = requests.post(
-            endpoint,
-            json={
-                "model": OLLAMA_MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "format": "json"
-            },
-            timeout=3.5
-        )
-        if resp.status_code == 200:
-            res_data = resp.json()
-            raw_response = res_data.get('response', '{}')
-            parsed_json = py_json.loads(raw_response)
-            is_real = parsed_json.get('is_real_transaction')
-            if is_real is not None:
-                return bool(is_real)
-        else:
-            print(f"[AUTO_TRACK WARNING] Ollama LLM returned status {resp.status_code}, failing open")
-    except Exception as e:
-        print(f"[AUTO_TRACK WARNING] Ollama LLM unreachable or error ({e}), failing open")
-
-    return True
+    return {'ok': True, 'parsed': parsed, 'source': 'rule', 'warnings': warnings, 'original_text': text}
 
 
 @app.route('/api/auto-track', methods=['GET', 'POST'])
@@ -1952,6 +2165,17 @@ def api_auto_track():
     if AUTO_TRACK_DEBUG_LOG:
         print(f"[AUTO_TRACK DEBUG] Parsed result: {parsed}")
 
+    if parsed and parsed.get('is_promo'):
+        if AUTO_TRACK_DEBUG_LOG:
+            print(f"[AUTO_TRACK DEBUG] Rejected as promo by blacklist: {parsed.get('reason')}")
+        return jsonify({
+            'ok': False,
+            'verdict': 'rejected_promo',
+            'message': '通知被识别为营销推广活动或非动账通知，已自动忽略入账',
+            'reason': parsed.get('reason'),
+            'raw_text': text
+        }), 200
+
     if not parsed or not parsed.get('amount'):
         if AUTO_TRACK_DEBUG_LOG:
             print("[AUTO_TRACK DEBUG] Failed to parse amount! Returning 422")
@@ -1974,21 +2198,8 @@ def api_auto_track():
             if AUTO_TRACK_DEBUG_LOG:
                 print(f"[AUTO_TRACK DEBUG] Applied remembered merchant override: '{merchant_note}' -> '{override['category']}'")
 
-    # Phase-2: 本地 LLM 营销广告二次校验（Fail-open 策略）
-    # 如果文本已经明确包含扣款动作与明确金额，直接判定为真实交易，避免末尾的卡券营销词被大模型误杀
-    lower_text = text.lower()
-    has_strong_payment_receipt = any(k in lower_text for k in [
-        'paid rm', 'paid to', 'payment of rm', 'payment of', 'spent rm', 'spent at',
-        'transfer of rm', 'transferred rm', 'transferred to', 'transfer to',
-        'transfer successful', 'transferred to', 'successfully transferred',
-        'duitnow qr', 'duitnow transfer', 'payment successful',
-        '付款 rm', '付款成功', '扣款 rm', '扣款成功', '转账给', '已支付', 'successfully paid'
-    ])
-
-    if has_strong_payment_receipt:
-        is_real = True
-    else:
-        is_real = classify_notification_with_llm(text)
+    # Phase-2: LLM 营销广告二次校验与要素智能增强（Fail-open 策略）
+    is_real, llm_data = classify_notification_with_llm(text)
 
     if not is_real:
         if AUTO_TRACK_DEBUG_LOG:
@@ -2000,6 +2211,13 @@ def api_auto_track():
             'parsed': parsed,
             'raw_text': text
         }), 200
+
+    # 智能增强：如果 LLM 提取到了更精准的分类或商户名称，且本地解析为缺省值，进行补充
+    if llm_data and isinstance(llm_data, dict):
+        if parsed.get('category') == '其他' and llm_data.get('category') and llm_data['category'] != '其他':
+            parsed['category'] = str(llm_data['category']).strip()
+        if parsed.get('note') in ('自动追踪消费', '自动追踪入账') and llm_data.get('merchant'):
+            parsed['note'] = str(llm_data['merchant']).strip()
 
     # 入库写入交易记录
     db = get_db()
@@ -2131,7 +2349,8 @@ def auto_track_page():
     return render_template(
         'auto_track.html',
         api_key=get_auto_track_key(),
-        webhook_url=webhook_url
+        webhook_url=webhook_url,
+        llm_info=get_active_llm_provider()
     )
 
 
