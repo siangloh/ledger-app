@@ -827,6 +827,30 @@ def init_db():
         if AUTO_TRACK_DEBUG_LOG:
             print(f"[INIT_DB] llm_learning_samples init error: {e}")
 
+    # 7. 分类预算上限与超支提醒去重表
+    db.executescript('''
+    CREATE TABLE IF NOT EXISTS category_budgets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        category TEXT NOT NULL,
+        monthly_limit REAL NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(user_id, category)
+    );
+
+    CREATE TABLE IF NOT EXISTS category_budget_alerts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        category TEXT NOT NULL,
+        month TEXT NOT NULL,
+        threshold INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(user_id, category, month, threshold)
+    );
+    ''')
+    db.commit()
+
     # 确保 admin 用户具备默认分类
     init_user_default_categories(db, admin_id)
     db.close()
@@ -890,6 +914,119 @@ def get_savings_breakdown(db, user_id=None):
     total_savings_pool = max(all_in_total - all_out_total, 0.0)
 
     return sorted_pool, round(total_savings_pool, 2)
+
+
+def get_category_budget_status(db, user_id=None, month=None):
+    """
+    返回当前用户每个已设置月度预算的支出分类的花费进度：
+    [{category, limit, spent, remaining, pct, level}], 按 pct 从高到低排序。
+    level: 'over' (>=100%) / 'warn' (>=70%) / 'ok'
+    """
+    if not user_id:
+        user_id = get_current_user_id()
+    if not month:
+        month = date.today().strftime('%Y-%m')
+
+    budgets = db.execute(
+        'SELECT category, monthly_limit FROM category_budgets WHERE user_id = ?', (user_id,)
+    ).fetchall()
+    if not budgets:
+        return []
+
+    year, mon = map(int, month.split('-'))
+    last_day = monthrange(year, mon)[1]
+    start = f'{month}-01'
+    end = f'{month}-{last_day:02d}'
+
+    spent_rows = db.execute(
+        "SELECT category, SUM(amount) as total FROM transactions "
+        "WHERE user_id = ? AND type = 'expense' AND date BETWEEN ? AND ? GROUP BY category",
+        (user_id, start, end)
+    ).fetchall()
+    spent_by_category = {(r['category'] or '其他'): float(r['total'] or 0.0) for r in spent_rows}
+
+    result = []
+    for b in budgets:
+        cat = b['category']
+        limit = float(b['monthly_limit'])
+        spent = spent_by_category.get(cat, 0.0)
+        pct = (spent / limit * 100.0) if limit > 0 else 0.0
+        level = 'over' if pct >= 100 else ('warn' if pct >= 70 else 'ok')
+        result.append({
+            'category': cat,
+            'limit': round(limit, 2),
+            'spent': round(spent, 2),
+            'remaining': round(limit - spent, 2),
+            'pct': round(pct, 1),
+            'level': level,
+        })
+    result.sort(key=lambda x: x['pct'], reverse=True)
+    return result
+
+
+def check_and_record_budget_alerts(db, user_id, category, month=None):
+    """
+    检查某个分类本月花费是否新跨越了一个提醒阈值（70% / 100% / 150%）。
+    每个 (用户, 分类, 月份, 阈值) 组合只提醒一次，避免同一档位反复弹出提醒。
+    若确实跨越了新的阈值，返回该提醒的详情 dict 并落库；否则返回 None。
+    """
+    if not category:
+        return None
+    if not month:
+        month = date.today().strftime('%Y-%m')
+
+    budget = db.execute(
+        'SELECT monthly_limit FROM category_budgets WHERE user_id = ? AND category = ?',
+        (user_id, category)
+    ).fetchone()
+    if not budget:
+        return None
+    limit = float(budget['monthly_limit'])
+    if limit <= 0:
+        return None
+
+    year, mon = map(int, month.split('-'))
+    last_day = monthrange(year, mon)[1]
+    start = f'{month}-01'
+    end = f'{month}-{last_day:02d}'
+    spent_row = db.execute(
+        "SELECT SUM(amount) as total FROM transactions "
+        "WHERE user_id = ? AND type = 'expense' AND category = ? AND date BETWEEN ? AND ?",
+        (user_id, category, start, end)
+    ).fetchone()
+    spent = float(spent_row['total'] or 0.0) if spent_row else 0.0
+    pct = spent / limit * 100.0
+
+    crossed = None
+    for threshold in (150, 100, 70):
+        if pct >= threshold:
+            crossed = threshold
+            break
+    if crossed is None:
+        return None
+
+    already_alerted = db.execute(
+        'SELECT 1 FROM category_budget_alerts WHERE user_id = ? AND category = ? AND month = ? AND threshold = ?',
+        (user_id, category, month, crossed)
+    ).fetchone()
+    if already_alerted:
+        return None
+
+    db.execute(
+        'INSERT INTO category_budget_alerts (user_id, category, month, threshold, created_at) VALUES (?,?,?,?,?)',
+        (user_id, category, month, crossed, datetime.now().isoformat())
+    )
+    db.commit()
+
+    return {
+        'category': category,
+        'month': month,
+        'threshold': crossed,
+        'limit': round(limit, 2),
+        'spent': round(spent, 2),
+        'pct': round(pct, 1),
+        'message': f'预算提醒：「{category}」本月已花 RM{spent:.2f} / RM{limit:.2f}（{round(pct)}%）',
+    }
 
 
 def shift_month(month_str, delta):
@@ -1240,10 +1377,12 @@ def index():
     }
     expense_categories = get_categories(db, 'expense', None, user_id)
     savings_categories = get_categories(db, 'savings', None, user_id)
+    budget_status = get_category_budget_status(db, user_id, month)
 
     return render_template(
         'index.html',
         month=month,
+        budget_status=budget_status,
         prev_month=shift_month(month, -1),
         next_month=shift_month(month, 1),
         total_income=total_income,
@@ -1771,6 +1910,12 @@ def add_transaction():
         'user_id': user_id
     })
 
+    budget_alert = None
+    if tx_type == 'expense':
+        budget_alert = check_and_record_budget_alerts(db, user_id, f.get('category'), tx_date[:7])
+        if budget_alert and not is_ajax_request():
+            flash(budget_alert['message'], 'warning' if budget_alert['threshold'] < 100 else 'error')
+
     if is_ajax_request():
         savings_pool, total_pool = get_savings_breakdown(db, user_id)
         # 实时计算当月的最新收入构成与支出分类占比，供前端即时局部更新图表与图例
@@ -1820,7 +1965,8 @@ def add_transaction():
                     'labels': [k for k, _ in sorted(m_exp.items(), key=lambda x: x[1], reverse=True)],
                     'values': [round(v, 2) for _, v in sorted(m_exp.items(), key=lambda x: x[1], reverse=True)]
                 }
-            }
+            },
+            'budget_alert': budget_alert
         })
 
     flash('记录已添加', 'success')
@@ -1922,8 +2068,14 @@ def edit_record(tx_id):
         db.commit()
         bump_data_version('edit', {'id': tx_id, 'from_savings': from_savings, 'from_savings_category': from_savings_category})
 
+        budget_alert = None
+        if tx_type == 'expense':
+            budget_alert = check_and_record_budget_alerts(db, user_id, new_category, (f.get('date') or '')[:7])
+            if budget_alert and not is_ajax_request():
+                flash(budget_alert['message'], 'warning' if budget_alert['threshold'] < 100 else 'error')
+
         if is_ajax_request():
-            return jsonify({'ok': True, 'message': '记录已更新'})
+            return jsonify({'ok': True, 'message': '记录已更新', 'budget_alert': budget_alert})
 
         flash('记录已更新', 'success')
         return redirect(url_for('records'))
@@ -2056,8 +2208,23 @@ def batch_edit_records():
     db.commit()
     bump_data_version('batch_edit', {'count': len(valid_ids)})
 
+    # 批量修改后，对涉及到的每个支出分类各检查一次是否需要发出超支提醒（去重表保证不会重复弹出）
+    budget_alerts = []
+    if new_type is None or new_type == 'expense':
+        touched_cats = db.execute(
+            f"SELECT DISTINCT category FROM transactions WHERE user_id = ? AND type = 'expense' AND id IN ({placeholders})",
+            [user_id] + valid_ids
+        ).fetchall()
+        this_month = date.today().strftime('%Y-%m')
+        for row in touched_cats:
+            alert = check_and_record_budget_alerts(db, user_id, row['category'], this_month)
+            if alert:
+                budget_alerts.append(alert)
+                if not is_ajax_request():
+                    flash(alert['message'], 'warning' if alert['threshold'] < 100 else 'error')
+
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': f'成功批量修改 {len(valid_ids)} 条记录', 'edited_ids': valid_ids})
+        return jsonify({'ok': True, 'message': f'成功批量修改 {len(valid_ids)} 条记录', 'edited_ids': valid_ids, 'budget_alerts': budget_alerts})
 
     flash(f'成功批量修改 {len(valid_ids)} 条记录', 'success')
     return redirect(url_for('records'))
@@ -2551,6 +2718,10 @@ def api_auto_track():
     notification_title = "自动记账成功 💸"
     notification_body = f"已自动记入【{type_text} · {parsed['category']}】{money_filter(parsed['amount'])}{note_str}"
 
+    budget_alert = None
+    if parsed['type'] == 'expense':
+        budget_alert = check_and_record_budget_alerts(db, target_user_id, parsed['category'], parsed['date'][:7])
+
     return jsonify({
         'ok': True,
         'verdict': 'accepted',
@@ -2558,7 +2729,8 @@ def api_auto_track():
         'transaction_id': cur.lastrowid,
         'parsed': parsed,
         'notification_title': notification_title,
-        'notification_body': notification_body
+        'notification_body': notification_body,
+        'budget_alert': budget_alert
     }), 201
 
 
@@ -2731,7 +2903,12 @@ def categories_page():
     income_side = db.execute("SELECT * FROM categories WHERE user_id = ? AND type='income' AND group_name='side' ORDER BY id", (user_id,)).fetchall()
     expense = db.execute("SELECT * FROM categories WHERE user_id = ? AND type='expense' ORDER BY id", (user_id,)).fetchall()
     savings = db.execute("SELECT * FROM categories WHERE user_id = ? AND type='savings' ORDER BY id", (user_id,)).fetchall()
-    return render_template('categories.html', income_main=income_main, income_side=income_side, expense=expense, savings=savings)
+    budget_status = get_category_budget_status(db, user_id)
+    budget_map = {b['category']: b for b in budget_status}
+    return render_template(
+        'categories.html', income_main=income_main, income_side=income_side, expense=expense, savings=savings,
+        budget_map=budget_map,
+    )
 
 
 @app.route('/categories/add', methods=['POST'])
@@ -2766,11 +2943,61 @@ def add_category():
 def delete_category(cat_id):
     user_id = get_current_user_id()
     db = get_db()
+    cat = db.execute('SELECT name FROM categories WHERE id = ? AND user_id = ?', (cat_id, user_id)).fetchone()
     db.execute('DELETE FROM categories WHERE id = ? AND user_id = ?', (cat_id, user_id))
+    if cat:
+        db.execute('DELETE FROM category_budgets WHERE user_id = ? AND category = ?', (user_id, cat['name']))
     db.commit()
     if is_ajax_request():
         return jsonify({'ok': True, 'message': '分类已删除（历史记录中的旧数据不受影响）', 'id': cat_id})
     flash('分类已删除（历史记录中的旧数据不受影响）', 'success')
+    return redirect(url_for('categories_page'))
+
+
+@app.route('/categories/<int:cat_id>/budget', methods=['POST'])
+def set_category_budget(cat_id):
+    """设置或取消某个支出分类的月度预算上限"""
+    user_id = get_current_user_id()
+    db = get_db()
+    cat = db.execute("SELECT name FROM categories WHERE id = ? AND user_id = ? AND type = 'expense'", (cat_id, user_id)).fetchone()
+    if not cat:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '分类不存在'}), 404
+        flash('分类不存在', 'error')
+        return redirect(url_for('categories_page'))
+
+    raw_limit = (request.form.get('monthly_limit') or '').strip()
+    now = datetime.now().isoformat()
+
+    if not raw_limit:
+        db.execute('DELETE FROM category_budgets WHERE user_id = ? AND category = ?', (user_id, cat['name']))
+        db.commit()
+        msg = f'已取消「{cat["name"]}」的月度预算'
+    else:
+        try:
+            limit = float(raw_limit)
+        except ValueError:
+            limit = -1
+        if limit <= 0:
+            if is_ajax_request():
+                return jsonify({'ok': False, 'message': '预算金额必须是大于 0 的数字'}), 400
+            flash('预算金额必须是大于 0 的数字', 'error')
+            return redirect(url_for('categories_page'))
+
+        existing = db.execute('SELECT id FROM category_budgets WHERE user_id = ? AND category = ?', (user_id, cat['name'])).fetchone()
+        if existing:
+            db.execute('UPDATE category_budgets SET monthly_limit = ?, updated_at = ? WHERE id = ?', (limit, now, existing['id']))
+        else:
+            db.execute(
+                'INSERT INTO category_budgets (user_id, category, monthly_limit, created_at, updated_at) VALUES (?,?,?,?,?)',
+                (user_id, cat['name'], limit, now, now)
+            )
+        db.commit()
+        msg = f'已设置「{cat["name"]}」的月度预算为 RM{limit:.2f}'
+
+    if is_ajax_request():
+        return jsonify({'ok': True, 'message': msg})
+    flash(msg, 'success')
     return redirect(url_for('categories_page'))
 
 
@@ -2975,6 +3202,7 @@ def import_confirm():
     inserted = 0
     skipped = 0
     now = datetime.now().isoformat()
+    touched_expense_cat_months = set()
 
     for _, row in df.iterrows():
         try:
@@ -3018,12 +3246,20 @@ def import_confirm():
                 (user_id, tx_date, tx_type, group_name, category, amount, note, 'import', now)
             )
             inserted += 1
+            if tx_type == 'expense':
+                touched_expense_cat_months.add((category, tx_date[:7]))
         except Exception:
             skipped += 1
             continue
 
     db.commit()
     os.remove(saved_path)
+
+    for cat, cat_month in touched_expense_cat_months:
+        alert = check_and_record_budget_alerts(db, user_id, cat, cat_month)
+        if alert:
+            flash(alert['message'], 'warning' if alert['threshold'] < 100 else 'error')
+
     flash(f'导入完成：成功 {inserted} 条，跳过 {skipped} 条', 'success')
     return redirect(url_for('records'))
 
@@ -3514,9 +3750,14 @@ def split_bill_save_record():
     )
     db.commit()
     bump_data_version('split_bill', {'note': note, 'amount': amount, 'category': category, 'type': 'expense', 'user_id': user_id})
+
+    budget_alert = check_and_record_budget_alerts(db, user_id, category, tx_date[:7])
+    if budget_alert and not is_ajax_request():
+        flash(budget_alert['message'], 'warning' if budget_alert['threshold'] < 100 else 'error')
+
     msg = f'已成功记入支出：{note} {money_filter(amount)}'
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': msg})
+        return jsonify({'ok': True, 'message': msg, 'budget_alert': budget_alert})
     flash(msg, 'success')
     return redirect(url_for('records'))
 

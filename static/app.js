@@ -497,6 +497,19 @@ function attachQuickAddFormAjax() {
           customClass: { popup: 'app-swal-toast' }
         });
 
+        if (data.budget_alert && data.budget_alert.message) {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: data.budget_alert.threshold >= 100 ? 'error' : 'warning',
+            title: data.budget_alert.message,
+            showConfirmButton: false,
+            timer: 4200,
+            timerProgressBar: true,
+            customClass: { popup: 'app-swal-toast' }
+          });
+        }
+
         if (actionUrl.includes('/records/') && actionUrl.includes('/edit')) {
           if (typeof htmx !== 'undefined') {
             htmx.ajax('GET', '/records', { target: '#mainContainer', swap: 'innerHTML show:window:top' });

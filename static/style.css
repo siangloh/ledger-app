@@ -945,6 +945,51 @@ tbody tr .actions { cursor: default; }
 }
 .cat-list li:last-child { border-bottom: none; }
 
+.cat-list-budget li {
+  display: block;
+  padding: 10px 2px 14px;
+}
+.cat-budget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.cat-budget-form {
+  margin: 6px 0 0;
+  gap: 8px;
+}
+.budget-progress-track {
+  margin-top: 8px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border-soft);
+  overflow: hidden;
+}
+.budget-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--green);
+  transition: width 0.2s ease;
+}
+.budget-progress-fill.level-warn { background: #ca8a04; }
+.budget-progress-fill.level-over { background: #dc2626; }
+.budget-progress-label {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.budget-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.budget-badge-warn { background: rgba(234, 179, 8, 0.15); color: #ca8a04; }
+.budget-badge-over { background: rgba(220, 38, 38, 0.12); color: #dc2626; }
+
 /* ---------- 图表画布 ---------- */
 
 canvas {

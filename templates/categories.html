@@ -55,15 +55,36 @@
 
   <section class="panel">
     <h3>支出分类</h3>
-    <ul class="cat-list">
+    <ul class="cat-list cat-list-budget">
       {% for c in expense %}
-      <li>{{ c.name }}
-        <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
-              data-confirm-title="删除分类「{{ c.name }}」？"
-              data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
+      {% set b = budget_map.get(c.name) %}
+      <li>
+        <div class="cat-budget-header">
+          <span>{{ c.name }}</span>
+          <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
+                data-confirm-title="删除分类「{{ c.name }}」？"
+                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
+          </form>
+        </div>
+        <form method="post" action="{{ url_for('set_category_budget', cat_id=c.id) }}" class="row cat-budget-form">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
+          <span class="hint">月度预算</span>
+          <input type="number" name="monthly_limit" min="0" step="0.01" placeholder="不限额"
+                 value="{{ b.limit if b else '' }}" style="width:100px;">
+          <button type="submit" class="btn-secondary btn-sm">保存</button>
         </form>
+        {% if b %}
+        <div class="budget-progress-track">
+          <div class="budget-progress-fill level-{{ b.level }}" style="width: {{ [b.pct, 100] | min }}%;"></div>
+        </div>
+        <div class="hint budget-progress-label">
+          本月已花 RM{{ '%.2f' | format(b.spent) }} / RM{{ '%.2f' | format(b.limit) }}（{{ b.pct }}%）
+          {% if b.level == 'over' %}<span class="budget-badge budget-badge-over">已超支</span>
+          {% elif b.level == 'warn' %}<span class="budget-badge budget-badge-warn">接近预算</span>{% endif %}
+        </div>
+        {% endif %}
       </li>
       {% else %}<li class="hint">暂无</li>{% endfor %}
     </ul>
