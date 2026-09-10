@@ -3,6 +3,7 @@ import re
 import sys
 import json
 import uuid
+import secrets
 import sqlite3
 import requests
 from calendar import monthrange
@@ -67,12 +68,12 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 # 限制上传文件大小最大 20MB (避免高像素手机照片超出限制)
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
-# 自动记账 API 鉴权密钥 (支持用户指定 key、环境变量及数据库配置)
-DEFAULT_AUTO_TRACK_KEY = 'zo}SxK_}_%0LO8w;'
+# 自动记账 API 鉴权密钥 (支持用户指定 key、环境变量及数据库配置；不再有任何硬编码保底值)
 AUTO_TRACK_KEY = os.environ.get('AUTO_TRACK_KEY')
 AUTO_TRACK_DEBUG_LOG = os.environ.get('AUTO_TRACK_DEBUG_LOG', '0') == '1'
 
-# 获取有效的 AUTO_TRACK_KEY（优先环境变量，次选数据库 system_settings，保底指定默认 key）
+# 获取有效的 AUTO_TRACK_KEY（优先环境变量，次选数据库 system_settings；两者都没设置就回传 None，
+# 代表目前没有配置任何 key —— 这种情况下 is_valid_api_key() 一律拒绝，不会有任何后备值可用）
 def get_auto_track_key():
     if AUTO_TRACK_KEY and AUTO_TRACK_KEY.strip():
         return AUTO_TRACK_KEY.strip()
@@ -83,24 +84,19 @@ def get_auto_track_key():
             return str(row['value']).strip()
     except Exception:
         pass
-    return DEFAULT_AUTO_TRACK_KEY
+    return None
 
 
 def is_valid_api_key(req_key):
-    """检验 API Key 是否合法（支持去除首尾空格、兼容默认与环境变量 key）"""
+    """检验 API Key 是否合法。只认目前实际配置的那一把 key，
+    不接受任何写死在代码里的默认值或旧版曾经泄漏过的 key（那些已经被视为永久作废）。"""
     if not req_key:
         return False
-    k = str(req_key).strip()
-    effective = (get_auto_track_key() or '').strip()
-    valid_set = {
-        effective,
-        DEFAULT_AUTO_TRACK_KEY,
-        'my-secret-ledger-key',
-        'ledger-auto-track-default-key'
-    }
-    if AUTO_TRACK_KEY and AUTO_TRACK_KEY.strip():
-        valid_set.add(AUTO_TRACK_KEY.strip())
-    return k in valid_set
+    effective = get_auto_track_key()
+    if not effective:
+        # 完全没有配置任何 key 时，拒绝所有请求，不回退到任何默认值
+        return False
+    return str(req_key).strip() == effective
 
 # LLM 智能服务配置 (优先 Google Gemini，其次 OpenAI/DeepSeek，再回退本地 Ollama 与快速规则引擎)
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
@@ -125,7 +121,8 @@ def get_active_llm_provider():
         return {'provider': 'openai', 'name': f'OpenAI ({OPENAI_MODEL})', 'available': True}
     return {'provider': 'ollama', 'name': f'Local Ollama ({OLLAMA_MODEL})', 'available': False}
 
-# 单用户访问密码 (优先环境变量，次选数据库 system_settings，保底 admin123)
+# 单用户访问密码 (优先环境变量，次选数据库 system_settings；都没设置就回传 None，
+# 不再有任何写死在代码里的保底密码)
 def get_app_password():
     env_pw = os.environ.get('APP_PASSWORD')
     if env_pw:
@@ -137,7 +134,7 @@ def get_app_password():
             return row['value']
     except Exception:
         pass
-    return 'admin123'
+    return None
 
 APP_PASSWORD = os.environ.get('APP_PASSWORD')
 
@@ -274,8 +271,8 @@ def get_current_user_id():
 def require_login():
     # 允许静态资源、登录/注册/登出路由、健康检查、PWA 核心资源以及外部自动记账 Webhook 豁免 Session 检查
     if (
-        request.endpoint in ('login', 'register', 'logout', 'static', 'health', 'api_realtime_check', 'manifest', 'service_worker', 'offline_page', 'api_check_username', 'download_apk', 'split_bill_ocr_upload', 'split_bill_parse_text')
-        or request.path in ('/login', '/register', '/logout', '/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html', '/api/check-username', '/download/apk', '/split-bill/ocr-upload', '/split-bill/parse-text')
+        request.endpoint in ('login', 'register', 'logout', 'static', 'health', 'api_realtime_check', 'manifest', 'service_worker', 'offline_page', 'api_check_username', 'download_apk')
+        or request.path in ('/login', '/register', '/logout', '/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html', '/api/check-username', '/download/apk')
         or (request.path and request.path.startswith('/static/'))
     ):
         return
@@ -314,7 +311,6 @@ def api_check_username():
 
 
 @app.route('/register', methods=['GET', 'POST'])
-@csrf.exempt
 def register():
     if session.get('logged_in') and session.get('user_id'):
         return redirect(url_for('index'))
@@ -381,7 +377,6 @@ def register():
 
 
 @app.route('/login', methods=['GET', 'POST'])
-@csrf.exempt
 def login():
     if session.get('logged_in') and session.get('user_id'):
         return redirect(url_for('index'))
@@ -652,7 +647,17 @@ def init_db():
     admin_row = db.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
     if not admin_row:
         admin_id = str(uuid.uuid4())
-        admin_pw = get_app_password() or 'admin123'
+        admin_pw = get_app_password()
+        if not admin_pw:
+            # 没有设置 APP_PASSWORD/system_settings，就生成一个随机的一次性密码，
+            # 而不是用任何写死的默认密码 —— 密码只会印一次在 server log 里，
+            # 你要用这个默认 admin 账号登录的话，去 log 里找这一行复制密码，
+            # 登录后建议尽快改掉或改用 /register 建一个自己的账号。
+            admin_pw = secrets.token_urlsafe(16)
+            app.logger.warning(
+                "未设置 APP_PASSWORD，已为默认 admin 账号生成一次性随机密码（仅显示这一次）：%s",
+                admin_pw
+            )
         db.execute(
             "INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
             (admin_id, 'admin', generate_password_hash(admin_pw), datetime.now().isoformat())
@@ -774,13 +779,6 @@ def init_db():
     );
     ''')
     db.commit()
-
-    try:
-        db.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES ('auto_track_key', ?)", (DEFAULT_AUTO_TRACK_KEY,))
-        db.execute("UPDATE system_settings SET value = ? WHERE key = 'auto_track_key' AND (value IS NULL OR value = '' OR value = 'ledger-auto-track-default-key')", (DEFAULT_AUTO_TRACK_KEY,))
-        db.commit()
-    except Exception:
-        pass
 
     try:
         db.execute("ALTER TABLE transactions ADD COLUMN from_savings INTEGER DEFAULT 0")
@@ -2373,7 +2371,9 @@ def nlp_parse():
 @app.route('/api/auto-track', methods=['GET', 'POST'])
 @csrf.exempt
 def api_auto_track():
-    # 鉴权检查：优先 Header X-API-KEY，其次 JSON/Form key，最后回退 URL 参数 ?key=xxx 保持向后兼容性
+    # 鉴权检查：只接受 Header X-API-KEY 或 JSON/表单 body 里的 key，不再接受 URL 参数 ?key=xxx。
+    # URL 参数里的密钥很容易被 server access log、浏览器历史记录、反向代理日志留下痕迹，
+    # 之前泄漏的那把 key 就是从类似的地方外流的，所以这里刻意不留这个入口。
     req_key = request.headers.get('X-API-KEY')
     data = {}
     if request.is_json:
@@ -2382,9 +2382,6 @@ def api_auto_track():
             req_key = data.get('key')
     else:
         req_key = req_key or request.form.get('key')
-
-    if not req_key:
-        req_key = request.args.get('key')
 
     print(f"[AUTO_TRACK] Request from {request.remote_addr}, Method={request.method}, KeyProvided={'YES' if req_key else 'NO'}, ContentType={request.content_type}")
 
@@ -2568,11 +2565,12 @@ def api_auto_track():
 @app.route('/api/categories', methods=['GET'])
 @csrf.exempt
 def api_get_categories():
-    """获取所有可用分类列表（支持 Android 端离线缓存与下拉选择）"""
+    """获取所有可用分类列表（专供 Android 端离线缓存与下拉选择使用）。
+    只认 X-API-KEY，不接受 session cookie 登录状态 —— 这个端点从未被网页端调用过，
+    保留 cookie 当备用认证方式只会平白让它暴露在 CSRF 攻击面下，没有实际用途。"""
     req_key = request.headers.get('X-API-KEY')
     if not is_valid_api_key(req_key):
-        if not session.get('logged_in'):
-            return jsonify({'ok': False, 'message': 'API Key 无效或未登录'}), 401
+        return jsonify({'ok': False, 'message': 'API Key 无效'}), 401
 
     user_id = get_current_user_id()
     db = get_db()
@@ -2584,11 +2582,11 @@ def api_get_categories():
 @app.route('/api/transactions/sync', methods=['POST'])
 @csrf.exempt
 def api_sync_transactions():
-    """批量同步移动端离线记账数据"""
+    """批量同步移动端离线记账数据。只认 X-API-KEY，不接受 session cookie —— 这个端点
+    从未被网页端调用过，保留 cookie 备用认证只会平白让写入操作暴露在 CSRF 攻击面下。"""
     req_key = request.headers.get('X-API-KEY')
     if not is_valid_api_key(req_key):
-        if not session.get('logged_in'):
-            return jsonify({'ok': False, 'message': 'API Key 无效或未登录'}), 401
+        return jsonify({'ok': False, 'message': 'API Key 无效'}), 401
 
     payload = request.get_json(silent=True) or {}
     txs = payload.get('transactions', [])
@@ -2642,14 +2640,12 @@ def auto_track_page():
     base_url = f"{scheme}://{request.host}".rstrip('/')
     api_key = get_auto_track_key()
     webhook_url = f"{base_url}/api/auto-track"
-    webhook_url_with_key = f"{base_url}/api/auto-track?key={api_key}"
     db = get_db()
     samples = db.execute("SELECT * FROM llm_learning_samples ORDER BY id ASC").fetchall()
     return render_template(
         'auto_track.html',
         api_key=api_key,
         webhook_url=webhook_url,
-        webhook_url_with_key=webhook_url_with_key,
         llm_info=get_active_llm_provider(),
         samples=samples
     )
@@ -2667,7 +2663,6 @@ def api_llm_samples_list():
 
 
 @app.route('/api/llm-samples/add', methods=['POST'])
-@csrf.exempt
 def api_llm_samples_add():
     if not session.get('logged_in'):
         return jsonify({'ok': False, 'message': '请先登录后再添加样本'}), 401
@@ -2704,7 +2699,6 @@ def api_llm_samples_add():
 
 
 @app.route('/api/llm-samples/delete/<int:sample_id>', methods=['POST'])
-@csrf.exempt
 def api_llm_samples_delete(sample_id):
     if not session.get('logged_in'):
         return jsonify({'ok': False, 'message': '请先登录'}), 401
@@ -2715,7 +2709,6 @@ def api_llm_samples_delete(sample_id):
 
 
 @app.route('/api/llm-samples/reset', methods=['POST'])
-@csrf.exempt
 def api_llm_samples_reset():
     if not session.get('logged_in'):
         return jsonify({'ok': False, 'message': '请先登录'}), 401
@@ -3295,7 +3288,6 @@ def split_bill_page():
 
 
 @app.route('/split-bill/parse-text', methods=['POST'])
-@csrf.exempt
 def split_bill_parse_text():
     """解析小票文本或粘贴内容"""
     text = request.form.get('text', '').strip()
@@ -3459,7 +3451,6 @@ def smart_orient_receipt_ocr(pil_img, engine):
 
 
 @app.route('/split-bill/ocr-upload', methods=['POST'])
-@csrf.exempt
 def split_bill_ocr_upload():
     """本地 RapidOCR 深度学习小票识别接口（零云端依赖，支持全方向自适应纠偏与同行对齐）"""
     file = request.files.get('file') or request.files.get('receipt_image')

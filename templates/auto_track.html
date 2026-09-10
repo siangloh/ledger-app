@@ -15,20 +15,15 @@
     <h3>🔗 你的专属接收网关 (Webhook URL)</h3>
     <div style="background: var(--surface-soft); padding: 14px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin: 12px 0 18px;">
       <div style="font-size: 12px; color: var(--navy); font-weight: 600; margin-bottom: 6px;">
-        ⭐ 一体化免 Header 接收地址（推荐！在 MacroDroid 中直接填此 URL，免配置 Headers）：
+        Webhook 地址（需配合 X-API-KEY 请求头使用，MacroDroid 的 HTTP Request 动作支持自定义 Header）：
       </div>
-      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
-        <input type="text" id="webhookInputWithKey" value="{{ webhook_url_with_key }}" readonly style="font-family: var(--font-mono); font-size: 12.5px; background: #fff;">
-        <button type="button" class="btn-primary" onclick="copyText('webhookInputWithKey', '一体化 Webhook 地址已复制')" style="white-space: nowrap; font-size: 12px;">复制地址</button>
+      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px;">
+        <input type="text" id="webhookInput" value="{{ webhook_url }}" readonly style="font-family: var(--font-mono); font-size: 12px; background: #fff;">
+        <button type="button" class="btn-secondary" onclick="copyText('webhookInput', '标准 Webhook 地址已复制')" style="white-space: nowrap; font-size: 12px;">复制</button>
       </div>
-
-      <details style="font-size: 12px; color: var(--muted); margin-bottom: 6px;">
-        <summary style="cursor: pointer; color: var(--ink-soft); font-weight: 500;">高级选项：标准地址（需配合 X-API-KEY 请求头使用）</summary>
-        <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px;">
-          <input type="text" id="webhookInput" value="{{ webhook_url }}" readonly style="font-family: var(--font-mono); font-size: 12px; background: #fff;">
-          <button type="button" class="btn-secondary" onclick="copyText('webhookInput', '标准 Webhook 地址已复制')" style="white-space: nowrap; font-size: 12px;">复制</button>
-        </div>
-      </details>
+      <div style="font-size: 11.5px; color: var(--muted); margin-bottom: 6px;">
+        出于安全考虑，密钥不再支持放在网址里（?key=...），这种写法容易被 server 日志、浏览器历史记录留下痕迹。请把下方 API Key 设置成一个叫 <code style="font-family: var(--font-mono);">X-API-KEY</code> 的请求头。
+      </div>
 
       <div style="display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; margin-top: 10px;">
         <span style="color: var(--green);">✓ 安全保护已激活：API Key = <code style="font-family: var(--font-mono); background: var(--border-soft); padding: 2px 6px; border-radius: 4px;">{{ api_key }}</code></span>
@@ -268,11 +263,11 @@ async function submitTestAutoTrack(e) {
   resultBox.style.display = 'none';
 
   try {
-    const res = await fetch("{{ webhook_url | safe }}", {
+    const res = await fetch({{ webhook_url | tojson }}, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-KEY': '{{ api_key }}'
+        'X-API-KEY': {{ api_key | tojson }}
       },
       body: JSON.stringify({ text: text })
     });
@@ -445,9 +440,10 @@ function openAddSampleModal(prefill = {}) {
 
 async function saveSampleToServer(payload) {
   try {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     const r = await fetch('/api/llm-samples/add', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
       body: JSON.stringify(payload)
     });
     const data = await r.json();
@@ -484,7 +480,8 @@ function deleteLlmSample(id) {
   }).then(async (res) => {
     if (res.isConfirmed) {
       try {
-        const r = await fetch(`/api/llm-samples/delete/${id}`, { method: 'POST' });
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const r = await fetch(`/api/llm-samples/delete/${id}`, { method: 'POST', headers: { 'X-CSRFToken': csrfToken } });
         const data = await r.json();
         if (data.ok) {
           const row = document.getElementById(`sample-row-${id}`);
@@ -522,7 +519,8 @@ function resetLlmSamples() {
   }).then(async (res) => {
     if (res.isConfirmed) {
       try {
-        const r = await fetch('/api/llm-samples/reset', { method: 'POST' });
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const r = await fetch('/api/llm-samples/reset', { method: 'POST', headers: { 'X-CSRFToken': csrfToken } });
         const data = await r.json();
         if (data.ok) {
           Swal.fire({

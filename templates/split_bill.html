@@ -536,8 +536,10 @@ async function handleReceiptFileSelect(files) {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
       const res = await fetch('/split-bill/ocr-upload', {
         method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
         body: formData
       });
       if (res.ok) {

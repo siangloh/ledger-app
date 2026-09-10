@@ -49,9 +49,18 @@ assert res['total'] == 27.40
 print("PASS")
 
 print("\n" + "=" * 70)
-print("2. /split-bill/parse-text endpoint (this is what both the web manual-paste")
-print("   box AND the Android ML-Kit-recognized-text flow call)")
+print("2. /split-bill/parse-text endpoint (login + CSRF now both required, see the")
+print("   security-fix pass in scratch/probe_security_fixes.py)")
 print("=" * 70)
+
+
+def get_csrf_token(html_bytes):
+    import re as _re
+    # forms use a hidden input; every page (via base.html) also carries a <meta> tag copy
+    m = _re.search(rb'name="csrf_token" value="([^"]+)"', html_bytes) or _re.search(rb'name="csrf-token" content="([^"]+)"', html_bytes)
+    assert m, "could not find a csrf token on the page"
+    return m.group(1).decode()
+
 
 with app.test_client() as client:
     with client.session_transaction() as sess:
@@ -59,7 +68,11 @@ with app.test_client() as client:
         sess['username'] = 'admin'
         sess['user_id'] = 1
 
-    resp = client.post('/split-bill/parse-text', data={'text': mamak_text})
+    # already authenticated in this session, so GET / (not /login, which would just
+    # redirect an authenticated session away) to grab a valid token from the meta tag.
+    token = get_csrf_token(client.get('/').data)
+
+    resp = client.post('/split-bill/parse-text', data={'text': mamak_text, 'csrf_token': token})
     assert resp.status_code == 200
     data = resp.get_json()
     print(f"ok={data['ok']}  items={len(data['data']['items'])}  total={data['data']['total']}")
@@ -67,23 +80,20 @@ with app.test_client() as client:
     assert len(data['data']['items']) == 5
 
     # Empty text should be rejected cleanly, not crash
-    resp2 = client.post('/split-bill/parse-text', data={'text': ''})
+    resp2 = client.post('/split-bill/parse-text', data={'text': '', 'csrf_token': token})
     assert resp2.status_code == 400
     print("PASS: valid text parses correctly, empty text rejected with 400 (no crash).")
 
 print("\n" + "=" * 70)
-print("3. Confirm the removed server-side OCR route is actually gone")
+print("3. /split-bill routes require login (no session -> redirected, not 200/404)")
 print("=" * 70)
 
-with app.test_client() as client:
-    with client.session_transaction() as sess:
-        sess['logged_in'] = True
-        sess['username'] = 'admin'
-        sess['user_id'] = 1
-    resp = client.post('/split-bill/ocr-upload', data={})
-    print(f"/split-bill/ocr-upload -> HTTP {resp.status_code} (expect 404, route no longer exists)")
-    assert resp.status_code == 404
-    print("PASS: server no longer exposes an OCR upload route.")
+with app.test_client() as anon_client:
+    anon_token = get_csrf_token(anon_client.get('/login').data)
+    resp = anon_client.post('/split-bill/ocr-upload', data={'csrf_token': anon_token})
+    print(f"/split-bill/ocr-upload, no login -> HTTP {resp.status_code} (expect 302 redirect to /login)")
+    assert resp.status_code == 302 and '/login' in (resp.headers.get('Location') or '')
+    print("PASS: server requires login before accepting an OCR upload (was previously public).")
 
 print("\nAll checks passed. Note: this only covers the text-parsing path — actual")
 print("on-device OCR accuracy (ML Kit, in the Android app) is not something this")
