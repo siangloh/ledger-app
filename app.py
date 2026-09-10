@@ -43,8 +43,8 @@ app.config['SESSION_COOKIE_SECURE'] = bool(is_production)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-# 限制上传文件大小最大 10MB
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
+# 限制上传文件大小最大 20MB (避免高像素手机照片超出限制)
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
 # 自动记账 API 鉴权密钥 (支持用户指定 key、环境变量及数据库配置)
 DEFAULT_AUTO_TRACK_KEY = 'zo}SxK_}_%0LO8w;'
@@ -154,8 +154,8 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 @app.errorhandler(413)
 def request_entity_too_large(error):
     if request.is_json or request.path.startswith('/split-bill/ocr-upload'):
-        return jsonify({'ok': False, 'message': '上传文件大小超出限制（最大允许 10MB）'}), 413
-    flash('上传文件大小超出限制（最大允许 10MB）', 'error')
+        return jsonify({'ok': False, 'message': '上传文件大小超出限制（最大允许 20MB）'}), 413
+    flash('上传文件大小超出限制（最大允许 20MB）', 'error')
     return redirect(request.referrer or url_for('index'))
 
 
@@ -3034,8 +3034,8 @@ def parse_receipt_text_to_items(raw_text):
                 total = float(m.group(1))
             continue
 
-        # 排除其他干扰行（如日期、电话、找零、银行卡号等）
-        if any(k in lower for k in ['cash', 'change', 'visa', 'mastercard', 'mydebit', 'table', 'date', 'tel', 'invoice', 'receipt', 'bill no']):
+        # 排除其他干扰行（如日期、电话、找零、银行卡号等，避免 tel 误伤 telur）
+        if any(k in lower for k in ['cash', 'change', 'visa', 'mastercard', 'mydebit', 'invoice', 'receipt', 'bill no']) or re.search(r'\b(?:table|date|tel|phone)\b', lower):
             continue
 
         # 提取常规菜品/消费条目：要求末尾有金额
@@ -3087,6 +3087,7 @@ def split_bill_page():
 
 
 @app.route('/split-bill/parse-text', methods=['POST'])
+@csrf.exempt
 def split_bill_parse_text():
     """解析小票文本或粘贴内容"""
     text = request.form.get('text', '').strip()
@@ -3097,9 +3098,80 @@ def split_bill_parse_text():
     return jsonify({'ok': True, 'data': parsed})
 
 
+def get_tesseract_cmd():
+    """多平台探测 tesseract 可执行文件路径"""
+    import shutil
+    env_cmd = os.environ.get('TESSERACT_CMD')
+    if env_cmd and os.path.isfile(env_cmd):
+        return env_cmd
+    which_cmd = shutil.which('tesseract')
+    if which_cmd:
+        return which_cmd
+    for p in ['/usr/bin/tesseract', '/usr/local/bin/tesseract']:
+        if os.path.isfile(p):
+            return p
+    for win_path in [
+        r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+        r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+        os.path.expanduser(r'~\AppData\Local\Programs\Tesseract-OCR\tesseract.exe')
+    ]:
+        if os.path.isfile(win_path):
+            return win_path
+    return None
+
+
+def preprocess_receipt_image_for_ocr(img):
+    """
+    自适应小票图像预处理流水线 (基于轻量纯 Pillow):
+    1. 自适应尺寸缩放:
+       - 若宽高比 height/width > 2.0 (超市等纵向细长收据):
+         锁定宽度为 1100px (保持字体高度与字距处于最佳水平)，高度上限放宽至 4000px，
+         避免常规压缩长边导致长小票底部微小文字被过度压扁失真。
+       - 常规小票 (height/width <= 2.0):
+         限制长边 <= 1800px，短边不低于 800px，加快处理速度并防止触发云端 100s 请求超时。
+    2. 灰度化 (L): 剥离背景色与杂色。
+    3. 自适应动态色阶拉伸与对比度提升: 压制反光与热敏纸变色。
+    4. 适度锐化: 增强细微笔画边缘。
+    """
+    from PIL import Image, ImageEnhance, ImageOps
+
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+
+    w, h = img.size
+    ratio = h / max(1, w)
+
+    if ratio > 2.0:
+        # 细长小票：以宽度 1100px 为锚点等比缩放
+        target_w = 1100
+        if w != target_w:
+            scale = target_w / w
+            new_h = min(4000, max(600, int(h * scale)))
+            img = img.resize((target_w, new_h), Image.Resampling.LANCZOS)
+    else:
+        # 常规小票
+        max_side = 1800
+        if max(w, h) > max_side:
+            scale = max_side / max(w, h)
+            img = img.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
+        elif min(w, h) < 700:
+            scale = 700 / max(1, min(w, h))
+            img = img.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
+
+    # 转灰度
+    gray = img.convert('L')
+    # 自动色阶拉伸，消除泛白反光
+    autocontrast_img = ImageOps.autocontrast(gray, cutoff=1)
+    # 适度对比度与锐化
+    enhanced = ImageEnhance.Contrast(autocontrast_img).enhance(1.6)
+    sharpened = ImageEnhance.Sharpness(enhanced).enhance(1.4)
+    return sharpened
+
+
 @app.route('/split-bill/ocr-upload', methods=['POST'])
+@csrf.exempt
 def split_bill_ocr_upload():
-    """上传小票图片进行 OCR 提取"""
+    """上传小票图片进行本地 Tesseract OCR 提取 (零外部 API 调用)"""
     file = request.files.get('file')
     if not file or file.filename == '':
         return jsonify({'ok': False, 'message': '请选择小票图片'}), 400
@@ -3113,30 +3185,49 @@ def split_bill_ocr_upload():
     file.save(img_path)
 
     extracted_text = ""
-    # 优先尝试本地 pytesseract 如果系统已安装
+    ocr_error_reason = None
     try:
         import pytesseract
         from PIL import Image
-        img = Image.open(img_path)
-        extracted_text = pytesseract.image_to_string(img)
-    except Exception:
-        pass
 
-    # 清理图片
-    try:
-        os.remove(img_path)
-    except OSError:
-        pass
+        tess_bin = get_tesseract_cmd()
+        if tess_bin:
+            pytesseract.pytesseract.tesseract_cmd = tess_bin
+
+        with Image.open(img_path) as raw_img:
+            processed_img = preprocess_receipt_image_for_ocr(raw_img)
+            # 优先使用中英双语识别，若中文字库缺失则回退为英文
+            try:
+                extracted_text = pytesseract.image_to_string(processed_img, lang='eng+chi_sim')
+            except Exception:
+                extracted_text = pytesseract.image_to_string(processed_img, lang='eng')
+    except ImportError:
+        ocr_error_reason = "pytesseract 依赖库未安装"
+    except Exception as e:
+        ocr_error_reason = str(e)
+    finally:
+        # 确保 100% 清除服务器端临时图片
+        try:
+            if os.path.exists(img_path):
+                os.remove(img_path)
+        except OSError:
+            pass
 
     if extracted_text and extracted_text.strip():
-        parsed = parse_receipt_text_to_items(extracted_text)
+        # 兼容性预处理: 热敏纸常见 OCR 混淆字符 (例如 RN 误读为 RM)
+        normalized_text = re.sub(r'\bRN\b', 'RM', extracted_text)
+        parsed = parse_receipt_text_to_items(normalized_text)
         return jsonify({'ok': True, 'raw_text': extracted_text, 'data': parsed})
 
-    # 如果运行环境暂无 OCR 引擎（如未安装 tesseract 可执行文件），给出友好提示并提供内置小票模板样例
+    # 无法解析或引擎异常时的友好降级
+    msg = '未识别到清晰小票文本，请改用「文字粘贴模式」或尝试更清晰平整的照片。'
+    if ocr_error_reason and 'tesseract is not installed' in ocr_error_reason.lower():
+        msg = '当前运行环境未检测到 Tesseract OCR 引擎，已为你开启小票手动录入/粘贴模式。'
+
     return jsonify({
         'ok': False,
-        'ocr_engine_ready': False,
-        'message': '当前云端/本地未安装 Tesseract OCR 引擎，已为你开启「小票文本快速粘贴/录入」模式。'
+        'ocr_engine_ready': bool(get_tesseract_cmd()),
+        'message': msg
     })
 
 

@@ -14,10 +14,41 @@ import java.net.URL
 
 object NetworkHelper {
     private const val TAG = "LedgerNetwork"
-    private const val BASE_URL = "https://ledger-app-l3hc.onrender.com"
+    const val DEFAULT_BASE_URL = "https://ledger-app-l3hc.onrender.com"
+    private const val PREFS_NAME = "ledger_network_prefs"
+    private const val KEY_SERVER_URL = "custom_server_url"
+
+    private var cachedContext: Context? = null
     private val API_KEY = BuildConfig.API_KEY
 
+    fun init(context: Context) {
+        cachedContext = context.applicationContext
+    }
+
+    fun getServerUrl(context: Context? = null): String {
+        val ctx = context ?: cachedContext
+        if (ctx == null) return DEFAULT_BASE_URL
+        return try {
+            val sp = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val custom = sp.getString(KEY_SERVER_URL, null)?.trim()?.trimEnd('/')
+            if (!custom.isNullOrEmpty()) custom else DEFAULT_BASE_URL
+        } catch (_: Exception) {
+            DEFAULT_BASE_URL
+        }
+    }
+
+    fun setServerUrl(context: Context, url: String) {
+        val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val clean = url.trim().trimEnd('/')
+        if (clean.isEmpty() || clean.equals(DEFAULT_BASE_URL, ignoreCase = true)) {
+            sp.edit().remove(KEY_SERVER_URL).apply()
+        } else {
+            sp.edit().putString(KEY_SERVER_URL, clean).apply()
+        }
+    }
+
     fun isOnline(context: Context): Boolean {
+        init(context)
         return try {
             val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
             val activeNetwork = cm.activeNetwork ?: return false
@@ -28,10 +59,10 @@ object NetworkHelper {
         }
     }
 
-    fun postNotificationAsync(text: String, callback: ((Boolean, String, String?) -> Unit)? = null) {
+    fun postNotificationAsync(text: String, context: Context? = null, callback: ((Boolean, String, String?) -> Unit)? = null) {
         Thread {
             try {
-                val fullUrl = "$BASE_URL/api/auto-track"
+                val fullUrl = "${getServerUrl(context)}/api/auto-track"
                 val url = URL(fullUrl)
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
@@ -79,7 +110,7 @@ object NetworkHelper {
     fun syncPendingTransactions(transactions: List<PendingTransaction>, callback: ((Boolean, List<Long>) -> Unit)? = null) {
         Thread {
             try {
-                val fullUrl = "$BASE_URL/api/transactions/sync"
+                val fullUrl = "${getServerUrl()}/api/transactions/sync"
                 val url = URL(fullUrl)
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
@@ -145,7 +176,7 @@ object NetworkHelper {
     fun fetchCategories(callback: ((Boolean, List<CachedCategory>) -> Unit)? = null) {
         Thread {
             try {
-                val fullUrl = "$BASE_URL/api/categories"
+                val fullUrl = "${getServerUrl()}/api/categories"
                 val url = URL(fullUrl)
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"

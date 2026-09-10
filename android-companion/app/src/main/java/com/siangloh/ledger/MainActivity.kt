@@ -41,7 +41,6 @@ class MainActivity : AppCompatActivity() {
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
 
     companion object {
-        private const val LEDGER_URL = "https://ledger-app-l3hc.onrender.com"
         private const val FILE_CHOOSER_REQUEST_CODE = 1001
     }
 
@@ -111,7 +110,7 @@ class MainActivity : AppCompatActivity() {
             offlineContainer.visibility = View.GONE
             webView.visibility = View.VISIBLE
             fabQuickAdd.visibility = View.VISIBLE
-            webView.loadUrl(LEDGER_URL)
+            webView.loadUrl(NetworkHelper.getServerUrl(this))
             SyncWorker.enqueueSync(this)
         } else {
             offlineContainer.visibility = View.VISIBLE
@@ -259,7 +258,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showQuickMenu() {
-        val options = arrayOf("⚡ 离线快速记账", "⚙️ 监测的应用设置", "📋 查看通知与同步日志", "🔄 手动同步")
+        val options = arrayOf("⚡ 离线快速记账", "⚙️ 监测的应用设置", "📋 查看通知与同步日志", "🔄 手动同步", "🌐 服务器地址设置")
         AlertDialog.Builder(this)
             .setTitle("快捷菜单")
             .setItems(options) { _, which ->
@@ -271,8 +270,34 @@ class MainActivity : AppCompatActivity() {
                         SyncWorker.enqueueSync(this)
                         Toast.makeText(this, "已发起后台同步请求", Toast.LENGTH_SHORT).show()
                     }
+                    4 -> showServerUrlDialog()
                 }
             }
+            .show()
+    }
+
+    private fun showServerUrlDialog() {
+        val input = android.widget.EditText(this).apply {
+            setText(NetworkHelper.getServerUrl(this@MainActivity))
+            setSelection(text.length)
+            hint = NetworkHelper.DEFAULT_BASE_URL
+        }
+        AlertDialog.Builder(this)
+            .setTitle("🌐 服务器地址设置")
+            .setMessage("如云端服务器域名变更，可在此修改服务器地址：")
+            .setView(input)
+            .setPositiveButton("保存") { _, _ ->
+                val newUrl = input.text.toString().trim()
+                NetworkHelper.setServerUrl(this, newUrl)
+                Toast.makeText(this, "服务器地址已更新并重新加载", Toast.LENGTH_SHORT).show()
+                loadContent()
+            }
+            .setNeutralButton("恢复默认") { _, _ ->
+                NetworkHelper.setServerUrl(this, "")
+                Toast.makeText(this, "已恢复为默认服务器地址", Toast.LENGTH_SHORT).show()
+                loadContent()
+            }
+            .setNegativeButton("取消", null)
             .show()
     }
 
