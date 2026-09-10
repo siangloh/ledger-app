@@ -475,8 +475,25 @@ function receiveScannedReceiptText(text) {
   const textarea = document.getElementById('receiptTextInput');
   if (textarea) textarea.value = text;
   // 识别完成，纯前端解析并立即调起“预填弹窗 + 大字号金额确认”
-  const parsed = parseReceiptTextClientSide(text);
-  openReviewModal(parsed, text);
+  // 这里刻意包一层 try/catch：如果解析或开弹窗这两步任何一步出错，
+  // 之前发生过"文字已经填进文本框，但后面整个中断、没有任何提示"的情况——
+  // 宁可跳出一个明确的错误提示，也不要静默卡住让人不知道发生了什么。
+  try {
+    const parsed = parseReceiptTextClientSide(text);
+    openReviewModal(parsed, text);
+  } catch (err) {
+    console.error('receiveScannedReceiptText failed:', err);
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        icon: 'error',
+        title: '识别文字已抓到，但解析时出错了',
+        html: `已把识别出的文字填入下方文本框，你可以检查后点击「智能解析明细」重新尝试。<br><span style="font-size:11.5px;color:var(--muted);">错误详情：${escapeHtml(String(err && err.message || err))}</span>`,
+        confirmButtonText: '好的'
+      });
+    } else {
+      alert('解析出错，请检查下方文本框内容后手动点击「智能解析明细」重试。');
+    }
+  }
 }
 
 // ============================================================
@@ -827,7 +844,12 @@ function parseReceiptTextClientSide(rawText) {
     // 价格后面不管是什么内容一律丢弃，不要求行尾必须精确符合某个允许字符白名单——
     // 真实拍照识别出来的文字，行尾常常会带一两个杂讯符号，只要求"精确匹配到行尾"
     // 很容易被这类杂讯拖累到整行都抓不到。(跟 app.py 的同一段逻辑保持一致)
-    const pricePattern = /(?:RM|MYR|\$|S\$|€|EUR|£|GBP|¥|円|₩|원|฿|Rp|₫)\s*[0-9]+(?:\.[0-9]{1,2})?|(?<![0-9.])[0-9]+\.[0-9]{1,2}(?![0-9])/gi;
+    // 注意：这里刻意不用 lookbehind/lookahead 语法 ( (?<!...) / (?!...) )。
+    // 这段是在手机 WebView 里跑的，部分较旧的系统 WebView 版本不支持 lookbehind，
+    // 一旦这个正则字面量本身编译失败，会直接抛出 SyntaxError 让整个函数当场中断，
+    // 而且这个中断点在 receiveScannedReceiptText() 填完文本框之后、跳出核对弹窗之前，
+    // 表现出来就是"文字进了文本框，但核对弹窗完全没出现，也没有任何报错提示"。
+    const pricePattern = /(?:RM|MYR|\$|S\$|€|EUR|£|GBP|¥|円|₩|원|฿|Rp|₫)\s*[0-9]+(?:\.[0-9]{1,2})?|[0-9]+\.[0-9]{1,2}/gi;
     const priceMatches = [...cleanLine.matchAll(pricePattern)];
     const lastMatch = priceMatches.length ? priceMatches[priceMatches.length - 1] : null;
     if (lastMatch) {
