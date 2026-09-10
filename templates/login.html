@@ -146,6 +146,11 @@
         {% for m in error_msgs %}<div>• {{ m }}</div>{% endfor %}
     </div>
     {% endif %}
+    {% if other_msgs %}
+    <div class="warning-box" style="margin-bottom: 16px; background: rgba(234, 179, 8, 0.1); color: #ca8a04; border: 1px solid rgba(234, 179, 8, 0.3); padding: 10px 14px; border-radius: 8px; font-size: 13px; text-align: left;">
+        {% for m in other_msgs %}<div>• {{ m }}</div>{% endfor %}
+    </div>
+    {% endif %}
     {% if success_msgs %}
     <div style="background: var(--green-soft); color: var(--green); padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; text-align: left;">
         {% for m in success_msgs %}<div>• {{ m }}</div>{% endfor %}

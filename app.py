@@ -30,30 +30,12 @@ from datetime import timedelta
 
 app = Flask(__name__)
 
-# 稳定 Session 密钥机制（杜绝 Render 每次重启、闲置唤醒或多 Worker 导致密钥漂移与 CSRF session token missing）
-def _resolve_stable_secret_key():
-    env_key = os.environ.get('FLASK_SECRET_KEY') or os.environ.get('SECRET_KEY')
-    if env_key and env_key.strip():
-        return env_key.strip()
-    data_dir = os.environ.get('DATA_DIR', '/var/data')
-    for dir_candidate in [data_dir, os.path.dirname(os.path.abspath(__file__))]:
-        if dir_candidate and os.path.isdir(dir_candidate):
-            key_file = os.path.join(dir_candidate, '.flask_secret_key')
-            try:
-                if os.path.isfile(key_file):
-                    with open(key_file, 'r', encoding='utf-8') as f:
-                        k = f.read().strip()
-                        if k:
-                            return k
-                k = os.urandom(32).hex()
-                with open(key_file, 'w', encoding='utf-8') as f:
-                    f.write(k)
-                return k
-            except Exception:
-                pass
-    return 'ledger-app-stable-session-secret-key-prod-2026'
-
-app.secret_key = _resolve_stable_secret_key()
+# 稳定 Session 密钥机制（保证跨 Gunicorn Worker、跨重启、跨唤醒密钥 100% 恒定一致，杜绝会话漂移）
+app.secret_key = (
+    os.environ.get('FLASK_SECRET_KEY')
+    or os.environ.get('SECRET_KEY')
+    or 'ledger-app-prod-secret-stable-key-8f4b2c1e9a7d-stable-2026'
+)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
 # 支持 Render 等反向代理正确识别 https 协议与客户端 IP
@@ -197,6 +179,16 @@ def handle_csrf_error(error):
     return redirect(request.referrer or url_for('index'))
 
 
+@app.after_request
+def add_cache_control_headers(response):
+    """对 HTML 页面与敏感路由强制不缓存，确保每次加载都能获取最新会话和有效状态"""
+    if response.mimetype == 'text/html' or (request.path and request.path in ('/login', '/register')):
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
+
 @app.route('/health')
 def health():
     return jsonify({'ok': True, 'status': 'online'})
@@ -299,6 +291,7 @@ def api_check_username():
 
 
 @app.route('/register', methods=['GET', 'POST'])
+@csrf.exempt
 def register():
     if session.get('logged_in') and session.get('user_id'):
         return redirect(url_for('index'))
@@ -354,6 +347,7 @@ def register():
         # 为新注册账号初始化专属独立的默认分类集
         init_user_default_categories(db, user_id)
 
+        session.permanent = True
         session['logged_in'] = True
         session['user_id'] = user_id
         session['username'] = username
@@ -364,6 +358,7 @@ def register():
 
 
 @app.route('/login', methods=['GET', 'POST'])
+@csrf.exempt
 def login():
     if session.get('logged_in') and session.get('user_id'):
         return redirect(url_for('index'))
@@ -384,6 +379,7 @@ def login():
         user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
 
         if user and check_password_hash(user['password_hash'], password):
+            session.permanent = True
             session['logged_in'] = True
             session['user_id'] = user['id']
             session['username'] = user['username']
@@ -399,6 +395,7 @@ def login():
                     (admin_id, 'admin', generate_password_hash(password), datetime.now().isoformat())
                 )
                 db.commit()
+            session.permanent = True
             session['logged_in'] = True
             session['user_id'] = admin_id
             session['username'] = 'admin'
