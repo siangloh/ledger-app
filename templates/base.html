@@ -90,12 +90,10 @@
         <button type="button" class="sheet-close-btn" onclick="toggleMoreSheet(false)">✕</button>
     </div>
     <div class="sheet-grid">
-        <a href="{{ url_for('download_apk') }}" id="appDownloadTile" class="sheet-tile" onclick="handleAppDownloadClick(event)" download="我的账本.apk" style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08);">
+        <a href="{{ url_for('download_apk') }}" id="appDownloadTile" class="sheet-tile" onclick="handleAppDownloadClick(event)" download="我的账本.apk" style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08); position: relative;">
+            <span id="appDownloadBadge" style="display: none; position: absolute; top: 6px; right: 6px; font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 600; line-height: 1.2;"></span>
             <span class="sheet-icon" id="appDownloadIcon">📱</span>
-            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                <span class="sheet-title" id="appDownloadTitle" style="font-weight: 600;">下载应用</span>
-                <span id="appDownloadBadge" style="display: none; font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 600;"></span>
-            </div>
+            <span class="sheet-title" id="appDownloadTitle" style="font-weight: 600;">下载应用</span>
             <span class="sheet-desc" id="appDownloadDesc">点击下载 Android 原生应用包</span>
         </a>
         <a href="{{ url_for('category_insights_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
@@ -154,7 +152,7 @@
 <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-<script src="{{ url_for('static', filename='app.js') }}?v=20260910_v3"></script>
+<script src="{{ url_for('static', filename='app.js') }}?v=20260910_v4"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
