@@ -754,14 +754,55 @@ MERCHANT_CATEGORY_MAPPING = {
 
 def parse_auto_track_notification(raw_text):
     """
-    解析来自 TnG eWallet / Maybank MAE / 银行短信 / 通知栏的文本。
+    解析来自 TnG eWallet / Maybank MAE / Public Bank (MyPB) / 银行短信 / 通知栏的文本。
     提取：金额 (RM)、商户名/接收方、时间、自动匹配分类。
+    自动过滤：营销广告、信用卡/贷款推广、返现活动宣传、安全提醒、OTP/TAC验证码等非动账通知。
     """
     text = raw_text.strip()
     if not text:
         return None
 
-    # 1. 提取金额：支持 "RM 15.00", "RM15.50", "RM 1,250.00", "MYR 20", "15.00"
+    lower_text = text.lower()
+
+    # 0. 强力过滤非动账类通知（营销推广、信用卡/贷款推销、返现活动宣传、抽奖、条款、OTP/TAC验证码、安全提醒等）
+    PROMO_AND_AD_KEYWORDS = [
+        'apply online', 'apply & get', 'apply for', 'apply now', 'apply today', 'application for',
+        'cardmember yet', 'credit cardmember', 'not a pb', 'not a member', 'eligible for',
+        'double cashback', 'cash back', 'stand a chance', 'lucky draw', 'win a', 'win up to',
+        'contest', 'rewards point', 'free gift', 'luggage set', 'gift voucher', 'earn entries',
+        't&cs apply', "t&c's apply", 'terms and conditions apply', 'terms and conditions', 'spend requirements', 'campaign period',
+        'exclusive offer', 'special offer', 'limited time offer', 'limited time only',
+        'balance transfer', 'flexi payment', 'personal loan', 'home loan', 'car loan', 'hire purchase',
+        'unit trust', 'fixed deposit promo', 'interest rate',
+        'maintenance notice', 'system maintenance', 'system upgrade', 'scheduled downtime',
+        'security reminder', 'stay alert', 'scam alert', 'fraud alert',
+        'otp', 'tac', 'one-time password', 'verification code', 'authorization code', 'do not share',
+        'your password', 'reset password', 'login alert', 'new login'
+    ]
+    if any(k in lower_text for k in PROMO_AND_AD_KEYWORDS):
+        return None
+
+    # 1. 动账行为动词硬性检查（必须具备明确真实的财务收支动作，杜绝普通资讯/广告被误记账）
+    is_expense = any(k in lower_text for k in [
+        'paid', 'spent', 'payment to', 'payment of', 'payment successful', 'payment has been made',
+        'deducted', 'debited', 'charged', 'transfer to', 'transferred to', 'transfer of',
+        'purchase at', 'purchase of', 'withdrawal', 'withdrawn', 'duitnow qr', 'duitnow transfer to',
+        '付款', '支出', '扣款', '转账给', '已支付', '买单', '消费', '成功支付', '成功转账', '成功扣款'
+    ])
+
+    is_income = any(k in lower_text for k in [
+        'received from', 'received', 'credited', 'refund', 'cash in', 'deposit', 'salary', 'dividend',
+        'duitnow transfer from', 'transfer from',
+        '转入', '收款', '存入', '退款', '到账', '收到转账', '入账'
+    ])
+
+    # 若既不是明确的支出动词，也不是明确的收入动词，直接判定为非交易动账通知并忽略
+    if not is_expense and not is_income:
+        return None
+
+    tx_type = 'income' if is_income and not is_expense else 'expense'
+
+    # 2. 提取金额：支持 "RM 15.00", "RM15.50", "RM 1,250.00", "MYR 20", "15.00"
     amount = None
     # 优先匹配带 RM / MYR 的格式 (允许千分位逗号)
     m_rm = re.search(r'(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)', text, re.IGNORECASE)
@@ -784,21 +825,6 @@ def parse_auto_track_notification(raw_text):
 
     if not amount or amount <= 0:
         return None
-
-    # 2. 判断是收入还是支出（优先匹配明确扣款/支出，避免通知末尾带的 cashback/voucher 奖励词误把支出判定为收入）
-    is_income = False
-    lower_text = text.lower()
-
-    is_expense = any(k in lower_text for k in [
-        'paid', 'spent', 'payment to', 'payment of', 'payment successful',
-        'deducted', 'debited', 'transfer to', 'transferred to', 'transfer of',
-        '付款', '支出', '扣款', '转账给', '已支付', '买单', '消费'
-    ])
-
-    if not is_expense and any(k in lower_text for k in ['received', 'credited', 'refund', '转入', '收款', '存入', '退款']):
-        is_income = True
-
-    tx_type = 'income' if is_income else 'expense'
 
     # 3. 提取商户 / 交易对手
     # 常见格式模式匹配：
