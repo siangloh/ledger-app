@@ -1,726 +1,786 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#10213b">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="mobile-web-app-capable" content="yes">
-<title>注册账号 - 我的记账本</title>
-<link rel="manifest" href="/manifest.json">
-<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
-<link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-<link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260910_v2">
-<style>
-  .login-page-wrapper {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  }
-  .login-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-card-hover);
-    border-radius: 20px;
-    padding: 36px 32px;
-    width: 100%;
-    max-width: 420px;
-    text-align: center;
-    box-sizing: border-box;
-  }
-  .login-logo {
-    width: 60px;
-    height: 60px;
-    background: linear-gradient(135deg, var(--navy), var(--navy-2));
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 30px;
-    margin: 0 auto 16px;
-    box-shadow: 0 6px 18px rgba(16, 33, 59, 0.2);
-    border: 2px solid rgba(182, 144, 47, 0.4);
-  }
-  .login-title {
-    font-family: var(--font-serif);
-    font-size: 22px;
-    color: var(--navy);
-    margin: 0 0 6px;
-    font-weight: 600;
-  }
-  .login-subtitle {
-    font-size: 13px;
-    color: var(--muted);
-    margin: 0 0 22px;
-  }
-  .login-form {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    text-align: left;
-  }
-  .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    position: relative;
-  }
-  .form-group label {
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--ink-soft);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .label-hint {
-    font-size: 11px;
-    color: var(--muted);
-    font-weight: normal;
-  }
-  .input-wrap {
-    position: relative;
-    width: 100%;
-    display: flex;
-    align-items: center;
-  }
-  .login-form input[type="text"],
-  .login-form input[type="password"] {
-    font-size: 14.5px;
-    padding: 11px 40px 11px 14px;
-    border-radius: 10px;
-    border: 1.5px solid var(--border);
-    background: var(--surface-soft);
-    color: var(--ink);
-    width: 100%;
-    box-sizing: border-box;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
-  }
-  .login-form input:focus {
-    outline: none;
-    border-color: var(--gold);
-    box-shadow: 0 0 0 3px var(--gold-soft);
-  }
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#10213b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>注册账号 - 我的记账本</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
+  <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260910_v2">
+  <style>
+    .login-page-wrapper {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
 
-  /* 实时校验状态边框与背景 */
-  .login-form input.input-error {
-    border-color: #f87171 !important;
-    background-color: rgba(239, 68, 68, 0.05) !important;
-    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.18) !important;
-  }
-  .login-form input.input-success {
-    border-color: #34d399 !important;
-    background-color: rgba(52, 211, 153, 0.04) !important;
-    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15) !important;
-  }
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-card-hover);
+      border-radius: 20px;
+      padding: 36px 32px;
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      box-sizing: border-box;
+    }
 
-  /* 实时错误提示文字 */
-  .realtime-feedback {
-    font-size: 12px;
-    line-height: 1.4;
-    min-height: 17px;
-    margin-top: 3px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    opacity: 0;
-    transform: translateY(-3px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
-  }
-  .realtime-feedback.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  .realtime-feedback.is-error {
-    color: #f87171;
-    font-weight: 500;
-  }
-  .realtime-feedback.is-success {
-    color: #34d399;
-    font-weight: 500;
-  }
-  .realtime-feedback.is-checking {
-    color: var(--muted);
-    font-style: italic;
-  }
+    .login-logo {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, var(--navy), var(--navy-2));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      margin: 0 auto 16px;
+      box-shadow: 0 6px 18px rgba(16, 33, 59, 0.2);
+      border: 2px solid rgba(182, 144, 47, 0.4);
+    }
 
-  /* 密码显隐切换按钮 */
-  .btn-toggle-pwd {
-    position: absolute;
-    right: 10px;
-    background: transparent;
-    border: none;
-    font-size: 15px;
-    cursor: pointer;
-    color: var(--muted);
-    padding: 6px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    user-select: none;
-    transition: opacity 0.15s ease;
-  }
-  .btn-toggle-pwd:hover {
-    opacity: 0.8;
-  }
+    .login-title {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      color: var(--navy);
+      margin: 0 0 6px;
+      font-weight: 600;
+    }
 
-  /* 状态小图标 (如：加载中旋转、对勾) */
-  .status-badge {
-    position: absolute;
-    right: 12px;
-    font-size: 13px;
-    pointer-events: none;
-  }
-  .status-spin {
-    display: inline-block;
-    width: 13px;
-    height: 13px;
-    border: 2px solid rgba(182, 144, 47, 0.3);
-    border-top-color: var(--gold);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
+    .login-subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0 0 22px;
+    }
 
-  /* 密码强度条 */
-  .pwd-strength-wrap {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 4px;
-    transition: opacity 0.2s ease;
-  }
-  .strength-track {
-    flex: 1;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-  .strength-fill {
-    height: 100%;
-    width: 0%;
-    border-radius: 2px;
-    transition: width 0.3s ease, background-color 0.3s ease;
-  }
-  .strength-text {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--muted);
-    min-width: 44px;
-    text-align: right;
-  }
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      text-align: left;
+    }
 
-  /* 密码规则检查清单 */
-  .pwd-rules-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 6px;
-  }
-  .pwd-rule-item {
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    background: var(--surface-soft);
-    color: var(--muted);
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    transition: all 0.2s ease;
-    user-select: none;
-  }
-  .pwd-rule-item.rule-valid {
-    border-color: rgba(52, 211, 153, 0.4);
-    background: rgba(52, 211, 153, 0.1);
-    color: #34d399;
-    font-weight: 500;
-  }
-  .pwd-rule-item.rule-invalid {
-    border-color: rgba(248, 113, 113, 0.35);
-    background: rgba(248, 113, 113, 0.08);
-    color: #f87171;
-  }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+    }
 
-  /* 提交按钮 */
-  .btn-login {
-    background: linear-gradient(135deg, var(--navy), var(--navy-2));
-    color: #f4ead0;
-    border: none;
-    padding: 13px;
-    border-radius: 12px;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
-    margin-top: 4px;
-  }
-  .btn-login:active {
-    transform: scale(0.98);
-  }
-  .btn-login:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-  .btn-spinner {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    border: 2px solid rgba(244, 234, 208, 0.35);
-    border-top-color: #f4ead0;
-    border-radius: 50%;
-    animation: btn-spin 0.65s linear infinite;
-    margin-right: 8px;
-    vertical-align: middle;
-  }
-  @keyframes btn-spin {
-    to { transform: rotate(360deg); }
-  }
+    .form-group label {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--ink-soft);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
 
-  .login-bottom-links {
-    margin-top: 20px;
-    font-size: 13px;
-    color: var(--muted);
-  }
-  .login-bottom-links a {
-    color: var(--gold);
-    text-decoration: none;
-    font-weight: 600;
-    margin-left: 4px;
-  }
-  .login-bottom-links a:hover {
-    text-decoration: underline;
-  }
-  .login-hint {
-    font-size: 11.5px;
-    color: var(--muted);
-    margin-top: 18px;
-    line-height: 1.5;
-  }
+    .label-hint {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: normal;
+    }
 
-  /* 震动动画 */
-  @keyframes fieldShake {
-    0%, 100% { transform: translateX(0); }
-    20%, 60% { transform: translateX(-5px); }
-    40%, 80% { transform: translateX(5px); }
-  }
-  .shake-animate {
-    animation: fieldShake 0.35s ease-in-out;
-  }
-</style>
+    .input-wrap {
+      position: relative;
+      width: 100%;
+      display: flex;
+      align-items: center;
+    }
+
+    .login-form input[type="text"],
+    .login-form input[type="password"] {
+      font-size: 14.5px;
+      padding: 11px 40px 11px 14px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      background: var(--surface-soft);
+      color: var(--ink);
+      width: 100%;
+      box-sizing: border-box;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    }
+
+    .login-form input:focus {
+      outline: none;
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px var(--gold-soft);
+    }
+
+    /* 实时校验状态边框与背景 */
+    .login-form input.input-error {
+      border-color: #f87171 !important;
+      background-color: rgba(239, 68, 68, 0.05) !important;
+      box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.18) !important;
+    }
+
+    .login-form input.input-success {
+      border-color: #34d399 !important;
+      background-color: rgba(52, 211, 153, 0.04) !important;
+      box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15) !important;
+    }
+
+    /* 实时错误提示文字 */
+    .realtime-feedback {
+      font-size: 12px;
+      line-height: 1.4;
+      min-height: 17px;
+      margin-top: 3px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      opacity: 0;
+      transform: translateY(-3px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .realtime-feedback.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .realtime-feedback.is-error {
+      color: #f87171;
+      font-weight: 500;
+    }
+
+    .realtime-feedback.is-success {
+      color: #34d399;
+      font-weight: 500;
+    }
+
+    .realtime-feedback.is-checking {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    /* 密码显隐切换按钮 */
+    .btn-toggle-pwd {
+      position: absolute;
+      right: 10px;
+      background: transparent;
+      border: none;
+      font-size: 15px;
+      cursor: pointer;
+      color: var(--muted);
+      padding: 6px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      transition: opacity 0.15s ease;
+    }
+
+    .btn-toggle-pwd:hover {
+      opacity: 0.8;
+    }
+
+    /* 状态小图标 (如：加载中旋转、对勾) */
+    .status-badge {
+      position: absolute;
+      right: 12px;
+      font-size: 13px;
+      pointer-events: none;
+    }
+
+    .status-spin {
+      display: inline-block;
+      width: 13px;
+      height: 13px;
+      border: 2px solid rgba(182, 144, 47, 0.3);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* 密码强度条 */
+    .pwd-strength-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      transition: opacity 0.2s ease;
+    }
+
+    .strength-track {
+      flex: 1;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .strength-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 2px;
+      transition: width 0.3s ease, background-color 0.3s ease;
+    }
+
+    .strength-text {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      min-width: 44px;
+      text-align: right;
+    }
+
+    /* 密码规则检查清单 */
+    .pwd-rules-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .pwd-rule-item {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    .pwd-rule-item.rule-valid {
+      border-color: rgba(52, 211, 153, 0.4);
+      background: rgba(52, 211, 153, 0.1);
+      color: #34d399;
+      font-weight: 500;
+    }
+
+    .pwd-rule-item.rule-invalid {
+      border-color: rgba(248, 113, 113, 0.35);
+      background: rgba(248, 113, 113, 0.08);
+      color: #f87171;
+    }
+
+    /* 提交按钮 */
+    .btn-login {
+      background: linear-gradient(135deg, var(--navy), var(--navy-2));
+      color: #f4ead0;
+      border: none;
+      padding: 13px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
+      margin-top: 4px;
+    }
+
+    .btn-login:active {
+      transform: scale(0.98);
+    }
+
+    .btn-login:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(244, 234, 208, 0.35);
+      border-top-color: #f4ead0;
+      border-radius: 50%;
+      animation: btn-spin 0.65s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes btn-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .login-bottom-links {
+      margin-top: 20px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .login-bottom-links a {
+      color: var(--gold);
+      text-decoration: none;
+      font-weight: 600;
+      margin-left: 4px;
+    }
+
+    .login-bottom-links a:hover {
+      text-decoration: underline;
+    }
+
+    .login-hint {
+      font-size: 11.5px;
+      color: var(--muted);
+      margin-top: 18px;
+      line-height: 1.5;
+    }
+
+    /* 震动动画 */
+    @keyframes fieldShake {
+
+      0%,
+      100% {
+        transform: translateX(0);
+      }
+
+      20%,
+      60% {
+        transform: translateX(-5px);
+      }
+
+      40%,
+      80% {
+        transform: translateX(5px);
+      }
+    }
+
+    .shake-animate {
+      animation: fieldShake 0.35s ease-in-out;
+    }
+  </style>
 </head>
+
 <body>
-<div class="login-page-wrapper">
-  <div class="login-card">
-    <div class="login-logo">✨</div>
-    <h1 class="login-title">创建新账本账号</h1>
-    <p class="login-subtitle">注册后拥有独享的私密财务与分类空间</p>
+  <div class="login-page-wrapper">
+    <div class="login-card">
+      <div class="login-logo">✨</div>
+      <h1 class="login-title">创建新账本账号</h1>
+      <p class="login-subtitle">注册后拥有独享的私密财务与分类空间</p>
 
-    {% set other_msgs = [] %}
-    {% set success_msgs = [] %}
-    {% set error_msgs = [] %}
-    {% for category, message in get_flashed_messages(with_categories=true) %}
-        {% if category == 'success' %}
-            {% set _ = success_msgs.append(message) %}
-        {% elif category == 'error' %}
-            {% set _ = error_msgs.append(message) %}
-        {% else %}
-            {% set _ = other_msgs.append(message) %}
-        {% endif %}
-    {% endfor %}
-    {% if error_msgs %}
-    <div class="warning-box" style="margin-bottom: 16px; background: rgba(239, 68, 68, 0.1); color: #f87171; padding: 10px 14px; border-radius: 8px; font-size: 13px; text-align: left;">
+      {% set other_msgs = [] %}
+      {% set success_msgs = [] %}
+      {% set error_msgs = [] %}
+      {% for category, message in get_flashed_messages(with_categories=true) %}
+      {% if category == 'success' %}
+      {% set _ = success_msgs.append(message) %}
+      {% elif category == 'error' %}
+      {% set _ = error_msgs.append(message) %}
+      {% else %}
+      {% set _ = other_msgs.append(message) %}
+      {% endif %}
+      {% endfor %}
+      {% if error_msgs %}
+      <div class="warning-box"
+        style="margin-bottom: 16px; background: rgba(239, 68, 68, 0.1); color: #f87171; padding: 10px 14px; border-radius: 8px; font-size: 13px; text-align: left;">
         {% for m in error_msgs %}<div>• {{ m }}</div>{% endfor %}
-    </div>
-    {% endif %}
-    {% if success_msgs %}
-    <div style="background: var(--green-soft); color: var(--green); padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; text-align: left;">
+      </div>
+      {% endif %}
+      {% if success_msgs %}
+      <div
+        style="background: var(--green-soft); color: var(--green); padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; text-align: left;">
         {% for m in success_msgs %}<div>• {{ m }}</div>{% endfor %}
-    </div>
-    {% endif %}
-
-    <form method="post" action="{{ url_for('register') }}" class="login-form" id="registerForm" novalidate>
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-      <!-- 用户名输入框 -->
-      <div class="form-group" id="groupUsername">
-        <label for="usernameInput">
-          用户名 / 账号
-          <span class="label-hint">3-30位 字母/数字/中文</span>
-        </label>
-        <div class="input-wrap">
-          <input type="text" id="usernameInput" name="username" value="{{ username or '' }}" placeholder="设置用户名（如：alex_2026）" required autofocus autocomplete="username" minlength="3" maxlength="30" spellcheck="false">
-          <span class="status-badge" id="usernameStatusBadge"></span>
-        </div>
-        <div class="realtime-feedback" id="usernameFeedback" role="alert"></div>
       </div>
+      {% endif %}
 
-      <!-- 设置密码输入框 -->
-      <div class="form-group" id="groupPassword">
-        <label for="passwordInput">
-          设置密码
-          <span class="label-hint">需包含大小写、数字及符号</span>
-        </label>
-        <div class="input-wrap">
-          <input type="password" id="passwordInput" name="password" placeholder="至少 6 位，含大写/小写/数字/符号" required autocomplete="new-password" minlength="6">
-          <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('passwordInput', this)" aria-label="查看密码" tabindex="-1">👁️</button>
-        </div>
+      <form method="post" action="{{ url_for('register') }}" class="login-form" id="registerForm" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-        <!-- 密码 5 项规则实时状态指示器 -->
-        <div class="pwd-rules-list" id="pwdRulesList">
-          <span class="pwd-rule-item" id="ruleLen"><span class="rule-icon">○</span> 至少 6 位</span>
-          <span class="pwd-rule-item" id="ruleUpper"><span class="rule-icon">○</span> 大写字母 (A-Z)</span>
-          <span class="pwd-rule-item" id="ruleLower"><span class="rule-icon">○</span> 小写字母 (a-z)</span>
-          <span class="pwd-rule-item" id="ruleNum"><span class="rule-icon">○</span> 数字 (0-9)</span>
-          <span class="pwd-rule-item" id="ruleSym"><span class="rule-icon">○</span> 特殊符号 (!@#$)</span>
-        </div>
-
-        <div class="pwd-strength-wrap" id="pwdStrengthWrap" style="display:none; margin-top:8px;">
-          <div class="strength-track">
-            <div class="strength-fill" id="pwdStrengthFill"></div>
+        <!-- 用户名输入框 -->
+        <div class="form-group" id="groupUsername">
+          <label for="usernameInput">
+            用户名 / 账号
+            <span class="label-hint">3-30位 字母/数字/中文</span>
+          </label>
+          <div class="input-wrap">
+            <input type="text" id="usernameInput" name="username" value="{{ username or '' }}"
+              placeholder="设置用户名（如：alex_2026）" required autofocus autocomplete="username" minlength="3" maxlength="30"
+              spellcheck="false">
+            <span class="status-badge" id="usernameStatusBadge"></span>
           </div>
-          <span class="strength-text" id="pwdStrengthText"></span>
+          <div class="realtime-feedback" id="usernameFeedback" role="alert"></div>
         </div>
-        <div class="realtime-feedback" id="passwordFeedback" role="alert"></div>
-      </div>
 
-      <!-- 确认密码输入框 -->
-      <div class="form-group" id="groupConfirmPassword">
-        <label for="confirmPasswordInput">
-          确认密码
-          <span class="label-hint">保持与上方一致</span>
-        </label>
-        <div class="input-wrap">
-          <input type="password" id="confirmPasswordInput" name="confirm_password" placeholder="再次输入相同的密码" required autocomplete="new-password" minlength="6">
-          <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('confirmPasswordInput', this)" aria-label="查看密码" tabindex="-1">👁️</button>
+        <!-- 设置密码输入框 -->
+        <div class="form-group" id="groupPassword">
+          <label for="passwordInput">
+            设置密码
+            <span class="label-hint">需包含大小写、数字及符号</span>
+          </label>
+          <div class="input-wrap">
+            <input type="password" id="passwordInput" name="password" placeholder="至少 6 位，含大写/小写/数字/符号" required
+              autocomplete="new-password" minlength="6">
+            <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('passwordInput', this)"
+              aria-label="查看密码" tabindex="-1">👁️</button>
+          </div>
+
+          <!-- 密码 5 项规则实时状态指示器 -->
+          <div class="pwd-rules-list" id="pwdRulesList">
+            <span class="pwd-rule-item" id="ruleLen"><span class="rule-icon">○</span> 至少 6 位</span>
+            <span class="pwd-rule-item" id="ruleUpper"><span class="rule-icon">○</span> 大写字母 (A-Z)</span>
+            <span class="pwd-rule-item" id="ruleLower"><span class="rule-icon">○</span> 小写字母 (a-z)</span>
+            <span class="pwd-rule-item" id="ruleNum"><span class="rule-icon">○</span> 数字 (0-9)</span>
+            <span class="pwd-rule-item" id="ruleSym"><span class="rule-icon">○</span> 特殊符号 (!@#$)</span>
+          </div>
+
+          <div class="pwd-strength-wrap" id="pwdStrengthWrap" style="display:none; margin-top:8px;">
+            <div class="strength-track">
+              <div class="strength-fill" id="pwdStrengthFill"></div>
+            </div>
+            <span class="strength-text" id="pwdStrengthText"></span>
+          </div>
+          <div class="realtime-feedback" id="passwordFeedback" role="alert"></div>
         </div>
-        <div class="realtime-feedback" id="confirmPasswordFeedback" role="alert"></div>
+
+        <!-- 确认密码输入框 -->
+        <div class="form-group" id="groupConfirmPassword">
+          <label for="confirmPasswordInput">
+            确认密码
+            <span class="label-hint">保持与上方一致</span>
+          </label>
+          <div class="input-wrap">
+            <input type="password" id="confirmPasswordInput" name="confirm_password" placeholder="再次输入相同的密码" required
+              autocomplete="new-password" minlength="6">
+            <button type="button" class="btn-toggle-pwd"
+              onclick="togglePasswordVisibility('confirmPasswordInput', this)" aria-label="查看密码"
+              tabindex="-1">👁️</button>
+          </div>
+          <div class="realtime-feedback" id="confirmPasswordFeedback" role="alert"></div>
+        </div>
+
+        <button type="submit" class="btn-login" id="btnSubmit">立即注册并进入</button>
+      </form>
+
+      <div class="login-bottom-links">
+        已有账号？<a href="{{ url_for('login') }}">立即登录 &rarr;</a>
       </div>
-
-      <button type="submit" class="btn-login" id="btnSubmit">立即注册并进入</button>
-    </form>
-
-    <div class="login-bottom-links">
-      已有账号？<a href="{{ url_for('login') }}">立即登录 &rarr;</a>
     </div>
-
-    <p class="login-hint">🔒 每个账号采用安全 UUID 隔离，数据与分类完全独立私密。</p>
   </div>
-</div>
 
-<script>
-// 显隐密码切换
-function togglePasswordVisibility(inputId, btn) {
-  const input = document.getElementById(inputId);
-  if (!input) return;
-  if (input.type === 'password') {
-    input.type = 'text';
-    btn.textContent = '🙈';
-    btn.setAttribute('aria-label', '隐藏密码');
-  } else {
-    input.type = 'password';
-    btn.textContent = '👁️';
-    btn.setAttribute('aria-label', '查看密码');
-  }
-}
-
-(function() {
-  const form = document.getElementById('registerForm');
-  const uInput = document.getElementById('usernameInput');
-  const pInput = document.getElementById('passwordInput');
-  const cpInput = document.getElementById('confirmPasswordInput');
-
-  const uFeedback = document.getElementById('usernameFeedback');
-  const pFeedback = document.getElementById('passwordFeedback');
-  const cpFeedback = document.getElementById('confirmPasswordFeedback');
-  const uBadge = document.getElementById('usernameStatusBadge');
-
-  const pwdStrengthWrap = document.getElementById('pwdStrengthWrap');
-  const pwdStrengthFill = document.getElementById('pwdStrengthFill');
-  const pwdStrengthText = document.getElementById('pwdStrengthText');
-
-  let usernameCheckTimer = null;
-  let isUsernameAvailable = false;
-  let lastCheckedUsername = '';
-
-  // 设置反馈信息辅助函数
-  function setFeedback(targetEl, inputEl, message, type) {
-    if (!message) {
-      targetEl.textContent = '';
-      targetEl.className = 'realtime-feedback';
-      inputEl.classList.remove('input-error', 'input-success');
-      return;
-    }
-    targetEl.textContent = message;
-    targetEl.className = `realtime-feedback visible is-${type}`;
-    if (type === 'error') {
-      inputEl.classList.add('input-error');
-      inputEl.classList.remove('input-success');
-    } else if (type === 'success') {
-      inputEl.classList.add('input-success');
-      inputEl.classList.remove('input-error');
-    } else {
-      inputEl.classList.remove('input-error', 'input-success');
-    }
-  }
-
-  // 1. 用户名实时校验
-  function validateUsername(isBlur = false) {
-    const val = uInput.value.trim();
-    clearTimeout(usernameCheckTimer);
-
-    if (!val) {
-      isUsernameAvailable = false;
-      uBadge.innerHTML = '';
-      if (isBlur) {
-        setFeedback(uFeedback, uInput, '⚠️ 用户名不能为空', 'error');
+  <script>
+    // 显隐密码切换
+    function togglePasswordVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+        btn.setAttribute('aria-label', '隐藏密码');
       } else {
-        setFeedback(uFeedback, uInput, '', '');
+        input.type = 'password';
+        btn.textContent = '👁️';
+        btn.setAttribute('aria-label', '查看密码');
       }
-      return false;
     }
 
-    if (val.length < 3) {
-      isUsernameAvailable = false;
-      uBadge.innerHTML = '';
-      setFeedback(uFeedback, uInput, `⚠️ 用户名太短，至少需要 3 个字符（当前 ${val.length} 个）`, 'error');
-      return false;
-    }
+    (function () {
+      const form = document.getElementById('registerForm');
+      const uInput = document.getElementById('usernameInput');
+      const pInput = document.getElementById('passwordInput');
+      const cpInput = document.getElementById('confirmPasswordInput');
 
-    if (val.length > 30) {
-      isUsernameAvailable = false;
-      uBadge.innerHTML = '';
-      setFeedback(uFeedback, uInput, '⚠️ 用户名不能超过 30 个字符', 'error');
-      return false;
-    }
+      const uFeedback = document.getElementById('usernameFeedback');
+      const pFeedback = document.getElementById('passwordFeedback');
+      const cpFeedback = document.getElementById('confirmPasswordFeedback');
+      const uBadge = document.getElementById('usernameStatusBadge');
 
-    const reg = /^[a-zA-Z0-9_\-\u4e00-\u9fa5]+$/;
-    if (!reg.test(val)) {
-      isUsernameAvailable = false;
-      uBadge.innerHTML = '';
-      setFeedback(uFeedback, uInput, '⚠️ 格式不合规：仅支持中文、英文字母、数字、下划线及连字符', 'error');
-      return false;
-    }
+      const pwdStrengthWrap = document.getElementById('pwdStrengthWrap');
+      const pwdStrengthFill = document.getElementById('pwdStrengthFill');
+      const pwdStrengthText = document.getElementById('pwdStrengthText');
 
-    // 格式合法，防抖请求后端验证用户名是否已被占用
-    if (val === lastCheckedUsername && isUsernameAvailable) {
-      setFeedback(uFeedback, uInput, '✓ 该用户名可用', 'success');
-      return true;
-    }
+      let usernameCheckTimer = null;
+      let isUsernameAvailable = false;
+      let lastCheckedUsername = '';
 
-    setFeedback(uFeedback, uInput, '正在检查用户名可用性...', 'checking');
-    uBadge.innerHTML = '<span class="status-spin"></span>';
+      // 设置反馈信息辅助函数
+      function setFeedback(targetEl, inputEl, message, type) {
+        if (!message) {
+          targetEl.textContent = '';
+          targetEl.className = 'realtime-feedback';
+          inputEl.classList.remove('input-error', 'input-success');
+          return;
+        }
+        targetEl.textContent = message;
+        targetEl.className = `realtime-feedback visible is-${type}`;
+        if (type === 'error') {
+          inputEl.classList.add('input-error');
+          inputEl.classList.remove('input-success');
+        } else if (type === 'success') {
+          inputEl.classList.add('input-success');
+          inputEl.classList.remove('input-error');
+        } else {
+          inputEl.classList.remove('input-error', 'input-success');
+        }
+      }
 
-    usernameCheckTimer = setTimeout(() => {
-      fetch(`/api/check-username?username=${encodeURIComponent(val)}`)
-        .then(r => r.json())
-        .then(data => {
+      // 1. 用户名实时校验
+      function validateUsername(isBlur = false) {
+        const val = uInput.value.trim();
+        clearTimeout(usernameCheckTimer);
+
+        if (!val) {
+          isUsernameAvailable = false;
           uBadge.innerHTML = '';
-          lastCheckedUsername = val;
-          if (data.ok && data.available) {
-            isUsernameAvailable = true;
-            setFeedback(uFeedback, uInput, '✓ ' + data.message, 'success');
+          if (isBlur) {
+            setFeedback(uFeedback, uInput, '⚠️ 用户名不能为空', 'error');
           } else {
-            isUsernameAvailable = false;
-            setFeedback(uFeedback, uInput, '⚠️ ' + (data.message || '该用户名已被占用'), 'error');
+            setFeedback(uFeedback, uInput, '', '');
           }
-        })
-        .catch(() => {
+          return false;
+        }
+
+        if (val.length < 3) {
+          isUsernameAvailable = false;
           uBadge.innerHTML = '';
-          // 网络失败时退化为本地格式有效
-          isUsernameAvailable = true;
-          setFeedback(uFeedback, uInput, '✓ 用户名格式正确', 'success');
-        });
-    }, isBlur ? 50 : 280);
+          setFeedback(uFeedback, uInput, `⚠️ 用户名太短，至少需要 3 个字符（当前 ${val.length} 个）`, 'error');
+          return false;
+        }
 
-    return true;
-  }
+        if (val.length > 30) {
+          isUsernameAvailable = false;
+          uBadge.innerHTML = '';
+          setFeedback(uFeedback, uInput, '⚠️ 用户名不能超过 30 个字符', 'error');
+          return false;
+        }
 
-  // 2. 密码实时校验与强度计算
-  function validatePassword(isBlur = false) {
-    const pwd = pInput.value;
-    const ruleLen = document.getElementById('ruleLen');
-    const ruleUpper = document.getElementById('ruleUpper');
-    const ruleLower = document.getElementById('ruleLower');
-    const ruleNum = document.getElementById('ruleNum');
-    const ruleSym = document.getElementById('ruleSym');
+        const reg = /^[a-zA-Z0-9_\-\u4e00-\u9fa5]+$/;
+        if (!reg.test(val)) {
+          isUsernameAvailable = false;
+          uBadge.innerHTML = '';
+          setFeedback(uFeedback, uInput, '⚠️ 格式不合规：仅支持中文、英文字母、数字、下划线及连字符', 'error');
+          return false;
+        }
 
-    const hasLen = pwd.length >= 6;
-    const hasUpper = /[A-Z]/.test(pwd);
-    const hasLower = /[a-z]/.test(pwd);
-    const hasNum = /[0-9]/.test(pwd);
-    const hasSym = /[^a-zA-Z0-9]/.test(pwd);
+        // 格式合法，防抖请求后端验证用户名是否已被占用
+        if (val === lastCheckedUsername && isUsernameAvailable) {
+          setFeedback(uFeedback, uInput, '✓ 该用户名可用', 'success');
+          return true;
+        }
 
-    function updateRuleItem(el, valid) {
-      if (!el) return;
-      const icon = el.querySelector('.rule-icon');
-      if (valid) {
-        el.className = 'pwd-rule-item rule-valid';
-        if (icon) icon.textContent = '✓';
-      } else {
-        el.className = (pwd.length > 0 && isBlur) ? 'pwd-rule-item rule-invalid' : 'pwd-rule-item';
-        if (icon) icon.textContent = '○';
+        setFeedback(uFeedback, uInput, '正在检查用户名可用性...', 'checking');
+        uBadge.innerHTML = '<span class="status-spin"></span>';
+
+        usernameCheckTimer = setTimeout(() => {
+          fetch(`/api/check-username?username=${encodeURIComponent(val)}`)
+            .then(r => r.json())
+            .then(data => {
+              uBadge.innerHTML = '';
+              lastCheckedUsername = val;
+              if (data.ok && data.available) {
+                isUsernameAvailable = true;
+                setFeedback(uFeedback, uInput, '✓ ' + data.message, 'success');
+              } else {
+                isUsernameAvailable = false;
+                setFeedback(uFeedback, uInput, '⚠️ ' + (data.message || '该用户名已被占用'), 'error');
+              }
+            })
+            .catch(() => {
+              uBadge.innerHTML = '';
+              // 网络失败时退化为本地格式有效
+              isUsernameAvailable = true;
+              setFeedback(uFeedback, uInput, '✓ 用户名格式正确', 'success');
+            });
+        }, isBlur ? 50 : 280);
+
+        return true;
       }
-    }
 
-    updateRuleItem(ruleLen, hasLen);
-    updateRuleItem(ruleUpper, hasUpper);
-    updateRuleItem(ruleLower, hasLower);
-    updateRuleItem(ruleNum, hasNum);
-    updateRuleItem(ruleSym, hasSym);
+      // 2. 密码实时校验与强度计算
+      function validatePassword(isBlur = false) {
+        const pwd = pInput.value;
+        const ruleLen = document.getElementById('ruleLen');
+        const ruleUpper = document.getElementById('ruleUpper');
+        const ruleLower = document.getElementById('ruleLower');
+        const ruleNum = document.getElementById('ruleNum');
+        const ruleSym = document.getElementById('ruleSym');
 
-    if (!pwd) {
-      pwdStrengthWrap.style.display = 'none';
-      if (isBlur) {
-        setFeedback(pFeedback, pInput, '⚠️ 密码不能为空', 'error');
-      } else {
-        setFeedback(pFeedback, pInput, '', '');
+        const hasLen = pwd.length >= 6;
+        const hasUpper = /[A-Z]/.test(pwd);
+        const hasLower = /[a-z]/.test(pwd);
+        const hasNum = /[0-9]/.test(pwd);
+        const hasSym = /[^a-zA-Z0-9]/.test(pwd);
+
+        function updateRuleItem(el, valid) {
+          if (!el) return;
+          const icon = el.querySelector('.rule-icon');
+          if (valid) {
+            el.className = 'pwd-rule-item rule-valid';
+            if (icon) icon.textContent = '✓';
+          } else {
+            el.className = (pwd.length > 0 && isBlur) ? 'pwd-rule-item rule-invalid' : 'pwd-rule-item';
+            if (icon) icon.textContent = '○';
+          }
+        }
+
+        updateRuleItem(ruleLen, hasLen);
+        updateRuleItem(ruleUpper, hasUpper);
+        updateRuleItem(ruleLower, hasLower);
+        updateRuleItem(ruleNum, hasNum);
+        updateRuleItem(ruleSym, hasSym);
+
+        if (!pwd) {
+          pwdStrengthWrap.style.display = 'none';
+          if (isBlur) {
+            setFeedback(pFeedback, pInput, '⚠️ 密码不能为空', 'error');
+          } else {
+            setFeedback(pFeedback, pInput, '', '');
+          }
+          return false;
+        }
+
+        // 显示强度指示条
+        pwdStrengthWrap.style.display = 'flex';
+        const passedCount = [hasLen, hasUpper, hasLower, hasNum, hasSym].filter(Boolean).length;
+
+        if (passedCount <= 2) {
+          pwdStrengthFill.style.width = '30%';
+          pwdStrengthFill.style.backgroundColor = '#f87171';
+          pwdStrengthText.textContent = '弱';
+          pwdStrengthText.style.color = '#f87171';
+        } else if (passedCount <= 4) {
+          pwdStrengthFill.style.width = '65%';
+          pwdStrengthFill.style.backgroundColor = '#fbbf24';
+          pwdStrengthText.textContent = '中等';
+          pwdStrengthText.style.color = '#fbbf24';
+        } else {
+          pwdStrengthFill.style.width = '100%';
+          pwdStrengthFill.style.backgroundColor = '#34d399';
+          pwdStrengthText.textContent = '强';
+          pwdStrengthText.style.color = '#34d399';
+        }
+
+        const missing = [];
+        if (!hasLen) missing.push('至少 6 位');
+        if (!hasUpper) missing.push('大写字母 (A-Z)');
+        if (!hasLower) missing.push('小写字母 (a-z)');
+        if (!hasNum) missing.push('数字 (0-9)');
+        if (!hasSym) missing.push('特殊符号 (!@#$ 等)');
+
+        if (missing.length > 0) {
+          setFeedback(pFeedback, pInput, `⚠️ 密码缺少：${missing.join('、')}`, 'error');
+          return false;
+        }
+
+        setFeedback(pFeedback, pInput, '✓ 密码符合所有安全要求', 'success');
+
+        // 若确认密码框已有输入，顺便联动重新校验确认密码
+        if (cpInput.value) {
+          validateConfirmPassword();
+        }
+
+        return true;
       }
-      return false;
-    }
 
-    // 显示强度指示条
-    pwdStrengthWrap.style.display = 'flex';
-    const passedCount = [hasLen, hasUpper, hasLower, hasNum, hasSym].filter(Boolean).length;
+      // 3. 确认密码实时校验
+      function validateConfirmPassword(isBlur = false) {
+        const pwd = pInput.value;
+        const cpwd = cpInput.value;
 
-    if (passedCount <= 2) {
-      pwdStrengthFill.style.width = '30%';
-      pwdStrengthFill.style.backgroundColor = '#f87171';
-      pwdStrengthText.textContent = '弱';
-      pwdStrengthText.style.color = '#f87171';
-    } else if (passedCount <= 4) {
-      pwdStrengthFill.style.width = '65%';
-      pwdStrengthFill.style.backgroundColor = '#fbbf24';
-      pwdStrengthText.textContent = '中等';
-      pwdStrengthText.style.color = '#fbbf24';
-    } else {
-      pwdStrengthFill.style.width = '100%';
-      pwdStrengthFill.style.backgroundColor = '#34d399';
-      pwdStrengthText.textContent = '强';
-      pwdStrengthText.style.color = '#34d399';
-    }
+        if (!cpwd) {
+          if (isBlur) {
+            setFeedback(cpFeedback, cpInput, '⚠️ 请再次输入密码以确认', 'error');
+          } else {
+            setFeedback(cpFeedback, cpInput, '', '');
+          }
+          return false;
+        }
 
-    const missing = [];
-    if (!hasLen) missing.push('至少 6 位');
-    if (!hasUpper) missing.push('大写字母 (A-Z)');
-    if (!hasLower) missing.push('小写字母 (a-z)');
-    if (!hasNum) missing.push('数字 (0-9)');
-    if (!hasSym) missing.push('特殊符号 (!@#$ 等)');
+        const isParentPwdValid = (
+          pwd.length >= 6 &&
+          /[A-Z]/.test(pwd) &&
+          /[a-z]/.test(pwd) &&
+          /[0-9]/.test(pwd) &&
+          /[^a-zA-Z0-9]/.test(pwd)
+        );
 
-    if (missing.length > 0) {
-      setFeedback(pFeedback, pInput, `⚠️ 密码缺少：${missing.join('、')}`, 'error');
-      return false;
-    }
+        if (!isParentPwdValid) {
+          setFeedback(cpFeedback, cpInput, '⚠️ 请先使上方密码满足全部复杂度要求', 'error');
+          return false;
+        }
 
-    setFeedback(pFeedback, pInput, '✓ 密码符合所有安全要求', 'success');
+        if (cpwd !== pwd) {
+          setFeedback(cpFeedback, cpInput, '⚠️ 两次输入的密码不一致，请检查', 'error');
+          return false;
+        }
 
-    // 若确认密码框已有输入，顺便联动重新校验确认密码
-    if (cpInput.value) {
-      validateConfirmPassword();
-    }
-
-    return true;
-  }
-
-  // 3. 确认密码实时校验
-  function validateConfirmPassword(isBlur = false) {
-    const pwd = pInput.value;
-    const cpwd = cpInput.value;
-
-    if (!cpwd) {
-      if (isBlur) {
-        setFeedback(cpFeedback, cpInput, '⚠️ 请再次输入密码以确认', 'error');
-      } else {
-        setFeedback(cpFeedback, cpInput, '', '');
+        setFeedback(cpFeedback, cpInput, '✓ 两次密码输入一致', 'success');
+        return true;
       }
-      return false;
-    }
 
-    const isParentPwdValid = (
-      pwd.length >= 6 &&
-      /[A-Z]/.test(pwd) &&
-      /[a-z]/.test(pwd) &&
-      /[0-9]/.test(pwd) &&
-      /[^a-zA-Z0-9]/.test(pwd)
-    );
+      // 绑定实时输入事件与失去焦点事件
+      uInput.addEventListener('input', () => validateUsername(false));
+      uInput.addEventListener('blur', () => validateUsername(true));
 
-    if (!isParentPwdValid) {
-      setFeedback(cpFeedback, cpInput, '⚠️ 请先使上方密码满足全部复杂度要求', 'error');
-      return false;
-    }
+      pInput.addEventListener('input', () => validatePassword(false));
+      pInput.addEventListener('blur', () => validatePassword(true));
 
-    if (cpwd !== pwd) {
-      setFeedback(cpFeedback, cpInput, '⚠️ 两次输入的密码不一致，请检查', 'error');
-      return false;
-    }
+      cpInput.addEventListener('input', () => validateConfirmPassword(false));
+      cpInput.addEventListener('blur', () => validateConfirmPassword(true));
 
-    setFeedback(cpFeedback, cpInput, '✓ 两次密码输入一致', 'success');
-    return true;
-  }
+      // 表单提交拦截与震动提示
+      form.addEventListener('submit', function (e) {
+        const isUValid = validateUsername(true);
+        const isPValid = validatePassword(true);
+        const isCPValid = validateConfirmPassword(true);
 
-  // 绑定实时输入事件与失去焦点事件
-  uInput.addEventListener('input', () => validateUsername(false));
-  uInput.addEventListener('blur', () => validateUsername(true));
+        if (!isUValid || !isUsernameAvailable) {
+          e.preventDefault();
+          triggerShake('groupUsername');
+          uInput.focus();
+          return;
+        }
 
-  pInput.addEventListener('input', () => validatePassword(false));
-  pInput.addEventListener('blur', () => validatePassword(true));
+        if (!isPValid) {
+          e.preventDefault();
+          triggerShake('groupPassword');
+          pInput.focus();
+          return;
+        }
 
-  cpInput.addEventListener('input', () => validateConfirmPassword(false));
-  cpInput.addEventListener('blur', () => validateConfirmPassword(true));
+        if (!isCPValid) {
+          e.preventDefault();
+          triggerShake('groupConfirmPassword');
+          cpInput.focus();
+          return;
+        }
 
-  // 表单提交拦截与震动提示
-  form.addEventListener('submit', function(e) {
-    const isUValid = validateUsername(true);
-    const isPValid = validatePassword(true);
-    const isCPValid = validateConfirmPassword(true);
+        // 表单验证全部通过，触发防重复提交与动效加载中状态
+        btnSubmit.innerHTML = '<span class="btn-spinner"></span> 正在创建账本并进入...';
+        setTimeout(() => { btnSubmit.disabled = true; }, 0);
+      });
 
-    if (!isUValid || !isUsernameAvailable) {
-      e.preventDefault();
-      triggerShake('groupUsername');
-      uInput.focus();
-      return;
-    }
+      function triggerShake(groupId) {
+        const g = document.getElementById(groupId);
+        if (!g) return;
+        g.classList.remove('shake-animate');
+        void g.offsetWidth; // 触发 reflow 重启关键帧动画
+        g.classList.add('shake-animate');
+      }
 
-    if (!isPValid) {
-      e.preventDefault();
-      triggerShake('groupPassword');
-      pInput.focus();
-      return;
-    }
-
-    if (!isCPValid) {
-      e.preventDefault();
-      triggerShake('groupConfirmPassword');
-      cpInput.focus();
-      return;
-    }
-
-    // 表单验证全部通过，触发防重复提交与动效加载中状态
-    btnSubmit.innerHTML = '<span class="btn-spinner"></span> 正在创建账本并进入...';
-    setTimeout(() => { btnSubmit.disabled = true; }, 0);
-  });
-
-  function triggerShake(groupId) {
-    const g = document.getElementById(groupId);
-    if (!g) return;
-    g.classList.remove('shake-animate');
-    void g.offsetWidth; // 触发 reflow 重启关键帧动画
-    g.classList.add('shake-animate');
-  }
-
-  // 若带初始值（如后端回填），触发一次初始化校验
-  if (uInput.value.trim()) {
-    validateUsername(true);
-  }
-})();
-</script>
+      // 若带初始值（如后端回填），触发一次初始化校验
+      if (uInput.value.trim()) {
+        validateUsername(true);
+      }
+    })();
+  </script>
 </body>
+
 </html>

@@ -16,6 +16,7 @@
       <td data-col="checkbox" style="text-align: center;">
         <input type="checkbox" name="ids" value="{{ r.id }}" class="record-checkbox" onchange="updateBatchBar()">
       </td>
+      <td data-col="date">{{ r.date }}</td>
       <td data-col="type">
         <span class="tag {{ 'tag-income' if r.type=='income' else ('tag-savings' if r.type=='savings' else 'tag-expense') }}">{{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }}</span>
         {% if r.from_savings %}<span class="tag tag-savings" style="margin-left: 4px; font-size: 10px; padding: 2px 6px;" title="从储蓄储备扣除">扣: {{ r.from_savings_category or '储蓄' }}</span>{% endif %}
