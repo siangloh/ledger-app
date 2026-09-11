@@ -13,7 +13,7 @@
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
 <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260911_v4">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260911_v5">
 </head>
 <body>
 <!-- 极速页面加载指示条 -->
@@ -26,19 +26,64 @@
             <span class="app-avatar-badge">💰</span>
             <a href="{{ url_for('index') }}" class="brand-link" hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true"><span class="brand">我的账本</span></a>
         </div>
-        <!-- 桌面端导航链接 -->
+        <!-- 桌面端导航链接 (分组下拉式) -->
         <nav class="desktop-nav-links">
-            <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}" data-nav="index" hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">仪表盘</a>
-            <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records" hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">历史记录</a>
-            <a href="{{ url_for('split_bill_page') }}" class="{{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill" hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">小票AA分账</a>
-            <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring" hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">固定收支</a>
-            <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories" hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">分类管理</a>
-            <a href="{{ url_for('category_insights_page') }}" class="{{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">分类洞察</a>
-            <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">批量导入</a>
-            {% if session.get('username') %}
-            <span style="color: var(--accent); margin-left: 14px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;" title="当前登录账号">👤 {{ session.username }}</span>
-            {% endif %}
-            <a href="{{ url_for('logout') }}" style="color: rgba(255, 255, 255, 0.6); margin-left: 8px; font-size: 13px;" title="退出登录">登出</a>
+          <!-- 主要入口 -->
+          <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}" data-nav="index" hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">仪表盘</a>
+          <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records" hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">历史记录</a>
+          <a href="{{ url_for('split_bill_page') }}" class="{{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill" hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">AA 分账</a>
+
+          <div class="nav-sep"></div>
+
+          <!-- 管理 dropdown -->
+          <div class="nav-group">
+            <button class="nav-group-trigger {% if request.endpoint in ('accounts_page','liabilities_page','subscriptions_page','recurring_page') %}active{% endif %}">
+              管理 <span class="nav-chevron">▾</span>
+            </button>
+            <div class="nav-dropdown">
+              <a href="{{ url_for('accounts_page') }}" class="{{ 'active' if request.endpoint == 'accounts_page' }}" data-nav="accounts" hx-get="{{ url_for('accounts_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
+                <span class="nav-icon">🏦</span>账户管理
+              </a>
+              <a href="{{ url_for('liabilities_page') }}" class="{{ 'active' if request.endpoint == 'liabilities_page' }}" data-nav="liabilities" hx-get="{{ url_for('liabilities_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
+                <span class="nav-icon">💳</span>负债分期
+              </a>
+              <a href="{{ url_for('subscriptions_page') }}" class="{{ 'active' if request.endpoint == 'subscriptions_page' }}" data-nav="subscriptions" hx-get="{{ url_for('subscriptions_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
+                <span class="nav-icon">🔄</span>订阅大厅
+              </a>
+              <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring" hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
+                <span class="nav-icon">📅</span>固定收支
+              </a>
+            </div>
+          </div>
+
+          <!-- 分析 dropdown -->
+          <div class="nav-group">
+            <button class="nav-group-trigger {% if request.endpoint in ('categories_page','category_insights_page','import_page','import_upload','import_confirm') %}active{% endif %}">
+              工具 <span class="nav-chevron">▾</span>
+            </button>
+            <div class="nav-dropdown">
+              <a href="{{ url_for('category_insights_page') }}" class="{{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
+                <span class="nav-icon">📊</span>分类洞察
+              </a>
+              <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories" hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
+                <span class="nav-icon">🏷️</span>分类管理
+              </a>
+              <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
+                <span class="nav-icon">📤</span>批量导入
+              </a>
+            </div>
+          </div>
+
+          <div class="nav-sep"></div>
+
+          <!-- 用户区 -->
+          {% if session.get('username') %}
+          <span class="nav-user-pill">
+            <span class="nav-user-avatar">👤</span>
+            {{ session.username }}
+          </span>
+          {% endif %}
+          <a href="{{ url_for('logout') }}" class="nav-logout-btn" title="退出登录">登出</a>
         </nav>
     </div>
 </header>
@@ -106,6 +151,21 @@
             <span class="sheet-title">固定收支</span>
             <span class="sheet-desc">房租工资每月自动</span>
         </a>
+        <a href="{{ url_for('liabilities_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'liabilities_page' }}" data-nav="liabilities" hx-get="{{ url_for('liabilities_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+            <span class="sheet-icon">💳</span>
+            <span class="sheet-title">负债分期</span>
+            <span class="sheet-desc">房贷车贷与免息分期</span>
+        </a>
+        <a href="{{ url_for('accounts_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'accounts_page' }}" data-nav="accounts" hx-get="{{ url_for('accounts_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+            <span class="sheet-icon">🏦</span>
+            <span class="sheet-title">账户管理</span>
+            <span class="sheet-desc">银行账户与信用卡</span>
+        </a>
+        <a href="{{ url_for('subscriptions_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'subscriptions_page' }}" data-nav="subscriptions" hx-get="{{ url_for('subscriptions_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+            <span class="sheet-icon">🔄</span>
+            <span class="sheet-title">订阅大厅</span>
+            <span class="sheet-desc">周期订阅与续费预警</span>
+        </a>
         <a href="{{ url_for('categories_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories" hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
             <span class="sheet-icon">🏷️</span>
             <span class="sheet-title">分类管理</span>
@@ -152,7 +212,7 @@
 <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-<script src="{{ url_for('static', filename='app.js') }}?v=20260911_v2"></script>
+<script src="{{ url_for('static', filename='app.js') }}?v=20260911_v4"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

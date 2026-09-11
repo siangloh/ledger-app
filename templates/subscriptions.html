@@ -1,0 +1,637 @@
+{% extends layout|default('base.html') %}
+{% block title %}订阅服务大厅与续费提醒 - 我的记账本{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 24px;">
+  <div>
+    <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 8px;">
+      <span>🔄</span> 订阅服务大厅与续费提醒
+      <span style="font-size: 13px; font-weight: normal; color: var(--muted); background: var(--bg-soft); padding: 3px 10px; border-radius: 12px; border: 1px solid var(--border);">
+        Subscriptions & Renewal Radar
+      </span>
+    </h1>
+    <p style="margin: 4px 0 0; font-size: 13px; color: var(--ink-soft);">
+      集中管控多币种周期性订阅（流媒体/云存储/生产力工具/年卡），智能测算开销大盘并精准预警续费扣款。
+    </p>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+    <button type="button" class="btn btn-primary btn-sm" onclick="openModal('modalAddSub')">
+      <span>✨</span> + 新增订阅服务
+    </button>
+  </div>
+</div>
+
+<!-- 顶层核心 KPI 看板 (4 大指标) -->
+<div class="kpi-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+  <!-- 1. 月度等效支出 & 年度总开销 -->
+  <div class="card" style="padding: 18px 20px; border-left: 4px solid var(--navy); position: relative;">
+    <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">月度平均订阅支出</div>
+    <div style="font-size: 26px; font-weight: 700; color: var(--navy); margin-top: 6px;">
+      RM {{ "{:,.2f}".format(summary.total_monthly_burn) }} <span style="font-size: 13px; font-weight: 500; color: var(--muted);">/月</span>
+    </div>
+    <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">
+      折算年度总开销: <strong>RM {{ "{:,.2f}".format(summary.total_annual_burn) }}</strong>
+    </div>
+  </div>
+
+  <!-- 2. 活跃与暂停统计 -->
+  <div class="card" style="padding: 18px 20px; border-left: 4px solid #10b981; position: relative;">
+    <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">订阅服务规模</div>
+    <div style="font-size: 26px; font-weight: 700; color: #10b981; margin-top: 6px;">
+      {{ summary.total_active_count }} <span style="font-size: 14px; font-weight: 500; color: var(--ink);">项进行中</span>
+    </div>
+    <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">
+      已暂停: {{ summary.total_paused_count }} 项 · 已取消: {{ summary.total_cancelled_count }} 项
+    </div>
+  </div>
+
+  <!-- 3. 近 7 天待续费预警 -->
+  <div class="card" style="padding: 18px 20px; border-left: 4px solid #f59e0b; position: relative;">
+    <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">近 7 天扣费雷达</div>
+    <div style="font-size: 26px; font-weight: 700; color: #f59e0b; margin-top: 6px;">
+      {{ summary.upcoming_7_days|length }} <span style="font-size: 14px; font-weight: 500; color: var(--ink);">笔即将扣费</span>
+    </div>
+    <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">
+      {% set critical_count = summary.upcoming_7_days | selectattr('alert_level.value', 'equalto', 'CRITICAL') | list | length %}
+      {% if critical_count > 0 %}
+        <span style="color: #e11d48; font-weight: 600;">⚠️ 含有 {{ critical_count }} 项高危预警（试用到期/退订拦截）</span>
+      {% else %}
+        现金流扣款均在可控周期内
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 4. Top 3 最贵项开销集中度 -->
+  <div class="card" style="padding: 18px 20px; border-left: 4px solid #8b5cf6; position: relative;">
+    <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Top 3 最贵订阅占比</div>
+    <div style="font-size: 26px; font-weight: 700; color: #8b5cf6; margin-top: 6px;">
+      {{ summary.top_3_percentage_total }}%
+    </div>
+    <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+      {% if summary.top_3_expensive_subscriptions %}
+        主要由 {{ summary.top_3_expensive_subscriptions[0].name }} 等构成
+      {% else %}
+        暂无订阅开销记录
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- 模块一：近 7 天待续费与预警雷达 (Alerts Radar) -->
+<div class="panel" style="margin-bottom: 24px; padding: 22px; border-radius: 14px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+    <div>
+      <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 8px;">
+        <span>🔔</span> 续费排程雷达（未来 7 天待扣款预警）
+      </h3>
+      <p style="margin: 4px 0 0; font-size: 12.5px; color: var(--ink-soft);">
+        自动检测临近扣费事件。针对试用期到期或已标记打算退订的项目执行强提醒，防止意外反向扣费。
+      </p>
+    </div>
+    <span style="font-size: 12px; background: var(--bg-soft); padding: 4px 10px; border-radius: 12px; border: 1px solid var(--border); color: var(--ink);">
+      共 {{ summary.upcoming_7_days|length }} 项排程
+    </span>
+  </div>
+
+  {% if summary.upcoming_7_days %}
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;">
+    {% for item in summary.upcoming_7_days %}
+    <div style="border-radius: 12px; padding: 16px; border: 1px solid {{ '#fecdd3' if item.alert_level.value == 'CRITICAL' else '#fef3c7' if item.alert_level.value == 'WARNING' else 'var(--border)' }}; background: {{ '#fff1f2' if item.alert_level.value == 'CRITICAL' else '#fffbeb' if item.alert_level.value == 'WARNING' else 'var(--card-bg)' }}; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; transition: transform 0.2s ease;">
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+          <div>
+            <span style="font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600; {{ 'background:#e11d48; color:#fff;' if item.alert_level.value == 'CRITICAL' else 'background:#f59e0b; color:#fff;' if item.alert_level.value == 'WARNING' else 'background:var(--bg-soft); color:var(--ink);' }}">
+              {{ '🚨 高危紧急' if item.alert_level.value == 'CRITICAL' else '⚠️ 临期预警' if item.alert_level.value == 'WARNING' else 'ℹ️ 计划扣费' }}
+            </span>
+            <span style="font-size: 11.5px; color: var(--muted); margin-left: 6px;">{{ item.category }}</span>
+            <h4 style="margin: 6px 0 2px; font-size: 16px; font-weight: 700; color: var(--navy);">
+              {{ item.name }}
+            </h4>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 17px; font-weight: 700; color: {{ '#e11d48' if item.alert_level.value == 'CRITICAL' else 'var(--navy)' }};">
+              {{ item.currency }} {{ "{:,.2f}".format(item.cost) }}
+            </div>
+            {% if item.currency != 'MYR' %}
+              <div style="font-size: 11px; color: var(--muted);">
+                ≈ RM {{ "{:,.2f}".format(item.converted_cost) }}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <p style="margin: 8px 0 0; font-size: 12.5px; color: {{ '#9f1239' if item.alert_level.value == 'CRITICAL' else '#92400e' if item.alert_level.value == 'WARNING' else 'var(--ink)' }}; font-weight: 500;">
+          {{ item.alert_message }}
+        </p>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed rgba(0,0,0,0.08); padding-top: 10px; margin-top: 4px; font-size: 12px;">
+        <span style="color: var(--ink-soft);">
+          扣款日: <strong>{{ item.next_billing_date }}</strong>
+          {% if item.days_left == 0 %}
+            <span style="color: #e11d48; font-weight: 700;">（今天）</span>
+          {% elif item.days_left > 0 %}
+            <span>（还剩 <strong>{{ item.days_left }}</strong> 天）</span>
+          {% else %}
+            <span style="color: #e11d48; font-weight: 700;">（已到期待对账）</span>
+          {% endif %}
+        </span>
+
+        <div style="display: flex; gap: 6px;">
+          <!-- 一键确认续费前滚 -->
+          <form method="post" action="{{ url_for('api_roll_subscription', sub_id=item.subscription_id) }}" style="margin:0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="record_expense" value="1">
+            <button type="submit" class="btn btn-sm btn-outline-success" style="padding: 3px 8px; font-size: 11.5px;" title="确认完成本期扣费，并自动滚动到下一期">
+              ✓ 扣款续期
+            </button>
+          </form>
+
+          <!-- 标记打算退订 -->
+          <form method="post" action="{{ url_for('api_toggle_cancel_target', sub_id=item.subscription_id) }}" style="margin:0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-secondary" style="padding: 3px 8px; font-size: 11.5px;">
+              {{ '取消退订标记' if item.target_to_cancel else '标为待退订' }}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="text-align: center; padding: 28px 10px; color: var(--muted);">
+    <span style="font-size: 28px;">🛡️</span>
+    <p style="margin: 8px 0 0; font-size: 13px;">未来 7 天内无即将扣款的订阅项目，现金流安全无风险。</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- 模块二：全量订阅服务列表 (Subscriptions Grid) -->
+<div class="panel" style="padding: 22px; border-radius: 14px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+    <div>
+      <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 8px;">
+        <span>📋</span> 订阅清单大厅（全部服务）
+      </h3>
+      <p style="margin: 4px 0 0; font-size: 12.5px; color: var(--ink-soft);">
+        点击服务可随时编辑参数、暂停计费或调整扣款卡片绑定。
+      </p>
+    </div>
+
+    <!-- 状态筛选器 -->
+    <div style="display: flex; gap: 6px;">
+      <button type="button" class="btn btn-sm sub-filter-btn active" onclick="filterSubscriptions('ALL', this)">全部 ({{ subscriptions|length }})</button>
+      <button type="button" class="btn btn-sm sub-filter-btn" onclick="filterSubscriptions('ACTIVE', this)">进行中 ({{ summary.total_active_count }})</button>
+      <button type="button" class="btn btn-sm sub-filter-btn" onclick="filterSubscriptions('PAUSED', this)">已暂停 ({{ summary.total_paused_count }})</button>
+      <button type="button" class="btn btn-sm sub-filter-btn" onclick="filterSubscriptions('CANCEL_TARGET', this)">打算退订</button>
+    </div>
+  </div>
+
+  {% if subscriptions %}
+  <div class="table-responsive" style="overflow-x: auto;">
+    <table class="table" style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+      <thead>
+        <tr style="border-bottom: 2px solid var(--border); color: var(--muted); text-align: left;">
+          <th style="padding: 10px 12px;">服务名称与分类</th>
+          <th style="padding: 10px 12px;">计费周期</th>
+          <th style="padding: 10px 12px; text-align: right;">单期费用</th>
+          <th style="padding: 10px 12px; text-align: right;">月均等效 (MYR)</th>
+          <th style="padding: 10px 12px;">下期扣款日</th>
+          <th style="padding: 10px 12px;">扣款账户/卡片</th>
+          <th style="padding: 10px 12px;">状态/标记</th>
+          <th style="padding: 10px 12px; text-align: right;">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in subscriptions %}
+        <tr class="sub-row" data-status="{{ s.status.value }}" data-target-cancel="{{ '1' if s.target_to_cancel else '0' }}"
+            style="border-bottom: 1px solid var(--border); opacity: {{ '0.6' if s.status.value == 'PAUSED' else '1.0' }};">
+          <!-- 名称与分类 -->
+          <td style="padding: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 22px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-soft); border-radius: 8px;">
+                {% if '流媒体' in s.category or 'Video' in s.category or 'Netflix' in s.name or 'Disney' in s.name or 'YouTube' in s.name %}🎬
+                {% elif '音乐' in s.category or 'Music' in s.category or 'Spotify' in s.name or 'Apple Music' in s.name %}🎵
+                {% elif '云存储' in s.category or 'iCloud' in s.name or 'Google' in s.name or 'Dropbox' in s.name %}☁️
+                {% elif 'AI' in s.category or 'ChatGPT' in s.name or 'Claude' in s.name or 'Cursor' in s.name %}🤖
+                {% elif '健身' in s.category or 'Gym' in s.name %}🏋️
+                {% elif '生产力' in s.category or 'Office' in s.name or 'Notion' in s.name %}⚡
+                {% else %}📦{% endif %}
+              </span>
+              <div>
+                <strong style="color: var(--navy); font-size: 14.5px;">{{ s.name }}</strong>
+                <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">{{ s.category }}</div>
+              </div>
+            </div>
+          </td>
+
+          <!-- 计费周期 -->
+          <td style="padding: 12px;">
+            <span style="display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: var(--bg-soft); color: var(--ink);">
+              {% if s.billing_cycle.value == 'WEEKLY' %}每周 (52期/年)
+              {% elif s.billing_cycle.value == 'MONTHLY' %}每月 (12期/年)
+              {% elif s.billing_cycle.value == 'QUARTERLY' %}每季 (4期/年)
+              {% elif s.billing_cycle.value == 'SEMI_ANNUAL' %}每半年 (2期/年)
+              {% elif s.billing_cycle.value == 'YEARLY' %}每年 (1期/年)
+              {% endif %}
+            </span>
+          </td>
+
+          <!-- 单期费用 -->
+          <td style="padding: 12px; text-align: right; font-weight: 700; color: var(--navy);">
+            {{ s.currency }} {{ "{:,.2f}".format(s.cost) }}
+          </td>
+
+          <!-- 月均等效开销 -->
+          <td style="padding: 12px; text-align: right; font-weight: 600; color: #4f46e5;">
+            {% if s.billing_cycle.value == 'MONTHLY' %}
+              RM {{ "{:,.2f}".format(s.cost) if s.currency == 'MYR' else '换算中' }}
+            {% else %}
+              <span style="font-size: 12.5px;">分摊测算中</span>
+            {% endif %}
+          </td>
+
+          <!-- 下期扣款日 -->
+          <td style="padding: 12px;">
+            <div style="font-weight: 600; color: var(--navy);">{{ s.next_billing_date }}</div>
+            {% set dleft = (s.next_billing_date - today_date).days %}
+            <div style="font-size: 11px; margin-top: 2px; color: {{ '#e11d48' if dleft <= 3 else 'var(--muted)' }};">
+              {% if dleft == 0 %}今天到期扣费
+              {% elif dleft > 0 %}还有 {{ dleft }} 天
+              {% else %}已过期 {{ -dleft }} 天未结算
+              {% endif %}
+            </div>
+          </td>
+
+          <!-- 账户卡片 -->
+          <td style="padding: 12px; color: var(--ink);">
+            {% if s.payment_method_name %}
+              💳 {{ s.payment_method_name }}
+            {% else %}
+              <span style="color: var(--muted);">未绑定账户</span>
+            {% endif %}
+          </td>
+
+          <!-- 状态标签 -->
+          <td style="padding: 12px;">
+            {% if s.status.value == 'ACTIVE' %}
+              <span style="background: #dcfce7; color: #166534; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600;">计费中</span>
+            {% else %}
+              <span style="background: #f1f5f9; color: #64748b; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600;">已暂停</span>
+            {% endif %}
+
+            {% if s.target_to_cancel %}
+              <span style="background: #fee2e2; color: #991b1b; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;" title="标记为打算退订">待退订</span>
+            {% endif %}
+
+            {% if s.is_trial %}
+              <span style="background: #fef3c7; color: #92400e; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">试用中</span>
+            {% endif %}
+          </td>
+
+          <!-- 操作按钮组 -->
+          <td style="padding: 12px; text-align: right;">
+            <div style="display: inline-flex; align-items: center; gap: 6px;">
+              <!-- 快速前滚 -->
+              <form method="post" action="{{ url_for('api_roll_subscription', sub_id=s.id) }}" style="margin:0;" onsubmit="return confirm('确定完成当期扣费并前滚至下一计费周期？');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="record_expense" value="1">
+                <button type="submit" class="btn btn-sm btn-outline-success" style="padding: 2px 7px; font-size: 11.5px;" title="完成扣款并前滚">
+                  续期
+                </button>
+              </form>
+
+              <!-- 暂停/恢复 -->
+              <form method="post" action="{{ url_for('api_toggle_subscription_status', sub_id=s.id) }}" style="margin:0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-secondary" style="padding: 2px 7px; font-size: 11.5px;">
+                  {{ '暂停' if s.status.value == 'ACTIVE' else '恢复' }}
+                </button>
+              </form>
+
+              <!-- 编辑按钮 -->
+              <button type="button" class="btn btn-sm btn-secondary" style="padding: 2px 7px; font-size: 11.5px;"
+                      onclick="openEditModal({{ s.id }}, '{{ s.name|e }}', '{{ s.category|e }}', '{{ s.billing_cycle.value }}', '{{ s.cost }}', '{{ s.currency }}', '{{ s.next_billing_date }}', '{{ s.payment_method_id or '' }}', {{ s.cancellation_reminder_days }}, {{ 'true' if s.auto_renew else 'false' }}, {{ 'true' if s.is_trial else 'false' }}, {{ 'true' if s.target_to_cancel else 'false' }}, '{{ s.note or '' }}')">
+                编辑
+              </button>
+
+              <!-- 删除 -->
+              <form method="post" action="{{ url_for('api_delete_subscription', sub_id=s.id) }}" style="margin:0;" onsubmit="return confirm('确认彻底删除订阅【{{ s.name }}】吗？');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger" style="padding: 2px 7px; font-size: 11.5px;">
+                  ✕
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align: center; padding: 40px 10px; color: var(--muted);">
+    <span style="font-size: 32px;">📑</span>
+    <p style="margin: 8px 0 0; font-size: 14px;">暂无订阅服务记录。点击上方「+ 新增订阅服务」添加您的 Netflix, Spotify, iCloud 或健身卡吧！</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ==================== Modal 1: 新增订阅 ==================== -->
+<div id="modalAddSub" class="modal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+  <div class="card modal-content" style="max-width:540px; width:92%; max-height:90vh; overflow-y:auto; padding:24px; border-radius:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h3 style="margin:0; font-size:18px; font-weight:700; color:var(--navy);">✨ 添加订阅服务</h3>
+      <button type="button" class="btn-close" onclick="closeModal('modalAddSub')" style="background:none; border:none; font-size:18px; cursor:pointer;">✕</button>
+    </div>
+
+    <form method="post" action="{{ url_for('api_add_subscription') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-group" style="margin-bottom:14px;">
+        <label style="font-size:13px; font-weight:600; color:var(--ink);">服务名称 *</label>
+        <input type="text" name="name" class="form-control" required placeholder="如 Netflix Premium, Spotify, ChatGPT Plus" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px;">
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">所属分类 *</label>
+          <select name="category" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+            <option value="流媒体">🎬 流媒体 (Video)</option>
+            <option value="音乐播客">🎵 音乐播客 (Music)</option>
+            <option value="云存储">☁️ 云存储 (Cloud)</option>
+            <option value="生产力工具">⚡ 生产力工具 (Tools)</option>
+            <option value="AI人工智能">🤖 AI人工智能 (AI)</option>
+            <option value="生活健身">🏋️ 生活健身 (Fitness)</option>
+            <option value="其他">📦 其他服务</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">计费周期 *</label>
+          <select name="billing_cycle" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+            <option value="MONTHLY" selected>每月扣款 (Monthly)</option>
+            <option value="YEARLY">每年扣款 (Yearly)</option>
+            <option value="QUARTERLY">每季度 (Quarterly)</option>
+            <option value="SEMI_ANNUAL">每半年 (Semi-Annual)</option>
+            <option value="WEEKLY">每周扣款 (Weekly)</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px; margin-bottom:14px;">
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">单期扣款金额 *</label>
+          <input type="number" step="0.01" name="cost" class="form-control" required placeholder="如 55.00" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+        </div>
+
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">结算币种</label>
+          <select name="currency" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+            <option value="MYR" selected>MYR (令吉)</option>
+            <option value="USD">USD (美元)</option>
+            <option value="SGD">SGD (新币)</option>
+            <option value="CNY">CNY (人民币)</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px;">
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">首次订阅日期</label>
+          <input type="date" name="start_date" value="{{ today }}" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+        </div>
+
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">下一次扣款日期 *</label>
+          <input type="date" name="next_billing_date" value="{{ today }}" class="form-control" required style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px;">
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">绑定扣款账户/信用卡</label>
+          <select name="payment_method_id" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+            <option value="">-- 未绑定/外部扣款 --</option>
+            {% for a in accounts %}
+              <option value="{{ a.id }}">{{ a.name }} ({{ a.type }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">提前几天预警提醒</label>
+          <input type="number" name="cancellation_reminder_days" value="3" min="1" max="30" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+        </div>
+      </div>
+
+      <!-- 智能标记开关 -->
+      <div style="background:var(--bg-soft); padding:12px 14px; border-radius:10px; margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <input type="checkbox" id="checkAutoRenew" name="auto_renew" value="1" checked>
+          <label for="checkAutoRenew" style="font-size:13px; font-weight:600; margin:0; cursor:pointer;">开启到期自动续订 (Auto-Renew)</label>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <input type="checkbox" id="checkTargetCancel" name="target_to_cancel" value="1">
+          <label for="checkTargetCancel" style="font-size:13px; font-weight:600; color:#e11d48; margin:0; cursor:pointer;">
+            打算退订（扣款前强提醒拦截，防止意外被反向扣费）
+          </label>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="checkTrial" name="is_trial" value="1">
+          <label for="checkTrial" style="font-size:13px; font-weight:600; color:#b45309; margin:0; cursor:pointer;">
+            目前处于免费试用期 (Free Trial)
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:18px;">
+        <label style="font-size:13px; font-weight:600; color:var(--ink);">备注信息</label>
+        <input type="text" name="note" class="form-control" placeholder="如：家庭组4人分摊 / 绑定的虚拟卡号等" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalAddSub')">取消</button>
+        <button type="submit" class="btn btn-primary">保存订阅</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==================== Modal 2: 编辑订阅 ==================== -->
+<div id="modalEditSub" class="modal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+  <div class="card modal-content" style="max-width:540px; width:92%; max-height:90vh; overflow-y:auto; padding:24px; border-radius:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h3 style="margin:0; font-size:18px; font-weight:700; color:var(--navy);">✏️ 编辑订阅服务</h3>
+      <button type="button" class="btn-close" onclick="closeModal('modalEditSub')" style="background:none; border:none; font-size:18px; cursor:pointer;">✕</button>
+    </div>
+
+    <form id="formEditSub" method="post" action="">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="form-group" style="margin-bottom:14px;">
+        <label style="font-size:13px; font-weight:600; color:var(--ink);">服务名称 *</label>
+        <input type="text" id="editName" name="name" class="form-control" required style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px;">
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">所属分类 *</label>
+          <select id="editCategory" name="category" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+            <option value="流媒体">🎬 流媒体 (Video)</option>
+            <option value="音乐播客">🎵 音乐播客 (Music)</option>
+            <option value="云存储">☁️ 云存储 (Cloud)</option>
+            <option value="生产力工具">⚡ 生产力工具 (Tools)</option>
+            <option value="AI人工智能">🤖 AI人工智能 (AI)</option>
+            <option value="生活健身">🏋️ 生活健身 (Fitness)</option>
+            <option value="其他">📦 其他服务</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">计费周期 *</label>
+          <select id="editBillingCycle" name="billing_cycle" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+            <option value="MONTHLY">每月扣款 (Monthly)</option>
+            <option value="YEARLY">每年扣款 (Yearly)</option>
+            <option value="QUARTERLY">每季度 (Quarterly)</option>
+            <option value="SEMI_ANNUAL">每半年 (Semi-Annual)</option>
+            <option value="WEEKLY">每周扣款 (Weekly)</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px; margin-bottom:14px;">
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">单期扣款金额 *</label>
+          <input type="number" step="0.01" id="editCost" name="cost" class="form-control" required style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+        </div>
+
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">结算币种</label>
+          <select id="editCurrency" name="currency" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+            <option value="MYR">MYR (令吉)</option>
+            <option value="USD">USD (美元)</option>
+            <option value="SGD">SGD (新币)</option>
+            <option value="CNY">CNY (人民币)</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px;">
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">下一次扣款日期 *</label>
+          <input type="date" id="editNextBillingDate" name="next_billing_date" class="form-control" required style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+        </div>
+
+        <div class="form-group">
+          <label style="font-size:13px; font-weight:600; color:var(--ink);">提前提醒天数</label>
+          <input type="number" id="editReminderDays" name="cancellation_reminder_days" min="1" max="30" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:14px;">
+        <label style="font-size:13px; font-weight:600; color:var(--ink);">绑定扣款账户/信用卡</label>
+        <select id="editPaymentMethodId" name="payment_method_id" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+          <option value="">-- 未绑定/外部扣款 --</option>
+          {% for a in accounts %}
+            <option value="{{ a.id }}">{{ a.name }} ({{ a.type }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- 智能标记开关 -->
+      <div style="background:var(--bg-soft); padding:12px 14px; border-radius:10px; margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <input type="checkbox" id="editAutoRenew" name="auto_renew" value="1">
+          <label for="editAutoRenew" style="font-size:13px; font-weight:600; margin:0; cursor:pointer;">开启自动续订</label>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <input type="checkbox" id="editTargetCancel" name="target_to_cancel" value="1">
+          <label for="editTargetCancel" style="font-size:13px; font-weight:600; color:#e11d48; margin:0; cursor:pointer;">
+            打算退订（高亮预警拦截）
+          </label>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="editTrial" name="is_trial" value="1">
+          <label for="editTrial" style="font-size:13px; font-weight:600; color:#b45309; margin:0; cursor:pointer;">
+            处于免费试用期
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:18px;">
+        <label style="font-size:13px; font-weight:600; color:var(--ink);">备注</label>
+        <input type="text" id="editNote" name="note" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalEditSub')">取消</button>
+        <button type="submit" class="btn btn-primary">保存修改</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.style.display = 'flex';
+  }
+}
+
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.style.display = 'none';
+  }
+}
+
+function openEditModal(id, name, cat, cycle, cost, curr, nextDate, paymentId, reminderDays, autoRenew, isTrial, targetCancel, note) {
+  const form = document.getElementById('formEditSub');
+  form.action = '/api/subscriptions/' + id + '/edit';
+
+  document.getElementById('editName').value = name;
+  document.getElementById('editCategory').value = cat;
+  document.getElementById('editBillingCycle').value = cycle;
+  document.getElementById('editCost').value = cost;
+  document.getElementById('editCurrency').value = curr;
+  document.getElementById('editNextBillingDate').value = nextDate;
+  document.getElementById('editReminderDays').value = reminderDays;
+  document.getElementById('editPaymentMethodId').value = paymentId || '';
+  document.getElementById('editAutoRenew').checked = Boolean(autoRenew);
+  document.getElementById('editTrial').checked = Boolean(isTrial);
+  document.getElementById('editTargetCancel').checked = Boolean(targetCancel);
+  document.getElementById('editNote').value = note || '';
+
+  openModal('modalEditSub');
+}
+
+function filterSubscriptions(type, btn) {
+  document.querySelectorAll('.sub-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const rows = document.querySelectorAll('.sub-row');
+  rows.forEach(r => {
+    const status = r.dataset.status;
+    const isCancel = r.dataset.targetCancel === '1';
+
+    if (type === 'ALL') {
+      r.style.display = '';
+    } else if (type === 'ACTIVE') {
+      r.style.display = status === 'ACTIVE' ? '' : 'none';
+    } else if (type === 'PAUSED') {
+      r.style.display = status === 'PAUSED' ? '' : 'none';
+    } else if (type === 'CANCEL_TARGET') {
+      r.style.display = isCancel ? '' : 'none';
+    }
+  });
+}
+</script>
+{% endblock %}

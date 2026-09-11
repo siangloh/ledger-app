@@ -1,0 +1,409 @@
+﻿{% extends "base.html" %}
+{% block title %}账户管理 - 我的记账本{% endblock %}
+
+{% block content %}
+<style>
+  :root {
+    --acc-card-bg: rgba(255,255,255,0.04);
+    --acc-border: rgba(255,255,255,0.08);
+    --acc-radius: 16px;
+  }
+  .acc-page-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:28px; flex-wrap:wrap; }
+  .acc-page-title { font-size:22px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:10px; }
+  .acc-page-title .badge-count { font-size:12px; background:rgba(99,102,241,0.2); color:#818cf8; border-radius:20px; padding:2px 10px; font-weight:600; }
+  .btn-add-acc { display:inline-flex; align-items:center; gap:6px; padding:10px 20px; border-radius:10px; background:linear-gradient(135deg,#6366f1,#818cf8); color:#fff; font-size:14px; font-weight:600; border:none; cursor:pointer; transition:opacity 0.2s,transform 0.15s; text-decoration:none; }
+  .btn-add-acc:hover { opacity:0.88; transform:translateY(-1px); }
+  .acc-summary-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:28px; }
+  .acc-kpi { background:var(--acc-card-bg); border:1px solid var(--acc-border); border-radius:12px; padding:16px 18px; display:flex; flex-direction:column; gap:4px; }
+  .acc-kpi-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; }
+  .acc-kpi-val { font-size:22px; font-weight:700; color:var(--ink); }
+  .acc-kpi-sub { font-size:11px; color:var(--muted); }
+  .acc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+  .acc-card { background:var(--acc-card-bg); border:1px solid var(--acc-border); border-radius:var(--acc-radius); padding:20px; display:flex; flex-direction:column; gap:12px; position:relative; transition:border-color 0.2s,transform 0.15s; }
+  .acc-card:hover { border-color:rgba(99,102,241,0.35); transform:translateY(-2px); }
+  .acc-card.inactive { opacity:0.5; }
+  .acc-card-top { display:flex; align-items:flex-start; gap:12px; }
+  .acc-icon { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+  .acc-icon.savings { background:rgba(16,185,129,0.15); }
+  .acc-icon.current { background:rgba(59,130,246,0.15); }
+  .acc-icon.credit_card { background:rgba(139,92,246,0.15); }
+  .acc-icon.e_wallet { background:rgba(245,158,11,0.15); }
+  .acc-icon.investment { background:rgba(99,102,241,0.15); }
+  .acc-icon.cash { background:rgba(34,197,94,0.15); }
+  .acc-icon.other { background:rgba(156,163,175,0.15); }
+  .acc-meta { flex:1; min-width:0; }
+  .acc-name { font-size:15px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .acc-type-badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:8px; margin-top:3px; font-weight:500; }
+  .badge-savings { background:rgba(16,185,129,0.15); color:#10b981; }
+  .badge-current { background:rgba(59,130,246,0.15); color:#3b82f6; }
+  .badge-credit_card { background:rgba(139,92,246,0.15); color:#8b5cf6; }
+  .badge-e_wallet { background:rgba(245,158,11,0.15); color:#f59e0b; }
+  .badge-investment { background:rgba(99,102,241,0.15); color:#6366f1; }
+  .badge-cash { background:rgba(34,197,94,0.15); color:#22c55e; }
+  .badge-other { background:rgba(156,163,175,0.15); color:#9ca3af; }
+  .acc-details { display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; }
+  .acc-detail-item { display:flex; flex-direction:column; gap:1px; }
+  .acc-detail-label { font-size:10px; color:var(--muted); }
+  .acc-detail-val { font-size:13px; color:var(--ink); font-weight:500; }
+  .acc-links-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .acc-link-chip { font-size:11px; padding:3px 10px; border-radius:8px; background:rgba(255,255,255,0.06); border:1px solid var(--acc-border); color:var(--muted); }
+  .acc-link-chip.has-links { background:rgba(99,102,241,0.1); border-color:rgba(99,102,241,0.3); color:#818cf8; }
+  .acc-actions { display:flex; gap:6px; border-top:1px solid var(--acc-border); padding-top:12px; flex-wrap:wrap; }
+  .btn-acc-action { flex:1; min-width:60px; padding:7px 10px; border-radius:8px; font-size:12px; font-weight:600; border:1px solid var(--acc-border); background:rgba(255,255,255,0.04); color:var(--muted); cursor:pointer; transition:all 0.15s; }
+  .btn-acc-action:hover { background:rgba(255,255,255,0.08); color:var(--ink); }
+  .btn-acc-edit { border-color:rgba(99,102,241,0.4); color:#818cf8; }
+  .btn-acc-edit:hover { background:rgba(99,102,241,0.12); color:#818cf8; }
+  .btn-acc-toggle.deactivate { border-color:rgba(245,158,11,0.4); color:#f59e0b; }
+  .btn-acc-toggle.deactivate:hover { background:rgba(245,158,11,0.1); }
+  .btn-acc-toggle.activate { border-color:rgba(16,185,129,0.4); color:#10b981; }
+  .btn-acc-toggle.activate:hover { background:rgba(16,185,129,0.1); }
+  .btn-acc-delete { border-color:rgba(239,68,68,0.35); color:#f87171; }
+  .btn-acc-delete:hover { background:rgba(239,68,68,0.1); }
+  .acc-inactive-banner { position:absolute; top:12px; right:12px; font-size:10px; padding:2px 8px; border-radius:6px; background:rgba(156,163,175,0.15); color:#9ca3af; font-weight:600; letter-spacing:0.04em; }
+  .acc-empty { text-align:center; padding:60px 20px; color:var(--muted); grid-column:1 / -1; }
+  .acc-empty .empty-icon { font-size:52px; display:block; margin-bottom:12px; }
+  .acc-empty h3 { font-size:18px; color:var(--ink); margin-bottom:6px; }
+  .acc-section-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin:8px 0 4px; grid-column:1 / -1; }
+  .acc-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); backdrop-filter:blur(4px); z-index:1000; align-items:center; justify-content:center; padding:20px; }
+  .acc-modal-overlay.open { display:flex; }
+  .acc-modal { background:var(--surface,#1a2744); border:1px solid var(--acc-border); border-radius:20px; padding:28px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; box-shadow:0 24px 48px rgba(0,0,0,0.5); }
+  .acc-modal h2 { font-size:18px; font-weight:700; color:var(--ink); margin:0 0 20px; display:flex; align-items:center; gap:8px; }
+  .acc-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .acc-form-grid .full-col { grid-column:1 / -1; }
+  .acc-form-group { display:flex; flex-direction:column; gap:5px; }
+  .acc-form-group label { font-size:12px; font-weight:600; color:var(--muted); }
+  .acc-form-group input, .acc-form-group select { padding:9px 12px; border-radius:9px; border:1px solid var(--acc-border); background:rgba(255,255,255,0.04); color:var(--ink); font-size:14px; width:100%; box-sizing:border-box; transition:border-color 0.2s; }
+  .acc-form-group input:focus, .acc-form-group select:focus { outline:none; border-color:#6366f1; }
+  .cc-section { display:contents; }
+  .cc-section.hidden > * { display:none; }
+  .acc-hint { font-size:11px; color:var(--muted); margin-top:2px; }
+  .acc-modal-footer { display:flex; gap:10px; margin-top:22px; justify-content:flex-end; }
+  .btn-cancel-modal { padding:10px 22px; border-radius:9px; border:1px solid var(--acc-border); background:transparent; color:var(--muted); font-size:14px; cursor:pointer; transition:all 0.15s; }
+  .btn-cancel-modal:hover { background:rgba(255,255,255,0.05); color:var(--ink); }
+  .btn-save-acc { padding:10px 26px; border-radius:9px; background:linear-gradient(135deg,#6366f1,#818cf8); color:#fff; font-size:14px; font-weight:600; border:none; cursor:pointer; transition:opacity 0.2s; }
+  .btn-save-acc:hover { opacity:0.88; }
+  @media(max-width:480px){.acc-form-grid{grid-template-columns:1fr;}.acc-modal{padding:20px;}}
+</style>
+
+<div class="acc-page-header">
+  <div class="acc-page-title">
+    🏦 账户管理
+    <span class="badge-count">{{ accounts | length }} 个账户</span>
+  </div>
+  <button class="btn-add-acc" onclick="openAddModal()">＋ 添加账户</button>
+</div>
+
+{% set active_accs = accounts | selectattr('is_active', 'equalto', 1) | list %}
+{% set inactive_accs = accounts | selectattr('is_active', 'equalto', 0) | list %}
+{% set cc_count = accounts | selectattr('type', 'equalto', 'credit_card') | list | length %}
+{% set total_cl = namespace(val=0) %}
+{% set total_subs = namespace(val=0) %}
+{% for a in accounts %}
+  {% if a.type == 'credit_card' and a.credit_limit %}{% set total_cl.val = total_cl.val + a.credit_limit %}{% endif %}
+  {% set total_subs.val = total_subs.val + (a.sub_count or 0) %}
+{% endfor %}
+
+<div class="acc-summary-strip">
+  <div class="acc-kpi">
+    <span class="acc-kpi-label">活跃账户</span>
+    <span class="acc-kpi-val">{{ active_accs | length }}</span>
+    <span class="acc-kpi-sub">共 {{ accounts | length }} 个</span>
+  </div>
+  <div class="acc-kpi">
+    <span class="acc-kpi-label">信用卡</span>
+    <span class="acc-kpi-val">{{ cc_count }}</span>
+    <span class="acc-kpi-sub">张</span>
+  </div>
+  <div class="acc-kpi">
+    <span class="acc-kpi-label">总信用额度</span>
+    <span class="acc-kpi-val">{{ "%.0f" | format(total_cl.val) }}</span>
+    <span class="acc-kpi-sub">MYR</span>
+  </div>
+  <div class="acc-kpi">
+    <span class="acc-kpi-label">绑定订阅</span>
+    <span class="acc-kpi-val">{{ total_subs.val }}</span>
+    <span class="acc-kpi-sub">个有效订阅</span>
+  </div>
+</div>
+
+<div class="acc-grid">
+  {% if not accounts %}
+  <div class="acc-empty">
+    <span class="empty-icon">🏦</span>
+    <h3>还没有添加任何账户</h3>
+    <p>点击右上角"添加账户"，录入你的银行账户或信用卡<br>录入后可在订阅、负债分期等模块中选择绑定</p>
+  </div>
+  {% else %}
+  {% set type_icons = {'savings': '🏦', 'current': '🏛️', 'credit_card': '💳', 'e_wallet': '📱', 'investment': '📈', 'cash': '💵', 'other': '📂'} %}
+  {% set type_labels = {'savings': '储蓄账户', 'current': '活期账户', 'credit_card': '信用卡', 'e_wallet': '电子钱包', 'investment': '投资账户', 'cash': '现金', 'other': '其他'} %}
+
+  {% if active_accs %}
+  <div class="acc-section-label">✅ 活跃账户 ({{ active_accs | length }})</div>
+  {% for a in active_accs %}
+  <div class="acc-card">
+    <div class="acc-card-top">
+      <div class="acc-icon {{ a.type }}">{{ type_icons.get(a.type, '📂') }}</div>
+      <div class="acc-meta">
+        <div class="acc-name" title="{{ a.name }}">{{ a.name }}</div>
+        <span class="acc-type-badge badge-{{ a.type }}">{{ type_labels.get(a.type, a.type) }}</span>
+      </div>
+    </div>
+    <div class="acc-details">
+      <div class="acc-detail-item">
+        <span class="acc-detail-label">币种</span>
+        <span class="acc-detail-val">{{ a.currency or 'MYR' }}</span>
+      </div>
+      {% if a.type == 'credit_card' %}
+      <div class="acc-detail-item">
+        <span class="acc-detail-label">信用额度</span>
+        <span class="acc-detail-val">{{ "%.0f" | format(a.credit_limit or 0) }} {{ a.currency or 'MYR' }}</span>
+      </div>
+      <div class="acc-detail-item">
+        <span class="acc-detail-label">账单日</span>
+        <span class="acc-detail-val">{% if a.statement_day %}每月 {{ a.statement_day }} 日{% else %}—{% endif %}</span>
+      </div>
+      <div class="acc-detail-item">
+        <span class="acc-detail-label">还款日</span>
+        <span class="acc-detail-val">{% if a.due_day %}每月 {{ a.due_day }} 日{% else %}—{% endif %}</span>
+      </div>
+      {% else %}
+      <div class="acc-detail-item">
+        <span class="acc-detail-label">账户类型</span>
+        <span class="acc-detail-val">{{ type_labels.get(a.type, a.type) }}</span>
+      </div>
+      {% endif %}
+    </div>
+    <div class="acc-links-row">
+      <span class="acc-link-chip {% if a.sub_count %}has-links{% endif %}">🔄 {{ a.sub_count or 0 }} 个订阅</span>
+      <span class="acc-link-chip {% if a.install_count %}has-links{% endif %}">📦 {{ a.install_count or 0 }} 个分期</span>
+    </div>
+    <div class="acc-actions">
+      <button class="btn-acc-action btn-acc-edit"
+        onclick="openEditModal({{ a.id }}, '{{ a.name|e }}', '{{ a.type }}', '{{ a.currency or 'MYR' }}', {{ a.credit_limit or 0 }}, {{ a.statement_day if a.statement_day else 'null' }}, {{ a.due_day if a.due_day else 'null' }}, {{ a.grace_period_days or 20 }})">
+        ✏️ 编辑
+      </button>
+      <form method="POST" action="/api/accounts/{{ a.id }}/toggle" style="display:contents;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-acc-action btn-acc-toggle deactivate">⏸ 停用</button>
+      </form>
+      <button class="btn-acc-action btn-acc-delete"
+        onclick="confirmDelete({{ a.id }}, '{{ a.name|e }}', {{ a.sub_count or 0 }}, {{ a.install_count or 0 }})">
+        🗑️ 删除
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if inactive_accs %}
+  <div class="acc-section-label">⏸ 已停用账户 ({{ inactive_accs | length }})</div>
+  {% for a in inactive_accs %}
+  <div class="acc-card inactive">
+    <span class="acc-inactive-banner">停用</span>
+    <div class="acc-card-top">
+      <div class="acc-icon {{ a.type }}">{{ type_icons.get(a.type, '📂') }}</div>
+      <div class="acc-meta">
+        <div class="acc-name" title="{{ a.name }}">{{ a.name }}</div>
+        <span class="acc-type-badge badge-{{ a.type }}">{{ type_labels.get(a.type, a.type) }}</span>
+      </div>
+    </div>
+    <div class="acc-actions">
+      <button class="btn-acc-action btn-acc-edit"
+        onclick="openEditModal({{ a.id }}, '{{ a.name|e }}', '{{ a.type }}', '{{ a.currency or 'MYR' }}', {{ a.credit_limit or 0 }}, {{ a.statement_day if a.statement_day else 'null' }}, {{ a.due_day if a.due_day else 'null' }}, {{ a.grace_period_days or 20 }})">
+        ✏️ 编辑
+      </button>
+      <form method="POST" action="/api/accounts/{{ a.id }}/toggle" style="display:contents;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-acc-action btn-acc-toggle activate">▶️ 重新启用</button>
+      </form>
+      <button class="btn-acc-action btn-acc-delete"
+        onclick="confirmDelete({{ a.id }}, '{{ a.name|e }}', 0, 0)">
+        🗑️ 删除
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+  {% endif %}
+</div>
+
+<!-- ADD MODAL -->
+<div class="acc-modal-overlay" id="addModalOverlay">
+  <div class="acc-modal">
+    <h2>🏦 添加新账户</h2>
+    <form method="POST" action="/api/accounts">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="acc-form-grid">
+        <div class="acc-form-group full-col">
+          <label>账户名称 *</label>
+          <input type="text" name="name" id="addName" required placeholder="如 Maybank Savings / Public Bank Visa" autocomplete="off">
+        </div>
+        <div class="acc-form-group">
+          <label>账户类型 *</label>
+          <select name="type" id="addType" onchange="onTypeChange('add')">
+            {% for val, label in account_types %}
+            <option value="{{ val }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="acc-form-group">
+          <label>结算币种</label>
+          <select name="currency" id="addCurrency">
+            {% for c in currencies %}
+            <option value="{{ c }}" {% if c == 'MYR' %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="cc-section hidden" id="addCcSection">
+          <div class="acc-form-group">
+            <label>信用额度 (Credit Limit)</label>
+            <input type="number" name="credit_limit" id="addCreditLimit" min="0" step="100" placeholder="如 10000">
+          </div>
+          <div class="acc-form-group">
+            <label>账单日 (Statement Day)</label>
+            <input type="number" name="statement_day" id="addStatementDay" min="1" max="31" placeholder="1–31">
+            <span class="acc-hint">每月账单生成日</span>
+          </div>
+          <div class="acc-form-group">
+            <label>还款日 (Due Day)</label>
+            <input type="number" name="due_day" id="addDueDay" min="1" max="31" placeholder="1–31">
+            <span class="acc-hint">每月最后还款日</span>
+          </div>
+          <div class="acc-form-group">
+            <label>宽限期 (天)</label>
+            <input type="number" name="grace_period_days" id="addGracePeriod" min="0" max="60" value="20">
+          </div>
+        </div>
+      </div>
+      <div class="acc-modal-footer">
+        <button type="button" class="btn-cancel-modal" onclick="closeAddModal()">取消</button>
+        <button type="submit" class="btn-save-acc">保存账户</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="acc-modal-overlay" id="editModalOverlay">
+  <div class="acc-modal">
+    <h2>✏️ 编辑账户</h2>
+    <form method="POST" id="editAccountForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="acc-form-grid">
+        <div class="acc-form-group full-col">
+          <label>账户名称 *</label>
+          <input type="text" name="name" id="editName" required autocomplete="off">
+        </div>
+        <div class="acc-form-group">
+          <label>账户类型 *</label>
+          <select name="type" id="editType" onchange="onTypeChange('edit')">
+            {% for val, label in account_types %}
+            <option value="{{ val }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="acc-form-group">
+          <label>结算币种</label>
+          <select name="currency" id="editCurrency">
+            {% for c in currencies %}
+            <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="cc-section hidden" id="editCcSection">
+          <div class="acc-form-group">
+            <label>信用额度</label>
+            <input type="number" name="credit_limit" id="editCreditLimit" min="0" step="100">
+          </div>
+          <div class="acc-form-group">
+            <label>账单日</label>
+            <input type="number" name="statement_day" id="editStatementDay" min="1" max="31">
+          </div>
+          <div class="acc-form-group">
+            <label>还款日</label>
+            <input type="number" name="due_day" id="editDueDay" min="1" max="31">
+          </div>
+          <div class="acc-form-group">
+            <label>宽限期 (天)</label>
+            <input type="number" name="grace_period_days" id="editGracePeriod" min="0" max="60" value="20">
+          </div>
+        </div>
+      </div>
+      <div class="acc-modal-footer">
+        <button type="button" class="btn-cancel-modal" onclick="closeEditModal()">取消</button>
+        <button type="submit" class="btn-save-acc">保存更改</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<form method="POST" id="deleteAccountForm" style="display:none;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openAddModal() {
+  document.getElementById('addModalOverlay').classList.add('open');
+  document.getElementById('addName').focus();
+  onTypeChange('add');
+}
+function closeAddModal() { document.getElementById('addModalOverlay').classList.remove('open'); }
+function closeEditModal() { document.getElementById('editModalOverlay').classList.remove('open'); }
+
+['addModalOverlay','editModalOverlay'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function(e){
+    if(e.target === this) this.classList.remove('open');
+  });
+});
+
+function onTypeChange(prefix) {
+  const val = document.getElementById(prefix + 'Type').value;
+  const sec = document.getElementById(prefix + 'CcSection');
+  if (val === 'credit_card') sec.classList.remove('hidden');
+  else sec.classList.add('hidden');
+}
+
+function openEditModal(id, name, type, currency, creditLimit, statementDay, dueDay, gracePeriod) {
+  const form = document.getElementById('editAccountForm');
+  form.action = '/api/accounts/' + id + '/edit';
+  document.getElementById('editName').value = name;
+  document.getElementById('editCurrency').value = currency;
+  const typeSelect = document.getElementById('editType');
+  typeSelect.value = type;
+  onTypeChange('edit');
+  document.getElementById('editCreditLimit').value = creditLimit || '';
+  document.getElementById('editStatementDay').value = statementDay !== null ? statementDay : '';
+  document.getElementById('editDueDay').value = dueDay !== null ? dueDay : '';
+  document.getElementById('editGracePeriod').value = gracePeriod || 20;
+  document.getElementById('editModalOverlay').classList.add('open');
+  document.getElementById('editName').focus();
+}
+
+function confirmDelete(id, name, subCount, installCount) {
+  let extra = '';
+  if (subCount > 0 || installCount > 0) {
+    extra = '<br><br><span style="color:#f87171">⚠️ 此账户已绑定 ' + subCount + ' 个订阅、' + installCount + ' 个分期，删除后绑定将自动解除。</span>';
+  }
+  Swal.fire({
+    title: '确认删除账户？',
+    html: '<p style="color:var(--muted);font-size:14px">账户「<strong style="color:var(--ink)">' + name + '</strong>」将被永久删除。' + extra + '</p>',
+    icon: 'warning',
+    background: 'var(--surface,#1a2744)',
+    color: 'var(--ink,#e2e8f0)',
+    showCancelButton: true,
+    confirmButtonText: '删除',
+    cancelButtonText: '取消',
+    confirmButtonColor: '#ef4444',
+  }).then(result => {
+    if (result.isConfirmed) {
+      const form = document.getElementById('deleteAccountForm');
+      form.action = '/api/accounts/' + id + '/delete';
+      form.submit();
+    }
+  });
+}
+</script>
+{% endblock %}

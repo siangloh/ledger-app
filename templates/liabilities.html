@@ -1,0 +1,494 @@
+{% extends layout|default('base.html') %}
+{% block title %}负债与分期付款追踪 - 我的记账本{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 24px;">
+  <div>
+    <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 8px;">
+      <span>💳</span> 负债与分期付款追踪
+      <span style="font-size: 13px; font-weight: normal; color: var(--muted); background: var(--bg-soft); padding: 3px 10px; border-radius: 12px; border: 1px solid var(--border);">
+        Liabilities & 0% EPP Tracker
+      </span>
+    </h1>
+    <p style="margin: 4px 0 0; font-size: 13px; color: var(--ink-soft);">
+      按月拆解贷款供款与免息分期，精准监控本金剩余、硬性月供现金流与未来释放节点。
+    </p>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+    <!-- 月份选择器 -->
+    <form method="get" action="{{ url_for('liabilities_page') }}" style="display: flex; align-items: center; gap: 6px; margin: 0;">
+      <input type="month" name="month" value="{{ target_month }}" onchange="this.form.submit()"
+             style="padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); font-weight: 600; color: var(--ink); font-size: 13.5px;">
+    </form>
+
+    <button type="button" class="btn btn-secondary btn-sm" onclick="openModal('modalAccount')">
+      <span>🏦</span> 账户/卡片
+    </button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="openModal('modalLoan')">
+      <span>🏠</span> + 新增贷款
+    </button>
+    <button type="button" class="btn btn-primary btn-sm" onclick="openModal('modalInstallment')">
+      <span>📱</span> + 新增分期
+    </button>
+    <form method="post" action="{{ url_for('api_sync_liabilities') }}" style="margin: 0;" onsubmit="return confirm('确认立即将本月到达扣款日期的分期入账到主账本中吗？');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-outline-success btn-sm" title="检测今日已到期分期并写入 transactions 支出">
+        <span>⚡</span> 自动记账同步
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- 顶层核心 KPI 看板 (3 大指标) -->
+<div class="kpi-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px;">
+  <!-- 1. 全景未还总本金 -->
+  <div class="card" style="padding: 18px 20px; border-left: 4px solid var(--navy); position: relative;">
+    <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">全景未还总负债本金</div>
+    <div style="font-size: 26px; font-weight: 700; color: var(--navy); margin-top: 6px;">
+      RM {{ "{:,.2f}".format(total_debt) }}
+    </div>
+    <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">
+      贷款剩余: RM {{ "{:,.2f}".format(total_loan_debt) }} · 分期未还: RM {{ "{:,.2f}".format(total_inst_debt) }}
+    </div>
+  </div>
+
+  <!-- 2. 本月刚性还款支出 -->
+  <div class="card" style="padding: 18px 20px; border-left: 4px solid #e11d48; position: relative;">
+    <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">
+      {{ target_month }} 刚性现金流总支出
+    </div>
+    <div style="font-size: 26px; font-weight: 700; color: #e11d48; margin-top: 6px;">
+      RM {{ "{:,.2f}".format(cashflow.totalRigidPayment) }}
+    </div>
+    <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">
+      固定贷款供款 + 信用卡分期必付合计
+    </div>
+  </div>
+
+  <!-- 3. 未来现金流释放预测 -->
+  <div class="card" style="padding: 18px 20px; border-left: 4px solid var(--green); position: relative;">
+    <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">
+      即将结清与现金流释放点
+    </div>
+    {% if cashflow.upcomingReleases %}
+      <div style="margin-top: 6px;">
+        {% for rel in cashflow.upcomingReleases %}
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; padding: 2px 0;">
+          <span style="font-weight: 600; color: var(--ink);">{{ rel.title }}</span>
+          <span style="color: var(--green); font-weight: 700;">+RM {{ "{:,.2f}".format(rel.monthly_amount) }}/月 ({{ rel.settle_month }})</span>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div style="font-size: 20px; font-weight: 600; color: var(--green); margin-top: 8px;">无临近结清项目</div>
+      <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">各分期尚有充裕还款周期</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- 模块一：当月现金流排程流水 (按扣款日 1日-31日 升序排列) -->
+<div class="card" style="margin-bottom: 24px;">
+  <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+    <div>
+      <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 6px;">
+        <span>📅</span> 模块一：{{ target_month }} 现金流刚性排程流水 (按扣款日升序)
+      </h2>
+      <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+        每月按日核对扣款，清晰追踪各账期自动扣缴进度
+      </div>
+    </div>
+    <span class="tag tag-primary" style="font-weight: 600;">共 {{ cashflow.events|length }} 笔排程事件</span>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table" style="margin: 0;">
+      <thead>
+        <tr>
+          <th style="width: 90px;">扣款日</th>
+          <th>项目名称</th>
+          <th>分类/类型</th>
+          <th>扣款账户/卡号</th>
+          <th style="text-align: center;">期数进度</th>
+          <th style="text-align: right;">当期金额 (RM)</th>
+          <th style="text-align: center;">状态 / 提醒</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if cashflow.events %}
+          {% for ev in cashflow.events %}
+          <tr>
+            <td>
+              <span class="badge" style="background: var(--navy); color: #fff; font-size: 12px; padding: 3px 8px; border-radius: 6px; font-weight: 700;">
+                {{ "%02d"|format(ev.day) }}日
+              </span>
+            </td>
+            <td><strong>{{ ev.title }}</strong></td>
+            <td>
+              {% if ev.type == '免息分期(EPP)' %}
+                <span class="tag" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;">免息分期 (0% EPP)</span>
+              {% else %}
+                <span class="tag" style="background: #fef3c7; color: #d97706; border: 1px solid #fde68a;">固定按揭贷款</span>
+              {% endif %}
+            </td>
+            <td><span style="color: var(--ink-soft);">{{ ev.accountId }}</span></td>
+            <td style="text-align: center; font-weight: 600; font-family: monospace; font-size: 13px;">
+              {{ ev.periodProgress }}
+            </td>
+            <td style="text-align: right; font-weight: 700; color: #e11d48; font-size: 14px;">
+              {{ "{:,.2f}".format(ev.amount) }}
+            </td>
+            <td style="text-align: center;">
+              {% if '[本月完结' in ev.status %}
+                <span class="tag" style="background: #dcfce7; color: #15803d; font-weight: 700; border: 1px solid #86efac; animation: pulse 2s infinite;">
+                  {{ ev.status }}
+                </span>
+              {% elif ev.type == '固定贷款' %}
+                <span class="tag tag-muted">自动扣款预留</span>
+              {% else %}
+                <span class="tag tag-muted">随卡账单还款</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="empty-row">
+            <td colspan="7" style="text-align: center; padding: 32px; color: var(--muted);">
+              {{ target_month }} 暂无任何负债扣款事件或还款计划。请在右上角新增免息分期或贷款。
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 模块二：分期与负债全景监控看板 -->
+<div class="grid-2-col" style="display: grid; grid-template-columns: 1fr; gap: 24px; margin-bottom: 32px;">
+  
+  <!-- A. 免息分期付款 (0% EPP) -->
+  <div class="card">
+    <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 6px;">
+        <span>📱</span> 模块二：大件免息分期 (0% Interest EPP)
+      </h2>
+      <button class="btn btn-outline-primary btn-sm" onclick="openModal('modalInstallment')">+ 录入分期</button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table" style="margin: 0;">
+        <thead>
+          <tr>
+            <th>分期项目</th>
+            <th>绑定卡片</th>
+            <th style="text-align: right;">原始总额</th>
+            <th style="text-align: right;">每月摊销</th>
+            <th style="width: 140px; text-align: center;">已还期数 / 进度</th>
+            <th style="text-align: right;">剩余本金</th>
+            <th style="text-align: center;">预计结清</th>
+            <th style="text-align: center;">释放现金流</th>
+            <th style="text-align: center;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if installments %}
+            {% for inst in installments %}
+            <tr style="{% if inst.status == 'completed' %}opacity: 0.6; background: var(--bg-soft);{% endif %}">
+              <td>
+                <strong>{{ inst.title }}</strong>
+                {% if inst.status == 'completed' %}
+                  <span class="tag tag-success" style="margin-left: 4px;">已结清</span>
+                {% endif %}
+              </td>
+              <td><span style="color: var(--ink-soft); font-size: 13px;">{{ inst.card_name or '—' }}</span></td>
+              <td style="text-align: right;">RM {{ "{:,.2f}".format(inst.total_amount) }}</td>
+              <td style="text-align: right; font-weight: 600;">RM {{ "{:,.2f}".format(inst.monthly_amount) }}</td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <div style="flex: 1; background: var(--border); height: 6px; border-radius: 4px; overflow: hidden;">
+                    <div style="width: {{ inst.progress_pct }}%; background: var(--navy); height: 100%;"></div>
+                  </div>
+                  <span style="font-size: 12px; font-weight: 600; min-width: 42px; text-align: right;">{{ inst.paid_periods }}/{{ inst.tenure_months }}</span>
+                </div>
+              </td>
+              <td style="text-align: right; font-weight: 700; color: #e11d48;">
+                RM {{ "{:,.2f}".format(inst.remaining_balance) }}
+              </td>
+              <td style="text-align: center; font-size: 12.5px; font-weight: 500;">
+                {{ inst.settle_month }}
+              </td>
+              <td style="text-align: center; font-weight: 600; color: var(--green);">
+                +RM {{ "{:,.2f}".format(inst.monthly_amount) }}/月
+              </td>
+              <td style="text-align: center;">
+                <form method="post" action="{{ url_for('api_delete_liability', item_type='installment', item_id=inst.id) }}" style="display:inline;" onsubmit="return confirm('确定删除该分期记录吗？');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn-ghost btn-sm" style="color: var(--danger); padding: 2px 6px;">&times;</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr class="empty-row">
+              <td colspan="9" style="text-align: center; padding: 24px; color: var(--muted);">暂无免息分期记录</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- B. 固定摊销贷款 (房贷/车贷/个人贷) -->
+  <div class="card">
+    <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 6px;">
+        <span>🏠</span> 模块二：固定摊销按揭贷款 (Fixed Loans)
+      </h2>
+      <button class="btn btn-outline-primary btn-sm" onclick="openModal('modalLoan')">+ 录入贷款</button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table" style="margin: 0;">
+        <thead>
+          <tr>
+            <th>贷款项目</th>
+            <th>扣款银行账户</th>
+            <th style="text-align: right;">贷款总本金</th>
+            <th style="text-align: center;">年化利率</th>
+            <th style="text-align: center;">还款方式</th>
+            <th style="text-align: right;">每月月供</th>
+            <th style="text-align: center;">固定扣款日</th>
+            <th style="text-align: right;">当前剩余本金</th>
+            <th style="text-align: center;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if loans %}
+            {% for loan in loans %}
+            <tr>
+              <td><strong>{{ loan.title }}</strong></td>
+              <td><span style="color: var(--ink-soft); font-size: 13px;">{{ loan.account_name or '主账户' }}</span></td>
+              <td style="text-align: right;">RM {{ "{:,.2f}".format(loan.loan_amount) }}</td>
+              <td style="text-align: center; font-weight: 600;">{{ loan.annual_interest_rate }}%</td>
+              <td style="text-align: center;">
+                {% if loan.method == 'flat_rate' %}
+                  <span class="tag" style="background: #f1f5f9; color: #475569;">车贷平息法</span>
+                {% else %}
+                  <span class="tag" style="background: #eef2ff; color: #4338ca;">等额本息</span>
+                {% endif %}
+              </td>
+              <td style="text-align: right; font-weight: 700; color: #e11d48;">
+                RM {{ "{:,.2f}".format(loan.monthly_payment) }}
+              </td>
+              <td style="text-align: center;">每月 {{ "%02d"|format(loan.due_day) }} 日</td>
+              <td style="text-align: right; font-weight: 700; color: var(--navy);">
+                RM {{ "{:,.2f}".format(loan.remaining_balance) }}
+              </td>
+              <td style="text-align: center;">
+                <form method="post" action="{{ url_for('api_delete_liability', item_type='loan', item_id=loan.id) }}" style="display:inline;" onsubmit="return confirm('确定删除该贷款项目吗？');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn-ghost btn-sm" style="color: var(--danger); padding: 2px 6px;">&times;</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr class="empty-row">
+              <td colspan="9" style="text-align: center; padding: 24px; color: var(--muted);">暂无固定按揭贷款记录</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- ================= 弹窗集合 ================= -->
+
+<!-- 1. 新增免息分期弹窗 -->
+<div id="modalInstallment" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 999; justify-content: center; align-items: center; padding: 16px;">
+  <div class="card" style="width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--navy);">+ 新增大件免息分期 (0% EPP)</h3>
+      <button type="button" class="btn-ghost" onclick="closeModal('modalInstallment')">&times;</button>
+    </div>
+    <form method="post" action="{{ url_for('api_add_installment') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div style="margin-bottom: 12px;">
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">分期商品名称 *</label>
+        <input type="text" name="title" required placeholder="如：iPhone 16 / 大件家电" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+        <div>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">商品总额 (RM) *</label>
+          <input type="number" step="0.01" name="total_amount" id="inst_total" required placeholder="3600.00" oninput="calcInstMonthly()" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+        </div>
+        <div>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">总分期期数 *</label>
+          <select name="tenure_months" id="inst_tenure" onchange="calcInstMonthly()" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+            <option value="3">3 期</option>
+            <option value="6">6 期</option>
+            <option value="12" selected>12 期</option>
+            <option value="24">24 期</option>
+            <option value="36">36 期</option>
+          </select>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+        <div>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">已还期数</label>
+          <input type="number" name="paid_periods" value="0" min="0" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+        </div>
+        <div>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">首期扣款日</label>
+          <input type="date" name="first_due_date" value="{{ target_month }}-05" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+        </div>
+      </div>
+      <div style="margin-bottom: 14px;">
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">绑定信用卡</label>
+        <select name="account_id" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+          <option value="">未指定 (通用卡)</option>
+          {% for acc in accounts if acc.type == 'credit_card' %}
+            <option value="{{ acc.id }}">{{ acc.name }} (还款日: {{ acc.due_day or 5 }}日)</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="padding: 10px; background: var(--bg-soft); border-radius: 6px; margin-bottom: 16px; font-size: 13px; color: var(--ink-soft);">
+        预估每月摊销：<strong id="inst_preview" style="color: #e11d48;">RM 0.00</strong> (尾差自动在首期平摊)
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalInstallment')">取消</button>
+        <button type="submit" class="btn btn-primary">保存分期</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 2. 新增固定贷款弹窗 -->
+<div id="modalLoan" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 999; justify-content: center; align-items: center; padding: 16px;">
+  <div class="card" style="width: 100%; max-width: 500px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--navy);">+ 新增固定贷款 (房贷/车贷/个人贷)</h3>
+      <button type="button" class="btn-ghost" onclick="closeModal('modalLoan')">&times;</button>
+    </div>
+    <form method="post" action="{{ url_for('api_add_loan') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div style="margin-bottom: 12px;">
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">贷款名称 *</label>
+        <input type="text" name="title" required placeholder="如：Maybank 房贷 / Toyota 车贷" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+        <div>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">贷款总本金 (RM) *</label>
+          <input type="number" step="0.01" name="loan_amount" required placeholder="500000.00" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+        </div>
+        <div>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">总期数 (月) *</label>
+          <input type="number" name="tenure_months" value="360" required placeholder="360" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+        <div>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">年化利率 (%)</label>
+          <input type="number" step="0.01" name="annual_interest_rate" value="4.25" placeholder="4.25" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+        </div>
+        <div>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">每月固定月供 (RM)</label>
+          <input type="number" step="0.01" name="monthly_payment" placeholder="留空则按公式自动算" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+        <div>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">还款计算方式</label>
+          <select name="method" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+            <option value="reducing_balance">等额本息 / 减少余额法 (房贷)</option>
+            <option value="flat_rate">车贷平息法 (Flat Rate)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">每月扣款日 *</label>
+          <input type="number" name="due_day" value="5" min="1" max="31" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+        </div>
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">扣款银行账户</label>
+        <select name="debit_account_id" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+          <option value="">默认银行账户</option>
+          {% for acc in accounts if acc.type == 'savings' %}
+            <option value="{{ acc.id }}">{{ acc.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalLoan')">取消</button>
+        <button type="submit" class="btn btn-primary">保存贷款</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 3. 新增卡片/账户弹窗 -->
+<div id="modalAccount" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 999; justify-content: center; align-items: center; padding: 16px;">
+  <div class="card" style="width: 100%; max-width: 440px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--navy);">+ 绑定卡片 / 银行账户</h3>
+      <button type="button" class="btn-ghost" onclick="closeModal('modalAccount')">&times;</button>
+    </div>
+    <form method="post" action="{{ url_for('api_add_account') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div style="margin-bottom: 12px;">
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">账户 / 卡片名称 *</label>
+        <input type="text" name="name" required placeholder="如：Maybank 储蓄卡 / Public Bank Visa" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">账户类型</label>
+        <select name="type" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+          <option value="credit_card">信用卡 (用于挂载分期)</option>
+          <option value="savings">银行储蓄户口 (用于扣除房车贷)</option>
+        </select>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+        <div>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">账单日 (Statement)</label>
+          <input type="number" name="statement_day" value="15" min="1" max="31" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+        </div>
+        <div>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">还款日 (Due Day)</label>
+          <input type="number" name="due_day" value="5" min="1" max="31" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalAccount')">取消</button>
+        <button type="submit" class="btn btn-primary">保存账户</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'flex';
+}
+
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+}
+
+function calcInstMonthly() {
+  const total = parseFloat(document.getElementById('inst_total').value) || 0;
+  const tenure = parseInt(document.getElementById('inst_tenure').value) || 12;
+  const m = (total / tenure).toFixed(2);
+  document.getElementById('inst_preview').textContent = `RM ${m}`;
+}
+
+// 点击遮罩外部关闭弹窗
+window.addEventListener('click', (e) => {
+  if (e.target.classList && e.target.classList.contains('modal-overlay')) {
+    e.target.style.display = 'none';
+  }
+});
+</script>
+{% endblock %}

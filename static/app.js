@@ -2130,6 +2130,8 @@ function updateActiveNav(urlStr) {
   else if (path.startsWith('/split-bill')) navKey = 'split-bill';
   else if (path.startsWith('/auto-track')) navKey = 'auto-track';
   else if (path.startsWith('/recurring')) navKey = 'recurring';
+  else if (path.startsWith('/liabilities')) navKey = 'liabilities';
+  else if (path.startsWith('/subscriptions')) navKey = 'subscriptions';
   else if (path.startsWith('/categories/insights')) navKey = 'insights';
   else if (path.startsWith('/categories')) navKey = 'categories';
   else if (path.startsWith('/import')) navKey = 'import';
@@ -2139,8 +2141,8 @@ function updateActiveNav(urlStr) {
     a.classList.toggle('active', a.dataset.nav === navKey);
   });
 
-  // 同步手机端底部导航高亮（如果是二级功能如分类洞察、固定收支、分类管理、批量导入，则高亮“更多”按钮）
-  const isSecondaryPage = ['insights', 'recurring', 'categories', 'import', 'auto-track'].includes(navKey);
+  // 同步手机端底部导航高亮（如果是二级功能如分类洞察、固定收支、负债分期、订阅大厅、分类管理、批量导入，则高亮“更多”按钮）
+  const isSecondaryPage = ['insights', 'recurring', 'categories', 'import', 'auto-track', 'liabilities', 'subscriptions'].includes(navKey);
   document.querySelectorAll('.mobile-bottom-nav .bnav-item').forEach(btn => {
     if (btn.id === 'btnMoreSheet') {
       btn.classList.toggle('active', isSecondaryPage);
@@ -2401,7 +2403,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const navKey = navItem.dataset.nav;
     if (navKey) {
       // 1. 立即同步手机端底部导航高亮
-      const isSecondary = ['insights', 'recurring', 'categories', 'import', 'auto-track'].includes(navKey);
+      const isSecondary = ['insights', 'recurring', 'categories', 'import', 'auto-track', 'liabilities', 'subscriptions'].includes(navKey);
       document.querySelectorAll('.mobile-bottom-nav .bnav-item').forEach(btn => {
         if (btn.id === 'btnMoreSheet') {
           btn.classList.toggle('active', isSecondary);
