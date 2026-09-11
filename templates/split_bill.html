@@ -328,7 +328,7 @@ Total 75.21"></textarea>
         <span style="font-size: 24px;">🧾</span>
         <div>
           <h3 style="margin: 0; font-size: 16px; color: var(--navy);">小票识别核对与确认 (Receipt Audit)</h3>
-          <span style="font-size: 11px; color: var(--green); background: var(--green-soft); padding: 2px 8px; border-radius: 10px; font-weight: 600;">⚡ 100% 纯端侧离线解析 · 请核验账目平衡</span>
+          <span id="modalEngineBadge" style="font-size: 11px; color: var(--green); background: var(--green-soft); padding: 2px 8px; border-radius: 10px; font-weight: 600;">✨ 深度学习智能解析 (自适应纠偏) · 请核验账目平衡</span>
         </div>
       </div>
       <button type="button" class="btn-ghost btn-sm" onclick="closeReviewModal()" style="font-size: 20px; padding: 2px 8px; line-height: 1;" title="关闭">&times;</button>
@@ -431,6 +431,7 @@ let people = ['我'];
 let items = [];
 let serviceCharge = 0.00;
 let tax = 0.00;
+var currentCurrency = 'RM';
 
 // 核对弹窗的草稿临时数据
 let reviewItems = [];
@@ -717,7 +718,6 @@ async function runClientSideOCR(imageDataUrl) {
 // ============================================================
 // 全球通用 JavaScript 小票规则解析器（支持全球多国货币、国际数字与税制）
 // ============================================================
-let currentCurrency = 'RM';
 
 function parseReceiptTextClientSide(rawText) {
   if (!rawText) return { items: [], subtotal: 0, service_charge: 0, tax: 0, discount: 0, rounding: 0, total: 0, currency_symbol: 'RM' };
@@ -947,6 +947,16 @@ function parseReceiptTextClientSide(rawText) {
 function openReviewModal(parsed, rawText) {
   currentCurrency = parsed.currency_symbol || 'RM';
   
+  // 更新引擎识别标志
+  const engineBadge = document.getElementById('modalEngineBadge');
+  if (engineBadge) {
+    if (parsed.orientation_corrected !== undefined || parsed.engine === 'rapidocr') {
+      engineBadge.innerHTML = '✨ 深度学习智能解析 (自适应纠偏) · 请核验账目平衡';
+    } else {
+      engineBadge.innerHTML = '⚡ 端侧离线解析 · 请核验账目平衡';
+    }
+  }
+
   // 更新弹窗及界面上的货币符号
   const modalCurr = document.getElementById('reviewModalCurrency');
   if (modalCurr) modalCurr.textContent = currentCurrency;
