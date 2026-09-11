@@ -16,7 +16,6 @@
     <thead>
       <tr>
         <th>类型</th>
-        <th>分组</th>
         <th>分类</th>
         <th>金额</th>
         <th>每月几号</th>
@@ -35,15 +34,7 @@
             {{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }}
           </span>
           {% if r.group_name %}
-          <span class="tag tag-muted mobile-only-tag">{{ {'main':'主业','side':'副业'}.get(r.group_name, r.group_name)
-            }}</span>
-          {% endif %}
-        </td>
-        <td data-col="group">
-          {% if r.group_name %}
-          <span class="tag tag-muted">{{ {'main':'主业','side':'副业'}.get(r.group_name, r.group_name) }}</span>
-          {% else %}
-          <span style="color: var(--muted);">—</span>
+          <span class="tag tag-muted" style="margin-left: 4px;">{{ {'main':'主业','side':'副业'}.get(r.group_name, r.group_name) }}</span>
           {% endif %}
         </td>
         <td data-col="category"><strong>{{ r.category }}</strong></td>
@@ -81,7 +72,7 @@
       </tr>
       {% else %}
       <tr class="empty-row">
-        <td colspan="9">暂无规则</td>
+        <td colspan="8">暂无规则</td>
       </tr>
       {% endfor %}
     </tbody>

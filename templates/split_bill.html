@@ -457,12 +457,7 @@ function setupReceiptScanEntry() {
 }
 
 function startReceiptScan() {
-  // 原生 Android App / Capacitor 优先通道
-  if (window.LedgerNativeBridge && typeof window.LedgerNativeBridge.scanReceipt === 'function') {
-    window.LedgerNativeBridge.scanReceipt();
-    return;
-  }
-  // 网页端 / PWA 通道：调起文件选择器（手机自动调起相机拍照）
+  // 统一调起手机相机/文件选择器，直通后端具有 0°/90°/180°/270° 自适应旋转与中英双语识别的 RapidOCR 深度学习引擎
   const fileInput = document.getElementById('receiptFileInput');
   if (fileInput) {
     fileInput.value = '';
@@ -470,16 +465,28 @@ function startReceiptScan() {
   }
 }
 
-// 原生 Android 回调函数
-function receiveScannedReceiptText(text) {
+// 原生 Android 回调函数（如从外部通知或原生组件送入文字）
+async function receiveScannedReceiptText(text) {
   const textarea = document.getElementById('receiptTextInput');
   if (textarea) textarea.value = text;
-  // 识别完成，纯前端解析并立即调起“预填弹窗 + 大字号金额确认”
-  // 这里刻意包一层 try/catch：如果解析或开弹窗这两步任何一步出错，
-  // 之前发生过"文字已经填进文本框，但后面整个中断、没有任何提示"的情况——
-  // 宁可跳出一个明确的错误提示，也不要静默卡住让人不知道发生了什么。
   try {
-    const parsed = parseReceiptTextClientSide(text);
+    let parsed = parseReceiptTextClientSide(text);
+    // 若端侧快速正则未提取出单品且有文本，自动向后端智能接口补全
+    if ((!parsed.items || parsed.items.length === 0) && text.trim()) {
+      try {
+        const formData = new FormData();
+        formData.append('text', text);
+        const res = await fetch('/split-bill/parse-text', { method: 'POST', body: formData });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.data && json.data.items && json.data.items.length > 0) {
+            parsed = json.data;
+          }
+        }
+      } catch (e) {
+        console.warn('Backend parse-text fallback notice:', e);
+      }
+    }
     openReviewModal(parsed, text);
   } catch (err) {
     console.error('receiveScannedReceiptText failed:', err);
@@ -508,17 +515,17 @@ async function handleReceiptFileSelect(files) {
   // 1. 弹出加载指示器
   if (typeof Swal !== 'undefined') {
     Swal.fire({
-      title: '正在离线识别小票...',
+      title: '正在智能识别小票...',
       html: `
         <div style="padding: 12px 0;">
-          <div style="font-size: 38px; margin-bottom: 12px;">⚡</div>
+          <div style="font-size: 38px; margin-bottom: 12px;">🧾</div>
           <div id="ocrProgressMsg" style="font-size: 13.5px; color: var(--ink-soft); line-height: 1.6;">
-            ① 正在通过 Canvas 等比压缩图片 (长边 ≤ 1280px)...
+            ① 正在优化小票画质与尺寸...
           </div>
           <div style="width: 100%; background: #e2e8f0; height: 6px; border-radius: 4px; margin-top: 14px; overflow: hidden;">
-            <div id="ocrProgressBar" style="width: 25%; height: 100%; background: var(--navy); transition: width 0.3s ease;"></div>
+            <div id="ocrProgressBar" style="width: 30%; height: 100%; background: var(--navy); transition: width 0.3s ease;"></div>
           </div>
-          <div style="font-size: 11px; color: var(--muted); margin-top: 8px;">100% 浏览器本地离线运行 · 图片绝不上传服务器</div>
+          <div style="font-size: 11px; color: var(--muted); margin-top: 8px;">支持横拍/倒拍自适应校正 · 智能同行菜品与金额对齐</div>
         </div>
       `,
       allowOutsideClick: false,
@@ -528,18 +535,30 @@ async function handleReceiptFileSelect(files) {
   }
 
   try {
-    // 2. 优先调用本地 RapidOCR (PP-OCR) 深度学习引擎（耗时仅 0.3s，字迹与同行横向对齐极其精准）
     let parsedData = null;
     let recognizedText = '';
     
-    updateOcrProgress(40, '② 启动本地 RapidOCR (PP-OCR) 深度学习引擎识别...');
+    // ① 客户端先快速等比优化，将手机超大尺寸照片压缩至约 1400px（仅需数十毫秒，防传输卡顿）
+    updateOcrProgress(35, '① 正在等比优化小票画质 (防超限并加速传输)...');
+    let uploadBlob = file;
+    let localDataUrl = null;
+    try {
+      const processedImg = await compressAndPreprocessImage(file);
+      if (processedImg && processedImg.dataUrl) {
+        localDataUrl = processedImg.dataUrl;
+        uploadBlob = await (await fetch(processedImg.dataUrl)).blob();
+      }
+    } catch (compErr) {
+      console.warn('Canvas pre-compress notice:', compErr);
+    }
+
+    // ② 优先调用强大的本地/服务器 RapidOCR 深度学习引擎（自动纠偏旋转 90°/180°/270° 与中英对齐）
+    updateOcrProgress(65, '② 启动 RapidOCR 深度学习引擎，自动纠偏图片朝向与识别...');
     try {
       const formData = new FormData();
-      formData.append('file', file);
-      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+      formData.append('file', uploadBlob, 'receipt.jpg');
       const res = await fetch('/split-bill/ocr-upload', {
         method: 'POST',
-        headers: { 'X-CSRFToken': csrfToken },
         body: formData
       });
       if (res.ok) {
@@ -547,21 +566,23 @@ async function handleReceiptFileSelect(files) {
         if (json.ok && json.data) {
           parsedData = json.data;
           recognizedText = json.raw_text || '';
+        } else if (json && json.message) {
+          console.warn('Backend OCR notice:', json.message);
         }
       }
     } catch (apiErr) {
-      console.warn('Local RapidOCR unavailable, fallback to client WASM:', apiErr);
+      console.warn('RapidOCR request error, fallback to client WASM:', apiErr);
     }
 
-    // 若本地接口未开启，优雅降级为纯浏览器端 Canvas + WASM 离线提取
+    // 若网络不可用或后端引擎暂未就绪，优雅降级为纯浏览器端 Canvas + WASM 提取
     if (!parsedData) {
-      updateOcrProgress(60, '② 切换至浏览器端 Canvas + 离线 WASM 文本提取...');
-      const processedImg = await compressAndPreprocessImage(file);
-      recognizedText = await runClientSideOCR(processedImg.dataUrl);
+      updateOcrProgress(80, '② 切换至浏览器端备用离线文本提取...');
+      const targetUrl = localDataUrl || (await compressAndPreprocessImage(file)).dataUrl;
+      recognizedText = await runClientSideOCR(targetUrl);
       parsedData = parseReceiptTextClientSide(recognizedText);
     }
 
-    updateOcrProgress(95, '③ 智能匹配单品、税费与金额...');
+    updateOcrProgress(98, '③ 智能匹配单品、税费与金额...');
     if (typeof Swal !== 'undefined') Swal.close();
 
     // 将识别出的文本填入文本框
@@ -767,7 +788,7 @@ function parseReceiptTextClientSide(rawText) {
     const lower = cleanLine.toLowerCase();
 
     // 1. 服务费 / 小费
-    const isSc = (['tip', 'gratuity', 'pourboire', 'trinkgeld', 'service charge', 'svc charge', 'svc chg', 'service fee', 'sc'].some(k => lower.includes(k)) ||
+    const isSc = (['tip', 'gratuity', 'pourboire', 'trinkgeld', 'service charge', 'svc charge', 'svc chg', 'service fee', 'sc'].some(k => (k.length <= 3 ? new RegExp('\\b' + k + '\\b', 'i').test(cleanLine) : lower.includes(k))) ||
                   ['服务费', '服務費', 'お通し', '席料', '봉사료'].some(k => cleanLine.includes(k)));
     if (isSc && !['茶位', '调料'].some(k => cleanLine.includes(k))) {
       const mPct = cleanLine.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);

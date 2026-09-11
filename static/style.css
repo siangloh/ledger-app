@@ -686,7 +686,7 @@ select option {
 
 /* 桌面端默认隐藏纯移动端标签 */
 .mobile-only-tag {
-  display: none;
+  display: none !important;
 }
 
 button { font-family: var(--font-sans); cursor: pointer; }

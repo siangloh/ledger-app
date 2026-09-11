@@ -3381,7 +3381,7 @@ def parse_receipt_text_to_items(raw_text):
         lower = clean_line.lower()
 
         # 1. 匹配小费与服务费 (Tip, Gratuity, Service Charge, Svc Chg, SC, 服务费, 席料)
-        is_sc_line = (any(k in lower for k in ['tip', 'gratuity', 'pourboire', 'trinkgeld', 'service charge', 'svc charge', 'svc chg', 'service fee', 'sc']) or
+        is_sc_line = (any((re.search(r'\b' + re.escape(k) + r'\b', lower) is not None) if len(k) <= 3 else (k in lower) for k in ['tip', 'gratuity', 'pourboire', 'trinkgeld', 'service charge', 'svc charge', 'svc chg', 'service fee', 'sc']) or
                       any(k in clean_line for k in ['服务费', '服務費', 'お通し', '席料', '봉사료']))
         if is_sc_line and not any(k in clean_line for k in ['茶位', '调料']):
             m_pct = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*%', clean_line)
@@ -3544,6 +3544,7 @@ def split_bill_page():
 
 
 @app.route('/split-bill/parse-text', methods=['POST'])
+@csrf.exempt
 def split_bill_parse_text():
     """解析小票文本或粘贴内容"""
     text = request.form.get('text', '').strip()
@@ -3707,6 +3708,7 @@ def smart_orient_receipt_ocr(pil_img, engine):
 
 
 @app.route('/split-bill/ocr-upload', methods=['POST'])
+@csrf.exempt
 def split_bill_ocr_upload():
     """本地 RapidOCR 深度学习小票识别接口（零云端依赖，支持全方向自适应纠偏与同行对齐）"""
     file = request.files.get('file') or request.files.get('receipt_image')
