@@ -1906,7 +1906,24 @@ function refreshDashboardPartials(event) {
     })
     .catch(console.error);
 
-  // 3. 如果在总体概览 Tab，重新拉取概览数据
+  // 3. 局部实时刷新月度预算监控卡片
+  const budgetWrap = document.getElementById('dashboardBudgetWrap');
+  if (budgetWrap) {
+    fetch('/partial/dashboard-budget' + (month ? '?month=' + encodeURIComponent(month) : ''), {
+      cache: 'no-store'
+    })
+      .then(res => res.text())
+      .then(html => {
+        budgetWrap.innerHTML = html;
+        budgetWrap.querySelectorAll('.budget-dash-card').forEach(c => c.classList.add('card-updated'));
+        setTimeout(() => {
+          budgetWrap.querySelectorAll('.budget-dash-card').forEach(c => c.classList.remove('card-updated'));
+        }, 2500);
+      })
+      .catch(console.error);
+  }
+
+  // 4. 如果在总体概览 Tab，重新拉取概览数据
   const ovSec = document.getElementById('overviewSection');
   if (ovSec && ovSec.style.display !== 'none' && typeof loadOverviewData === 'function') {
     loadOverviewData(currentOverviewRange || 'all');
@@ -2701,6 +2718,141 @@ window.handleAppDownloadClick = function (e) {
   }
 };
 
+// ==========================================
+// 分类月度预算交互 (弹窗设置与仪表盘折叠)
+// ==========================================
+window.openSetBudgetModal = function (triggerBtn) {
+  if (!triggerBtn) return;
+  const catId = triggerBtn.dataset.id;
+  const catName = triggerBtn.dataset.name || '此分类';
+  const currentLimit = triggerBtn.dataset.limit || '';
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ||
+                    document.querySelector('input[name="csrf_token"]')?.value || '';
 
+  const currentNum = currentLimit ? parseFloat(currentLimit) : '';
 
+  if (typeof Swal === 'undefined') {
+    const val = window.prompt(`设置「${catName}」每月预算上限（RM，留空或0为不限额）：`, currentNum !== '' ? currentNum : '');
+    if (val !== null) {
+      submitCategoryBudgetAjax(catId, val, csrfToken);
+    }
+    return;
+  }
 
+  Swal.fire({
+    title: `🎯 设置「${catName}」月度预算`,
+    html: `
+      <div style="text-align: left; font-size: 13px; color: var(--muted); margin-bottom: 14px; line-height: 1.6;">
+        设定该分类每月支出上限。支出累计达到 <b>70%</b> 和 <b>100%</b> 时系统会自动预警提醒。
+      </div>
+      <div style="position: relative; margin-bottom: 12px;">
+        <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-weight: 700; color: var(--ink); font-size: 15px;">RM</span>
+        <input id="swalBudgetInput" type="number" step="0.01" min="0" class="swal2-input"
+               style="margin: 0; width: 100%; box-sizing: border-box; padding-left: 48px; font-size: 16px; font-weight: 600;"
+               placeholder="不设限额（留空或填 0）" value="${currentNum !== '' ? currentNum : ''}">
+      </div>
+      <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 4px;">
+        <button type="button" class="btn-ghost-sm" style="border: 1px solid var(--border-soft); padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="document.getElementById('swalBudgetInput').value='200'">200</button>
+        <button type="button" class="btn-ghost-sm" style="border: 1px solid var(--border-soft); padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="document.getElementById('swalBudgetInput').value='500'">500</button>
+        <button type="button" class="btn-ghost-sm" style="border: 1px solid var(--border-soft); padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="document.getElementById('swalBudgetInput').value='1000'">1000</button>
+        <button type="button" class="btn-ghost-sm" style="border: 1px solid var(--border-soft); padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="document.getElementById('swalBudgetInput').value='2000'">2000</button>
+        ${currentLimit ? '<button type="button" class="btn-ghost-sm" style="color: #dc2626; border: 1px solid rgba(220,38,38,0.3); padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="document.getElementById(\'swalBudgetInput\').value=\'\'">清除限额</button>' : ''}
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: '保存限额',
+    cancelButtonText: '取消',
+    buttonsStyling: false,
+    customClass: {
+      popup: 'app-swal-popup',
+      title: 'app-swal-title',
+      htmlContainer: 'app-swal-html',
+      confirmButton: 'btn-primary',
+      cancelButton: 'btn-ghost',
+      actions: 'app-swal-actions'
+    },
+    didOpen: () => {
+      const input = document.getElementById('swalBudgetInput');
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    },
+    preConfirm: () => {
+      const input = document.getElementById('swalBudgetInput');
+      return input ? input.value.trim() : '';
+    }
+  }).then((result) => {
+    if (result.isConfirmed) {
+      submitCategoryBudgetAjax(catId, result.value, csrfToken);
+    }
+  });
+};
+
+function submitCategoryBudgetAjax(catId, limitValue, csrfToken) {
+  const formData = new FormData();
+  formData.append('csrf_token', csrfToken);
+  formData.append('monthly_limit', limitValue);
+
+  fetch(`/categories/${catId}/budget`, {
+    method: 'POST',
+    body: formData,
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      if (typeof Swal !== 'undefined') {
+        Swal.fire({
+          toast: true,
+          position: 'top',
+          icon: 'success',
+          title: data.message || '预算设置已更新',
+          showConfirmButton: false,
+          timer: 1500,
+          customClass: { popup: 'app-swal-toast' }
+        });
+      }
+      if (typeof htmx !== 'undefined') {
+        htmx.ajax('GET', window.location.pathname + window.location.search, {
+          target: '#mainContainer',
+          swap: 'innerHTML show:window:top'
+        });
+      } else {
+        window.location.reload();
+      }
+    } else {
+      if (typeof Swal !== 'undefined') {
+        Swal.fire({
+          icon: 'error',
+          title: '设置失败',
+          text: data.message || '请检查输入',
+          customClass: { popup: 'app-swal-popup' }
+        });
+      } else {
+        alert(data.message || '设置失败');
+      }
+    }
+  })
+  .catch(err => {
+    console.error('Budget update error:', err);
+    window.location.reload();
+  });
+}
+
+window.toggleBudgetDashExpand = function () {
+  const grid = document.getElementById('budgetDashGrid');
+  const btn = document.getElementById('budgetDashExpandBtn');
+  if (!grid || !btn) return;
+  const isCollapsed = grid.classList.contains('collapsed');
+  if (isCollapsed) {
+    grid.classList.remove('collapsed');
+    btn.innerHTML = '<span>收起 ▴</span>';
+  } else {
+    grid.classList.add('collapsed');
+    const total = grid.querySelectorAll('.budget-dash-card').length;
+    btn.innerHTML = `<span>展开全部 ${total} 项预算 ▾</span>`;
+  }
+};

@@ -951,7 +951,16 @@ def get_category_budget_status(db, user_id=None, month=None):
         limit = float(b['monthly_limit'])
         spent = spent_by_category.get(cat, 0.0)
         pct = (spent / limit * 100.0) if limit > 0 else 0.0
-        level = 'over' if pct >= 100 else ('warn' if pct >= 70 else 'ok')
+        # 严格区分超支与满额：只有真正超过限额 (pct > 100) 才是 over (超支)
+        # 刚好用满 100% 是 reached (已达上限/满额)，绝不是超支
+        if pct > 100.0:
+            level = 'over'
+        elif pct == 100.0:
+            level = 'reached'
+        elif pct >= 70.0:
+            level = 'warn'
+        else:
+            level = 'ok'
         result.append({
             'category': cat,
             'limit': round(limit, 2),
@@ -1458,6 +1467,15 @@ def partial_dashboard_cards():
         balance=balance,
         savings_by_category=savings_pool_by_category,
     )
+
+
+@app.route('/partial/dashboard-budget')
+def partial_dashboard_budget():
+    user_id = get_current_user_id()
+    month = request.args.get('month') or date.today().strftime('%Y-%m')
+    db = get_db()
+    budget_status = get_category_budget_status(db, user_id, month)
+    return render_template('partials/dashboard_budget.html', budget_status=budget_status)
 
 
 @app.route('/api/dashboard-charts')
@@ -2972,6 +2990,7 @@ def set_category_budget(cat_id):
     if not raw_limit:
         db.execute('DELETE FROM category_budgets WHERE user_id = ? AND category = ?', (user_id, cat['name']))
         db.commit()
+        bump_data_version('budget', {'category': cat['name'], 'user_id': user_id})
         msg = f'已取消「{cat["name"]}」的月度预算'
     else:
         try:
@@ -2993,6 +3012,7 @@ def set_category_budget(cat_id):
                 (user_id, cat['name'], limit, now, now)
             )
         db.commit()
+        bump_data_version('budget', {'category': cat['name'], 'limit': limit, 'user_id': user_id})
         msg = f'已设置「{cat["name"]}」的月度预算为 RM{limit:.2f}'
 
     if is_ajax_request():

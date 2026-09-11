@@ -22,31 +22,9 @@
     {% include 'partials/dashboard_cards.html' %}
   </div>
 
-  {% if budget_status %}
-  <div class="panels">
-    <section class="panel panel-full">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <h3 style="margin:0;">预算进度</h3>
-        <a href="{{ url_for('categories_page') }}" class="btn-link" style="font-size:12.5px; font-weight:500;">管理预算 &rarr;</a>
-      </div>
-      <ul class="cat-list cat-list-budget" style="margin:0;">
-        {% for b in budget_status %}
-        <li>
-          <div class="cat-budget-header"><span>{{ b.category }}</span></div>
-          <div class="budget-progress-track">
-            <div class="budget-progress-fill level-{{ b.level }}" style="width: {{ [b.pct, 100] | min }}%;"></div>
-          </div>
-          <div class="hint budget-progress-label">
-            本月已花 RM{{ '%.2f' | format(b.spent) }} / RM{{ '%.2f' | format(b.limit) }}（{{ b.pct }}%）
-            {% if b.level == 'over' %}<span class="budget-badge budget-badge-over">已超支</span>
-            {% elif b.level == 'warn' %}<span class="budget-badge budget-badge-warn">接近预算</span>{% endif %}
-          </div>
-        </li>
-        {% endfor %}
-      </ul>
-    </section>
+  <div id="dashboardBudgetWrap">
+    {% include 'partials/dashboard_budget.html' %}
   </div>
-  {% endif %}
 
   <div class="panels">
     <section class="panel">

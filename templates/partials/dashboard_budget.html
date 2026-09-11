@@ -1,0 +1,63 @@
+{% if budget_status %}
+{% set over_list = budget_status | selectattr('level', 'equalto', 'over') | list %}
+{% set reached_list = budget_status | selectattr('level', 'equalto', 'reached') | list %}
+{% set warn_list = budget_status | selectattr('level', 'equalto', 'warn') | list %}
+<div class="panels">
+  <section class="panel panel-full budget-dash-panel">
+    <div class="budget-dash-header">
+      <div class="budget-dash-title">
+        <span class="budget-dash-icon">🎯</span>
+        <strong>月度预算监控</strong>
+        <span class="budget-dash-counts">
+          已设 {{ budget_status|length }} 项
+          {% if over_list|length > 0 %}
+            <span class="b-badge-alert">⚠️ {{ over_list|length }} 项超支</span>
+          {% elif reached_list|length > 0 %}
+            <span class="b-badge-reached">🎯 {{ reached_list|length }} 项已达上限</span>
+          {% elif warn_list|length > 0 %}
+            <span class="b-badge-warn">⚡ {{ warn_list|length }} 项接近上限</span>
+          {% else %}
+            <span class="b-badge-ok">✓ 支出良好</span>
+          {% endif %}
+        </span>
+      </div>
+      <a href="{{ url_for('categories_page') }}" class="btn-link" style="font-size:12px; font-weight:500;">
+        管理限额 &rarr;
+      </a>
+    </div>
+
+    <div class="budget-dash-grid {{ 'collapsed' if budget_status|length > 4 else '' }}" id="budgetDashGrid">
+      {% for b in budget_status %}
+      <div class="budget-dash-card level-{{ b.level }} {{ 'hidden-extra' if loop.index > 4 else '' }}">
+        <div class="b-card-top">
+          <span class="b-card-name" title="{{ b.category }}">{{ b.category }}</span>
+          <span class="b-card-pct level-{{ b.level }}">
+            {{ b.pct }}%
+            {% if b.level == 'over' %}已超支{% elif b.level == 'reached' %}已达上限{% elif b.level == 'warn' %}预警{% endif %}
+          </span>
+        </div>
+        <div class="b-card-track">
+          <div class="b-card-fill level-{{ b.level }}" style="width: {{ [b.pct, 100] | min }}%;"></div>
+        </div>
+        <div class="b-card-bottom">
+          <span>花 RM{{ '%.0f' | format(b.spent) }} / 限 RM{{ '%.0f' | format(b.limit) }}</span>
+          {% if b.remaining < 0 %}
+            <span class="b-card-rem text-danger">超 RM{{ '%.0f' | format(-b.remaining) }}</span>
+          {% elif b.remaining == 0 %}
+            <span class="b-card-rem text-reached">余 RM0 (已满)</span>
+          {% else %}
+            <span class="b-card-rem">余 RM{{ '%.0f' | format(b.remaining) }}</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if budget_status|length > 4 %}
+    <div class="budget-dash-expand" id="budgetDashExpandBtn" onclick="toggleBudgetDashExpand()">
+      <span>展开全部 {{ budget_status|length }} 项预算 ▾</span>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endif %}
