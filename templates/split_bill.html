@@ -557,7 +557,8 @@ async function handleReceiptFileSelect(files) {
     updateOcrProgress(65, '② 启动 RapidOCR 深度学习引擎，自动纠偏图片朝向与识别...');
     try {
       const formData = new FormData();
-      formData.append('file', uploadBlob, 'receipt.jpg');
+      // 直接上传原始照片（若文件 < 20MB），让后端 OpenCV CLAHE + 双边滤波处理原图最高清像素
+      formData.append('file', file);
       const res = await fetch('/split-bill/ocr-upload', {
         method: 'POST',
         body: formData
@@ -566,6 +567,8 @@ async function handleReceiptFileSelect(files) {
         const json = await res.json();
         if (json.ok && json.data) {
           parsedData = json.data;
+          parsedData.engine = 'rapidocr';
+          parsedData.orientation_corrected = (json.rotation_applied !== 0);
           recognizedText = json.raw_text || '';
         } else if (json && json.message) {
           console.warn('Backend OCR notice:', json.message);

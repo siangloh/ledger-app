@@ -3897,7 +3897,9 @@ def split_bill_ocr_upload():
         if not result or not raw_text:
             return jsonify({'ok': False, 'message': '未能识别出文字，请确保小票清晰平整'}), 200
 
-        return jsonify({'ok': True, 'data': parsed, 'raw_text': raw_text, 'rotation_applied': rot})
+        parsed['engine'] = 'rapidocr'
+        parsed['orientation_corrected'] = bool(rot != 0)
+        return jsonify({'ok': True, 'data': parsed, 'raw_text': raw_text, 'rotation_applied': rot, 'engine': 'rapidocr'})
     except Exception as e:
         app.logger.error("RapidOCR recognition failed: %s", e)
         return jsonify({'ok': False, 'message': f'小票识别失败: {str(e)}'}), 500
