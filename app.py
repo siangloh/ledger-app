@@ -3807,56 +3807,102 @@ def preprocess_receipt_for_ocr(pil_img):
     return final_img
 
 
-def evaluate_ocr_quality(ocr_res):
-    """计算 OCR 识别结果的有效性得分（总分 = 平均置信度 * 100 + 有效文本块数 * 2）"""
+def score_receipt_orientation(ocr_res):
+    """
+    通过真实小票关键词 + 高置信度英文词汇打分，彻底杜绝乱码假阳性
+    """
     if not ocr_res:
-        return 0.0, 0
-    scores = [item[2] for item in ocr_res]  # RapidOCR 返回格式: [box, text, score]
-    avg_score = sum(scores) / len(scores) if scores else 0
+        return -999, 0
 
-    # 过滤掉单字符噪点，计算长度 >= 2 的有效单词数
-    valid_words = sum(1 for item in ocr_res if len(item[1].strip()) >= 2 and item[2] > 0.6)
+    # 小票常见强特征词（只要出现这些词，方向必定 100% 正确）
+    ANCHOR_WORDS = [
+        r'TOTAL', r'MYR', r'RM', r'SUBTOTAL', r'CHANGE',
+        r'INVOICE', r'TABLE', r'DATE', r'ORDER', r'CASHIER',
+        r'ROUNDING', r'ITEM', r'QTY', r'PRICE', r'TAX',
+        r'RECEIPT', r'CHECK', r'AMOUNT', r'PAYMENT'
+    ]
 
-    # 只要平均置信度高且有效单词多，说明方向正确
-    total_rating = avg_score * 100 + valid_words * 2
-    return total_rating, valid_words
+    total_score = 0
+    anchor_hits = 0
+    valid_word_count = 0
+
+    for item in ocr_res:
+        # item 结构: [box, text, score]
+        text = str(item[1]).strip().upper()
+        confidence = float(item[2])
+
+        # 乱码通常置信度低于 0.6，且充斥大量特殊符号
+        if confidence < 0.6:
+            continue
+
+        # 命中强特征关键词，疯狂加分
+        for pattern in ANCHOR_WORDS:
+            if re.search(r'\b' + pattern + r'\b', text) or pattern in text:
+                anchor_hits += 1
+                total_score += 50
+                break
+
+        # 正常的英文单词/菜品名，加分
+        if re.search(r'[A-Z]{3,}', text) or re.search(r'[\u4e00-\u9fa5]{2,}', text):
+            valid_word_count += 1
+            total_score += 5
+
+        # 如果充斥乱码符号（=, |, %, ~, £, §, ©, «, »），强力扣分
+        gibberish_count = len(re.findall(r'[=\|%~£§©«»_\\<>]', text))
+        total_score -= gibberish_count * 15
+
+    return total_score, anchor_hits
 
 
 def smart_orient_receipt_ocr(pil_img, engine):
     """
-    通过旋转置信度评估，彻底解决 WhatsApp / 手机侧拍 90°/270° 问题
+    暴力 4 方向评测，杜绝任何提前退出的假阳性
     """
     from PIL import Image
 
-    # 准备 4 个方向的测试：0°, 90°顺时针 (270), 180°, 270°顺时针 (90)
-    # PIL rotate: 270 代表顺时针转 90度（扶正侧拍照片）
-    orientations = [
+    # 强制评测 4 个方向: 0°, 顺时针90°(270), 顺时针180°, 顺时针270°(90)
+    angle_candidates = [
         (0, pil_img),
-        (270, pil_img.transpose(Image.Transpose.ROTATE_270)),  # 顺时针 90°（最常见的手机横拍）
-        (90, pil_img.transpose(Image.Transpose.ROTATE_90)),    # 逆时针 90°
-        (180, pil_img.transpose(Image.Transpose.ROTATE_180))   # 倒立 180°
+        (270, pil_img.transpose(Image.Transpose.ROTATE_270)),  # 解决侧拍小票的关键
+        (180, pil_img.transpose(Image.Transpose.ROTATE_180)),
+        (90, pil_img.transpose(Image.Transpose.ROTATE_90))
     ]
 
     best_angle = 0
     best_res = None
-    best_score = -1
+    max_score = -99999
 
-    for angle, img in orientations:
+    print("\n========== [OCR Orientation Debugging] ==========", flush=True)
+    app.logger.info("========== [OCR Orientation Debugging] ==========")
+    for angle, img in angle_candidates:
         # 预处理后送入
         proc_arr = preprocess_receipt_for_ocr(img)
         res, _ = engine(proc_arr)
+        if not res:
+            res, _ = engine(np.array(img.convert('RGB')))
 
-        score, valid_cnt = evaluate_ocr_quality(res)
+        score, anchors = score_receipt_orientation(res)
+        log_line = f"Angle {angle:3d}° -> Score: {score:5d} | Anchors Hit: {anchors} | Blocks: {len(res) if res else 0}"
+        print(log_line, flush=True)
+        app.logger.info(log_line)
 
-        # 只要找到了明显清晰的文字（置信度高且词汇多），立即锁定最佳方向
-        if score > best_score:
-            best_score = score
+        if score > max_score:
+            max_score = score
             best_angle = angle
             best_res = res
 
-            # 提前跳出（如果置信度极高且识别到大量正常单词，不需要把 4 个方向全跑一遍）
-            if valid_cnt > 15 and (score > 150):
-                break
+        # 只要找到了核心结算关键词（如 TOTAL / RM / ORDER），说明方向绝对正了，可直接锁定
+        if anchors >= 2:
+            confirm_line = f">> Confirmed upright angle: {angle}° with {anchors} anchors."
+            print(confirm_line, flush=True)
+            app.logger.info(confirm_line)
+            best_angle = angle
+            best_res = res
+            break
+
+    summary_line = f"========== Final Pick: {best_angle}° (Score: {max_score}) ==========\n"
+    print(summary_line, flush=True)
+    app.logger.info(summary_line)
 
     if not best_res:
         return [], "", {'items': [], 'total': 0.0}, 0
@@ -3864,7 +3910,6 @@ def smart_orient_receipt_ocr(pil_img, engine):
     raw_text = cluster_ocr_blocks_to_lines(best_res)
     parsed = parse_receipt_text_to_items(raw_text)
 
-    app.logger.info("Best orientation found: %d° with score: %.1f", best_angle, best_score)
     return best_res, raw_text, parsed, best_angle
 
 
