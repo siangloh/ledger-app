@@ -3667,11 +3667,11 @@ def get_rapid_ocr():
         try:
             from rapidocr_onnxruntime import RapidOCR
             _rapid_ocr_engine = RapidOCR(
+                use_angle_cls=True,
                 det_unclip_ratio=1.9,
-                det_db_box_thresh=0.4,
-                det_db_unclip_ratio=1.9
+                det_db_box_thresh=0.35
             )
-            app.logger.info("RapidOCR engine initialized successfully with receipt-optimized params")
+            app.logger.info("RapidOCR engine initialized successfully with use_angle_cls=True and receipt-optimized params")
         except Exception as e:
             app.logger.warning("RapidOCR engine unavailable: %s", e)
             _rapid_ocr_engine = False
@@ -3807,74 +3807,65 @@ def preprocess_receipt_for_ocr(pil_img):
     return final_img
 
 
+def evaluate_ocr_quality(ocr_res):
+    """计算 OCR 识别结果的有效性得分（总分 = 平均置信度 * 100 + 有效文本块数 * 2）"""
+    if not ocr_res:
+        return 0.0, 0
+    scores = [item[2] for item in ocr_res]  # RapidOCR 返回格式: [box, text, score]
+    avg_score = sum(scores) / len(scores) if scores else 0
+
+    # 过滤掉单字符噪点，计算长度 >= 2 的有效单词数
+    valid_words = sum(1 for item in ocr_res if len(item[1].strip()) >= 2 and item[2] > 0.6)
+
+    # 只要平均置信度高且有效单词多，说明方向正确
+    total_rating = avg_score * 100 + valid_words * 2
+    return total_rating, valid_words
+
+
 def smart_orient_receipt_ocr(pil_img, engine):
     """
-    强化版小票 OCR 管道：
-    加入 CLAHE 增强、动态放大与置信度保护
+    通过旋转置信度评估，彻底解决 WhatsApp / 手机侧拍 90°/270° 问题
     """
-    # 0. 预处理原图
-    processed_0 = preprocess_receipt_for_ocr(pil_img)
+    from PIL import Image
 
-    # 1. 初始角度 (0°) 测试识别
-    res0, _ = engine(processed_0)
-    if res0:
-        stats0 = get_ocr_orientation_stats(res0, processed_0.shape[0])
-        raw_text0 = cluster_ocr_blocks_to_lines(res0)
-        parsed0 = parse_receipt_text_to_items(raw_text0)
+    # 准备 4 个方向的测试：0°, 90°顺时针 (270), 180°, 270°顺时针 (90)
+    # PIL rotate: 270 代表顺时针转 90度（扶正侧拍照片）
+    orientations = [
+        (0, pil_img),
+        (270, pil_img.transpose(Image.Transpose.ROTATE_270)),  # 顺时针 90°（最常见的手机横拍）
+        (90, pil_img.transpose(Image.Transpose.ROTATE_90)),    # 逆时针 90°
+        (180, pil_img.transpose(Image.Transpose.ROTATE_180))   # 倒立 180°
+    ]
 
-        # 快速直出条件：横向文本占绝对优势，且解析出结构化结果
-        if stats0['horiz'] > max(5, stats0['vert'] * 1.5) and (stats0['footer_bottom'] >= stats0['footer_top'] or len(parsed0['items']) > 0):
-            return res0, raw_text0, parsed0, 0
+    best_angle = 0
+    best_res = None
+    best_score = -1
 
-        # 候选角度策略
-        if stats0['vert'] >= stats0['horiz']:
-            test_angles = [90, 270]
-        else:
-            test_angles = [180, 90, 270]
+    for angle, img in orientations:
+        # 预处理后送入
+        proc_arr = preprocess_receipt_for_ocr(img)
+        res, _ = engine(proc_arr)
 
-        score0 = (
-            (stats0['horiz'] - stats0['vert'] * 2) +
-            (stats0['footer_bottom'] - stats0['footer_top']) * 6 +
-            len(parsed0['items']) * 15 +
-            (20 if parsed0['total'] > 0 else 0)
-        )
-    else:
-        # 0° 未检出任何文字框（多为纯侧向 90°/270° 或倒置 180°），必须穷举候选角度，绝不能在此直接放弃
-        test_angles = [90, 270, 180]
-        stats0 = {'horiz': 0, 'vert': 0, 'footer_bottom': 0, 'footer_top': 0, 'count': 0}
-        raw_text0 = ""
-        parsed0 = {'items': [], 'subtotal': 0.0, 'total': 0.0, 'service_charge': 0.0, 'tax': 0.0, 'discount': 0.0, 'rounding': 0.0, 'currency_symbol': 'RM'}
-        score0 = -999
+        score, valid_cnt = evaluate_ocr_quality(res)
 
-    candidates = []
-    for angle in test_angles:
-        rot_img = pil_img.rotate(angle, expand=True)
-        # 对旋转后的图片同样走标准化预处理管道
-        rot_processed = preprocess_receipt_for_ocr(rot_img)
-        r_res, _ = engine(rot_processed)
-        if not r_res:
-            continue
+        # 只要找到了明显清晰的文字（置信度高且词汇多），立即锁定最佳方向
+        if score > best_score:
+            best_score = score
+            best_angle = angle
+            best_res = res
 
-        r_stats = get_ocr_orientation_stats(r_res, rot_processed.shape[0])
-        r_text = cluster_ocr_blocks_to_lines(r_res)
-        r_parsed = parse_receipt_text_to_items(r_text)
+            # 提前跳出（如果置信度极高且识别到大量正常单词，不需要把 4 个方向全跑一遍）
+            if valid_cnt > 15 and (score > 150):
+                break
 
-        score = (
-            (r_stats['horiz'] - r_stats['vert'] * 2) +
-            (r_stats['footer_bottom'] - r_stats['footer_top']) * 6 +
-            len(r_parsed['items']) * 15 +
-            (20 if r_parsed['total'] > 0 else 0)
-        )
-        candidates.append((score, angle, r_res, r_text, r_parsed))
+    if not best_res:
+        return [], "", {'items': [], 'total': 0.0}, 0
 
-    if candidates:
-        candidates.sort(key=lambda x: x[0], reverse=True)
-        best = candidates[0]
-        if best[0] > score0:
-            app.logger.info("Auto-corrected receipt orientation by %d° (score %d vs original %d)", best[1], best[0], score0)
-            return best[2], best[3], best[4], best[1]
+    raw_text = cluster_ocr_blocks_to_lines(best_res)
+    parsed = parse_receipt_text_to_items(raw_text)
 
-    return res0, raw_text0, parsed0, 0
+    app.logger.info("Best orientation found: %d° with score: %.1f", best_angle, best_score)
+    return best_res, raw_text, parsed, best_angle
 
 
 @app.route('/split-bill/ocr-upload', methods=['POST'])
