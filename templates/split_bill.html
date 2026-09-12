@@ -512,6 +512,8 @@ async function receiveScannedReceiptText(text) {
 async function handleReceiptFileSelect(files) {
   if (!files || files.length === 0) return;
   const file = files[0];
+  const fileInput = document.getElementById('receiptFileInput');
+  if (fileInput) fileInput.value = '';
 
   // 1. 弹出加载指示器
   if (typeof Swal !== 'undefined') {
@@ -535,29 +537,26 @@ async function handleReceiptFileSelect(files) {
     });
   }
 
+  let parsedData = null;
+  let recognizedText = '';
+  let backendNotice = '';
+
   try {
-    let parsedData = null;
-    let recognizedText = '';
-    
-    // ① 客户端先快速等比优化，将手机超大尺寸照片压缩至约 1400px（仅需数十毫秒，防传输卡顿）
-    updateOcrProgress(35, '① 正在等比优化小票画质 (防超限并加速传输)...');
-    let uploadBlob = file;
+    updateOcrProgress(35, '① 正在准备小票图像...');
     let localDataUrl = null;
     try {
       const processedImg = await compressAndPreprocessImage(file);
       if (processedImg && processedImg.dataUrl) {
         localDataUrl = processedImg.dataUrl;
-        uploadBlob = await (await fetch(processedImg.dataUrl)).blob();
       }
     } catch (compErr) {
       console.warn('Canvas pre-compress notice:', compErr);
     }
 
-    // ② 优先调用强大的本地/服务器 RapidOCR 深度学习引擎（自动纠偏旋转 90°/180°/270° 与中英对齐）
+    // ② 优先调用服务器端 RapidOCR 深度学习引擎（自动纠偏旋转 90°/180°/270° 与几何聚类）
     updateOcrProgress(65, '② 启动 RapidOCR 深度学习引擎，自动纠偏图片朝向与识别...');
     try {
       const formData = new FormData();
-      // 直接上传原始照片（若文件 < 20MB），让后端 OpenCV CLAHE + 双边滤波处理原图最高清像素
       formData.append('file', file);
       const res = await fetch('/split-bill/ocr-upload', {
         method: 'POST',
@@ -570,43 +569,68 @@ async function handleReceiptFileSelect(files) {
           parsedData.engine = 'rapidocr';
           parsedData.orientation_corrected = (json.rotation_applied !== 0);
           recognizedText = json.raw_text || '';
-        } else if (json && json.message) {
-          console.warn('Backend OCR notice:', json.message);
+        } else if (json && json.data) {
+          backendNotice = json.message || '未能从照片中提取到清晰文字';
+          if (json.raw_text) recognizedText = json.raw_text;
         }
       }
     } catch (apiErr) {
-      console.warn('RapidOCR request error, fallback to client WASM:', apiErr);
+      console.warn('RapidOCR request notice:', apiErr);
     }
 
-    // 若网络不可用或后端引擎暂未就绪，优雅降级为纯浏览器端 Canvas + WASM 提取
-    if (!parsedData) {
-      updateOcrProgress(80, '② 切换至浏览器端备用离线文本提取...');
-      const targetUrl = localDataUrl || (await compressAndPreprocessImage(file)).dataUrl;
-      recognizedText = await runClientSideOCR(targetUrl);
-      parsedData = parseReceiptTextClientSide(recognizedText);
+    // ③ 若服务器未提取到有效单品且有前端离线库，尝试端侧极速备用（设置 5 秒超时保护防卡死）
+    if ((!parsedData || !parsedData.items || parsedData.items.length === 0) && typeof Tesseract !== 'undefined') {
+      try {
+        updateOcrProgress(80, '② 端侧快速检测...');
+        const targetUrl = localDataUrl || (await compressAndPreprocessImage(file)).dataUrl;
+        const clientText = await Promise.race([
+          runClientSideOCR(targetUrl),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+        ]);
+        if (clientText && clientText.trim().length > (recognizedText || '').trim().length) {
+          recognizedText = clientText;
+          const clientParsed = parseReceiptTextClientSide(clientText);
+          if (clientParsed && clientParsed.items && clientParsed.items.length > 0) {
+            parsedData = clientParsed;
+          }
+        }
+      } catch (clientErr) {
+        console.warn('Client OCR notice:', clientErr);
+      }
     }
-
-    updateOcrProgress(98, '③ 智能匹配单品、税费与金额...');
-    if (typeof Swal !== 'undefined') Swal.close();
-
-    // 将识别出的文本填入文本框
-    const textarea = document.getElementById('receiptTextInput');
-    if (textarea) textarea.value = recognizedText;
-
-    // 唤起“预填弹窗 + 大字号金额确认”
-    openReviewModal(parsedData, recognizedText);
 
   } catch (err) {
-    if (typeof Swal !== 'undefined') {
-      Swal.close();
-      Swal.fire({
-        icon: 'error',
-        title: '识别异常',
-        html: `识别过程遇到问题：${err.message || err}<br><br><span style="font-size:12px; color:var(--muted);">你可以通过右侧文本框直接粘贴小票明细进行智能解析。</span>`,
-        confirmButtonText: '确定'
-      });
-    } else {
-      alert('识别失败: ' + err.message);
+    console.error('OCR pipeline notice:', err);
+  } finally {
+    // 确保无论如何进度弹窗都能正常关闭
+    if (typeof Swal !== 'undefined') Swal.close();
+
+    // 无论识别到多少内容（哪怕是字迹浅或空白），100% 必定弹出核对弹窗供用户查看与调整！
+    if (!parsedData) {
+      parsedData = parseReceiptTextClientSide(recognizedText || '');
+    }
+
+    const textarea = document.getElementById('receiptTextInput');
+    if (textarea) textarea.value = recognizedText || '';
+
+    // 唤起“预填弹窗 + 大字号金额确认”
+    openReviewModal(parsedData, recognizedText || '');
+
+    // 若未识别出单品或金额为0，轻量 Toast 提示用户可直接手动输入或调整
+    if ((!parsedData.items || parsedData.items.length === 0) && (parsedData.total || 0) === 0) {
+      if (typeof Swal !== 'undefined') {
+        const Toast = Swal.mixin({
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 3500,
+          timerProgressBar: true
+        });
+        Toast.fire({
+          icon: 'info',
+          title: backendNotice || '照片字迹较浅或未检出菜品，您可直接在此手动录入金额与单品'
+        });
+      }
     }
   }
 }
@@ -618,15 +642,14 @@ function updateOcrProgress(percent, msg) {
   if (text && msg) text.textContent = msg;
 }
 
-// Canvas 等比例快速压缩 + 灰度增强（耗时数十毫秒）
+// Canvas 等比例快速压缩（限制最大长边在 1400px，既清晰又防 OOM）
 function compressAndPreprocessImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        // 手机拍照尺寸控制：限制最大长边在 1280px ~ 1400px
-        const MAX_DIM = 1280;
+        const MAX_DIM = 1400;
         let w = img.width;
         let h = img.height;
         if (w > MAX_DIM || h > MAX_DIM) {
@@ -645,33 +668,8 @@ function compressAndPreprocessImage(file) {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, w, h);
 
-        // 针对热敏纸小票的核心图像转换：局部对比度拉伸 + 底色漂白 + 墨迹加深
-        try {
-          const imgData = ctx.getImageData(0, 0, w, h);
-          const d = imgData.data;
-          for (let i = 0; i < d.length; i += 4) {
-            // 人眼感知加权灰度
-            const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-            
-            // S型底色漂白与墨迹强化曲线：
-            // 灰度 > 135 的纸张底色提升 25% 彻底漂白；灰度 <= 135 的文字线条压暗 18% 变浓黑
-            let enhanced;
-            if (gray > 135) {
-              enhanced = Math.min(255, gray * 1.25);
-            } else {
-              enhanced = Math.max(0, gray * 0.82);
-            }
-            d[i] = enhanced;
-            d[i + 1] = enhanced;
-            d[i + 2] = enhanced;
-          }
-          ctx.putImageData(imgData, 0, 0);
-        } catch (procErr) {
-          console.warn('Canvas filter notice:', procErr);
-        }
-
         resolve({
-          dataUrl: canvas.toDataURL('image/jpeg', 0.88),
+          dataUrl: canvas.toDataURL('image/jpeg', 0.92),
           width: w,
           height: h
         });
@@ -684,38 +682,31 @@ function compressAndPreprocessImage(file) {
   });
 }
 
-// 离线端侧 OCR 推理实现（Worker 异步线程，支持中英双语与优雅降级）
+// 离线端侧 OCR 推理实现（Worker 异步线程，轻量英文+数字优先，防卡死）
 async function runClientSideOCR(imageDataUrl) {
   if (typeof Tesseract !== 'undefined') {
     let worker;
     try {
-      // 优先尝试中英双语识别模式（适应东南亚及中文菜品小票）
-      worker = await Tesseract.createWorker(['eng', 'chi_sim'], 1, {
-        logger: m => {
-          if (m.status === 'recognizing text') {
-            const p = Math.round((m.progress || 0) * 100);
-            updateOcrProgress(50 + Math.round(p * 0.38), `② 正在进行端侧中英 OCR 识别 (${p}%)...`);
-          }
-        }
-      });
-    } catch (langErr) {
-      console.warn('Dual-lang worker init failed, fallback to eng:', langErr);
       worker = await Tesseract.createWorker('eng', 1, {
         logger: m => {
           if (m.status === 'recognizing text') {
             const p = Math.round((m.progress || 0) * 100);
-            updateOcrProgress(50 + Math.round(p * 0.38), `② 正在进行端侧英文 OCR 识别 (${p}%)...`);
+            updateOcrProgress(70 + Math.round(p * 0.25), `② 正在进行端侧极速文本识别 (${p}%)...`);
           }
         }
       });
+      const ret = await worker.recognize(imageDataUrl);
+      await worker.terminate();
+      return ret.data.text || '';
+    } catch (workerErr) {
+      console.warn('Client-side Tesseract error:', workerErr);
+      if (worker) {
+        try { await worker.terminate(); } catch (e) {}
+      }
+      return '';
     }
-    const ret = await worker.recognize(imageDataUrl);
-    await worker.terminate();
-    return ret.data.text || '';
   }
-
-  // 兜底若网络离线且未缓存 Tesseract 库
-  throw new Error('离线 OCR 组件正在就绪中，请先使用右侧输入框粘贴小票文字。');
+  return '';
 }
 
 // ============================================================
@@ -948,15 +939,18 @@ function parseReceiptTextClientSide(rawText) {
 // 核心 UI 功能：“预填弹窗 + 大字号金额确认与核验” (Review Modal)
 // ============================================================
 function openReviewModal(parsed, rawText) {
+  parsed = parsed || {};
   currentCurrency = parsed.currency_symbol || 'RM';
   
   // 更新引擎识别标志
   const engineBadge = document.getElementById('modalEngineBadge');
   if (engineBadge) {
-    if (parsed.orientation_corrected !== undefined || parsed.engine === 'rapidocr') {
-      engineBadge.innerHTML = '✨ 深度学习智能解析 (自适应纠偏) · 请核验账目平衡';
+    if (parsed.orientation_corrected) {
+      engineBadge.innerHTML = '✨ RapidOCR 智能解析 (已自适应旋转纠偏) · 请核验账目平衡';
+    } else if (parsed.engine === 'rapidocr') {
+      engineBadge.innerHTML = '✨ RapidOCR 深度学习解析 · 请核验账目平衡';
     } else {
-      engineBadge.innerHTML = '⚡ 端侧离线解析 · 请核验账目平衡';
+      engineBadge.innerHTML = '⚡ 智能录入核验 · 请核验账目平衡';
     }
   }
 
@@ -966,15 +960,23 @@ function openReviewModal(parsed, rawText) {
   document.querySelectorAll('.review-curr-symbol').forEach(el => el.textContent = currentCurrency);
   document.querySelectorAll('.dyn-curr').forEach(el => el.textContent = currentCurrency);
 
-  reviewItems = (parsed.items || []).map(it => ({
-    name: it.name,
-    price: it.price
+  const itemsList = Array.isArray(parsed.items) ? parsed.items : [];
+  reviewItems = itemsList.map(it => ({
+    name: String(it && it.name ? it.name : '菜品'),
+    price: (it && typeof it.price === 'number') ? it.price : (parseFloat(it && it.price) || 0)
   }));
 
-  document.getElementById('reviewGrandTotal').value = (parsed.total || 0).toFixed(2);
-  document.getElementById('reviewServiceCharge').value = (parsed.service_charge || 0).toFixed(2);
-  document.getElementById('reviewTax').value = (parsed.tax || 0).toFixed(2);
-  document.getElementById('reviewRawTextArea').value = rawText || '';
+  const grandTotalEl = document.getElementById('reviewGrandTotal');
+  if (grandTotalEl) grandTotalEl.value = (Number(parsed.total) || 0).toFixed(2);
+
+  const scEl = document.getElementById('reviewServiceCharge');
+  if (scEl) scEl.value = (Number(parsed.service_charge) || 0).toFixed(2);
+
+  const taxEl = document.getElementById('reviewTax');
+  if (taxEl) taxEl.value = (Number(parsed.tax) || 0).toFixed(2);
+
+  const rawTextEl = document.getElementById('reviewRawTextArea');
+  if (rawTextEl) rawTextEl.value = rawText || '';
 
   renderReviewTable();
   updateReviewBalance();

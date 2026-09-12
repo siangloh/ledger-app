@@ -3812,29 +3812,34 @@ def smart_orient_receipt_ocr(pil_img, engine):
 
     # 1. 初始角度 (0°) 测试识别
     res0, _ = engine(processed_0)
-    if not res0:
-        return res0, "", {'items': [], 'subtotal': 0.0, 'total': 0.0, 'service_charge': 0.0, 'tax': 0.0, 'discount': 0.0, 'rounding': 0.0, 'currency_symbol': '$'}, 0
+    if res0:
+        stats0 = get_ocr_orientation_stats(res0, processed_0.shape[0])
+        raw_text0 = cluster_ocr_blocks_to_lines(res0)
+        parsed0 = parse_receipt_text_to_items(raw_text0)
 
-    stats0 = get_ocr_orientation_stats(res0, processed_0.shape[0])
-    raw_text0 = cluster_ocr_blocks_to_lines(res0)
-    parsed0 = parse_receipt_text_to_items(raw_text0)
+        # 快速直出条件：横向文本占绝对优势，且解析出结构化结果
+        if stats0['horiz'] > max(5, stats0['vert'] * 1.5) and (stats0['footer_bottom'] >= stats0['footer_top'] or len(parsed0['items']) > 0):
+            return res0, raw_text0, parsed0, 0
 
-    # 快速直出条件：横向文本占绝对优势，且解析出结构化结果
-    if stats0['horiz'] > max(5, stats0['vert'] * 1.5) and (stats0['footer_bottom'] >= stats0['footer_top'] or len(parsed0['items']) > 0):
-        return res0, raw_text0, parsed0, 0
+        # 候选角度策略
+        if stats0['vert'] >= stats0['horiz']:
+            test_angles = [90, 270]
+        else:
+            test_angles = [180, 90, 270]
 
-    # 候选角度策略
-    if stats0['vert'] >= stats0['horiz']:
-        test_angles = [90, 270]
+        score0 = (
+            (stats0['horiz'] - stats0['vert'] * 2) +
+            (stats0['footer_bottom'] - stats0['footer_top']) * 6 +
+            len(parsed0['items']) * 15 +
+            (20 if parsed0['total'] > 0 else 0)
+        )
     else:
-        test_angles = [180, 90, 270]
-
-    score0 = (
-        (stats0['horiz'] - stats0['vert'] * 2) +
-        (stats0['footer_bottom'] - stats0['footer_top']) * 6 +
-        len(parsed0['items']) * 15 +
-        (20 if parsed0['total'] > 0 else 0)
-    )
+        # 0° 未检出任何文字框（多为纯侧向 90°/270° 或倒置 180°），必须穷举候选角度，绝不能在此直接放弃
+        test_angles = [90, 270, 180]
+        stats0 = {'horiz': 0, 'vert': 0, 'footer_bottom': 0, 'footer_top': 0, 'count': 0}
+        raw_text0 = ""
+        parsed0 = {'items': [], 'subtotal': 0.0, 'total': 0.0, 'service_charge': 0.0, 'tax': 0.0, 'discount': 0.0, 'rounding': 0.0, 'currency_symbol': 'RM'}
+        score0 = -999
 
     candidates = []
     for angle in test_angles:
@@ -3894,8 +3899,28 @@ def split_bill_ocr_upload():
 
         # 核心：即使无 EXIF 标签（如 WhatsApp 压缩图），也能依据文字框几何与小票布局自动旋转纠正
         result, raw_text, parsed, rot = smart_orient_receipt_ocr(pil_img, engine)
+        default_parsed = {
+            'items': [],
+            'subtotal': 0.0,
+            'total': 0.0,
+            'service_charge': 0.0,
+            'tax': 0.0,
+            'discount': 0.0,
+            'rounding': 0.0,
+            'currency_symbol': 'RM'
+        }
         if not result or not raw_text:
-            return jsonify({'ok': False, 'message': '未能识别出文字，请确保小票清晰平整'}), 200
+            return jsonify({
+                'ok': False,
+                'message': '未能识别出文字，请确保小票清晰平整',
+                'data': default_parsed,
+                'raw_text': '',
+                'rotation_applied': 0,
+                'engine': 'rapidocr'
+            }), 200
+
+        if not parsed:
+            parsed = default_parsed
 
         parsed['engine'] = 'rapidocr'
         parsed['orientation_corrected'] = bool(rot != 0)
