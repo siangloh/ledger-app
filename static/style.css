@@ -2882,4 +2882,156 @@ canvas {
   }
 }
 
+/* ============================================================
+   小票识别核对与确认弹窗 (Receipt Review Modal) - 全局样式与定位
+   ============================================================ */
+.receipt-modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(15, 23, 42, 0.78) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  z-index: 99999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+  animation: fadeInModal 0.2s ease-out;
+}
+
+.receipt-modal-backdrop[style*="display: none"],
+.receipt-modal-backdrop[style*="display:none"],
+.receipt-modal-backdrop.is-hidden {
+  display: none !important;
+}
+
+@keyframes fadeInModal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUpModal {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.receipt-modal-card {
+  background: var(--surface, #1e293b);
+  border: 1px solid var(--border, #334155);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  max-width: 680px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.receipt-modal-header {
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border-soft, #334155);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-soft, #0f172a);
+}
+
+.receipt-modal-body {
+  padding: 20px 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.receipt-modal-footer {
+  padding: 14px 22px;
+  border-top: 1px solid var(--border-soft, #334155);
+  background: var(--surface-soft, #0f172a);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* 大字号实付总额（Grand Total）确认看板 */
+.hero-amount-banner {
+  background: linear-gradient(135deg, var(--navy, #1e3a8a) 0%, var(--navy-2, #0f172a) 100%);
+  color: #fff;
+  padding: 18px 20px;
+  border-radius: var(--radius-md, 8px);
+  margin-bottom: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
+}
+
+.hero-amount-val {
+  font-size: 32px;
+  font-weight: 800;
+  font-family: var(--font-mono, monospace);
+  color: #fff;
+  letter-spacing: -0.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hero-stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.hero-stat-item {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.88);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hero-stat-item strong {
+  color: #fff;
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+}
+
+/* 账目平衡校验指示器 */
+.balance-alert-box {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm, 6px);
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 13px;
+  transition: all 0.25s ease;
+}
+
+.balance-alert-box.is-balanced {
+  background: var(--green-soft, rgba(16, 185, 129, 0.15));
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: var(--green, #10b981);
+}
+
+.balance-alert-box.is-discrepant {
+  background: var(--rose-soft, rgba(244, 63, 94, 0.15));
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  color: var(--rose, #f43f5e);
+}
+
 

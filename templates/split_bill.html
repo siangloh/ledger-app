@@ -320,7 +320,7 @@ Total 75.21"></textarea>
      核心 UI 弹窗：小票识别预填弹窗 + 大字号金额确认与核验 (Receipt Review Modal)
      无论选哪个引擎，务必在 UI 上做“预填弹窗 + 大字号金额确认”，允许用户快速点选或修正
      ============================================================ -->
-<div id="receiptReviewModal" class="receipt-modal-backdrop" style="display: none;">
+<div id="receiptReviewModal" class="receipt-modal-backdrop" style="display: none;" onclick="if (event.target === this) closeReviewModal()">
   <div class="receipt-modal-card">
     <!-- 弹窗顶部 -->
     <div class="receipt-modal-header">
@@ -871,12 +871,12 @@ function parseReceiptTextClientSide(rawText) {
     const lastMatch = priceMatches.length ? priceMatches[priceMatches.length - 1] : null;
     if (lastMatch) {
       let nameRaw = cleanLine.slice(0, lastMatch.index).trim()
-        .replace(/^[\s\-:#$*¥€£“"'|.,;，、]+|[\s\-:#$*¥€£“"'|.,;，、]+$/g, '');
+        .replace(/^[\\\/<>=~_+\s\-:#$*¥€£“"'|.,;，、]+|[\\\/<>=~_+\s\-:#$*¥€£“"'|.,;，、]+$/g, '');
       nameRaw = nameRaw.replace(/^(?:RM|MYR|\$|S\$|€|£|¥|円|₩)\s*/i, '');
       nameRaw = nameRaw.replace(/\s*(?:RM|MYR|\$|S\$|€|£|¥|円|₩)\s*$/i, '');
       nameRaw = nameRaw.replace(/^[（(]?(?:Takeaway|TA|Dine[- ]in)[)）]?\s*(?:\([0-9.]+\/ea\))?\s*/i, '');
       nameRaw = nameRaw.replace(/^[（(]?[0-9.]+\/ea[)）]?\s*/i, '');
-      nameRaw = nameRaw.replace(/^[\s\-:#$*¥“"'|.,;，、]+|[\s\-:#$*¥“"'|.,;，、]+$/g, '').trim();
+      nameRaw = nameRaw.replace(/^[\\\/<>=~_+\s\-:#$*¥“"'|.,;，、]+|[\\\/<>=~_+\s\-:#$*¥“"'|.,;，、]+$/g, '').trim();
 
       const numMatch = lastMatch[0].match(/[0-9]+(?:\.[0-9]{1,2})?/);
       const priceVal = numMatch ? parseFloat(numMatch[0]) : 0;
@@ -884,6 +884,10 @@ function parseReceiptTextClientSide(rawText) {
       if (['$', '€', '£', 'RM', 'S$'].includes(currency_symbol) && priceVal > 5000) {
         continue;
       }
+
+      // 必须包含有效词汇（至少两个连续字母或东亚字符），过滤掉小票条码/虚线/框线碎片
+      const hasValidWord = /[a-zA-Z]{2,}/.test(nameRaw) || /[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]/.test(nameRaw);
+      if (!hasValidWord) continue;
 
       if (nameRaw && nameRaw.length >= 2 && priceVal > 0) {
         let qty = 1;
@@ -982,7 +986,12 @@ function openReviewModal(parsed, rawText) {
   updateReviewBalance();
 
   const modal = document.getElementById('receiptReviewModal');
-  if (modal) modal.style.display = 'flex';
+  if (modal) {
+    if (modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
+    modal.style.display = 'flex';
+  }
 }
 
 const GLOBAL_PRESETS = {

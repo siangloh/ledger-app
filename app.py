@@ -3568,18 +3568,23 @@ def parse_receipt_text_to_items(raw_text):
         price_matches = list(price_pattern.finditer(clean_line))
         m_item = price_matches[-1] if price_matches else None
         if m_item:
-            name_raw = clean_line[:m_item.start()].strip(' -:\t#$*¥€£“"\'|.,;，、')
+            name_raw = clean_line[:m_item.start()].strip(' -:\t#$*¥€£“"\'|.,;，、\\/<>=~_+`')
             name_raw = re.sub(r'^(?:RM|MYR|\$|S\$|€|£|¥|円|₩)\s*', '', name_raw, flags=re.IGNORECASE)
             name_raw = re.sub(r'\s*(?:RM|MYR|\$|S\$|€|£|¥|円|₩)\s*$', '', name_raw, flags=re.IGNORECASE)
             name_raw = re.sub(r'^[（(]?(?:Takeaway|TA|Dine[- ]in)[)）]?\s*(?:\([0-9.]+/ea\))?\s*', '', name_raw, flags=re.IGNORECASE)
             name_raw = re.sub(r'^[（(]?[0-9.]+/ea[)）]?\s*', '', name_raw, flags=re.IGNORECASE)
-            name_raw = name_raw.strip(' -:\t#$*¥“"\'|.,;，、')
+            name_raw = name_raw.strip(' -:\t#$*¥“"\'|.,;，、\\/<>=~_+`')
 
             num_match = re.search(r'[0-9]+(?:\.[0-9]{1,2})?', m_item.group())
             price_val = float(num_match.group()) if num_match else 0.0
 
             # 异常超大金额保护 (非 JPY/KRW/VND/IDR 等大面额货币时，单品价格不应超过 5000)
             if currency_symbol in ['$', '€', '£', 'RM', 'S$'] and price_val > 5000:
+                continue
+
+            # 必须包含有效词汇（至少两个连续英文字母，或中日韩文字），过滤小票框线/噪点碎片
+            has_valid_word = bool(re.search(r'[a-zA-Z]{2,}', name_raw) or re.search(r'[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]', name_raw))
+            if not has_valid_word:
                 continue
 
             if name_raw and len(name_raw) >= 2 and price_val > 0:
