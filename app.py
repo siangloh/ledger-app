@@ -10,7 +10,7 @@ from calendar import monthrange
 from datetime import datetime, date
 from decimal import Decimal
 
-# ç¡®ä¿åœ¨ Windows æŽ§åˆ¶å°çŽ¯å¢ƒä¸‹è¾“å‡ºä¸­æ–‡ä¸å‘ç”Ÿ charmap ç¼–ç å´©æºƒ
+# 确保在 Windows 控制台环境下输出中文不发生 charmap 编码崩溃
 if hasattr(sys.stdout, 'reconfigure'):
     try:
         sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -27,7 +27,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, g, request, redirect, url_for, render_template, flash, jsonify, session, send_from_directory, make_response, has_request_context
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# æ•°æ®å­˜å‚¨ç›®å½•
+# 数据存储目录
 DATA_DIR = os.environ.get('DATA_DIR', BASE_DIR)
 os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, 'ledger.db')
@@ -52,7 +52,7 @@ from subscription_tracker import (
     default_mock_exchange_rate_provider
 )
 
-# Turso äº‘æ•°æ®åº“å‡­è¯ (ä»ŽçŽ¯å¢ƒå˜é‡è¯»å–ï¼Œfail-fast)
+# Turso 云数据库凭证 (从环境变量读取，fail-fast)
 TURSO_URL = turso_db.TURSO_URL
 TURSO_AUTH_TOKEN = turso_db.TURSO_AUTH_TOKEN
 
@@ -61,7 +61,7 @@ from datetime import timedelta
 
 app = Flask(__name__)
 
-# ç¨³å®š Session å¯†é’¥æœºåˆ¶ï¼ˆä¿è¯è·¨ Gunicorn Workerã€è·¨é‡å¯ã€è·¨å”¤é†’å¯†é’¥ 100% æ’å®šä¸€è‡´ï¼Œæœç»ä¼šè¯æ¼‚ç§»ï¼‰
+# 稳定 Session 密钥机制（保证跨 Gunicorn Worker、跨重启、跨唤醒密钥 100% 恒定一致，杜绝会话漂移）
 app.secret_key = (
     os.environ.get('FLASK_SECRET_KEY')
     or os.environ.get('SECRET_KEY')
@@ -70,28 +70,28 @@ app.secret_key = (
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
-# æ”¯æŒ Render ç­‰åå‘ä»£ç†æ­£ç¡®è¯†åˆ« https åè®®ä¸Žå®¢æˆ·ç«¯ IP
+# 支持 Render 等反向代理正确识别 https 协议与客户端 IP
 from werkzeug.middleware.proxy_fix import ProxyFix
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
-# CSRF ä¿æŠ¤ (å…¨å±€å¯ç”¨ï¼Œè‡ªåŠ¨åŒ– Webhook ä½¿ç”¨ @csrf.exempt æŽ’é™¤)
+# CSRF 保护 (全局启用，自动化 Webhook 使用 @csrf.exempt 排除)
 csrf = CSRFProtect(app)
 
-# å®‰å…¨ Session Cookie æ ‡å¿— (ç”Ÿäº§çŽ¯å¢ƒ/HTTPS å¼€å¯ Secure)
+# 安全 Session Cookie 标志 (生产环境/HTTPS 开启 Secure)
 is_production = os.environ.get('RENDER') or os.environ.get('FLASK_ENV') == 'production' or os.environ.get('SESSION_COOKIE_SECURE', '0') == '1'
 app.config['SESSION_COOKIE_SECURE'] = bool(is_production)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-# é™åˆ¶ä¸Šä¼ æ–‡ä»¶å¤§å°æœ€å¤§ 20MB (é¿å…é«˜åƒç´ æ‰‹æœºç…§ç‰‡è¶…å‡ºé™åˆ¶)
+# 限制上传文件大小最大 20MB (避免高像素手机照片超出限制)
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
-# è‡ªåŠ¨è®°è´¦ API é‰´æƒå¯†é’¥ (æ”¯æŒç”¨æˆ·æŒ‡å®š keyã€çŽ¯å¢ƒå˜é‡åŠæ•°æ®åº“é…ç½®ï¼›ä¸å†æœ‰ä»»ä½•ç¡¬ç¼–ç ä¿åº•å€¼)
+# 自动记账 API 鉴权密钥 (支持用户指定 key、环境变量及数据库配置；不再有任何硬编码保底值)
 AUTO_TRACK_KEY = os.environ.get('AUTO_TRACK_KEY')
 AUTO_TRACK_DEBUG_LOG = os.environ.get('AUTO_TRACK_DEBUG_LOG', '0') == '1'
 
-# èŽ·å–æœ‰æ•ˆçš„ AUTO_TRACK_KEYï¼ˆä¼˜å…ˆçŽ¯å¢ƒå˜é‡ï¼Œæ¬¡é€‰æ•°æ®åº“ system_settingsï¼›ä¸¤è€…éƒ½æ²¡è®¾ç½®å°±å›žä¼  Noneï¼Œ
-# ä»£è¡¨ç›®å‰æ²¡æœ‰é…ç½®ä»»ä½• key â€”â€” è¿™ç§æƒ…å†µä¸‹ is_valid_api_key() ä¸€å¾‹æ‹’ç»ï¼Œä¸ä¼šæœ‰ä»»ä½•åŽå¤‡å€¼å¯ç”¨ï¼‰
+# 获取有效的 AUTO_TRACK_KEY（优先环境变量，次选数据库 system_settings；两者都没设置就回传 None，
+# 代表目前没有配置任何 key —— 这种情况下 is_valid_api_key() 一律拒绝，不会有任何后备值可用）
 def get_auto_track_key():
     if AUTO_TRACK_KEY and AUTO_TRACK_KEY.strip():
         return AUTO_TRACK_KEY.strip()
@@ -106,17 +106,17 @@ def get_auto_track_key():
 
 
 def is_valid_api_key(req_key):
-    """æ£€éªŒ API Key æ˜¯å¦åˆæ³•ã€‚åªè®¤ç›®å‰å®žé™…é…ç½®çš„é‚£ä¸€æŠŠ keyï¼Œ
-    ä¸æŽ¥å—ä»»ä½•å†™æ­»åœ¨ä»£ç é‡Œçš„é»˜è®¤å€¼æˆ–æ—§ç‰ˆæ›¾ç»æ³„æ¼è¿‡çš„ keyï¼ˆé‚£äº›å·²ç»è¢«è§†ä¸ºæ°¸ä¹…ä½œåºŸï¼‰ã€‚"""
+    """检验 API Key 是否合法。只认目前实际配置的那一把 key，
+    不接受任何写死在代码里的默认值或旧版曾经泄漏过的 key（那些已经被视为永久作废）。"""
     if not req_key:
         return False
     effective = get_auto_track_key()
     if not effective:
-        # å®Œå…¨æ²¡æœ‰é…ç½®ä»»ä½• key æ—¶ï¼Œæ‹’ç»æ‰€æœ‰è¯·æ±‚ï¼Œä¸å›žé€€åˆ°ä»»ä½•é»˜è®¤å€¼
+        # 完全没有配置任何 key 时，拒绝所有请求，不回退到任何默认值
         return False
     return str(req_key).strip() == effective
 
-# LLM æ™ºèƒ½æœåŠ¡é…ç½® (ä¼˜å…ˆ Google Geminiï¼Œå…¶æ¬¡ OpenAI/DeepSeekï¼Œå†å›žé€€æœ¬åœ° Ollama ä¸Žå¿«é€Ÿè§„åˆ™å¼•æ“Ž)
+# LLM 智能服务配置 (优先 Google Gemini，其次 OpenAI/DeepSeek，再回退本地 Ollama 与快速规则引擎)
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
 GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-flash-lite-latest').strip()
 GEMINI_FALLBACK_MODELS = ['gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash']
@@ -130,7 +130,7 @@ LLM_TIMEOUT = float(os.environ.get('LLM_TIMEOUT', '4.5'))
 
 
 def get_active_llm_provider():
-    """è¿”å›žå½“å‰ä¼˜å…ˆå¯ç”¨çš„ LLM ä¾›åº”å•†åç§°ä¸Žæ¨¡åž‹"""
+    """返回当前优先启用的 LLM 供应商名称与模型"""
     if GEMINI_API_KEY:
         return {'provider': 'gemini', 'name': f'Google Gemini ({GEMINI_MODEL})', 'available': True}
     if DEEPSEEK_API_KEY:
@@ -139,8 +139,8 @@ def get_active_llm_provider():
         return {'provider': 'openai', 'name': f'OpenAI ({OPENAI_MODEL})', 'available': True}
     return {'provider': 'ollama', 'name': f'Local Ollama ({OLLAMA_MODEL})', 'available': False}
 
-# å•ç”¨æˆ·è®¿é—®å¯†ç  (ä¼˜å…ˆçŽ¯å¢ƒå˜é‡ï¼Œæ¬¡é€‰æ•°æ®åº“ system_settingsï¼›éƒ½æ²¡è®¾ç½®å°±å›žä¼  Noneï¼Œ
-# ä¸å†æœ‰ä»»ä½•å†™æ­»åœ¨ä»£ç é‡Œçš„ä¿åº•å¯†ç )
+# 单用户访问密码 (优先环境变量，次选数据库 system_settings；都没设置就回传 None，
+# 不再有任何写死在代码里的保底密码)
 def get_app_password():
     env_pw = os.environ.get('APP_PASSWORD')
     if env_pw:
@@ -157,7 +157,7 @@ def get_app_password():
 APP_PASSWORD = os.environ.get('APP_PASSWORD')
 
 # ---------------------------------------------------------------------------
-# å®žæ—¶åŒæ­¥ä¸Žå±€éƒ¨æ›´æ–°çŠ¶æ€ç‰ˆæœ¬æŽ§åˆ¶
+# 实时同步与局部更新状态版本控制
 # ---------------------------------------------------------------------------
 import time
 
@@ -183,43 +183,43 @@ def bump_data_version(event_type='update', data=None, user_id=None):
         USER_DATA_VERSIONS[user_id] = DATA_VERSION
         USER_LATEST_EVENTS[user_id] = LATEST_EVENT
 
-# æœ¬åœ°å•äººä½¿ç”¨çš„å¼€å‘æœåŠ¡å™¨ï¼šå…³é—­é™æ€æ–‡ä»¶ç¼“å­˜ï¼Œé¿å…æµè§ˆå™¨ç¼“å­˜æ—§çš„ CSS/JS å¯¼è‡´æ”¹åŠ¨çœ‹ä¸åˆ°
+# 本地单人使用的开发服务器：关闭静态文件缓存，避免浏览器缓存旧的 CSS/JS 导致改动看不到
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 
 @app.errorhandler(413)
 def request_entity_too_large(error):
     if request.is_json:
-        return jsonify({'ok': False, 'message': 'ä¸Šä¼ æ–‡ä»¶å¤§å°è¶…å‡ºé™åˆ¶ï¼ˆæœ€å¤§å…è®¸ 20MBï¼‰'}), 413
-    flash('ä¸Šä¼ æ–‡ä»¶å¤§å°è¶…å‡ºé™åˆ¶ï¼ˆæœ€å¤§å…è®¸ 20MBï¼‰', 'error')
+        return jsonify({'ok': False, 'message': '上传文件大小超出限制（最大允许 20MB）'}), 413
+    flash('上传文件大小超出限制（最大允许 20MB）', 'error')
     return redirect(request.referrer or url_for('index'))
 
 
 @app.errorhandler(500)
 def internal_server_error(error):
-    """ç¡®ä¿ /split-bill/ è·¯ç”±çš„ 500 é”™è¯¯ä»¥ JSON å½¢å¼è¿”å›žï¼Œè€Œä¸æ˜¯ HTML é”™è¯¯é¡µ"""
+    """确保 /split-bill/ 路由的 500 错误以 JSON 形式返回，而不是 HTML 错误页"""
     import traceback
     traceback.print_exc()
     if request.path.startswith('/split-bill/'):
-        return jsonify({'ok': False, 'message': f'æœåŠ¡å™¨å†…éƒ¨é”™è¯¯ï¼Œè¯·ç¨åŽé‡è¯•ã€‚({str(error)})'}), 200
+        return jsonify({'ok': False, 'message': f'服务器内部错误，请稍后重试。({str(error)})'}), 200
     return error
 
 
 @app.errorhandler(CSRFError)
 def handle_csrf_error(error):
-    """æ‹¦æˆª CSRF ä»¤ç‰Œè¿‡æœŸæˆ–ä¸¢å¤±é”™è¯¯ï¼Œä»¥å‹å¥½æ–¹å¼æç¤º/é‡å®šå‘ï¼Œä¸å†å±•ç¤ºåŽŸç”Ÿç”Ÿç¡¬çš„ 400 Bad Request é¡µé¢"""
+    """拦截 CSRF 令牌过期或丢失错误，以友好方式提示/重定向，不再展示原生生硬的 400 Bad Request 页面"""
     if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.path.startswith('/api/') or request.path.startswith('/split-bill/'):
         return jsonify({
             'ok': False,
-            'message': 'é¡µé¢ä¼šè¯å·²è¶…æ—¶å¤±æ•ˆï¼Œè¯·ä¸‹æ‹‰åˆ·æ–°å½“å‰ç½‘é¡µåŽé‡è¯•ã€‚'
+            'message': '页面会话已超时失效，请下拉刷新当前网页后重试。'
         }), 400
-    flash('é¡µé¢åœé¡¿æ—¶é—´è¾ƒé•¿æˆ–æœåŠ¡åˆšæ›´æ–°ï¼Œä¼šè¯å·²è‡ªåŠ¨é‡ç½®ï¼Œè¯·é‡è¯•æäº¤ã€‚', 'warning')
+    flash('页面停顿时间较长或服务刚更新，会话已自动重置，请重试提交。', 'warning')
     return redirect(request.referrer or url_for('index'))
 
 
 @app.after_request
 def add_cache_control_headers(response):
-    """å¯¹ HTML é¡µé¢ä¸Žæ•æ„Ÿè·¯ç”±å¼ºåˆ¶ä¸ç¼“å­˜ï¼Œç¡®ä¿æ¯æ¬¡åŠ è½½éƒ½èƒ½èŽ·å–æœ€æ–°ä¼šè¯å’Œæœ‰æ•ˆçŠ¶æ€"""
+    """对 HTML 页面与敏感路由强制不缓存，确保每次加载都能获取最新会话和有效状态"""
     if response.mimetype == 'text/html' or (request.path and request.path in ('/login', '/register')):
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
@@ -287,7 +287,7 @@ def get_current_user_id():
 
 @app.before_request
 def require_login():
-    # å…è®¸é™æ€èµ„æºã€ç™»å½•/æ³¨å†Œ/ç™»å‡ºè·¯ç”±ã€å¥åº·æ£€æŸ¥ã€PWA æ ¸å¿ƒèµ„æºä»¥åŠå¤–éƒ¨è‡ªåŠ¨è®°è´¦ Webhook è±å… Session æ£€æŸ¥
+    # 允许静态资源、登录/注册/登出路由、健康检查、PWA 核心资源以及外部自动记账 Webhook 豁免 Session 检查
     if (
         request.endpoint in ('login', 'register', 'logout', 'static', 'health', 'api_realtime_check', 'manifest', 'service_worker', 'offline_page', 'api_check_username', 'download_apk', 'split_bill_ocr_upload', 'split_bill_parse_text')
         or request.path in ('/login', '/register', '/logout', '/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html', '/api/check-username', '/download/apk', '/split-bill/ocr-upload', '/split-bill/parse-text')
@@ -314,18 +314,18 @@ def require_login():
 def api_check_username():
     username = (request.args.get('username') or '').strip()
     if not username:
-        return jsonify({'ok': False, 'available': False, 'message': 'è¯·è¾“å…¥ç”¨æˆ·å'})
+        return jsonify({'ok': False, 'available': False, 'message': '请输入用户名'})
     if len(username) < 3:
-        return jsonify({'ok': False, 'available': False, 'message': f'ç”¨æˆ·åå¤ªçŸ­ï¼Œè‡³å°‘éœ€ 3 ä¸ªå­—ç¬¦ï¼ˆå½“å‰ {len(username)} ä¸ªï¼‰'})
+        return jsonify({'ok': False, 'available': False, 'message': f'用户名太短，至少需 3 个字符（当前 {len(username)} 个）'})
     if len(username) > 30:
-        return jsonify({'ok': False, 'available': False, 'message': 'ç”¨æˆ·åä¸èƒ½è¶…è¿‡ 30 ä¸ªå­—ç¬¦'})
+        return jsonify({'ok': False, 'available': False, 'message': '用户名不能超过 30 个字符'})
     if not re.match(r'^[a-zA-Z0-9_\-\u4e00-\u9fa5]+$', username):
-        return jsonify({'ok': False, 'available': False, 'message': 'ä»…æ”¯æŒä¸­æ–‡ã€è‹±æ–‡å­—æ¯ã€æ•°å­—ã€ä¸‹åˆ’çº¿åŠè¿žå­—ç¬¦'})
+        return jsonify({'ok': False, 'available': False, 'message': '仅支持中文、英文字母、数字、下划线及连字符'})
     db = get_db()
     existing = db.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()
     if existing:
-        return jsonify({'ok': True, 'available': False, 'message': 'è¯¥ç”¨æˆ·åå·²è¢«å ç”¨ï¼Œè¯·ç›´æŽ¥ç™»å½•æˆ–æ›´æ¢'})
-    return jsonify({'ok': True, 'available': True, 'message': 'è¯¥ç”¨æˆ·åå¯ç”¨ âœ“'})
+        return jsonify({'ok': True, 'available': False, 'message': '该用户名已被占用，请直接登录或更换'})
+    return jsonify({'ok': True, 'available': True, 'message': '该用户名可用 ✓'})
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -339,37 +339,37 @@ def register():
         confirm_password = request.form.get('confirm_password', '')
 
         if not username:
-            flash('ç”¨æˆ·åä¸èƒ½ä¸ºç©º', 'error')
+            flash('用户名不能为空', 'error')
             return render_template('register.html')
         if len(username) < 3 or len(username) > 30:
-            flash('ç”¨æˆ·åé•¿åº¦éœ€åœ¨ 3 åˆ° 30 ä¸ªå­—ç¬¦ä¹‹é—´', 'error')
+            flash('用户名长度需在 3 到 30 个字符之间', 'error')
             return render_template('register.html')
         if not re.match(r'^[a-zA-Z0-9_\-\u4e00-\u9fa5]+$', username):
-            flash('ç”¨æˆ·åä»…æ”¯æŒä¸­æ–‡ã€å­—æ¯ã€æ•°å­—åŠä¸‹åˆ’çº¿', 'error')
+            flash('用户名仅支持中文、字母、数字及下划线', 'error')
             return render_template('register.html')
         if not password or len(password) < 6:
-            flash('å¯†ç é•¿åº¦è‡³å°‘éœ€è¦ 6 ä¸ªå­—ç¬¦', 'error')
+            flash('密码长度至少需要 6 个字符', 'error')
             return render_template('register.html')
         if not re.search(r'[A-Z]', password):
-            flash('å¯†ç éœ€åŒ…å«è‡³å°‘ä¸€ä¸ªå¤§å†™å­—æ¯ (A-Z)', 'error')
+            flash('密码需包含至少一个大写字母 (A-Z)', 'error')
             return render_template('register.html')
         if not re.search(r'[a-z]', password):
-            flash('å¯†ç éœ€åŒ…å«è‡³å°‘ä¸€ä¸ªå°å†™å­—æ¯ (a-z)', 'error')
+            flash('密码需包含至少一个小写字母 (a-z)', 'error')
             return render_template('register.html')
         if not re.search(r'[0-9]', password):
-            flash('å¯†ç éœ€åŒ…å«è‡³å°‘ä¸€ä¸ªæ•°å­— (0-9)', 'error')
+            flash('密码需包含至少一个数字 (0-9)', 'error')
             return render_template('register.html')
         if not re.search(r'[^a-zA-Z0-9]', password):
-            flash('å¯†ç éœ€åŒ…å«è‡³å°‘ä¸€ä¸ªç‰¹æ®Šç¬¦å·ï¼ˆå¦‚ !@#$%^&* ç­‰ï¼‰', 'error')
+            flash('密码需包含至少一个特殊符号（如 !@#$%^&* 等）', 'error')
             return render_template('register.html')
         if password != confirm_password:
-            flash('ä¸¤æ¬¡è¾“å…¥çš„å¯†ç ä¸ä¸€è‡´', 'error')
+            flash('两次输入的密码不一致', 'error')
             return render_template('register.html')
 
         db = get_db()
         existing = db.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()
         if existing:
-            flash('è¯¥ç”¨æˆ·åå·²è¢«æ³¨å†Œï¼Œè¯·ç›´æŽ¥ç™»å½•æˆ–æ¢ä¸€ä¸ªç”¨æˆ·å', 'error')
+            flash('该用户名已被注册，请直接登录或换一个用户名', 'error')
             return render_template('register.html')
 
         user_id = str(uuid.uuid4())
@@ -381,14 +381,14 @@ def register():
         )
         db.commit()
 
-        # ä¸ºæ–°æ³¨å†Œè´¦å·åˆå§‹åŒ–ä¸“å±žç‹¬ç«‹çš„é»˜è®¤åˆ†ç±»é›†
+        # 为新注册账号初始化专属独立的默认分类集
         init_user_default_categories(db, user_id)
 
         session.permanent = True
         session['logged_in'] = True
         session['user_id'] = user_id
         session['username'] = username
-        flash(f'æ³¨å†ŒæˆåŠŸï¼Œæ¬¢è¿Žä½¿ç”¨å¤šè´¦æœ¬ä¸ªäººè´¢åŠ¡ç³»ç»Ÿï¼Œ{username}ï¼', 'success')
+        flash(f'注册成功，欢迎使用多账本个人财务系统，{username}！', 'success')
         return redirect(url_for('index'))
 
     return render_template('register.html')
@@ -408,7 +408,7 @@ def login():
         password = request.form.get('password', '')
 
         if not username or not password:
-            flash('è¯·è¾“å…¥ç”¨æˆ·åå’Œå¯†ç ', 'error')
+            flash('请输入用户名和密码', 'error')
             return render_template('login.html', next=next_url, username=username), 400
 
         db = get_db()
@@ -419,7 +419,7 @@ def login():
             session['logged_in'] = True
             session['user_id'] = user['id']
             session['username'] = user['username']
-            flash(f'æ¬¢è¿Žå›žæ¥ï¼Œ{user["username"]}ï¼', 'success')
+            flash(f'欢迎回来，{user["username"]}！', 'success')
             return redirect(next_url)
         elif username == 'admin' and password == get_app_password():
             if user:
@@ -435,10 +435,10 @@ def login():
             session['logged_in'] = True
             session['user_id'] = admin_id
             session['username'] = 'admin'
-            flash('ç™»å½•æˆåŠŸï¼', 'success')
+            flash('登录成功！', 'success')
             return redirect(next_url)
         else:
-            flash('ç”¨æˆ·åæˆ–å¯†ç é”™è¯¯ï¼Œè¯·é‡è¯•', 'error')
+            flash('用户名或密码错误，请重试', 'error')
             return render_template('login.html', next=next_url, username=username), 401
 
     return render_template('login.html', next=next_url)
@@ -447,14 +447,14 @@ def login():
 @app.route('/logout', methods=['GET', 'POST'])
 def logout():
     session.clear()
-    flash('æ‚¨å·²æˆåŠŸé€€å‡ºç™»å½•ã€‚', 'success')
+    flash('您已成功退出登录。', 'success')
     return redirect(url_for('login'))
 
 
 
 @app.template_filter('money')
 def money_filter(value):
-    """æ ¼å¼åŒ–ä¸ºæž—å‰ç‰¹é‡‘é¢ï¼Œå¦‚ RM 3,900.00"""
+    """格式化为林吉特金额，如 RM 3,900.00"""
     try:
         value = float(value)
     except (TypeError, ValueError):
@@ -463,7 +463,7 @@ def money_filter(value):
 
 
 # ---------------------------------------------------------------------------
-# æ•°æ®åº“
+# 数据库
 # ---------------------------------------------------------------------------
 
 def get_db():
@@ -488,23 +488,23 @@ def init_user_default_categories(db, user_id):
     count = row[0] if row else 0
     if count == 0:
         defaults = [
-            (user_id, 'income', 'main', 'å·¥èµ„'),
-            (user_id, 'income', 'main', 'å¥–é‡‘'),
-            (user_id, 'income', 'side', 'è‡ªç”±èŒä¸š'),
-            (user_id, 'income', 'side', 'å…¼èŒ'),
-            (user_id, 'income', 'side', 'æŠ•èµ„'),
-            (user_id, 'expense', None, 'é¤é¥®'),
-            (user_id, 'expense', None, 'äº¤é€š'),
-            (user_id, 'expense', None, 'æˆ¿ç§Ÿ'),
-            (user_id, 'expense', None, 'è´­ç‰©'),
-            (user_id, 'expense', None, 'å¨±ä¹'),
-            (user_id, 'expense', None, 'åŒ»ç–—'),
-            (user_id, 'expense', None, 'é€šè®¯'),
-            (user_id, 'expense', None, 'å…¶ä»–'),
-            (user_id, 'savings', None, 'å®šæœŸå­˜æ¬¾'),
-            (user_id, 'savings', None, 'åº”æ€¥åŸºé‡‘'),
-            (user_id, 'savings', None, 'æŠ•èµ„ç†è´¢'),
-            (user_id, 'savings', None, 'å¿ƒæ„¿åŸºé‡‘'),
+            (user_id, 'income', 'main', '工资'),
+            (user_id, 'income', 'main', '奖金'),
+            (user_id, 'income', 'side', '自由职业'),
+            (user_id, 'income', 'side', '兼职'),
+            (user_id, 'income', 'side', '投资'),
+            (user_id, 'expense', None, '餐饮'),
+            (user_id, 'expense', None, '交通'),
+            (user_id, 'expense', None, '房租'),
+            (user_id, 'expense', None, '购物'),
+            (user_id, 'expense', None, '娱乐'),
+            (user_id, 'expense', None, '医疗'),
+            (user_id, 'expense', None, '通讯'),
+            (user_id, 'expense', None, '其他'),
+            (user_id, 'savings', None, '定期存款'),
+            (user_id, 'savings', None, '应急基金'),
+            (user_id, 'savings', None, '投资理财'),
+            (user_id, 'savings', None, '心愿基金'),
         ]
         db.executemany('INSERT INTO categories (user_id, type, group_name, name) VALUES (?,?,?,?)', defaults)
         db.commit()
@@ -518,7 +518,7 @@ DEFAULT_LEARNING_SAMPLES = [
         'sample_amount': None,
         'sample_merchant': 'Public Bank',
         'sample_category': None,
-        'notes': 'é“¶è¡Œä¿¡ç”¨å¡å¼€å¡æ´»åŠ¨è¥é”€å¹¿å‘Šï¼ŒéžåŠ¨è´¦é€šçŸ¥'
+        'notes': '银行信用卡开卡活动营销广告，非动账通知'
     },
     {
         'text': 'Exclusive for you! Need extra cash? Apply for Maybank Personal Loan from 5.88% p.a. and get instant approval today. T&Cs apply.',
@@ -527,7 +527,7 @@ DEFAULT_LEARNING_SAMPLES = [
         'sample_amount': None,
         'sample_merchant': 'Maybank',
         'sample_category': None,
-        'notes': 'é“¶è¡Œä¸ªäººè´·æ¬¾æŽ¨é”€å¹¿å‘Š'
+        'notes': '银行个人贷款推销广告'
     },
     {
         'text': "Touch 'n Go eWallet: Stand a chance to win a Proton eMas 7 and RM50,000 cash prizes! Spend RM10 with DuitNow QR to earn entries. Promo ends 30 Sept.",
@@ -536,7 +536,7 @@ DEFAULT_LEARNING_SAMPLES = [
         'sample_amount': None,
         'sample_merchant': "Touch 'n Go",
         'sample_category': None,
-        'notes': 'æŠ½å¥–æ´»åŠ¨ä¸Žæ¶ˆè´¹è¾¾æ ‡ç«žèµ›å®£ä¼ ï¼Œéžå®žé™…æ¶ˆè´¹'
+        'notes': '抽奖活动与消费达标竞赛宣传，非实际消费'
     },
     {
         'text': 'PB Alert: Your OTP is 582910 for First-Time Login. Do not reveal this OTP to anyone, including bank staff.',
@@ -545,7 +545,7 @@ DEFAULT_LEARNING_SAMPLES = [
         'sample_amount': None,
         'sample_merchant': 'Public Bank',
         'sample_category': None,
-        'notes': 'ä¸€æ¬¡æ€§ç™»å½•éªŒè¯ç  / å®‰å…¨æé†’'
+        'notes': '一次性登录验证码 / 安全提醒'
     },
     {
         'text': "Touch 'n Go eWallet: You have successfully paid RM 15.50 to FamilyMart SS15 on 10/09/2026. Ref: TNG8892182. Claim your cashback voucher now!",
@@ -553,8 +553,8 @@ DEFAULT_LEARNING_SAMPLES = [
         'is_real_transaction': 1,
         'sample_amount': 15.50,
         'sample_merchant': 'FamilyMart SS15',
-        'sample_category': 'é¤é¥®',
-        'notes': 'ä¾¿åˆ©åº—æ‰«ç æ¶ˆè´¹ï¼Œæœ«å°¾å¸¦è¥é”€å¡åˆ¸å¥–åŠ±ï¼Œåº”åˆ¤å®šä¸ºçœŸå®žæ¶ˆè´¹'
+        'sample_category': '餐饮',
+        'notes': '便利店扫码消费，末尾带营销卡券奖励，应判定为真实消费'
     },
     {
         'text': 'PB Payment Alert: You have paid RM 45.00 to PETRONAS SOLARIS on 10/09/2026 via debit card. Ref: PB491823.',
@@ -562,8 +562,8 @@ DEFAULT_LEARNING_SAMPLES = [
         'is_real_transaction': 1,
         'sample_amount': 45.00,
         'sample_merchant': 'PETRONAS SOLARIS',
-        'sample_category': 'äº¤é€š',
-        'notes': 'æ²¹ç«™åŠ æ²¹æ¶ˆè´¹æ”¯å‡º'
+        'sample_category': '交通',
+        'notes': '油站加油消费支出'
     },
     {
         'text': 'Payment of RM 28.00 to GrabCar completed via GrabPay on 10 Sep 2026.',
@@ -571,8 +571,8 @@ DEFAULT_LEARNING_SAMPLES = [
         'is_real_transaction': 1,
         'sample_amount': 28.00,
         'sample_merchant': 'GrabCar',
-        'sample_category': 'äº¤é€š',
-        'notes': 'ç½‘çº¦è½¦æ‰“è½¦å‡ºè¡Œæ”¯å‡º'
+        'sample_category': '交通',
+        'notes': '网约车打车出行支出'
     },
     {
         'text': 'MAE: RM 36.40 debited for payment at 99 SPEEDMART - 1482 on 10 Sep 2026.',
@@ -580,8 +580,8 @@ DEFAULT_LEARNING_SAMPLES = [
         'is_real_transaction': 1,
         'sample_amount': 36.40,
         'sample_merchant': '99 SPEEDMART',
-        'sample_category': 'è´­ç‰©',
-        'notes': 'è¿žé”è¶…å¸‚æ—¥å¸¸ç”¨å“æ¶ˆè´¹æ”¯å‡º'
+        'sample_category': '购物',
+        'notes': '连锁超市日常用品消费支出'
     },
     {
         'text': 'Transfer Successful. RM 120.00 has been successfully transferred to Tan Ah Kow via DuitNow Transfer. Ref: 20260910001.',
@@ -589,8 +589,8 @@ DEFAULT_LEARNING_SAMPLES = [
         'is_real_transaction': 1,
         'sample_amount': 120.00,
         'sample_merchant': 'Tan Ah Kow',
-        'sample_category': 'å…¶ä»–',
-        'notes': 'å‘ä»–äººè½¬è´¦ä»˜æ¬¾ / æ”¯å‡º'
+        'sample_category': '其他',
+        'notes': '向他人转账付款 / 支出'
     },
     {
         'text': 'DuitNow Transfer: You have received RM 250.00 from Wong Mei Ling on 10 Sep 2026. Ref: DN982187.',
@@ -598,8 +598,8 @@ DEFAULT_LEARNING_SAMPLES = [
         'is_real_transaction': 1,
         'sample_amount': 250.00,
         'sample_merchant': 'Wong Mei Ling',
-        'sample_category': 'å…¶ä»–',
-        'notes': 'æ”¶åˆ°ä»–äºº DuitNow è½¬è´¦è¿›è´¦ï¼Œè®°ä¸ºæ”¶å…¥'
+        'sample_category': '其他',
+        'notes': '收到他人 DuitNow 转账进账，记为收入'
     },
     {
         'text': 'Salary Credit: RM 8,500.00 credited into your account from ABC TECH SDN BHD on 28/08/2026. Salary payment.',
@@ -607,8 +607,8 @@ DEFAULT_LEARNING_SAMPLES = [
         'is_real_transaction': 1,
         'sample_amount': 8500.00,
         'sample_merchant': 'ABC TECH SDN BHD',
-        'sample_category': 'å·¥èµ„',
-        'notes': 'å…¬å¸è–ªèµ„ä»£å‘ï¼Œä¸»ä¸šæ”¶å…¥å…¥è´¦'
+        'sample_category': '工资',
+        'notes': '公司薪资代发，主业收入入账'
     },
     {
         'text': 'JomPAY: RM 142.50 paid to Tenaga Nasional Berhad (TNB) via Maybank MAE on 05 Sep 2026.',
@@ -616,14 +616,14 @@ DEFAULT_LEARNING_SAMPLES = [
         'is_real_transaction': 1,
         'sample_amount': 142.50,
         'sample_merchant': 'Tenaga Nasional Berhad (TNB)',
-        'sample_category': 'é€šè®¯',
-        'notes': 'æ°´ç”µç¼´è´¹æ”¯å‡º'
+        'sample_category': '通讯',
+        'notes': '水电缴费支出'
     }
 ]
 
 
 def seed_learning_samples(db):
-    """å°†é»˜è®¤é¢„è®¾è¯­æ–™æ ·æœ¬çŒå…¥æ•°æ®åº“"""
+    """将默认预设语料样本灌入数据库"""
     now = datetime.now().isoformat()
     for s in DEFAULT_LEARNING_SAMPLES:
         db.execute('''
@@ -650,7 +650,7 @@ def init_db():
         db = sqlite3.connect(DB_PATH)
         db.row_factory = sqlite3.Row
 
-    # 1. ç”¨æˆ·è¡¨ï¼ˆUUID ä¸»é”®ï¼Œç¡®ä¿å®‰å…¨æ€§å’Œå”¯ä¸€æ€§ï¼‰
+    # 1. 用户表（UUID 主键，确保安全性和唯一性）
     db.execute('''
     CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -661,19 +661,19 @@ def init_db():
     ''')
     db.commit()
 
-    # ç¡®ä¿é»˜è®¤ admin ç”¨æˆ·å­˜åœ¨ï¼Œåˆ†é…ç‹¬ç«‹ UUID
+    # 确保默认 admin 用户存在，分配独立 UUID
     admin_row = db.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
     if not admin_row:
         admin_id = str(uuid.uuid4())
         admin_pw = get_app_password()
         if not admin_pw:
-            # æ²¡æœ‰è®¾ç½® APP_PASSWORD/system_settingsï¼Œå°±ç”Ÿæˆä¸€ä¸ªéšæœºçš„ä¸€æ¬¡æ€§å¯†ç ï¼Œ
-            # è€Œä¸æ˜¯ç”¨ä»»ä½•å†™æ­»çš„é»˜è®¤å¯†ç  â€”â€” å¯†ç åªä¼šå°ä¸€æ¬¡åœ¨ server log é‡Œï¼Œ
-            # ä½ è¦ç”¨è¿™ä¸ªé»˜è®¤ admin è´¦å·ç™»å½•çš„è¯ï¼ŒåŽ» log é‡Œæ‰¾è¿™ä¸€è¡Œå¤åˆ¶å¯†ç ï¼Œ
-            # ç™»å½•åŽå»ºè®®å°½å¿«æ”¹æŽ‰æˆ–æ”¹ç”¨ /register å»ºä¸€ä¸ªè‡ªå·±çš„è´¦å·ã€‚
+            # 没有设置 APP_PASSWORD/system_settings，就生成一个随机的一次性密码，
+            # 而不是用任何写死的默认密码 —— 密码只会印一次在 server log 里，
+            # 你要用这个默认 admin 账号登录的话，去 log 里找这一行复制密码，
+            # 登录后建议尽快改掉或改用 /register 建一个自己的账号。
             admin_pw = secrets.token_urlsafe(16)
             app.logger.warning(
-                "æœªè®¾ç½® APP_PASSWORDï¼Œå·²ä¸ºé»˜è®¤ admin è´¦å·ç”Ÿæˆä¸€æ¬¡æ€§éšæœºå¯†ç ï¼ˆä»…æ˜¾ç¤ºè¿™ä¸€æ¬¡ï¼‰ï¼š%s",
+                "未设置 APP_PASSWORD，已为默认 admin 账号生成一次性随机密码（仅显示这一次）：%s",
                 admin_pw
             )
         db.execute(
@@ -684,7 +684,7 @@ def init_db():
     else:
         admin_id = admin_row['id'] if (isinstance(admin_row, sqlite3.Row) or isinstance(admin_row, dict)) else admin_row[0]
 
-    # 2. æ£€æŸ¥ categories è¡¨æ˜¯å¦å·²æœ‰ user_id å­—æ®µåŠç‹¬ç«‹å¤åˆå”¯ä¸€çº¦æŸ UNIQUE(user_id, type, group_name, name)
+    # 2. 检查 categories 表是否已有 user_id 字段及独立复合唯一约束 UNIQUE(user_id, type, group_name, name)
     try:
         col_names = [r[1] for r in db.execute("PRAGMA table_info(categories)").fetchall()]
     except Exception:
@@ -703,7 +703,7 @@ def init_db():
         ''')
         db.commit()
     elif 'user_id' not in col_names:
-        # è¿›è¡Œå®‰å…¨è¿ç§»ï¼Œé‡æž„ä¸ºæ”¯æŒå¤šç”¨æˆ·ç‹¬ç«‹åˆ†ç±»ä¸”ä¿ç•™åŽ†å²æ•°æ®
+        # 进行安全迁移，重构为支持多用户独立分类且保留历史数据
         db.execute("ALTER TABLE categories RENAME TO categories_old")
         db.execute('''
         CREATE TABLE categories (
@@ -722,7 +722,7 @@ def init_db():
         db.execute("DROP TABLE categories_old")
         db.commit()
 
-    # 3. äº¤æ˜“è¡¨ä¸Žå¤šç”¨æˆ·æ”¯æŒ
+    # 3. 交易表与多用户支持
     db.execute('''
     CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -752,7 +752,7 @@ def init_db():
     db.execute("UPDATE transactions SET user_id = ? WHERE user_id IS NULL OR user_id = ''", (admin_id,))
     db.commit()
 
-    # 4. å›ºå®šæ”¶æ”¯è¡¨ä¸Žå¤šç”¨æˆ·æ”¯æŒ
+    # 4. 固定收支表与多用户支持
     db.execute('''
     CREATE TABLE IF NOT EXISTS recurring_rules (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -783,7 +783,7 @@ def init_db():
     db.execute("UPDATE recurring_rules SET user_id = ? WHERE user_id IS NULL OR user_id = ''", (admin_id,))
     db.commit()
 
-    # 5. å•†æˆ·-åˆ†ç±»è®°å¿†è¡¨ä¸Žç³»ç»Ÿé…ç½®è¡¨
+    # 5. 商户-分类记忆表与系统配置表
     db.executescript('''
     CREATE TABLE IF NOT EXISTS merchant_category_overrides (
         merchant_note TEXT PRIMARY KEY,
@@ -810,7 +810,7 @@ def init_db():
     except Exception:
         pass
 
-    # ç´¢å¼•ä¼˜åŒ–
+    # 索引优化
     try:
         db.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_categories_user ON categories(user_id)")
@@ -819,7 +819,7 @@ def init_db():
     except Exception:
         pass
 
-    # 6. LLM å­¦ä¹ æ ·æœ¬è¡¨ (Few-Shot Datasheet)
+    # 6. LLM 学习样本表 (Few-Shot Datasheet)
     try:
         db.execute('''
         CREATE TABLE IF NOT EXISTS llm_learning_samples (
@@ -845,7 +845,7 @@ def init_db():
         if AUTO_TRACK_DEBUG_LOG:
             print(f"[INIT_DB] llm_learning_samples init error: {e}")
 
-    # 7. åˆ†ç±»é¢„ç®—ä¸Šé™ä¸Žè¶…æ”¯æé†’åŽ»é‡è¡¨
+    # 7. 分类预算上限与超支提醒去重表
     db.executescript('''
     CREATE TABLE IF NOT EXISTS category_budgets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -867,7 +867,7 @@ def init_db():
         UNIQUE(user_id, category, month, threshold)
     );
 
-    -- 8. è´Ÿå€ºã€ä¿¡ç”¨å¡ä¸Žåˆ†æœŸä»˜æ¬¾è¿½è¸ªè¡¨
+    -- 8. 负债、信用卡与分期付款追踪表
     CREATE TABLE IF NOT EXISTS accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id TEXT NOT NULL,
@@ -921,7 +921,7 @@ def init_db():
     CREATE INDEX IF NOT EXISTS idx_installments_user_status ON installments(user_id, status);
     CREATE INDEX IF NOT EXISTS idx_loans_user_status ON loans(user_id, status);
 
-    -- 9. è®¢é˜…æœåŠ¡ä¸Žç»­è´¹æé†’è¡¨
+    -- 9. 订阅服务与续费提醒表
     CREATE TABLE IF NOT EXISTS subscriptions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id TEXT NOT NULL,
@@ -950,7 +950,7 @@ def init_db():
     ''')
     db.commit()
 
-    # ç¡®ä¿ admin ç”¨æˆ·å…·å¤‡é»˜è®¤åˆ†ç±»
+    # 确保 admin 用户具备默认分类
     init_user_default_categories(db, admin_id)
     db.close()
 
@@ -970,9 +970,9 @@ def get_categories(db, type_, group_name, user_id=None):
 
 def get_savings_breakdown(db, user_id=None):
     """
-    è®¡ç®—å½“å‰ç”¨æˆ·æ‰€æœ‰åŽ†å²å‚¨è“„åˆ†ç±»çš„ç´¯è®¡ç»“ä½™ï¼ˆå‚¨è“„èµ„é‡‘æ± ï¼‰ï¼š
-    å„åˆ†ç±»ç´¯è®¡å­˜å…¥ - ä»Žè¯¥åˆ†ç±»æ‰£é™¤çš„åŽ†å²æ”¯å‡º
-    è¿”å›ž: (savings_pool_by_category: dict, total_savings_pool: float)
+    计算当前用户所有历史储蓄分类的累计结余（储蓄资金池）：
+    各分类累计存入 - 从该分类扣除的历史支出
+    返回: (savings_pool_by_category: dict, total_savings_pool: float)
     """
     if not user_id:
         user_id = get_current_user_id()
@@ -982,17 +982,17 @@ def get_savings_breakdown(db, user_id=None):
     ).fetchall()
     savings_in = {}
     for r in in_rows:
-        cat = r['category'] or 'å‚¨è“„'
+        cat = r['category'] or '储蓄'
         savings_in[cat] = savings_in.get(cat, 0.0) + float(r['total'] or 0.0)
 
     out_rows = db.execute(
-        "SELECT COALESCE(NULLIF(from_savings_category, ''), category, 'å…¶ä»–') as scat, SUM(amount) as total "
+        "SELECT COALESCE(NULLIF(from_savings_category, ''), category, '其他') as scat, SUM(amount) as total "
         "FROM transactions WHERE user_id=? AND type='expense' AND COALESCE(from_savings, 0)=1 GROUP BY scat",
         (user_id,)
     ).fetchall()
     savings_out = {}
     for r in out_rows:
-        scat = r['scat'] or 'å…¶ä»–'
+        scat = r['scat'] or '其他'
         savings_out[scat] = savings_out.get(scat, 0.0) + float(r['total'] or 0.0)
 
     configured_cats = [c['name'] for c in db.execute("SELECT name FROM categories WHERE user_id=? AND type='savings'", (user_id,)).fetchall()]
@@ -1017,8 +1017,8 @@ def get_savings_breakdown(db, user_id=None):
 
 def get_category_budget_status(db, user_id=None, month=None):
     """
-    è¿”å›žå½“å‰ç”¨æˆ·æ¯ä¸ªå·²è®¾ç½®æœˆåº¦é¢„ç®—çš„æ”¯å‡ºåˆ†ç±»çš„èŠ±è´¹è¿›åº¦ï¼š
-    [{category, limit, spent, remaining, pct, level}], æŒ‰ pct ä»Žé«˜åˆ°ä½ŽæŽ’åºã€‚
+    返回当前用户每个已设置月度预算的支出分类的花费进度：
+    [{category, limit, spent, remaining, pct, level}], 按 pct 从高到低排序。
     level: 'over' (>=100%) / 'warn' (>=70%) / 'ok'
     """
     if not user_id:
@@ -1042,7 +1042,7 @@ def get_category_budget_status(db, user_id=None, month=None):
         "WHERE user_id = ? AND type = 'expense' AND date BETWEEN ? AND ? GROUP BY category",
         (user_id, start, end)
     ).fetchall()
-    spent_by_category = {(r['category'] or 'å…¶ä»–'): float(r['total'] or 0.0) for r in spent_rows}
+    spent_by_category = {(r['category'] or '其他'): float(r['total'] or 0.0) for r in spent_rows}
 
     result = []
     for b in budgets:
@@ -1050,8 +1050,8 @@ def get_category_budget_status(db, user_id=None, month=None):
         limit = float(b['monthly_limit'])
         spent = spent_by_category.get(cat, 0.0)
         pct = (spent / limit * 100.0) if limit > 0 else 0.0
-        # ä¸¥æ ¼åŒºåˆ†è¶…æ”¯ä¸Žæ»¡é¢ï¼šåªæœ‰çœŸæ­£è¶…è¿‡é™é¢ (pct > 100) æ‰æ˜¯ over (è¶…æ”¯)
-        # åˆšå¥½ç”¨æ»¡ 100% æ˜¯ reached (å·²è¾¾ä¸Šé™/æ»¡é¢)ï¼Œç»ä¸æ˜¯è¶…æ”¯
+        # 严格区分超支与满额：只有真正超过限额 (pct > 100) 才是 over (超支)
+        # 刚好用满 100% 是 reached (已达上限/满额)，绝不是超支
         if pct > 100.0:
             level = 'over'
         elif pct == 100.0:
@@ -1074,9 +1074,9 @@ def get_category_budget_status(db, user_id=None, month=None):
 
 def check_and_record_budget_alerts(db, user_id, category, month=None):
     """
-    æ£€æŸ¥æŸä¸ªåˆ†ç±»æœ¬æœˆèŠ±è´¹æ˜¯å¦æ–°è·¨è¶Šäº†ä¸€ä¸ªæé†’é˜ˆå€¼ï¼ˆ70% / 100% / 150%ï¼‰ã€‚
-    æ¯ä¸ª (ç”¨æˆ·, åˆ†ç±», æœˆä»½, é˜ˆå€¼) ç»„åˆåªæé†’ä¸€æ¬¡ï¼Œé¿å…åŒä¸€æ¡£ä½åå¤å¼¹å‡ºæé†’ã€‚
-    è‹¥ç¡®å®žè·¨è¶Šäº†æ–°çš„é˜ˆå€¼ï¼Œè¿”å›žè¯¥æé†’çš„è¯¦æƒ… dict å¹¶è½åº“ï¼›å¦åˆ™è¿”å›ž Noneã€‚
+    检查某个分类本月花费是否新跨越了一个提醒阈值（70% / 100% / 150%）。
+    每个 (用户, 分类, 月份, 阈值) 组合只提醒一次，避免同一档位反复弹出提醒。
+    若确实跨越了新的阈值，返回该提醒的详情 dict 并落库；否则返回 None。
     """
     if not category:
         return None
@@ -1133,7 +1133,7 @@ def check_and_record_budget_alerts(db, user_id, category, month=None):
         'limit': round(limit, 2),
         'spent': round(spent, 2),
         'pct': round(pct, 1),
-        'message': f'é¢„ç®—æé†’ï¼šã€Œ{category}ã€æœ¬æœˆå·²èŠ± RM{spent:.2f} / RM{limit:.2f}ï¼ˆ{round(pct)}%ï¼‰',
+        'message': f'预算提醒：「{category}」本月已花 RM{spent:.2f} / RM{limit:.2f}（{round(pct)}%）',
     }
 
 
@@ -1150,7 +1150,7 @@ def shift_month(month_str, delta):
 
 
 def generate_due_recurring(user_id=None):
-    """æŒ‰å½“å‰çœŸå®žæœˆä»½ç”Ÿæˆåˆ°æœŸçš„å›ºå®šæ”¶æ”¯è®°å½•ï¼ˆæ¯ä¸ªè§„åˆ™æ¯æœˆåªç”Ÿæˆä¸€æ¬¡ï¼‰ã€‚"""
+    """按当前真实月份生成到期的固定收支记录（每个规则每月只生成一次）。"""
     db = get_db()
     current_month = date.today().strftime('%Y-%m')
     year, mon = map(int, current_month.split('-'))
@@ -1183,65 +1183,65 @@ def generate_due_recurring(user_id=None):
 
 
 # ---------------------------------------------------------------------------
-# è‡ªç„¶è¯­è¨€å¿«é€Ÿè®°è´¦è§£æž
+# 自然语言快速记账解析
 # ---------------------------------------------------------------------------
 
-INCOME_MAIN_KEYWORDS = ['å·¥èµ„', 'è–ªèµ„', 'å‘è–ª', 'å¥–é‡‘', 'å¹´ç»ˆå¥–', 'ç»©æ•ˆ']
-INCOME_SIDE_KEYWORDS = ['å‰¯ä¸š', 'è‡ªç”±èŒä¸š', 'å…¼èŒ', 'ç¨¿è´¹', 'ç§æ´»', 'æŠ•èµ„', 'ç†è´¢', 'åˆ†çº¢', 'åˆ©æ¯', 'å¤–å¿«']
+INCOME_MAIN_KEYWORDS = ['工资', '薪资', '发薪', '奖金', '年终奖', '绩效']
+INCOME_SIDE_KEYWORDS = ['副业', '自由职业', '兼职', '稿费', '私活', '投资', '理财', '分红', '利息', '外快']
 
 INCOME_CATEGORY_KEYWORDS = {
-    'å·¥èµ„': ['å·¥èµ„', 'è–ªèµ„', 'å‘è–ª'],
-    'å¥–é‡‘': ['å¥–é‡‘', 'å¹´ç»ˆå¥–', 'ç»©æ•ˆ'],
-    'è‡ªç”±èŒä¸š': ['è‡ªç”±èŒä¸š', 'ç¨¿è´¹', 'ç§æ´»', 'å†™ä½œ', 'è®¾è®¡è´¹'],
-    'å…¼èŒ': ['å…¼èŒ', 'å¤–å¿«'],
-    'æŠ•èµ„': ['æŠ•èµ„', 'ç†è´¢', 'åˆ†çº¢', 'åˆ©æ¯'],
+    '工资': ['工资', '薪资', '发薪'],
+    '奖金': ['奖金', '年终奖', '绩效'],
+    '自由职业': ['自由职业', '稿费', '私活', '写作', '设计费'],
+    '兼职': ['兼职', '外快'],
+    '投资': ['投资', '理财', '分红', '利息'],
 }
 
 EXPENSE_CATEGORY_KEYWORDS = {
-    'é¤é¥®': [
-        'åƒ', 'é¥­', 'é¤', 'å¤–å–', 'å¥¶èŒ¶', 'å’–å•¡', 'æ—©é¥­', 'åˆé¥­', 'æ™šé¥­', 'å¤œå®µ', 'é›¶é£Ÿ',
+    '餐饮': [
+        '吃', '饭', '餐', '外卖', '奶茶', '咖啡', '早饭', '午饭', '晚饭', '夜宵', '零食',
         'kfc', 'mcd', 'mcdonald', 'starbucks', 'zus', 'chagee', 'tealive', 'subway',
         'familymart', 'family mart', 'rotiboy', 'baker', 'kopitiam', 'restaurant',
         'nasi', 'cafe', 'food', 'din', 'bbq', 'sushi', 'pizza'
     ],
-    'äº¤é€š': [
-        'æ‰“è½¦', 'åœ°é“', 'å…¬äº¤', 'é«˜é“', 'ç«è½¦', 'æœºç¥¨', 'æ²¹è´¹', 'åœè½¦', 'äº¤é€š', 'å‡ºè¡Œ',
+    '交通': [
+        '打车', '地铁', '公交', '高铁', '火车', '机票', '油费', '停车', '交通', '出行',
         'petronas', 'shell', 'caltex', 'bhp', 'petron', 'grab', 'touch n go', 'tng rfid',
         'parking', 'tng reload', 'toll', 'rapidkl', 'mrt', 'lrt', 'airasia'
     ],
-    'æˆ¿ç§Ÿ': ['æˆ¿ç§Ÿ', 'ç§Ÿé‡‘', 'ç‰©ä¸šè´¹', 'rental', 'maintenance fee'],
-    'è´­ç‰©': [
-        'è´­ç‰©', 'æ·˜å®', 'äº¬ä¸œ', 'è¡£æœ', 'è¶…å¸‚', 'shopee', 'lazada', 'watsons', 'guardian',
+    '房租': ['房租', '租金', '物业费', 'rental', 'maintenance fee'],
+    '购物': [
+        '购物', '淘宝', '京东', '衣服', '超市', 'shopee', 'lazada', 'watsons', 'guardian',
         'uniqlo', 'lotus', 'aeon', 'jaya grocer', 'village grocer', 'mr diy', 'econsave',
         '99 speedmart', 'speedmart', 'donki', 'supermarket', 'mall'
     ],
-    'å¨±ä¹': ['ç”µå½±', 'æ¸¸æˆ', 'å¨±ä¹', 'å”±æ­Œ', 'æ—…æ¸¸', 'æ™¯ç‚¹', 'steam', 'netflix', 'spotify', 'cinema', 'gsc', 'tgv'],
-    'åŒ»ç–—': ['åŒ»é™¢', 'çœ‹ç—…', 'åŒ»ç–—', 'ä½“æ£€', 'è¯', 'clinic', 'hospital', 'pharmacy', 'dental'],
-    'é€šè®¯': ['è¯è´¹', 'æµé‡', 'ç½‘è´¹', 'é€šè®¯', 'maxis', 'digi', 'celcom', 'umobile', 'unifi', 'tnb', 'air selangor'],
+    '娱乐': ['电影', '游戏', '娱乐', '唱歌', '旅游', '景点', 'steam', 'netflix', 'spotify', 'cinema', 'gsc', 'tgv'],
+    '医疗': ['医院', '看病', '医疗', '体检', '药', 'clinic', 'hospital', 'pharmacy', 'dental'],
+    '通讯': ['话费', '流量', '网费', '通讯', 'maxis', 'digi', 'celcom', 'umobile', 'unifi', 'tnb', 'air selangor'],
 }
 
 MERCHANT_CATEGORY_MAPPING = {
-    # äº¤é€šåŠ æ²¹
-    'petronas': 'äº¤é€š', 'shell': 'äº¤é€š', 'caltex': 'äº¤é€š', 'bhp': 'äº¤é€š', 'petron': 'äº¤é€š',
-    'grab': 'äº¤é€š', 'touch n go': 'äº¤é€š', 'parking': 'äº¤é€š', 'toll': 'äº¤é€š', 'rapidkl': 'äº¤é€š',
-    # é¤é¥®
-    'familymart': 'é¤é¥®', 'family mart': 'é¤é¥®', 'kfc': 'é¤é¥®', 'mcdonald': 'é¤é¥®', 'mcd': 'é¤é¥®',
-    'starbucks': 'é¤é¥®', 'zus': 'é¤é¥®', 'chagee': 'é¤é¥®', 'tealive': 'é¤é¥®', 'subway': 'é¤é¥®',
-    'foodpanda': 'é¤é¥®', 'grabfood': 'é¤é¥®', 'kopitiam': 'é¤é¥®', 'restaurant': 'é¤é¥®', 'cafe': 'é¤é¥®',
-    # è´­ç‰©è¶…å¸‚
-    '99 speedmart': 'è´­ç‰©', 'speedmart': 'è´­ç‰©', 'lotus': 'è´­ç‰©', 'aeon': 'è´­ç‰©', 'watsons': 'è´­ç‰©',
-    'guardian': 'è´­ç‰©', 'mr diy': 'è´­ç‰©', 'shopee': 'è´­ç‰©', 'lazada': 'è´­ç‰©', 'jaya grocer': 'è´­ç‰©',
-    'village grocer': 'è´­ç‰©', 'econsave': 'è´­ç‰©', 'donki': 'è´­ç‰©',
-    # æ°´ç”µé€šè®¯
-    'tnb': 'é€šè®¯', 'unifi': 'é€šè®¯', 'maxis': 'é€šè®¯', 'celcom': 'é€šè®¯', 'digi': 'é€šè®¯', 'umobile': 'é€šè®¯'
+    # 交通加油
+    'petronas': '交通', 'shell': '交通', 'caltex': '交通', 'bhp': '交通', 'petron': '交通',
+    'grab': '交通', 'touch n go': '交通', 'parking': '交通', 'toll': '交通', 'rapidkl': '交通',
+    # 餐饮
+    'familymart': '餐饮', 'family mart': '餐饮', 'kfc': '餐饮', 'mcdonald': '餐饮', 'mcd': '餐饮',
+    'starbucks': '餐饮', 'zus': '餐饮', 'chagee': '餐饮', 'tealive': '餐饮', 'subway': '餐饮',
+    'foodpanda': '餐饮', 'grabfood': '餐饮', 'kopitiam': '餐饮', 'restaurant': '餐饮', 'cafe': '餐饮',
+    # 购物超市
+    '99 speedmart': '购物', 'speedmart': '购物', 'lotus': '购物', 'aeon': '购物', 'watsons': '购物',
+    'guardian': '购物', 'mr diy': '购物', 'shopee': '购物', 'lazada': '购物', 'jaya grocer': '购物',
+    'village grocer': '购物', 'econsave': '购物', 'donki': '购物',
+    # 水电通讯
+    'tnb': '通讯', 'unifi': '通讯', 'maxis': '通讯', 'celcom': '通讯', 'digi': '通讯', 'umobile': '通讯'
 }
 
 
 def parse_auto_track_notification(raw_text):
     """
-    è§£æžæ¥è‡ª TnG eWallet / Maybank MAE / Public Bank (MyPB) / é“¶è¡ŒçŸ­ä¿¡ / é€šçŸ¥æ çš„æ–‡æœ¬ã€‚
-    æå–ï¼šé‡‘é¢ (RM)ã€å•†æˆ·å/æŽ¥æ”¶æ–¹ã€æ—¶é—´ã€è‡ªåŠ¨åŒ¹é…åˆ†ç±»ã€‚
-    è‡ªåŠ¨è¿‡æ»¤ï¼šè¥é”€å¹¿å‘Šã€ä¿¡ç”¨å¡/è´·æ¬¾æŽ¨å¹¿ã€è¿”çŽ°æ´»åŠ¨å®£ä¼ ã€å®‰å…¨æé†’ã€OTP/TACéªŒè¯ç ç­‰éžåŠ¨è´¦é€šçŸ¥ã€‚
+    解析来自 TnG eWallet / Maybank MAE / Public Bank (MyPB) / 银行短信 / 通知栏的文本。
+    提取：金额 (RM)、商户名/接收方、时间、自动匹配分类。
+    自动过滤：营销广告、信用卡/贷款推广、返现活动宣传、安全提醒、OTP/TAC验证码等非动账通知。
     """
     text = raw_text.strip()
     if not text:
@@ -1249,7 +1249,7 @@ def parse_auto_track_notification(raw_text):
 
     lower_text = text.lower()
 
-    # 0. å¼ºåŠ›è¿‡æ»¤éžåŠ¨è´¦ç±»é€šçŸ¥ï¼ˆè¥é”€æŽ¨å¹¿ã€ä¿¡ç”¨å¡/è´·æ¬¾æŽ¨é”€ã€è¿”çŽ°æ´»åŠ¨å®£ä¼ ã€æŠ½å¥–ã€æ¡æ¬¾ã€OTP/TACéªŒè¯ç ã€å®‰å…¨æé†’ç­‰ï¼‰
+    # 0. 强力过滤非动账类通知（营销推广、信用卡/贷款推销、返现活动宣传、抽奖、条款、OTP/TAC验证码、安全提醒等）
     PROMO_AND_AD_KEYWORDS = [
         'apply online', 'apply & get', 'apply for', 'apply now', 'apply today', 'application for',
         'cardmember yet', 'credit cardmember', 'not a pb', 'not a member', 'eligible for',
@@ -1265,31 +1265,31 @@ def parse_auto_track_notification(raw_text):
         'your password', 'reset password', 'login alert', 'new login'
     ]
     if any(k in lower_text for k in PROMO_AND_AD_KEYWORDS):
-        return {'is_promo': True, 'reason': 'å‘½ä¸­è¥é”€æŽ¨å¹¿æ´»åŠ¨æˆ–éžåŠ¨è´¦å®‰å…¨è¯åº“'}
+        return {'is_promo': True, 'reason': '命中营销推广活动或非动账安全词库'}
 
-    # 1. åŠ¨è´¦è¡Œä¸ºåŠ¨è¯ç¡¬æ€§æ£€æŸ¥ï¼ˆå¿…é¡»å…·å¤‡æ˜Žç¡®çœŸå®žçš„è´¢åŠ¡æ”¶æ”¯åŠ¨ä½œï¼Œæœç»æ™®é€šèµ„è®¯/å¹¿å‘Šè¢«è¯¯è®°è´¦ï¼‰
+    # 1. 动账行为动词硬性检查（必须具备明确真实的财务收支动作，杜绝普通资讯/广告被误记账）
     is_expense = any(k in lower_text for k in [
         'paid', 'spent', 'payment to', 'payment of', 'payment successful', 'payment has been made',
         'deducted', 'debited', 'charged', 'transfer to', 'transferred to', 'transfer of',
         'purchase at', 'purchase of', 'withdrawal', 'withdrawn', 'duitnow qr', 'duitnow transfer to',
-        'ä»˜æ¬¾', 'æ”¯å‡º', 'æ‰£æ¬¾', 'è½¬è´¦ç»™', 'å·²æ”¯ä»˜', 'ä¹°å•', 'æ¶ˆè´¹', 'æˆåŠŸæ”¯ä»˜', 'æˆåŠŸè½¬è´¦', 'æˆåŠŸæ‰£æ¬¾'
+        '付款', '支出', '扣款', '转账给', '已支付', '买单', '消费', '成功支付', '成功转账', '成功扣款'
     ])
 
     is_income = any(k in lower_text for k in [
         'received from', 'received', 'credited', 'refund', 'cash in', 'deposit', 'salary', 'dividend',
         'duitnow transfer from', 'transfer from',
-        'è½¬å…¥', 'æ”¶æ¬¾', 'å­˜å…¥', 'é€€æ¬¾', 'åˆ°è´¦', 'æ”¶åˆ°è½¬è´¦', 'å…¥è´¦'
+        '转入', '收款', '存入', '退款', '到账', '收到转账', '入账'
     ])
 
-    # è‹¥æ—¢ä¸æ˜¯æ˜Žç¡®çš„æ”¯å‡ºåŠ¨è¯ï¼Œä¹Ÿä¸æ˜¯æ˜Žç¡®çš„æ”¶å…¥åŠ¨è¯ï¼Œç›´æŽ¥åˆ¤å®šä¸ºéžäº¤æ˜“åŠ¨è´¦é€šçŸ¥å¹¶å¿½ç•¥
+    # 若既不是明确的支出动词，也不是明确的收入动词，直接判定为非交易动账通知并忽略
     if not is_expense and not is_income:
         return None
 
     tx_type = 'income' if is_income and not is_expense else 'expense'
 
-    # 2. æå–é‡‘é¢ï¼šæ”¯æŒ "RM 15.00", "RM15.50", "RM 1,250.00", "MYR 20", "15.00"
+    # 2. 提取金额：支持 "RM 15.00", "RM15.50", "RM 1,250.00", "MYR 20", "15.00"
     amount = None
-    # ä¼˜å…ˆåŒ¹é…å¸¦ RM / MYR çš„æ ¼å¼ (å…è®¸åƒåˆ†ä½é€—å·)
+    # 优先匹配带 RM / MYR 的格式 (允许千分位逗号)
     m_rm = re.search(r'(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)', text, re.IGNORECASE)
     if m_rm:
         try:
@@ -1299,7 +1299,7 @@ def parse_auto_track_notification(raw_text):
             amount = None
 
     if amount is None:
-        # å›žé€€æå–æ™®é€šæ•°å­—ï¼ˆå…è®¸åƒåˆ†ä½ï¼‰
+        # 回退提取普通数字（允许千分位）
         nums = list(re.finditer(r'\b([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\b', text))
         if nums:
             try:
@@ -1311,8 +1311,8 @@ def parse_auto_track_notification(raw_text):
     if not amount or amount <= 0:
         return None
 
-    # 3. æå–å•†æˆ· / äº¤æ˜“å¯¹æ‰‹
-    # å¸¸è§æ ¼å¼æ¨¡å¼åŒ¹é…ï¼š
+    # 3. 提取商户 / 交易对手
+    # 常见格式模式匹配：
     # - "paid RM 15.00 to FamilyMart"
     # - "spent RM 45.00 at PETRONAS"
     # - "Transfer of RM 20.00 to Ali"
@@ -1321,27 +1321,27 @@ def parse_auto_track_notification(raw_text):
     m_to = re.search(r'(?:to|at|from|paid to|transfer to|payment to)\s+([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{2,35})', text, re.IGNORECASE)
     if m_to:
         m_str = m_to.group(1).strip()
-        # æ¸…ç†åŽç»­å¹²æ‰°è¯å¦‚ on, via, using, ref, date, claim, cashback, voucher ç­‰ä»¥åŠå¥å·/æ¢è¡Œ
+        # 清理后续干扰词如 on, via, using, ref, date, claim, cashback, voucher 等以及句号/换行
         m_cleaned = re.split(r'[\.\n\r]|\s+(?:on|via|ref|using|with|at|for|date|txid|claim|get|earn|earned|cashback|voucher|was|is|successful)\b', m_str, flags=re.IGNORECASE)[0]
         merchant = m_cleaned.strip(' .,-')
 
     if not merchant:
-        # å°è¯•ä¸­æ–‡æ ¼å¼ï¼šâ€œåœ¨ã€å…¨å®¶ã€‘æ¶ˆè´¹â€ã€â€œå‘ã€å¼ ä¸‰ã€‘è½¬è´¦â€
-        m_cn = re.search(r'(?:åœ¨|å‘)\s*([A-Za-z0-9\u4e00-\u9fa5\s&]{2,20})\s*(?:æ¶ˆè´¹|è½¬è´¦|ä»˜æ¬¾)', text)
+        # 尝试中文格式：“在【全家】消费”、“向【张三】转账”
+        m_cn = re.search(r'(?:在|向)\s*([A-Za-z0-9\u4e00-\u9fa5\s&]{2,20})\s*(?:消费|转账|付款)', text)
         if m_cn:
             merchant = m_cn.group(1).strip()
 
     if not merchant:
-        merchant = 'è‡ªåŠ¨è¿½è¸ªæ¶ˆè´¹' if tx_type == 'expense' else 'è‡ªåŠ¨è¿½è¸ªå…¥è´¦'
+        merchant = '自动追踪消费' if tx_type == 'expense' else '自动追踪入账'
 
-    # 4. è‡ªåŠ¨å½’ç±»åˆ†ç±» (Category)
-    category = 'å…¶ä»–'
+    # 4. 自动归类分类 (Category)
+    category = '其他'
     if tx_type == 'income':
-        category = 'å…¶ä»–'
+        category = '其他'
         group_name = 'side'
     else:
         group_name = None
-        # ä¼˜å…ˆé€šè¿‡å•†æˆ·ååŒ¹é…æ˜ å°„è¡¨
+        # 优先通过商户名匹配映射表
         matched_cat = None
         m_lower = merchant.lower()
         for kw, cat in MERCHANT_CATEGORY_MAPPING.items():
@@ -1350,21 +1350,21 @@ def parse_auto_track_notification(raw_text):
                 break
 
         if not matched_cat:
-            # æ¬¡ä¼˜æŒ‰é€šç”¨æ”¯å‡ºåˆ†ç±»å…³é”®è¯è¯åº“åŒ¹é…
+            # 次优按通用支出分类关键词词库匹配
             for cat, kws in EXPENSE_CATEGORY_KEYWORDS.items():
                 if any(k in m_lower or k in lower_text for k in kws):
                     matched_cat = cat
                     break
 
-        category = matched_cat if matched_cat else 'å…¶ä»–'
+        category = matched_cat if matched_cat else '其他'
 
-    # 5. æå–æ—¥æœŸï¼ˆè‹¥æ— æ³•ä»Žæ–‡æœ¬ä¸­è§£æžå‡º YYYY-MM-DDï¼Œåˆ™é»˜è®¤å½“å‰æ—¥æœŸï¼‰
+    # 5. 提取日期（若无法从文本中解析出 YYYY-MM-DD，则默认当前日期）
     tx_date = date.today().isoformat()
     m_date = re.search(r'(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})', text)
     if m_date:
         try:
             d_str = m_date.group(1).replace('/', '-').replace('.', '-')
-            # æ ¼å¼åŒ–ç»Ÿä¸€ä¸º YYYY-MM-DD
+            # 格式化统一为 YYYY-MM-DD
             parts = d_str.split('-')
             tx_date = f'{int(parts[0]):04d}-{int(parts[1]):02d}-{int(parts[2]):02d}'
         except Exception:
@@ -1382,13 +1382,13 @@ def parse_auto_track_notification(raw_text):
 
 
 def parse_nlp_text(text):
-    """ä»Žä¸€å¥è‡ªç„¶è¯­è¨€æ–‡æœ¬ä¸­è§£æžå‡ºé‡‘é¢/ç±»åž‹/åˆ†ç»„/åˆ†ç±»ï¼Œä»…è¿”å›žè‰ç¨¿ï¼Œä¸ç›´æŽ¥å…¥åº“ã€‚"""
+    """从一句自然语言文本中解析出金额/类型/分组/分类，仅返回草稿，不直接入库。"""
     text = text.strip()
     warnings = []
 
     amount_matches = list(re.finditer(r'\d+(\.\d+)?', text))
     if not amount_matches:
-        return None, ['æœªèƒ½è¯†åˆ«å‡ºé‡‘é¢ï¼Œè¯·æ‰‹åŠ¨å¡«å†™']
+        return None, ['未能识别出金额，请手动填写']
     m = amount_matches[-1]
     amount = float(m.group())
     remainder = (text[:m.start()] + text[m.end():]).strip()
@@ -1406,16 +1406,16 @@ def parse_nlp_text(text):
                 category = cat
                 break
         if category is None:
-            category = 'å·¥èµ„' if group_name == 'main' else 'è‡ªç”±èŒä¸š'
-            warnings.append('æœªèƒ½ç²¾ç¡®åŒ¹é…æ”¶å…¥å­åˆ†ç±»ï¼Œå·²ä½¿ç”¨é»˜è®¤åˆ†ç±»ï¼Œè¯·æ£€æŸ¥')
+            category = '工资' if group_name == 'main' else '自由职业'
+            warnings.append('未能精确匹配收入子分类，已使用默认分类，请检查')
     else:
         for cat, kws in EXPENSE_CATEGORY_KEYWORDS.items():
             if any(k in text for k in kws):
                 category = cat
                 break
         if category is None:
-            category = 'å…¶ä»–'
-            warnings.append('æœªèƒ½åŒ¹é…æ”¯å‡ºåˆ†ç±»ï¼Œå·²å½’ä¸º"å…¶ä»–"ï¼Œè¯·æ£€æŸ¥')
+            category = '其他'
+            warnings.append('未能匹配支出分类，已归为"其他"，请检查')
 
     if not remainder:
         remainder = text
@@ -1431,7 +1431,7 @@ def parse_nlp_text(text):
 
 
 # ---------------------------------------------------------------------------
-# ä»ªè¡¨ç›˜
+# 仪表盘
 # ---------------------------------------------------------------------------
 
 @app.route('/')
@@ -1439,7 +1439,7 @@ def index():
     user_id = get_current_user_id()
     generated = generate_due_recurring(user_id)
     if generated:
-        flash(f'å·²è‡ªåŠ¨ç”Ÿæˆæœ¬æœˆå›ºå®šæ”¶æ”¯ {generated} æ¡', 'success')
+        flash(f'已自动生成本月固定收支 {generated} 条', 'success')
 
     month = request.args.get('month') or date.today().strftime('%Y-%m')
     db = get_db()
@@ -1460,10 +1460,10 @@ def index():
     savings_expense = sum(r['amount'] for r in rows if r['type'] == 'expense' and r['from_savings'])
     month_savings_in = sum(r['amount'] for r in rows if r['type'] == 'savings')
 
-    # æœ¬æœˆå‡€ç»“ä½™ï¼šæ”¶å…¥ - æ—¥å¸¸æ”¯å‡º - å­˜å…¥å‚¨è“„ï¼ˆä»Žå‚¨è“„æ‰£é™¤çš„æ”¯å‡ºä¸æ‰£å½“æœˆç»“ä½™ï¼‰
+    # 本月净结余：收入 - 日常支出 - 存入储蓄（从储蓄扣除的支出不扣当月结余）
     balance = total_income - regular_expense - month_savings_in
 
-    # å‚¨è“„èµ„é‡‘æ± æ˜Žç»†ä¸Žç´¯è®¡æ€»å‚¨è“„
+    # 储蓄资金池明细与累计总储蓄
     savings_pool_by_category, total_savings_pool = get_savings_breakdown(db, user_id)
 
     income_group = {'main': 0.0, 'side': 0.0}
@@ -1473,10 +1473,10 @@ def index():
             gname = r['group_name'] or 'main'
             income_group[gname] = income_group.get(gname, 0.0) + r['amount']
         elif r['type'] == 'expense':
-            c = r['category'] or 'å…¶ä»–'
+            c = r['category'] or '其他'
             expense_by_category[c] = expense_by_category.get(c, 0.0) + r['amount']
 
-    # æ”¯å‡ºåˆ†ç±»æŒ‰é‡‘é¢ä»Žé«˜åˆ°ä½ŽæŽ’åºï¼Œç¡®ä¿å›¾è¡¨ä¸Žå›¾ä¾‹è§†è§‰ç»Ÿä¸€ä¸”çªå‡ºé‡ç‚¹
+    # 支出分类按金额从高到低排序，确保图表与图例视觉统一且突出重点
     expense_by_category = dict(sorted(expense_by_category.items(), key=lambda x: x[1], reverse=True))
 
     income_categories = {
@@ -1608,7 +1608,7 @@ def api_dashboard_charts():
             gname = r['group_name'] or 'main'
             income_group[gname] = income_group.get(gname, 0.0) + r['amount']
         elif r['type'] == 'expense':
-            c = r['category'] or 'å…¶ä»–'
+            c = r['category'] or '其他'
             expense_by_category[c] = expense_by_category.get(c, 0.0) + r['amount']
 
     sorted_expenses = sorted(expense_by_category.items(), key=lambda x: x[1], reverse=True)
@@ -1617,7 +1617,7 @@ def api_dashboard_charts():
         'ok': True,
         'month': month,
         'income': {
-            'labels': ['ä¸»ä¸šæ”¶å…¥', 'å‰¯ä¸šæ”¶å…¥'],
+            'labels': ['主业收入', '副业收入'],
             'values': [round(income_group.get('main', 0.0), 2), round(income_group.get('side', 0.0), 2)]
         },
         'expense': {
@@ -1673,7 +1673,7 @@ def api_overview():
 
     rows = db.execute(query, params).fetchall()
 
-    # å¦‚æžœæ˜¯ all æˆ– customï¼ŒåŠ¨æ€æ ¹æ®è®°å½•æˆ–å‚æ•°ç”Ÿæˆè¿žç»­æœˆä»½
+    # 如果是 all 或 custom，动态根据记录或参数生成连续月份
     if time_range in ('all', 'custom'):
         if rows:
             min_m = rows[0]['date'][:7]
@@ -1726,12 +1726,12 @@ def api_overview():
             else:
                 regular_expense += amt
                 monthly_stats[m]['regular_expense'] += amt
-            cat = r['category'] or 'å…¶ä»–'
+            cat = r['category'] or '其他'
             expense_cats[cat] = expense_cats.get(cat, 0.0) + amt
         elif t == 'savings':
             total_savings += amt
             monthly_stats[m]['savings'] = monthly_stats[m].get('savings', 0.0) + amt
-            cat = r['category'] or 'å‚¨è“„'
+            cat = r['category'] or '储蓄'
             savings_cats[cat] = savings_cats.get(cat, 0.0) + amt
 
     month_keys.sort()
@@ -1751,7 +1751,7 @@ def api_overview():
             'balance': round(inc - reg_exp - sav, 2)
         })
 
-    # æœˆå‡è®¡ç®—ï¼šæœ‰æœˆä»½è·¨åº¦æŒ‰è·¨åº¦ç®—ï¼Œå¦åˆ™æŒ‰å®žé™…æœ‰è®°å½•çš„æœˆä»½æ•°ï¼Œè‡³å°‘ä¸º 1
+    # 月均计算：有月份跨度按跨度算，否则按实际有记录的月份数，至少为 1
     num_months = max(len(month_keys), 1)
     avg_income = total_income / num_months
     avg_expense = total_expense / num_months
@@ -1762,7 +1762,7 @@ def api_overview():
     all_savings_out = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = ? AND type='expense' AND COALESCE(from_savings, 0)=1", (user_id,)).fetchone()[0] or 0.0
     total_savings_pool = max(float(all_savings_in) - float(all_savings_out), 0.0)
 
-    # æ”¯å‡ºåˆ†ç±»æŒ‰é‡‘é¢é™åºæŽ’åº
+    # 支出分类按金额降序排序
     sorted_exp = sorted(expense_cats.items(), key=lambda x: x[1], reverse=True)
     exp_labels = [k for k, v in sorted_exp]
     exp_values = [round(v, 2) for k, v in sorted_exp]
@@ -1804,7 +1804,7 @@ def api_overview():
 
 
 # ---------------------------------------------------------------------------
-# æ”¯å‡ºåˆ†ç±»æ·±åº¦æ´žå¯ŸæŠ¥å‘Š (Category Breakdown & Insights)
+# 支出分类深度洞察报告 (Category Breakdown & Insights)
 # ---------------------------------------------------------------------------
 
 def get_category_insights_data(db, time_range='all', start_date=None, end_date=None, user_id=None):
@@ -1866,23 +1866,23 @@ def get_category_insights_data(db, time_range='all', start_date=None, end_date=N
     month_keys.sort()
     num_months = max(len(month_keys), 1)
 
-    # ç»Ÿè®¡å½“æœˆä¸Žä¸Šæœˆçš„ç»å¯¹æ”¯å‡º
+    # 统计当月与上月的绝对支出
     cur_month_rows = db.execute(
         "SELECT category, SUM(amount) as total FROM transactions WHERE user_id = ? AND type='expense' AND date LIKE ? GROUP BY category",
         (user_id, f"{current_month}%")
     ).fetchall()
-    cur_month_map = {r['category'] or 'å…¶ä»–': float(r['total'] or 0) for r in cur_month_rows}
+    cur_month_map = {r['category'] or '其他': float(r['total'] or 0) for r in cur_month_rows}
 
     prev_month_rows = db.execute(
         "SELECT category, SUM(amount) as total FROM transactions WHERE user_id = ? AND type='expense' AND date LIKE ? GROUP BY category",
         (user_id, f"{prev_month}%")
     ).fetchall()
-    prev_month_map = {r['category'] or 'å…¶ä»–': float(r['total'] or 0) for r in prev_month_rows}
+    prev_month_map = {r['category'] or '其他': float(r['total'] or 0) for r in prev_month_rows}
 
-    # ç»Ÿè®¡åˆ†ç±»æ±‡æ€»åŠæœˆåº¦åˆ†å¸ƒ
+    # 统计分类汇总及月度分布
     cat_stats = {}
     for r in rows:
-        cat = r['category'] or 'å…¶ä»–'
+        cat = r['category'] or '其他'
         amt = float(r['amount'] or 0)
         m = r['date'][:7]
         if cat not in cat_stats:
@@ -1911,14 +1911,14 @@ def get_category_insights_data(db, time_range='all', start_date=None, end_date=N
                 trend_text = f"{pct}%"
             else:
                 trend_dir = 'flat'
-                trend_text = "æŒå¹³ 0%"
+                trend_text = "持平 0%"
         else:
             if cur_amt > 0:
                 trend_dir = 'up'
-                trend_text = "æœ¬æœˆæ–°å¢ž"
+                trend_text = "本月新增"
             else:
                 trend_dir = 'flat'
-                trend_text = "â€”"
+                trend_text = "—"
 
         sorted_months = sorted(info['monthly'].keys())
         monthly_values = [round(info['monthly'][mk], 2) for mk in sorted_months]
@@ -1978,7 +1978,7 @@ def category_insights_page():
 
 
 # ---------------------------------------------------------------------------
-# äº¤æ˜“è®°å½•ï¼šæ–°å¢ž / ç¼–è¾‘ / åˆ é™¤ / åˆ—è¡¨
+# 交易记录：新增 / 编辑 / 删除 / 列表
 # ---------------------------------------------------------------------------
 
 @app.route('/transactions/add', methods=['POST'])
@@ -1992,8 +1992,8 @@ def add_transaction():
         amount = 0
     if amount <= 0:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': 'é‡‘é¢å¿…é¡»æ˜¯å¤§äºŽ 0 çš„æ•°å­—'}), 400
-        flash('é‡‘é¢å¿…é¡»æ˜¯å¤§äºŽ 0 çš„æ•°å­—', 'error')
+            return jsonify({'ok': False, 'message': '金额必须是大于 0 的数字'}), 400
+        flash('金额必须是大于 0 的数字', 'error')
         return redirect(url_for('index'))
 
     tx_type = f.get('type')
@@ -2004,7 +2004,7 @@ def add_transaction():
     from_savings = 1 if (tx_type == 'expense' and f.get('from_savings') in ('1', 'true', 'on')) else 0
     from_savings_category = (f.get('from_savings_category') or '').strip() if from_savings else None
     if from_savings and not from_savings_category:
-        from_savings_category = f.get('category') or 'å‚¨è“„'
+        from_savings_category = f.get('category') or '储蓄'
 
     tx_date = f.get('date') or date.today().isoformat()
     cur = db.execute(
@@ -2035,7 +2035,7 @@ def add_transaction():
 
     if is_ajax_request():
         savings_pool, total_pool = get_savings_breakdown(db, user_id)
-        # å®žæ—¶è®¡ç®—å½“æœˆçš„æœ€æ–°æ”¶å…¥æž„æˆä¸Žæ”¯å‡ºåˆ†ç±»å æ¯”ï¼Œä¾›å‰ç«¯å³æ—¶å±€éƒ¨æ›´æ–°å›¾è¡¨ä¸Žå›¾ä¾‹
+        # 实时计算当月的最新收入构成与支出分类占比，供前端即时局部更新图表与图例
         tx_month = tx_date[:7]
         y, m = map(int, tx_month.split('-'))
         ld = monthrange(y, m)[1]
@@ -2052,12 +2052,12 @@ def add_transaction():
                 gn = r['group_name'] or 'main'
                 m_inc[gn] = m_inc.get(gn, 0.0) + r['amount']
             elif r['type'] == 'expense':
-                c = r['category'] or 'å…¶ä»–'
+                c = r['category'] or '其他'
                 m_exp[c] = m_exp.get(c, 0.0) + r['amount']
 
         return jsonify({
             'ok': True,
-            'message': 'è®°å½•å·²æ·»åŠ ',
+            'message': '记录已添加',
             'version': DATA_VERSION,
             'transaction': {
                 'id': cur.lastrowid,
@@ -2075,7 +2075,7 @@ def add_transaction():
             'chart_data': {
                 'month': tx_month,
                 'income': {
-                    'labels': ['ä¸»ä¸šæ”¶å…¥', 'å‰¯ä¸šæ”¶å…¥'],
+                    'labels': ['主业收入', '副业收入'],
                     'values': [round(m_inc.get('main', 0.0), 2), round(m_inc.get('side', 0.0), 2)]
                 },
                 'expense': {
@@ -2086,7 +2086,7 @@ def add_transaction():
             'budget_alert': budget_alert
         })
 
-    flash('è®°å½•å·²æ·»åŠ ', 'success')
+    flash('记录已添加', 'success')
     return redirect(url_for('index', month=tx_date[:7]))
 
 
@@ -2162,7 +2162,7 @@ def edit_record(tx_id):
             amount = 0
         new_category = f.get('category')
 
-        # æ£€æŸ¥æ˜¯å¦ä¸º auto_track æ¥æºä¸”ä¿®æ”¹äº†åˆ†ç±»ï¼Œè‹¥æ˜¯åˆ™è®°å¿†å•†æˆ·-åˆ†ç±»æ˜ å°„è¦†ç›–
+        # 检查是否为 auto_track 来源且修改了分类，若是则记忆商户-分类映射覆盖
         current_tx = db.execute('SELECT source, note, category FROM transactions WHERE id=? AND user_id=?', (tx_id, user_id)).fetchone()
         if current_tx and current_tx['source'] == 'auto_track' and current_tx['note'] and new_category:
             merchant_note = current_tx['note'].strip()
@@ -2176,7 +2176,7 @@ def edit_record(tx_id):
         from_savings = 1 if (tx_type == 'expense' and f.get('from_savings') in ('1', 'true', 'on')) else 0
         from_savings_category = (f.get('from_savings_category') or '').strip() if from_savings else None
         if from_savings and not from_savings_category:
-            from_savings_category = f.get('category') or 'å‚¨è“„'
+            from_savings_category = f.get('category') or '储蓄'
 
         db.execute(
             'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=?, from_savings=?, from_savings_category=? WHERE id=? AND user_id=?',
@@ -2192,9 +2192,9 @@ def edit_record(tx_id):
                 flash(budget_alert['message'], 'warning' if budget_alert['threshold'] < 100 else 'error')
 
         if is_ajax_request():
-            return jsonify({'ok': True, 'message': 'è®°å½•å·²æ›´æ–°', 'budget_alert': budget_alert})
+            return jsonify({'ok': True, 'message': '记录已更新', 'budget_alert': budget_alert})
 
-        flash('è®°å½•å·²æ›´æ–°', 'success')
+        flash('记录已更新', 'success')
         return redirect(url_for('records'))
 
     row = db.execute('SELECT * FROM transactions WHERE id=? AND user_id=?', (tx_id, user_id)).fetchone()
@@ -2223,9 +2223,9 @@ def delete_record(tx_id):
     bump_data_version('delete', {'id': tx_id})
 
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': 'è®°å½•å·²åˆ é™¤', 'id': tx_id})
+        return jsonify({'ok': True, 'message': '记录已删除', 'id': tx_id})
 
-    flash('è®°å½•å·²åˆ é™¤', 'success')
+    flash('记录已删除', 'success')
     return redirect(url_for('records'))
 
 
@@ -2236,11 +2236,11 @@ def batch_delete_records():
     ids = request.form.getlist('ids')
     if not ids:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': 'æœªé€‰ä¸­ä»»ä½•è®°å½•'}), 400
-        flash('æœªé€‰ä¸­ä»»ä½•è®°å½•', 'error')
+            return jsonify({'ok': False, 'message': '未选中任何记录'}), 400
+        flash('未选中任何记录', 'error')
         return redirect(url_for('records'))
 
-    # å®‰å…¨åœ°è¿‡æ»¤æ•°å­— ID
+    # 安全地过滤数字 ID
     valid_ids = []
     for i in ids:
         try:
@@ -2255,20 +2255,20 @@ def batch_delete_records():
         bump_data_version('batch_delete', {'count': len(valid_ids)})
 
         if is_ajax_request():
-            return jsonify({'ok': True, 'message': f'æˆåŠŸæ‰¹é‡åˆ é™¤ {len(valid_ids)} æ¡è®°å½•', 'deleted_ids': valid_ids})
+            return jsonify({'ok': True, 'message': f'成功批量删除 {len(valid_ids)} 条记录', 'deleted_ids': valid_ids})
 
-        flash(f'æˆåŠŸæ‰¹é‡åˆ é™¤ {len(valid_ids)} æ¡è®°å½•', 'success')
+        flash(f'成功批量删除 {len(valid_ids)} 条记录', 'success')
     else:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': 'æœªé€‰ä¸­æœ‰æ•ˆçš„è®°å½•'}), 400
-        flash('æœªé€‰ä¸­æœ‰æ•ˆçš„è®°å½•', 'error')
+            return jsonify({'ok': False, 'message': '未选中有效的记录'}), 400
+        flash('未选中有效的记录', 'error')
 
     return redirect(url_for('records'))
 
 
 @app.route('/records/batch-edit', methods=['POST'])
 def batch_edit_records():
-    """æ‰¹é‡ä¿®æ”¹è®°å½•çš„åˆ†ç±»ä¸Žç±»åž‹"""
+    """批量修改记录的分类与类型"""
     user_id = get_current_user_id()
     db = get_db()
     ids = request.form.getlist('ids')
@@ -2280,8 +2280,8 @@ def batch_edit_records():
 
     if not ids:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': 'æœªé€‰ä¸­ä»»ä½•è®°å½•'}), 400
-        flash('æœªé€‰ä¸­ä»»ä½•è®°å½•', 'error')
+            return jsonify({'ok': False, 'message': '未选中任何记录'}), 400
+        flash('未选中任何记录', 'error')
         return redirect(url_for('records'))
 
     valid_ids = []
@@ -2293,14 +2293,14 @@ def batch_edit_records():
 
     if not valid_ids:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': 'æœªé€‰ä¸­æœ‰æ•ˆçš„è®°å½•'}), 400
-        flash('æœªé€‰ä¸­æœ‰æ•ˆçš„è®°å½•', 'error')
+            return jsonify({'ok': False, 'message': '未选中有效的记录'}), 400
+        flash('未选中有效的记录', 'error')
         return redirect(url_for('records'))
 
     if not new_type and not new_category:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': 'æœªæŒ‡å®šéœ€è¦ä¿®æ”¹çš„åˆ†ç±»æˆ–ç±»åž‹'}), 400
-        flash('æœªæŒ‡å®šéœ€è¦ä¿®æ”¹çš„åˆ†ç±»æˆ–ç±»åž‹', 'warning')
+            return jsonify({'ok': False, 'message': '未指定需要修改的分类或类型'}), 400
+        flash('未指定需要修改的分类或类型', 'warning')
         return redirect(url_for('records'))
 
     updates = []
@@ -2325,7 +2325,7 @@ def batch_edit_records():
     db.commit()
     bump_data_version('batch_edit', {'count': len(valid_ids)})
 
-    # æ‰¹é‡ä¿®æ”¹åŽï¼Œå¯¹æ¶‰åŠåˆ°çš„æ¯ä¸ªæ”¯å‡ºåˆ†ç±»å„æ£€æŸ¥ä¸€æ¬¡æ˜¯å¦éœ€è¦å‘å‡ºè¶…æ”¯æé†’ï¼ˆåŽ»é‡è¡¨ä¿è¯ä¸ä¼šé‡å¤å¼¹å‡ºï¼‰
+    # 批量修改后，对涉及到的每个支出分类各检查一次是否需要发出超支提醒（去重表保证不会重复弹出）
     budget_alerts = []
     if new_type is None or new_type == 'expense':
         touched_cats = db.execute(
@@ -2341,18 +2341,18 @@ def batch_edit_records():
                     flash(alert['message'], 'warning' if alert['threshold'] < 100 else 'error')
 
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': f'æˆåŠŸæ‰¹é‡ä¿®æ”¹ {len(valid_ids)} æ¡è®°å½•', 'edited_ids': valid_ids, 'budget_alerts': budget_alerts})
+        return jsonify({'ok': True, 'message': f'成功批量修改 {len(valid_ids)} 条记录', 'edited_ids': valid_ids, 'budget_alerts': budget_alerts})
 
-    flash(f'æˆåŠŸæ‰¹é‡ä¿®æ”¹ {len(valid_ids)} æ¡è®°å½•', 'success')
+    flash(f'成功批量修改 {len(valid_ids)} 条记录', 'success')
     return redirect(url_for('records'))
 
 
 # ---------------------------------------------------------------------------
-# è‡ªç„¶è¯­è¨€å¿«é€Ÿè®°è´¦
+# 自然语言快速记账
 # ---------------------------------------------------------------------------
 
 def clean_and_parse_json(raw_str):
-    """ä»Ž LLM è¿”å›žçš„æ–‡æœ¬ä¸­ç¨³å¥æå–å¹¶è§£æž JSON å¯¹è±¡"""
+    """从 LLM 返回的文本中稳健提取并解析 JSON 对象"""
     if not raw_str or not isinstance(raw_str, str):
         return None
     s = raw_str.strip()
@@ -2375,11 +2375,11 @@ def clean_and_parse_json(raw_str):
 
 def call_llm_json(prompt, system_instruction=None, timeout=None):
     """
-    é€šç”¨å¤šæº LLM JSON æŽ¥å£ï¼š
-    1. ä¼˜å…ˆ Google Gemini 2.5 Flash
-    2. æ¬¡é€‰ DeepSeek / OpenAI
-    3. æ¬¡é€‰ æœ¬åœ° Ollama
-    4. å¤±è´¥è¿”å›ž Noneï¼Œè°ƒç”¨æ–¹è‡ªåŠ¨é™çº§åˆ°è§„åˆ™å¼•æ“Ž
+    通用多源 LLM JSON 接口：
+    1. 优先 Google Gemini 2.5 Flash
+    2. 次选 DeepSeek / OpenAI
+    3. 次选 本地 Ollama
+    4. 失败返回 None，调用方自动降级到规则引擎
     """
     t = timeout or LLM_TIMEOUT
 
@@ -2490,7 +2490,7 @@ def call_llm_json(prompt, system_instruction=None, timeout=None):
 
 
 def get_llm_learning_samples_prompt(user_id=None, limit=12):
-    """ä»Ž llm_learning_samples æ•°æ®åº“è¯»å–æ ·æœ¬ï¼Œæž„é€ æä¾›ç»™ LLM æç¤ºè¯çš„åŠ¨æ€å‚è€ƒæ¡ˆä¾‹åº“"""
+    """从 llm_learning_samples 数据库读取样本，构造提供给 LLM 提示词的动态参考案例库"""
     try:
         db = get_db()
         rows = db.execute('''
@@ -2502,7 +2502,7 @@ def get_llm_learning_samples_prompt(user_id=None, limit=12):
             return ""
 
         lines = [
-            "[LEARNING SAMPLES & REFERENCE DATASHEET / è¯­è¨€å­¦ä¹ æ ·æœ¬åº“ä¸Žåˆ¤å®šç¤ºèŒƒ]:",
+            "[LEARNING SAMPLES & REFERENCE DATASHEET / 语言学习样本库与判定示范]:",
             "Refer closely to the following labeled real-world samples when evaluating notifications:"
         ]
         for idx, r in enumerate(rows, 1):
@@ -2529,10 +2529,10 @@ def get_llm_learning_samples_prompt(user_id=None, limit=12):
 
 def classify_notification_with_llm(text):
     """
-    æ™ºèƒ½è¥é”€/å¹¿å‘Šè¿‡æ»¤ä¸Žå…³é”®è¦ç´ æå–ï¼š
-    é€šè¿‡ LLM æ·±åº¦æ ¡éªŒé€šçŸ¥æ˜¯å¦ä¸ºçœŸå®žå‘ç”Ÿçš„äº¤æ˜“ï¼ˆæ‰£æ¬¾/å…¥è´¦ï¼‰ï¼Œè¿˜æ˜¯è¥é”€æŽ¨å¹¿ã€æŠ½å¥–ã€ä¿¡ç”¨å¡åŠžå¡æŽ¨å¹¿ã€è¿”çŽ°æ´»åŠ¨æˆ–OTPéªŒè¯ç ã€‚
-    è¿”å›ž: (is_real: bool, llm_data: dict or None)
-    é‡‡ç”¨ Fail-open ç­–ç•¥ï¼šè‹¥ LLM ç¦»çº¿æˆ–è¶…æ—¶ï¼Œæ”¾è¡Œå¹¶è¿”å›ž (True, None)ï¼Œç¡®ä¿ä¸æ¼è®°çœŸå®žäº¤æ˜“ã€‚
+    智能营销/广告过滤与关键要素提取：
+    通过 LLM 深度校验通知是否为真实发生的交易（扣款/入账），还是营销推广、抽奖、信用卡办卡推广、返现活动或OTP验证码。
+    返回: (is_real: bool, llm_data: dict or None)
+    采用 Fail-open 策略：若 LLM 离线或超时，放行并返回 (True, None)，确保不漏记真实交易。
     """
     system_instruction = (
         "You are an expert financial transaction validator and parser for Malaysian banking and e-wallets "
@@ -2547,8 +2547,8 @@ def classify_notification_with_llm(text):
         "earn cash back on future spends, or an advertisement (e.g. 'Apply online for PB Credit Card to get RM300 Cash Back'), "
         "is_real_transaction MUST BE FALSE.\n"
         "3. If it is an OTP, verification code, login alert, or system downtime notice, is_real_transaction MUST BE FALSE.\n"
-        "4. Standard expense categories: é¤é¥®, äº¤é€š, è´­ç‰©, å¨±ä¹, å±…ä½, åŒ»ç–—, æ•™è‚², é€šè®¯, æ—…è¡Œ, äººæƒ…, å…¶ä»–.\n"
-        "5. Standard income categories: å·¥èµ„, å¥–é‡‘, æŠ•èµ„, è‡ªç”±èŒä¸š, å…¶ä»–.\n"
+        "4. Standard expense categories: 餐饮, 交通, 购物, 娱乐, 居住, 医疗, 教育, 通讯, 旅行, 人情, 其他.\n"
+        "5. Standard income categories: 工资, 奖金, 投资, 自由职业, 其他.\n"
         "Reply with ONLY valid JSON: {\n"
         "  \"is_real_transaction\": true/false,\n"
         "  \"label_type\": \"promo\"|\"expense\"|\"income_transfer\"|\"expense_transfer\"|\"otp_notice\",\n"
@@ -2569,23 +2569,23 @@ def classify_notification_with_llm(text):
         is_real = bool(res['is_real_transaction'])
         return is_real, res
 
-    # æ— æ³•é€šè¿‡ LLM åˆ¤å®šæ—¶ï¼Œæ‰§è¡Œ Fail-openï¼Œæ”¾è¡ŒçœŸå®žäº¤æ˜“
+    # 无法通过 LLM 判定时，执行 Fail-open，放行真实交易
     return True, None
 
 
 def parse_nlp_with_llm(text):
     """
-    é€šè¿‡ LLM å°†å£è¯­åŒ–è‡ªç„¶è¯­è¨€æ–‡æœ¬è§£æžä¸ºæ ‡å‡†è®°è´¦å¯¹è±¡ã€‚
-    è¿”å›ž dict æˆ– None
+    通过 LLM 将口语化自然语言文本解析为标准记账对象。
+    返回 dict 或 None
     """
     system_instruction = (
         "You are an intelligent accounting parser for a personal ledger app in Malaysia.\n"
         "Parse colloquial natural language entries (in Chinese or English or Malay) into a structured ledger transaction.\n"
         "Categories allowed:\n"
-        "- expense: é¤é¥®, äº¤é€š, è´­ç‰©, å¨±ä¹, å±…ä½, åŒ»ç–—, æ•™è‚², é€šè®¯, æ—…è¡Œ, äººæƒ…, å…¶ä»–\n"
-        "- income: å·¥èµ„, å¥–é‡‘, æŠ•èµ„, è‡ªç”±èŒä¸š, å…¶ä»– (group_name is 'main' for salary/main job, 'side' for side gig/investment)\n"
-        "- savings: åº”æ€¥é‡‘, å…»è€, æ—…æ¸¸, å¿ƒæ„¿, å…¶ä»–\n"
-        f"- Assume today is {date.today().isoformat()}. Parse relative dates like 'æ˜¨å¤©', 'å‰å¤©', 'yesterday' correctly.\n"
+        "- expense: 餐饮, 交通, 购物, 娱乐, 居住, 医疗, 教育, 通讯, 旅行, 人情, 其他\n"
+        "- income: 工资, 奖金, 投资, 自由职业, 其他 (group_name is 'main' for salary/main job, 'side' for side gig/investment)\n"
+        "- savings: 应急金, 养老, 旅游, 心愿, 其他\n"
+        f"- Assume today is {date.today().isoformat()}. Parse relative dates like '昨天', '前天', 'yesterday' correctly.\n"
         "Return ONLY a JSON object: {\n"
         "  \"amount\": positive float,\n"
         "  \"type\": \"expense\" | \"income\" | \"savings\",\n"
@@ -2618,7 +2618,7 @@ def parse_nlp_with_llm(text):
                     'date': str(parsed_date),
                     'type': tx_type,
                     'group_name': group_name,
-                    'category': str(res.get('category') or 'å…¶ä»–'),
+                    'category': str(res.get('category') or '其他'),
                     'amount': amt,
                     'note': str(res.get('note') or text).strip()
                 }
@@ -2631,9 +2631,9 @@ def parse_nlp_with_llm(text):
 def nlp_parse():
     text = request.form.get('text', '').strip()
     if not text:
-        return {'ok': False, 'message': 'è¯·è¾“å…¥å†…å®¹åŽå†ç‚¹æ™ºèƒ½è§£æž'}
+        return {'ok': False, 'message': '请输入内容后再点智能解析'}
 
-    # 1. ä¼˜å…ˆè°ƒç”¨ LLM æ·±åº¦æ™ºèƒ½è§£æž
+    # 1. 优先调用 LLM 深度智能解析
     llm_parsed = parse_nlp_with_llm(text)
     if llm_parsed and llm_parsed.get('amount'):
         return {
@@ -2644,10 +2644,10 @@ def nlp_parse():
             'original_text': text
         }
 
-    # 2. å›žé€€åˆ°æœ¬åœ°è§„åˆ™è§£æžå™¨
+    # 2. 回退到本地规则解析器
     parsed, warnings = parse_nlp_text(text)
     if parsed is None:
-        return {'ok': False, 'message': 'è§£æžå¤±è´¥ï¼š' + 'ï¼›'.join(warnings) + 'ã€‚è¯·æ”¹ç”¨ä¸‹æ–¹å¿«é€Ÿå½•å…¥è¡¨å•æ‰‹åŠ¨å¡«å†™ã€‚'}
+        return {'ok': False, 'message': '解析失败：' + '；'.join(warnings) + '。请改用下方快速录入表单手动填写。'}
 
     return {'ok': True, 'parsed': parsed, 'source': 'rule', 'warnings': warnings, 'original_text': text}
 
@@ -2655,9 +2655,9 @@ def nlp_parse():
 @app.route('/api/auto-track', methods=['GET', 'POST'])
 @csrf.exempt
 def api_auto_track():
-    # é‰´æƒæ£€æŸ¥ï¼šåªæŽ¥å— Header X-API-KEY æˆ– JSON/è¡¨å• body é‡Œçš„ keyï¼Œä¸å†æŽ¥å— URL å‚æ•° ?key=xxxã€‚
-    # URL å‚æ•°é‡Œçš„å¯†é’¥å¾ˆå®¹æ˜“è¢« server access logã€æµè§ˆå™¨åŽ†å²è®°å½•ã€åå‘ä»£ç†æ—¥å¿—ç•™ä¸‹ç—•è¿¹ï¼Œ
-    # ä¹‹å‰æ³„æ¼çš„é‚£æŠŠ key å°±æ˜¯ä»Žç±»ä¼¼çš„åœ°æ–¹å¤–æµçš„ï¼Œæ‰€ä»¥è¿™é‡Œåˆ»æ„ä¸ç•™è¿™ä¸ªå…¥å£ã€‚
+    # 鉴权检查：只接受 Header X-API-KEY 或 JSON/表单 body 里的 key，不再接受 URL 参数 ?key=xxx。
+    # URL 参数里的密钥很容易被 server access log、浏览器历史记录、反向代理日志留下痕迹，
+    # 之前泄漏的那把 key 就是从类似的地方外流的，所以这里刻意不留这个入口。
     req_key = request.headers.get('X-API-KEY')
     data = {}
     if request.is_json:
@@ -2671,13 +2671,13 @@ def api_auto_track():
 
     if not is_valid_api_key(req_key):
         print(f"[AUTO_TRACK] Rejected: Invalid API Key")
-        return jsonify({'ok': False, 'message': 'API Key æ— æ•ˆæˆ–æœªåœ¨æœåŠ¡å™¨é…ç½®ï¼Œæ‹’ç»è®¿é—®'}), 401
+        return jsonify({'ok': False, 'message': 'API Key 无效或未在服务器配置，拒绝访问'}), 401
 
-    # èŽ·å–é€šçŸ¥æ–‡æœ¬ï¼šä¼˜å…ˆä»Ž Query å‚æ•°èŽ·å–ï¼Œå†ä»Ž JSON / è¡¨å• / Raw Payload èŽ·å–
+    # 获取通知文本：优先从 Query 参数获取，再从 JSON / 表单 / Raw Payload 获取
     raw_payload = request.get_data(as_text=True)
     text = request.args.get('text') or ""
 
-    # 1. å°è¯•ä»Ž JSON æå–ï¼ˆå¦‚æžœ Query å‚æ•°æœªæä¾›ï¼‰
+    # 1. 尝试从 JSON 提取（如果 Query 参数未提供）
     if not text and request.is_json:
         try:
             data = request.get_json(silent=True) or {}
@@ -2686,13 +2686,13 @@ def api_auto_track():
         except Exception:
             pass
 
-    # 2. å°è¯•ä»Ž Form è¡¨å•æå–
+    # 2. 尝试从 Form 表单提取
     if not text:
         text = request.form.get('text') or request.form.get('body') or request.form.get('message') or ""
 
-    # 3. å°è¯•ä»Ž Raw Payload æå– (è¿‡æ»¤æ— æ„ä¹‰çš„ç©ºæˆ–æžçŸ­å­—ç¬¦)
+    # 3. 尝试从 Raw Payload 提取 (过滤无意义的空或极短字符)
     if not text and raw_payload and len(raw_payload.strip()) > 3:
-        # å¦‚æžœæ˜¯ JSON å­—ç¬¦ä¸²ä½†å«æ¢è¡Œå¯¼è‡´ get_json å¤±è´¥ï¼Œåšå®½å®¹æ­£åˆ™æå–
+        # 如果是 JSON 字符串但含换行导致 get_json 失败，做宽容正则提取
         if raw_payload.strip().startswith('{'):
             try:
                 import re
@@ -2705,7 +2705,7 @@ def api_auto_track():
             text = raw_payload
 
     text = (text or "").strip()
-    # å¦‚æžœ payload æ˜¯ç±»ä¼¼ text=... çš„ urlencoded å½¢å¼ï¼Œè‡ªåŠ¨è§£å‡º
+    # 如果 payload 是类似 text=... 的 urlencoded 形式，自动解出
     if text.startswith('text='):
         from urllib.parse import unquote
         text = unquote(text[5:]).strip()
@@ -2715,7 +2715,7 @@ def api_auto_track():
     if not text or text == "None" or text == "null":
         return jsonify({
             'ok': False,
-            'message': 'æœªæ”¶åˆ°æœ‰æ•ˆçš„é€šçŸ¥æ–‡æœ¬å†…å®¹ï¼ˆè‹¥ä¸ºæ‰‹åŠ¨æµ‹è¯•ï¼Œè¯·ç¡®ä¿å½“å‰é€šçŸ¥æ å­˜åœ¨çœŸå®žçš„æ‰£æ¬¾é€šçŸ¥ï¼‰'
+            'message': '未收到有效的通知文本内容（若为手动测试，请确保当前通知栏存在真实的扣款通知）'
         }), 400
 
     parsed = parse_auto_track_notification(text)
@@ -2728,7 +2728,7 @@ def api_auto_track():
         return jsonify({
             'ok': False,
             'verdict': 'rejected_promo',
-            'message': 'é€šçŸ¥è¢«è¯†åˆ«ä¸ºè¥é”€æŽ¨å¹¿æ´»åŠ¨æˆ–éžåŠ¨è´¦é€šçŸ¥ï¼Œå·²è‡ªåŠ¨å¿½ç•¥å…¥è´¦',
+            'message': '通知被识别为营销推广活动或非动账通知，已自动忽略入账',
             'reason': parsed.get('reason'),
             'raw_text': text
         }), 200
@@ -2738,11 +2738,11 @@ def api_auto_track():
             print("[AUTO_TRACK DEBUG] Failed to parse amount! Returning 422")
         return jsonify({
             'ok': False,
-            'message': 'æœªèƒ½ä»Žé€šçŸ¥ä¸­æå–å‡ºæœ‰æ•ˆé‡‘é¢æˆ–å•†æˆ·ä¿¡æ¯',
+            'message': '未能从通知中提取出有效金额或商户信息',
             'raw_text': text
         }), 422
 
-    # ä¼˜å…ˆæ£€æŸ¥æ˜¯å¦å­˜åœ¨å•†æˆ·åŽ†å²æ‰‹åŠ¨çº åè®°å½•ï¼ˆç²¾ç¡®åŒ¹é…æå–åˆ°çš„å•†æˆ·/å¤‡æ³¨åï¼Œä¼˜å…ˆçº§é«˜äºŽé»˜è®¤æŽ¨æ–­ä¸Ž LLM åˆ†ç±»ï¼‰
+    # 优先检查是否存在商户历史手动纠偏记录（精确匹配提取到的商户/备注名，优先级高于默认推断与 LLM 分类）
     merchant_note = (parsed.get('note') or '').strip()
     if merchant_note:
         db = get_db()
@@ -2755,7 +2755,7 @@ def api_auto_track():
             if AUTO_TRACK_DEBUG_LOG:
                 print(f"[AUTO_TRACK DEBUG] Applied remembered merchant override: '{merchant_note}' -> '{override['category']}'")
 
-    # Phase-2: LLM è¥é”€å¹¿å‘ŠäºŒæ¬¡æ ¡éªŒä¸Žè¦ç´ æ™ºèƒ½å¢žå¼ºï¼ˆFail-open ç­–ç•¥ï¼‰
+    # Phase-2: LLM 营销广告二次校验与要素智能增强（Fail-open 策略）
     is_real, llm_data = classify_notification_with_llm(text)
 
     if not is_real:
@@ -2764,31 +2764,31 @@ def api_auto_track():
         return jsonify({
             'ok': False,
             'verdict': 'rejected_promo',
-            'message': 'é€šçŸ¥è¢«è¯†åˆ«ä¸ºè¥é”€æŽ¨å¹¿æˆ–éžçœŸå®žäº¤æ˜“ï¼Œå·²å¿½ç•¥å…¥è´¦',
+            'message': '通知被识别为营销推广或非真实交易，已忽略入账',
             'parsed': parsed,
             'raw_text': text
         }), 200
 
-    # æ™ºèƒ½å¢žå¼ºï¼šå¦‚æžœ LLM æå–åˆ°äº†æ›´ç²¾å‡†çš„åˆ†ç±»ã€å•†æˆ·åç§°æˆ–è½¬è´¦è¿›è´¦æ–¹å‘
+    # 智能增强：如果 LLM 提取到了更精准的分类、商户名称或转账进账方向
     if llm_data and isinstance(llm_data, dict):
         label_type = llm_data.get('label_type')
         if label_type == 'income_transfer':
             parsed['type'] = 'income'
             if not parsed.get('group_name'):
-                parsed['group_name'] = 'main' if any(k in text.lower() for k in ['salary', 'payroll', 'å·¥èµ„', 'è–ªèµ„', 'è–ªæ°´']) else 'side'
+                parsed['group_name'] = 'main' if any(k in text.lower() for k in ['salary', 'payroll', '工资', '薪资', '薪水']) else 'side'
         elif label_type in ('expense', 'expense_transfer'):
             parsed['type'] = 'expense'
             parsed['group_name'] = None
 
-        if parsed.get('category') == 'å…¶ä»–' and llm_data.get('category') and llm_data['category'] != 'å…¶ä»–':
+        if parsed.get('category') == '其他' and llm_data.get('category') and llm_data['category'] != '其他':
             parsed['category'] = str(llm_data['category']).strip()
-        if parsed.get('note') in ('è‡ªåŠ¨è¿½è¸ªæ¶ˆè´¹', 'è‡ªåŠ¨è¿½è¸ªå…¥è´¦') and llm_data.get('merchant'):
+        if parsed.get('note') in ('自动追踪消费', '自动追踪入账') and llm_data.get('merchant'):
             parsed['note'] = str(llm_data['merchant']).strip()
 
-    # å…¥åº“å†™å…¥äº¤æ˜“è®°å½•
+    # 入库写入交易记录
     db = get_db()
     now = datetime.now().isoformat()
-    # ç¡®å®šå…¥è´¦å½’å±žç”¨æˆ·ï¼ˆæ”¯æŒå‚æ•°æŒ‡å®š user_id æˆ– usernameï¼Œä¿åº•ä½¿ç”¨ admin æˆ–é¦–ä½ç”¨æˆ·ï¼‰
+    # 确定入账归属用户（支持参数指定 user_id 或 username，保底使用 admin 或首位用户）
     target_user_id = data.get('user_id') or request.args.get('user_id')
     target_username = data.get('username') or request.args.get('username')
     if target_username and not target_user_id:
@@ -2830,10 +2830,10 @@ def api_auto_track():
         'user_id': target_user_id
     })
 
-    type_text = 'æ”¯å‡º' if parsed['type'] == 'expense' else 'æ”¶å…¥' if parsed['type'] == 'income' else 'å‚¨è“„'
+    type_text = '支出' if parsed['type'] == 'expense' else '收入' if parsed['type'] == 'income' else '储蓄'
     note_str = f" ({parsed['note']})" if parsed['note'] else ""
-    notification_title = "è‡ªåŠ¨è®°è´¦æˆåŠŸ ðŸ’¸"
-    notification_body = f"å·²è‡ªåŠ¨è®°å…¥ã€{type_text} Â· {parsed['category']}ã€‘{money_filter(parsed['amount'])}{note_str}"
+    notification_title = "自动记账成功 💸"
+    notification_body = f"已自动记入【{type_text} · {parsed['category']}】{money_filter(parsed['amount'])}{note_str}"
 
     budget_alert = None
     if parsed['type'] == 'expense':
@@ -2842,7 +2842,7 @@ def api_auto_track():
     return jsonify({
         'ok': True,
         'verdict': 'accepted',
-        'message': f"æˆåŠŸè‡ªåŠ¨è®°è´¦ï¼š{parsed['note']} {money_filter(parsed['amount'])} ({parsed['category']})",
+        'message': f"成功自动记账：{parsed['note']} {money_filter(parsed['amount'])} ({parsed['category']})",
         'transaction_id': cur.lastrowid,
         'parsed': parsed,
         'notification_title': notification_title,
@@ -2854,12 +2854,12 @@ def api_auto_track():
 @app.route('/api/categories', methods=['GET'])
 @csrf.exempt
 def api_get_categories():
-    """èŽ·å–æ‰€æœ‰å¯ç”¨åˆ†ç±»åˆ—è¡¨ï¼ˆä¸“ä¾› Android ç«¯ç¦»çº¿ç¼“å­˜ä¸Žä¸‹æ‹‰é€‰æ‹©ä½¿ç”¨ï¼‰ã€‚
-    åªè®¤ X-API-KEYï¼Œä¸æŽ¥å— session cookie ç™»å½•çŠ¶æ€ â€”â€” è¿™ä¸ªç«¯ç‚¹ä»Žæœªè¢«ç½‘é¡µç«¯è°ƒç”¨è¿‡ï¼Œ
-    ä¿ç•™ cookie å½“å¤‡ç”¨è®¤è¯æ–¹å¼åªä¼šå¹³ç™½è®©å®ƒæš´éœ²åœ¨ CSRF æ”»å‡»é¢ä¸‹ï¼Œæ²¡æœ‰å®žé™…ç”¨é€”ã€‚"""
+    """获取所有可用分类列表（专供 Android 端离线缓存与下拉选择使用）。
+    只认 X-API-KEY，不接受 session cookie 登录状态 —— 这个端点从未被网页端调用过，
+    保留 cookie 当备用认证方式只会平白让它暴露在 CSRF 攻击面下，没有实际用途。"""
     req_key = request.headers.get('X-API-KEY')
     if not is_valid_api_key(req_key):
-        return jsonify({'ok': False, 'message': 'API Key æ— æ•ˆ'}), 401
+        return jsonify({'ok': False, 'message': 'API Key 无效'}), 401
 
     user_id = get_current_user_id()
     db = get_db()
@@ -2871,11 +2871,11 @@ def api_get_categories():
 @app.route('/api/transactions/sync', methods=['POST'])
 @csrf.exempt
 def api_sync_transactions():
-    """æ‰¹é‡åŒæ­¥ç§»åŠ¨ç«¯ç¦»çº¿è®°è´¦æ•°æ®ã€‚åªè®¤ X-API-KEYï¼Œä¸æŽ¥å— session cookie â€”â€” è¿™ä¸ªç«¯ç‚¹
-    ä»Žæœªè¢«ç½‘é¡µç«¯è°ƒç”¨è¿‡ï¼Œä¿ç•™ cookie å¤‡ç”¨è®¤è¯åªä¼šå¹³ç™½è®©å†™å…¥æ“ä½œæš´éœ²åœ¨ CSRF æ”»å‡»é¢ä¸‹ã€‚"""
+    """批量同步移动端离线记账数据。只认 X-API-KEY，不接受 session cookie —— 这个端点
+    从未被网页端调用过，保留 cookie 备用认证只会平白让写入操作暴露在 CSRF 攻击面下。"""
     req_key = request.headers.get('X-API-KEY')
     if not is_valid_api_key(req_key):
-        return jsonify({'ok': False, 'message': 'API Key æ— æ•ˆ'}), 401
+        return jsonify({'ok': False, 'message': 'API Key 无效'}), 401
 
     payload = request.get_json(silent=True) or {}
     txs = payload.get('transactions', [])
@@ -2896,9 +2896,9 @@ def api_sync_transactions():
                     item.get('date') or date.today().isoformat(),
                     item.get('type') or 'expense',
                     item.get('group_name') or 'personal',
-                    item.get('category') or 'å…¶ä»–',
+                    item.get('category') or '其他',
                     float(item.get('amount') or 0.0),
-                    item.get('note') or 'ç¦»çº¿å½•å…¥',
+                    item.get('note') or '离线录入',
                     item.get('source') or 'offline_sync',
                     now
                 )
@@ -2915,14 +2915,14 @@ def api_sync_transactions():
 
 @app.route('/download/apk')
 def download_apk():
-    """ä¸‹è½½ 100% åŽŸç”Ÿä¸“å±ž Android ä¼´ä¾£ App å®‰è£…åŒ… (å… MacroDroid / é›¶ç¬¬ä¸‰æ–¹å·¥å…·)"""
+    """下载 100% 原生专属 Android 伴侣 App 安装包 (免 MacroDroid / 零第三方工具)"""
     download_dir = os.path.join(app.root_path, 'static', 'download')
-    return send_from_directory(download_dir, 'ledger-app.apk', as_attachment=True, download_name='æˆ‘çš„è´¦æœ¬.apk')
+    return send_from_directory(download_dir, 'ledger-app.apk', as_attachment=True, download_name='我的账本.apk')
 
 
 @app.route('/auto-track')
 def auto_track_page():
-    """Auto Track é…ç½®ä¸Žæµ‹è¯•é¡µé¢"""
+    """Auto Track 配置与测试页面"""
     scheme = request.headers.get('X-Forwarded-Proto', request.scheme)
     if 'onrender.com' in request.host:
         scheme = 'https'
@@ -2941,7 +2941,7 @@ def auto_track_page():
 
 
 # ---------------------------------------------------------------------------
-# LLM è¯­è¨€å­¦ä¹ æ ·æœ¬åº“ (Few-Shot Datasheet ç®¡ç†æŽ¥å£)
+# LLM 语言学习样本库 (Few-Shot Datasheet 管理接口)
 # ---------------------------------------------------------------------------
 
 @app.route('/api/llm-samples', methods=['GET'])
@@ -2954,12 +2954,12 @@ def api_llm_samples_list():
 @app.route('/api/llm-samples/add', methods=['POST'])
 def api_llm_samples_add():
     if not session.get('logged_in'):
-        return jsonify({'ok': False, 'message': 'è¯·å…ˆç™»å½•åŽå†æ·»åŠ æ ·æœ¬'}), 401
+        return jsonify({'ok': False, 'message': '请先登录后再添加样本'}), 401
     db = get_db()
     data = request.get_json(silent=True) or request.form
     text = (data.get('text') or '').strip()
     if not text:
-        return jsonify({'ok': False, 'message': 'æ ·æœ¬é€šçŸ¥æ–‡æœ¬ä¸èƒ½ä¸ºç©º'}), 400
+        return jsonify({'ok': False, 'message': '样本通知文本不能为空'}), 400
 
     label_type = (data.get('label_type') or 'expense').strip()
     is_real = 1 if data.get('is_real_transaction') in (True, 1, '1', 'true', 'True') else 0
@@ -2984,32 +2984,32 @@ def api_llm_samples_add():
     ''', (user_id, text, label_type, is_real, amount, merchant, category, notes, now))
     db.commit()
 
-    return jsonify({'ok': True, 'message': 'æˆåŠŸå½•å…¥å­¦ä¹ æ ·æœ¬åº“ï¼å¤§æ¨¡åž‹ä¸‹æ¬¡é‡åˆ°ç±»ä¼¼é€šçŸ¥å°†ç…§æ­¤å­¦ä¹ ã€‚'})
+    return jsonify({'ok': True, 'message': '成功录入学习样本库！大模型下次遇到类似通知将照此学习。'})
 
 
 @app.route('/api/llm-samples/delete/<int:sample_id>', methods=['POST'])
 def api_llm_samples_delete(sample_id):
     if not session.get('logged_in'):
-        return jsonify({'ok': False, 'message': 'è¯·å…ˆç™»å½•'}), 401
+        return jsonify({'ok': False, 'message': '请先登录'}), 401
     db = get_db()
     db.execute("DELETE FROM llm_learning_samples WHERE id = ?", (sample_id,))
     db.commit()
-    return jsonify({'ok': True, 'message': 'æ ·æœ¬å·²æˆåŠŸåˆ é™¤'})
+    return jsonify({'ok': True, 'message': '样本已成功删除'})
 
 
 @app.route('/api/llm-samples/reset', methods=['POST'])
 def api_llm_samples_reset():
     if not session.get('logged_in'):
-        return jsonify({'ok': False, 'message': 'è¯·å…ˆç™»å½•'}), 401
+        return jsonify({'ok': False, 'message': '请先登录'}), 401
     db = get_db()
     db.execute("DELETE FROM llm_learning_samples")
     db.commit()
     seed_learning_samples(db)
-    return jsonify({'ok': True, 'message': 'å·²æˆåŠŸå°†å­¦ä¹ æ ·æœ¬åº“æ¢å¤ä¸ºå®˜æ–¹é¢„è®¾è¯­æ–™åº“ï¼'})
+    return jsonify({'ok': True, 'message': '已成功将学习样本库恢复为官方预设语料库！'})
 
 
 # ---------------------------------------------------------------------------
-# åˆ†ç±»ç®¡ç†
+# 分类管理
 # ---------------------------------------------------------------------------
 
 @app.route('/categories')
@@ -3040,19 +3040,19 @@ def add_category():
     name = (f.get('name') or '').strip()
     if not name:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': 'åˆ†ç±»åç§°ä¸èƒ½ä¸ºç©º'}), 400
-        flash('åˆ†ç±»åç§°ä¸èƒ½ä¸ºç©º', 'error')
+            return jsonify({'ok': False, 'message': '分类名称不能为空'}), 400
+        flash('分类名称不能为空', 'error')
         return redirect(url_for('categories_page'))
     try:
         db.execute('INSERT INTO categories (user_id, type, group_name, name) VALUES (?,?,?,?)', (user_id, type_, group_name, name))
         db.commit()
         if is_ajax_request():
-            return jsonify({'ok': True, 'message': 'åˆ†ç±»å·²æ·»åŠ '})
-        flash('åˆ†ç±»å·²æ·»åŠ ', 'success')
+            return jsonify({'ok': True, 'message': '分类已添加'})
+        flash('分类已添加', 'success')
     except sqlite3.IntegrityError:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': 'è¯¥åˆ†ç±»å·²å­˜åœ¨'}), 400
-        flash('è¯¥åˆ†ç±»å·²å­˜åœ¨', 'error')
+            return jsonify({'ok': False, 'message': '该分类已存在'}), 400
+        flash('该分类已存在', 'error')
     return redirect(url_for('categories_page'))
 
 
@@ -3066,21 +3066,21 @@ def delete_category(cat_id):
         db.execute('DELETE FROM category_budgets WHERE user_id = ? AND category = ?', (user_id, cat['name']))
     db.commit()
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': 'åˆ†ç±»å·²åˆ é™¤ï¼ˆåŽ†å²è®°å½•ä¸­çš„æ—§æ•°æ®ä¸å—å½±å“ï¼‰', 'id': cat_id})
-    flash('åˆ†ç±»å·²åˆ é™¤ï¼ˆåŽ†å²è®°å½•ä¸­çš„æ—§æ•°æ®ä¸å—å½±å“ï¼‰', 'success')
+        return jsonify({'ok': True, 'message': '分类已删除（历史记录中的旧数据不受影响）', 'id': cat_id})
+    flash('分类已删除（历史记录中的旧数据不受影响）', 'success')
     return redirect(url_for('categories_page'))
 
 
 @app.route('/categories/<int:cat_id>/budget', methods=['POST'])
 def set_category_budget(cat_id):
-    """è®¾ç½®æˆ–å–æ¶ˆæŸä¸ªæ”¯å‡ºåˆ†ç±»çš„æœˆåº¦é¢„ç®—ä¸Šé™"""
+    """设置或取消某个支出分类的月度预算上限"""
     user_id = get_current_user_id()
     db = get_db()
     cat = db.execute("SELECT name FROM categories WHERE id = ? AND user_id = ? AND type = 'expense'", (cat_id, user_id)).fetchone()
     if not cat:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': 'åˆ†ç±»ä¸å­˜åœ¨'}), 404
-        flash('åˆ†ç±»ä¸å­˜åœ¨', 'error')
+            return jsonify({'ok': False, 'message': '分类不存在'}), 404
+        flash('分类不存在', 'error')
         return redirect(url_for('categories_page'))
 
     raw_limit = (request.form.get('monthly_limit') or '').strip()
@@ -3090,7 +3090,7 @@ def set_category_budget(cat_id):
         db.execute('DELETE FROM category_budgets WHERE user_id = ? AND category = ?', (user_id, cat['name']))
         db.commit()
         bump_data_version('budget', {'category': cat['name'], 'user_id': user_id})
-        msg = f'å·²å–æ¶ˆã€Œ{cat["name"]}ã€çš„æœˆåº¦é¢„ç®—'
+        msg = f'已取消「{cat["name"]}」的月度预算'
     else:
         try:
             limit = float(raw_limit)
@@ -3098,8 +3098,8 @@ def set_category_budget(cat_id):
             limit = -1
         if limit <= 0:
             if is_ajax_request():
-                return jsonify({'ok': False, 'message': 'é¢„ç®—é‡‘é¢å¿…é¡»æ˜¯å¤§äºŽ 0 çš„æ•°å­—'}), 400
-            flash('é¢„ç®—é‡‘é¢å¿…é¡»æ˜¯å¤§äºŽ 0 çš„æ•°å­—', 'error')
+                return jsonify({'ok': False, 'message': '预算金额必须是大于 0 的数字'}), 400
+            flash('预算金额必须是大于 0 的数字', 'error')
             return redirect(url_for('categories_page'))
 
         existing = db.execute('SELECT id FROM category_budgets WHERE user_id = ? AND category = ?', (user_id, cat['name'])).fetchone()
@@ -3112,7 +3112,7 @@ def set_category_budget(cat_id):
             )
         db.commit()
         bump_data_version('budget', {'category': cat['name'], 'limit': limit, 'user_id': user_id})
-        msg = f'å·²è®¾ç½®ã€Œ{cat["name"]}ã€çš„æœˆåº¦é¢„ç®—ä¸º RM{limit:.2f}'
+        msg = f'已设置「{cat["name"]}」的月度预算为 RM{limit:.2f}'
 
     if is_ajax_request():
         return jsonify({'ok': True, 'message': msg})
@@ -3121,7 +3121,7 @@ def set_category_budget(cat_id):
 
 
 # ---------------------------------------------------------------------------
-# å›ºå®š / é‡å¤æ”¶æ”¯
+# 固定 / 重复收支
 # ---------------------------------------------------------------------------
 
 @app.route('/recurring')
@@ -3165,8 +3165,8 @@ def add_recurring():
 
     if amount <= 0:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': 'é‡‘é¢å¿…é¡»æ˜¯å¤§äºŽ 0 çš„æ•°å­—'}), 400
-        flash('é‡‘é¢å¿…é¡»æ˜¯å¤§äºŽ 0 çš„æ•°å­—', 'error')
+            return jsonify({'ok': False, 'message': '金额必须是大于 0 的数字'}), 400
+        flash('金额必须是大于 0 的数字', 'error')
         return redirect(url_for('recurring_page'))
 
     db.execute(
@@ -3178,8 +3178,8 @@ def add_recurring():
     db.commit()
     bump_data_version('recurring_add', {'type': tx_type, 'amount': amount, 'day_of_month': day, 'category': f.get('category'), 'user_id': user_id})
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': 'å›ºå®šæ”¶æ”¯è§„åˆ™å·²æ·»åŠ '})
-    flash('å›ºå®šæ”¶æ”¯è§„åˆ™å·²æ·»åŠ ', 'success')
+        return jsonify({'ok': True, 'message': '固定收支规则已添加'})
+    flash('固定收支规则已添加', 'success')
     return redirect(url_for('recurring_page'))
 
 
@@ -3191,8 +3191,8 @@ def delete_recurring(rule_id):
     db.commit()
     bump_data_version('recurring_delete', {'id': rule_id, 'user_id': user_id})
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': 'è§„åˆ™å·²åˆ é™¤', 'id': rule_id})
-    flash('è§„åˆ™å·²åˆ é™¤', 'success')
+        return jsonify({'ok': True, 'message': '规则已删除', 'id': rule_id})
+    flash('规则已删除', 'success')
     return redirect(url_for('recurring_page'))
 
 
@@ -3206,13 +3206,13 @@ def toggle_recurring(rule_id):
         db.execute('UPDATE recurring_rules SET is_active = ? WHERE id = ? AND user_id = ?', (new_active, rule_id, user_id))
         db.commit()
         bump_data_version('recurring_toggle', {'id': rule_id, 'user_id': user_id})
-        msg = 'è§„åˆ™å·²åœç”¨' if row['is_active'] else 'è§„åˆ™å·²å¯ç”¨'
+        msg = '规则已停用' if row['is_active'] else '规则已启用'
         if is_ajax_request():
             return jsonify({'ok': True, 'message': msg, 'id': rule_id, 'is_active': new_active})
         flash(msg, 'success')
     else:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': 'æœªæ‰¾åˆ°å¯¹åº”è§„åˆ™'}), 404
+            return jsonify({'ok': False, 'message': '未找到对应规则'}), 404
     return redirect(url_for('recurring_page'))
 
 
@@ -3222,9 +3222,9 @@ def manual_generate_recurring():
     count = generate_due_recurring(user_id)
     if count:
         bump_data_version('recurring_generate', {'count': count, 'user_id': user_id})
-        msg = f'å·²ç”Ÿæˆ {count} æ¡æœ¬æœˆå›ºå®šæ”¶æ”¯è®°å½•'
+        msg = f'已生成 {count} 条本月固定收支记录'
     else:
-        msg = 'æœ¬æœˆå›ºå®šæ”¶æ”¯å·²å…¨éƒ¨ç”Ÿæˆï¼Œæ— éœ€é‡å¤ç”Ÿæˆ'
+        msg = '本月固定收支已全部生成，无需重复生成'
     if is_ajax_request():
         return jsonify({'ok': True, 'message': msg, 'count': count})
     flash(msg, 'success')
@@ -3232,7 +3232,7 @@ def manual_generate_recurring():
 
 
 # ---------------------------------------------------------------------------
-# æ‰¹é‡å¯¼å…¥ (CSV / Excel)
+# 批量导入 (CSV / Excel)
 # ---------------------------------------------------------------------------
 
 def read_import_file(path):
@@ -3250,12 +3250,12 @@ def import_page():
 def import_upload():
     file = request.files.get('file')
     if not file or file.filename == '':
-        flash('è¯·é€‰æ‹©è¦å¯¼å…¥çš„æ–‡ä»¶', 'error')
+        flash('请选择要导入的文件', 'error')
         return redirect(url_for('import_page'))
 
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ('.csv', '.xlsx', '.xls'):
-        flash('ä»…æ”¯æŒ .csv / .xlsx / .xls æ–‡ä»¶', 'error')
+        flash('仅支持 .csv / .xlsx / .xls 文件', 'error')
         return redirect(url_for('import_page'))
 
     token = uuid.uuid4().hex
@@ -3266,12 +3266,12 @@ def import_upload():
         df = read_import_file(saved_path)
     except Exception as e:
         os.remove(saved_path)
-        flash(f'æ–‡ä»¶è¯»å–å¤±è´¥ï¼š{e}', 'error')
+        flash(f'文件读取失败：{e}', 'error')
         return redirect(url_for('import_page'))
 
     if df.empty:
         os.remove(saved_path)
-        flash('æ–‡ä»¶ä¸­æ²¡æœ‰æ•°æ®', 'error')
+        flash('文件中没有数据', 'error')
         return redirect(url_for('import_page'))
 
     columns = df.columns.tolist()
@@ -3297,13 +3297,13 @@ def import_confirm():
     saved_path = os.path.join(UPLOAD_DIR, token + ext) if token and ext else None
 
     if not saved_path or not os.path.exists(saved_path):
-        flash('å¯¼å…¥ä¼šè¯å·²è¿‡æœŸï¼Œè¯·é‡æ–°ä¸Šä¼ æ–‡ä»¶', 'error')
+        flash('导入会话已过期，请重新上传文件', 'error')
         return redirect(url_for('import_page'))
 
     try:
         df = read_import_file(saved_path)
     except Exception as e:
-        flash(f'æ–‡ä»¶è¯»å–å¤±è´¥ï¼š{e}', 'error')
+        flash(f'文件读取失败：{e}', 'error')
         return redirect(url_for('import_page'))
 
     date_col = f.get('date_col')
@@ -3312,7 +3312,7 @@ def import_confirm():
     type_col = f.get('type_col')
     category_col = f.get('category_col')
     note_col = f.get('note_col')
-    default_category = (f.get('default_category') or 'æœªåˆ†ç±»').strip()
+    default_category = (f.get('default_category') or '未分类').strip()
     default_group = f.get('default_group') or 'main'
     date_format = f.get('date_format') or None
 
@@ -3342,7 +3342,7 @@ def import_confirm():
                 tx_type = 'income'
             elif type_mode == 'column' and type_col:
                 raw_type = str(row[type_col]).strip()
-                tx_type = 'income' if ('æ”¶å…¥' in raw_type or raw_type.lower() == 'income') else 'expense'
+                tx_type = 'income' if ('收入' in raw_type or raw_type.lower() == 'income') else 'expense'
             else:  # sign
                 tx_type = 'income' if amount >= 0 else 'expense'
 
@@ -3379,42 +3379,42 @@ def import_confirm():
         if alert:
             flash(alert['message'], 'warning' if alert['threshold'] < 100 else 'error')
 
-    flash(f'å¯¼å…¥å®Œæˆï¼šæˆåŠŸ {inserted} æ¡ï¼Œè·³è¿‡ {skipped} æ¡', 'success')
+    flash(f'导入完成：成功 {inserted} 条，跳过 {skipped} 条', 'success')
     return redirect(url_for('records'))
 
 
 # ---------------------------------------------------------------------------
-# å°ç¥¨è¯†åˆ«ä¸Žæ™ºèƒ½ AA åˆ†è´¦ (Split Bill)
+# 小票识别与智能 AA 分账 (Split Bill)
 # ---------------------------------------------------------------------------
 
 def parse_receipt_text_to_items(raw_text):
     """
-    å…¨çƒé€šç”¨å°ç¥¨è§£æžå¼•æ“Ž (Global Universal Receipt Engine)
-    æ”¯æŒç¾Žæ¬§ã€ä¸­æ—¥éŸ©ã€ä¸œå—äºšç­‰å¤šå›½è´§å¸ç¬¦å·ã€å›½é™…æ•°å­—æ ¼å¼ã€å¤šè¯­ç§ç¨Žåˆ¶ä¸Žå°è´¹/æœåŠ¡è´¹ç»“æž„ã€‚
+    全球通用小票解析引擎 (Global Universal Receipt Engine)
+    支持美欧、中日韩、东南亚等多国货币符号、国际数字格式、多语种税制与小费/服务费结构。
     """
     if not raw_text:
         return {'items': [], 'subtotal': 0.0, 'service_charge': 0.0, 'tax': 0.0, 'discount': 0.0, 'rounding': 0.0, 'total': 0.0, 'currency_symbol': 'RM'}
 
-    # 1. è´§å¸ç¬¦å·è‡ªé€‚åº”æŽ¢æµ‹
+    # 1. 货币符号自适应探测
     currency_symbol = 'RM'
     if re.search(r'\b(?:RM|MYR)\b', raw_text, re.IGNORECASE):
         currency_symbol = 'RM'
     elif re.search(r'(?:S\$|\bSGD\b|GST\s*REG)', raw_text, re.IGNORECASE):
         currency_symbol = 'S$'
-    elif re.search(r'(?:â‚¬|\bEUR\b|TTC|TVA|HT\b)', raw_text):
-        currency_symbol = 'â‚¬'
-    elif re.search(r'(?:Â£|\bGBP\b)', raw_text):
-        currency_symbol = 'Â£'
-    elif re.search(r'(?:Â¥|å††|\bJPY\b|ãŠä¼šè¨ˆ|æ¶ˆè²»ç¨Ž)', raw_text):
-        currency_symbol = 'Â¥'
-    elif re.search(r'(?:â‚©|ì›|\bKRW\b|ê²°ì œ|ë¶€ê°€ì„¸)', raw_text):
-        currency_symbol = 'â‚©'
-    elif re.search(r'(?:à¸¿|\bTHB\b)', raw_text):
-        currency_symbol = 'à¸¿'
+    elif re.search(r'(?:€|\bEUR\b|TTC|TVA|HT\b)', raw_text):
+        currency_symbol = '€'
+    elif re.search(r'(?:£|\bGBP\b)', raw_text):
+        currency_symbol = '£'
+    elif re.search(r'(?:¥|円|\bJPY\b|お会計|消費税)', raw_text):
+        currency_symbol = '¥'
+    elif re.search(r'(?:₩|원|\bKRW\b|결제|부가세)', raw_text):
+        currency_symbol = '₩'
+    elif re.search(r'(?:฿|\bTHB\b)', raw_text):
+        currency_symbol = '฿'
     elif re.search(r'(?:Rp|\bIDR\b)', raw_text):
         currency_symbol = 'Rp'
-    elif re.search(r'(?:â‚«|\bVND\b)', raw_text):
-        currency_symbol = 'â‚«'
+    elif re.search(r'(?:₫|\bVND\b)', raw_text):
+        currency_symbol = '₫'
     elif re.search(r'(?:NT\$|\bTWD\b)', raw_text):
         currency_symbol = 'NT$'
     elif re.search(r'(?:HK\$|\bHKD\b)', raw_text):
@@ -3422,7 +3422,7 @@ def parse_receipt_text_to_items(raw_text):
     elif re.search(r'\$', raw_text):
         currency_symbol = '$'
     elif re.search(r'[\u4e00-\u9fa5]', raw_text):
-        currency_symbol = 'Â¥' if ('Â¥' in raw_text or 'å…ƒ' in raw_text or 'å¾®ä¿¡' in raw_text or 'æ”¯ä»˜å®' in raw_text) else 'RM'
+        currency_symbol = '¥' if ('¥' in raw_text or '元' in raw_text or '微信' in raw_text or '支付宝' in raw_text) else 'RM'
 
     lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
 
@@ -3436,53 +3436,53 @@ def parse_receipt_text_to_items(raw_text):
     rounding = 0.0
     total = 0.0
 
-    # å¸¸è§æ”¯ä»˜ä¸Žç»“ç®—æ–¹å¼ï¼ˆå¿…é¡»æŽ’é™¤ï¼Œä¸èƒ½å½“ä½œæ¶ˆè´¹èœå“ï¼‰
+    # 常见支付与结算方式（必须排除，不能当作消费菜品）
     exclude_payment_patterns = [
         r'\b(?:cash|change|change\s*due|tendered|due)\b',
         r'\b(?:card|cards|visa|mastercard|amex|mydebit|debit|credit|nets|eftpos)\b',
-        r'\b(?:tng|touch\s*[\'â€™]?n\s*go|grabpay|boost|alipay|wechat|duit\s*now|duitnow|paypay|line\s*pay|kakaopay|promptpay)\b',
-        r'\b(?:carte\s*bancaire|rendu|barzahlung|kartenzahlung|r[uÃ¼]ckgeld|efectivo|cambio|contanti|resto)\b',
-        r'(?:çŽ°é‡‘|æ‰¾é›¶|å®žæ”¶|æ‰¾å›ž|å¾®ä¿¡æ”¯ä»˜|æ”¯ä»˜å®|æ‰«ç æ”¯ä»˜|åˆ·å¡|ãŠé‡£ã‚Š|é ã‚Š|ã‚¯ãƒ¬ã‚¸ãƒƒãƒˆ|é›»å­ãƒžãƒãƒ¼|æ±ºæ¸ˆ|í˜„ê¸ˆ|ê±°ìŠ¤ë¦„ëˆ|ì‹ ìš©ì¹´ë“œ|tunai|baki|kembalian)'
+        r'\b(?:tng|touch\s*[\'’]?n\s*go|grabpay|boost|alipay|wechat|duit\s*now|duitnow|paypay|line\s*pay|kakaopay|promptpay)\b',
+        r'\b(?:carte\s*bancaire|rendu|barzahlung|kartenzahlung|r[uü]ckgeld|efectivo|cambio|contanti|resto)\b',
+        r'(?:现金|找零|实收|找回|微信支付|支付宝|扫码支付|刷卡|お釣り|預り|クレジット|電子マネー|決済|현금|거스름돈|신용카드|tunai|baki|kembalian)'
     ]
 
-    # ç¥¨å¤´ã€åœ°å€ã€é‚®ç¼–ã€æµæ°´å·ã€æ¡Œå·ã€é—®å€™è¯­ç­‰éžå•†å“è¡Œ
+    # 票头、地址、邮编、流水号、桌号、问候语等非商品行
     exclude_header_noise = [
         r'\b(?:invoice|receipt|bill\s*no|table|date|time|tel|phone|drawer|reg|cashier|server|chk|check\s*closed)\b',
         r'\b(?:terminal|merchant|auth|approval|ref|pax|order|order\s*#|siret|gst\s*reg|gst\s*no|co\s*no)\b',
         r'\b(?:items?\s*count|item\s*count|total\s*qty|qty\s*total|qty\s*item|price\s*\(myr\))\b',
         r'\b(?:thank\s*you|please\s*come|merci|danke|terima\s*kasih|arigato|grazia)\b',
-        r'(?:å•å·|å°å·|å®¢æ•°|æ”¶é“¶å‘˜|æ—¶é—´|å“å|æ•°é‡|é‡‘é¢|è°¢è°¢æƒ é¡¾|æ¬¢è¿Žå†æ¬¡å…‰ä¸´|æ¯Žåº¦ã‚ã‚ŠãŒã¨ã†ã”ã–ã„ã¾ã™|ã¾ãŸã®ãŠè¶Šã—ã‚’|ê°ì‚¬í•©ë‹ˆë‹¤|ãƒ†ãƒ¼ãƒ–ãƒ«|äººæ•°|ãƒ¬ã‚¸|ãƒ¬ã‚·ãƒ¼ãƒˆ)',
+        r'(?:单号|台号|客数|收银员|时间|品名|数量|金额|谢谢惠顾|欢迎再次光临|毎度ありがとうございます|またのお越しを|감사합니다|テーブル|人数|レジ|レシート)',
         r'^[x*\-_=+#\s\d|.:/]+$',
         r'\b[x*]{4,}\b'
     ]
 
-    # åœ°å€ä¸Žé‚®ç¼–ç‰¹å¾ (é˜²æ­¢å°† New York NY 10010 æˆ– Singapore 329801 è¯¯è®¤ä¸ºå•†å“)
+    # 地址与邮编特征 (防止将 New York NY 10010 或 Singapore 329801 误认为商品)
     address_keywords = [
         'road', 'street', 'avenue', 'boulevard', 'jalan', 'lorong', 'lane', 'park', 'block',
         'blvd', 'ave', 'st.', 'rd.', 'singapore', 'new york', 'penang', 'paris', 'tokyo',
-        'åŒº', 'è·¯', 'è¡—', 'å·', 'å··', 'é“', 'å¸‚', 'çœ'
+        '区', '路', '街', '号', '巷', '道', '市', '省'
     ]
 
     def normalize_numbers(raw_str):
         s = raw_str
-        # æ¬§æ´²é€—å·å°æ•°ï¼š6,40 â‚¬ æˆ– 23,55 -> 6.40, 23.55
-        s = re.sub(r'(\d+),(\d{2})(?:\s*(?:â‚¬|EUR|\b))', r'\1.\2', s)
-        # å¸¸è§åƒåˆ†ä½ï¼š1,480 æˆ– 1,480.00 -> 1480 æˆ– 1480.00
+        # 欧洲逗号小数：6,40 € 或 23,55 -> 6.40, 23.55
+        s = re.sub(r'(\d+),(\d{2})(?:\s*(?:€|EUR|\b))', r'\1.\2', s)
+        # 常见千分位：1,480 或 1,480.00 -> 1480 或 1480.00
         s = re.sub(r'(\d+),(\d{3})\b', r'\1\2', s)
-        # å¼‚å¸¸ç©ºæ ¼å°æ•°ï¼š4 .95 -> 4.95
+        # 异常空格小数：4 .95 -> 4.95
         s = re.sub(r'(\d+)\s*\.\s*(\d+)', r'\1.\2', s)
-        # ä¿®æ­£çƒ­æ•çº¸è¯¯è¯†åˆ« Â¥ å­—æ¯ (å¦‚ Â¥t -> Vt)
-        s = re.sub(r'Â¥([A-Za-z])', r'V\1', s)
+        # 修正热敏纸误识别 ¥ 字母 (如 ¥t -> Vt)
+        s = re.sub(r'¥([A-Za-z])', r'V\1', s)
         return s
 
     for line in lines:
         clean_line = normalize_numbers(line)
         lower = clean_line.lower()
 
-        # 1. åŒ¹é…å°è´¹ä¸ŽæœåŠ¡è´¹ (Tip, Gratuity, Service Charge, Svc Chg, SC, æœåŠ¡è´¹, å¸­æ–™)
+        # 1. 匹配小费与服务费 (Tip, Gratuity, Service Charge, Svc Chg, SC, 服务费, 席料)
         is_sc_line = (any((re.search(r'\b' + re.escape(k) + r'\b', lower) is not None) if len(k) <= 3 else (k in lower) for k in ['tip', 'gratuity', 'pourboire', 'trinkgeld', 'service charge', 'svc charge', 'svc chg', 'service fee', 'sc']) or
-                      any(k in clean_line for k in ['æœåŠ¡è´¹', 'æœå‹™è²»', 'ãŠé€šã—', 'å¸­æ–™', 'ë´‰ì‚¬ë£Œ']))
-        if is_sc_line and not any(k in clean_line for k in ['èŒ¶ä½', 'è°ƒæ–™']):
+                      any(k in clean_line for k in ['服务费', '服務費', 'お通し', '席料', '봉사료']))
+        if is_sc_line and not any(k in clean_line for k in ['茶位', '调料']):
             m_pct = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*%', clean_line)
             if m_pct:
                 service_rate = float(m_pct.group(1))
@@ -3491,9 +3491,9 @@ def parse_receipt_text_to_items(raw_text):
                 service_charge = float(amounts[-1])
             continue
 
-        # 2. åŒ¹é…æ”¿åºœç¨Ž / å¢žå€¼ç¨Ž / VAT / GST / SST / TVA / MwSt / IVA / æ¶ˆè´¹ç¨Ž / ë¶€ê°€ì„¸
-        if any(k in lower for k in ['sst', 'gst', 'service tax', 'gov tax', 'sales tax', 'vat', 'tva', 'mwst', 'ust', 'iva', 'tax']) or any(k in clean_line for k in ['æ¶ˆè´¹ç¨Ž', 'æ¶ˆè²»ç¨Ž', 'å¢žå€¼ç¨Ž', 'ç¨Žè´¹', 'ç¨Žé¢', 'å†…ç¨Ž', 'å¤–ç¨Ž', 'ë¶€ê°€ì„¸']):
-            if 'total' not in lower and 'subtotal' not in lower and 'åˆè®¡' not in clean_line and 'å°è®¡' not in clean_line and 'å°è¨ˆ' not in clean_line:
+        # 2. 匹配政府税 / 增值税 / VAT / GST / SST / TVA / MwSt / IVA / 消费税 / 부가세
+        if any(k in lower for k in ['sst', 'gst', 'service tax', 'gov tax', 'sales tax', 'vat', 'tva', 'mwst', 'ust', 'iva', 'tax']) or any(k in clean_line for k in ['消费税', '消費税', '增值税', '税费', '税额', '内税', '外税', '부가세']):
+            if 'total' not in lower and 'subtotal' not in lower and '合计' not in clean_line and '小计' not in clean_line and '小計' not in clean_line:
                 m_pct = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*%', clean_line)
                 if m_pct:
                     tax_rate = float(m_pct.group(1))
@@ -3502,84 +3502,84 @@ def parse_receipt_text_to_items(raw_text):
                     tax = float(amounts[-1])
                 continue
 
-        # 3. åŒ¹é…æŠ¹é›¶ä¸Žèˆå…¥ (Rounding, Bill Rounding, Rnd, æŠ¹é›¶)
-        if any(k in lower for k in ['rounding', 'bill rounding', 'round adj', 'rnd']) or 'æŠ¹é›¶' in clean_line or 'èˆå…¥' in clean_line:
+        # 3. 匹配抹零与舍入 (Rounding, Bill Rounding, Rnd, 抹零)
+        if any(k in lower for k in ['rounding', 'bill rounding', 'round adj', 'rnd']) or '抹零' in clean_line or '舍入' in clean_line:
             m_rnd = re.search(r'([-+]?\s*[0-9]+(?:\.[0-9]{1,2})?)\b', clean_line)
             if m_rnd:
                 rnd_val = float(m_rnd.group(1).replace(' ', ''))
-                # æŠ¹é›¶é‡‘é¢æœ¬è´¨ä¸Šåªä¼šæ˜¯å¾ˆå°çš„è°ƒæ•´ï¼ˆé€šå¸¸åœ¨ -1 åˆ° +1 ä¹‹é—´ï¼‰ï¼Œå¦‚æžœ OCR æŠŠè¿™è¡Œ
-                # è®¤é”™æˆä¸€ä¸ªç¦»è°±çš„å¤§æ•°å­—ï¼ˆæ¯”å¦‚æŠŠ "0.00" è®¤æˆ "8"ï¼‰ï¼Œä¸Žå…¶ç…§å•å…¨æ”¶ä¸€ä¸ªæ˜Žæ˜¾ä¸
-                # åˆç†çš„æŠ¹é›¶é‡‘é¢ï¼Œä¸å¦‚ç›´æŽ¥å½“ä½œæ²¡è®¤å‡ºæ¥ï¼Œç»´æŒé»˜è®¤çš„ 0.00ã€‚
+                # 抹零金额本质上只会是很小的调整（通常在 -1 到 +1 之间），如果 OCR 把这行
+                # 认错成一个离谱的大数字（比如把 "0.00" 认成 "8"），与其照单全收一个明显不
+                # 合理的抹零金额，不如直接当作没认出来，维持默认的 0.00。
                 if abs(rnd_val) <= 1.0:
                     rounding = rnd_val
             continue
 
-        # 4. åŒ¹é…ä¼˜æƒ ä¸ŽæŠ˜æ‰£ (Discount, Promo, Voucher, Rebate, ä¼˜æƒ , æŠ˜æ‰£, æ»¡å‡, å‰²å¼•, í• ì¸)
-        if any(k in lower for k in ['discount', 'promo', 'voucher', 'rebate', 'remise', 'rabatt', 'descuento']) or any(k in clean_line for k in ['ä¼˜æƒ ', 'æŠ˜æ‰£', 'æ»¡å‡', 'æŠµæ‰£', 'å‰²å¼•', 'å€¤å¼•', 'í• ì¸']):
+        # 4. 匹配优惠与折扣 (Discount, Promo, Voucher, Rebate, 优惠, 折扣, 满减, 割引, 할인)
+        if any(k in lower for k in ['discount', 'promo', 'voucher', 'rebate', 'remise', 'rabatt', 'descuento']) or any(k in clean_line for k in ['优惠', '折扣', '满减', '抵扣', '割引', '値引', '할인']):
             amounts = re.findall(r'([0-9]+(?:\.[0-9]{1,2})?)\b', clean_line)
             if amounts:
                 discount = float(amounts[-1])
             continue
 
-        # 5. åŒ¹é…å°è®¡ Subtotal / Total HT / Zwischensumme / å°è®¡ / å°è¨ˆ / æ¶ˆè´¹å°è®¡
-        if any(k in lower for k in ['subtotal', 'sub-total', 'total ht', 'zwischensumme', 'sous-total', 'net amount']) or any(k in clean_line for k in ['å°è®¡', 'å°è¨ˆ', 'æ¶ˆè´¹å°è®¡', 'å° è¨ˆ']):
+        # 5. 匹配小计 Subtotal / Total HT / Zwischensumme / 小计 / 小計 / 消费小计
+        if any(k in lower for k in ['subtotal', 'sub-total', 'total ht', 'zwischensumme', 'sous-total', 'net amount']) or any(k in clean_line for k in ['小计', '小計', '消费小计', '小 計']):
             amounts = re.findall(r'([0-9]+(?:\.[0-9]{1,2})?)\b', clean_line)
             if amounts:
                 subtotal = float(amounts[-1])
             continue
 
-        # 6. åŒ¹é…æ€»é‡‘é¢ Total / Grand Total / Total TTC / Gesamtbetrag / åˆè®¡ / æ€»è®¡ / å®žä»˜ / ãŠä¼šè¨ˆ / åˆè¨ˆé‡‘é¡ / ê²°ì œê¸ˆì•¡ / Jumlah
-        if any(k in lower for k in ['grand total', 'net total', 'total amount', 'amount due', 'total payable', 'amount payable', 'total ttc', 'gesamtbetrag', 'endbetrag', 'importe total', 'totale', 'total', 'jumlah']) or any(k in clean_line for k in ['åˆè®¡', 'æ€»è®¡', 'å®žä»˜', 'å®žæ”¶', 'åº”æ”¶', 'ç»“ç®—', 'ãŠä¼šè¨ˆ', 'åˆè¨ˆé‡‘é¡', 'åˆè¨ˆ', 'í•©ê³„', 'ê²°ì œê¸ˆì•¡', 'ì´ê¸ˆì•¡']):
-            if 'total ht' not in lower and 'subtotal' not in lower and 'æ¶ˆè´¹å°è®¡' not in clean_line:
+        # 6. 匹配总金额 Total / Grand Total / Total TTC / Gesamtbetrag / 合计 / 总计 / 实付 / お会計 / 合計金額 / 결제금액 / Jumlah
+        if any(k in lower for k in ['grand total', 'net total', 'total amount', 'amount due', 'total payable', 'amount payable', 'total ttc', 'gesamtbetrag', 'endbetrag', 'importe total', 'totale', 'total', 'jumlah']) or any(k in clean_line for k in ['合计', '总计', '实付', '实收', '应收', '结算', 'お会計', '合計金額', '合計', '합계', '결제금액', '총금액']):
+            if 'total ht' not in lower and 'subtotal' not in lower and '消费小计' not in clean_line:
                 amounts = re.findall(r'([0-9]+(?:\.[0-9]{1,2})?)\b', clean_line)
                 if amounts:
                     total = float(amounts[-1])
                 continue
 
-        # 7. æŽ’é™¤æ”¯ä»˜æ–¹å¼è¡Œä¸Žå™ªå£°è¡Œ
+        # 7. 排除支付方式行与噪声行
         if any(re.search(pat, clean_line, re.IGNORECASE) for pat in exclude_payment_patterns):
             continue
         if any(re.search(pat, clean_line, re.IGNORECASE) for pat in exclude_header_noise):
             continue
 
-        # 8. æŽ’é™¤åœ°å€è¡Œä¸­çš„é‚®ç¼–è¯†åˆ« (å¦‚ NY 10010, Singapore 329801)
+        # 8. 排除地址行中的邮编识别 (如 NY 10010, Singapore 329801)
         if any(kw in lower for kw in address_keywords):
             if re.search(r'\b\d{4,6}\b\s*$', clean_line):
                 continue
 
-        # 8.5 æŽ’é™¤"å•ä»·/ä»½"æ ‡æ³¨çš„å»¶ç»­è¡Œ (å¦‚ "(Takeaway) (14.90/ea)")
-        # æœ‰äº›æ”¶é“¶ç³»ç»Ÿ (å¦‚ FEEDME SMART POS) ä¼šæŠŠå“é¡¹æ‹†æˆå¥½å‡ ä¸ªåŽŸå§‹è¡Œè¾“å‡ºï¼šç¬¬ä¸€è¡Œæ˜¯
-        # "æ•°é‡ å“å ... ä»·æ ¼"ï¼ŒæŽ¥ä¸‹æ¥è¿˜ä¼šæœ‰ä¸€è¡Œä¸“é—¨é‡å¤æ ‡æ³¨ "(å•ä»·/ea)"ã€‚è¿™ç§å»¶ç»­è¡Œæœ¬èº«
-        # ä¸æ˜¯æ–°çš„å“é¡¹ï¼Œåªæ˜¯æŠŠå·²ç»åœ¨ç¬¬ä¸€è¡ŒæŠ“åˆ°çš„ä»·æ ¼å†è®²ä¸€æ¬¡ï¼Œå¦‚æžœä¸æŽ’é™¤æŽ‰ï¼Œä¼šè¢«è¯¯åˆ¤æˆ
-        # ä¸€ç¬”æ–°çš„ã€å“åä¹±ä¸ƒå…«ç³Ÿçš„å“é¡¹ (æ¯”å¦‚æŠŠ "(Takeaway)" è¿™å‡ ä¸ªå­—å½“æˆå“å)ã€‚
+        # 8.5 排除"单价/份"标注的延续行 (如 "(Takeaway) (14.90/ea)")
+        # 有些收银系统 (如 FEEDME SMART POS) 会把品项拆成好几个原始行输出：第一行是
+        # "数量 品名 ... 价格"，接下来还会有一行专门重复标注 "(单价/ea)"。这种延续行本身
+        # 不是新的品项，只是把已经在第一行抓到的价格再讲一次，如果不排除掉，会被误判成
+        # 一笔新的、品名乱七八糟的品项 (比如把 "(Takeaway)" 这几个字当成品名)。
         if re.search(r'[0-9]+\.?[0-9]*\s*/\s*ea\b', lower):
             continue
 
-        # 9. æå–å¸¸è§„å•å“è¡Œï¼šæ‰¾è¿™ä¸€è¡Œé‡Œ"æœ€åŽä¸€ä¸ªé•¿å¾—åƒä»·æ ¼çš„æ•°å­—"ï¼Œä»·æ ¼å‰é¢å½“å“åï¼Œ
-        # ä»·æ ¼åŽé¢ä¸ç®¡æ˜¯ä»€ä¹ˆå†…å®¹ï¼ˆè¡Œå°¾å¸¸è§çš„ OCR ä¹±ç ç¬¦å·ã€å•ä½æ ‡æ³¨ã€å¤šä½™ç©ºç™½ç­‰ï¼‰ä¸€å¾‹ä¸¢å¼ƒï¼Œ
-        # ä¸è¦æ±‚è¡Œå°¾å¿…é¡»ç²¾ç¡®ç¬¦åˆæŸä¸ªå…è®¸å­—ç¬¦çš„ç™½åå•â€”â€”çœŸå®žæ‹ç…§è¯†åˆ«å‡ºæ¥çš„æ–‡å­—ï¼Œè¡Œå°¾å¸¸å¸¸ä¼š
-        # å¸¦ä¸€ä¸¤ä¸ªæ‚è®¯ç¬¦å·ï¼ˆæ¯”å¦‚å…¨å½¢é€—å·ã€ç«–çº¿ï¼‰ï¼Œåªè¦æ±‚"ç²¾ç¡®åŒ¹é…åˆ°è¡Œå°¾"å¾ˆå®¹æ˜“è¢«è¿™ç±»æ‚è®¯æ‹–ç´¯
-        # åˆ°æ•´è¡Œéƒ½æŠ“ä¸åˆ°ï¼Œè¿™é‡Œæ”¹æˆåªæ‰¾ä»·æ ¼æœ¬èº«ï¼Œä»·æ ¼åŽé¢çš„ä¸œè¥¿ç›´æŽ¥å¿½ç•¥ã€‚
+        # 9. 提取常规单品行：找这一行里"最后一个长得像价格的数字"，价格前面当品名，
+        # 价格后面不管是什么内容（行尾常见的 OCR 乱码符号、单位标注、多余空白等）一律丢弃，
+        # 不要求行尾必须精确符合某个允许字符的白名单——真实拍照识别出来的文字，行尾常常会
+        # 带一两个杂讯符号（比如全形逗号、竖线），只要求"精确匹配到行尾"很容易被这类杂讯拖累
+        # 到整行都抓不到，这里改成只找价格本身，价格后面的东西直接忽略。
         price_pattern = re.compile(
-            r'(?:RM|MYR|\$|S\$|â‚¬|EUR|Â£|GBP|Â¥|å††|â‚©|ì›|à¸¿|Rp|â‚«)\s*[0-9]+(?:\.[0-9]{1,2})?'
+            r'(?:RM|MYR|\$|S\$|€|EUR|£|GBP|¥|円|₩|원|฿|Rp|₫)\s*[0-9]+(?:\.[0-9]{1,2})?'
             r'|(?<![0-9.])[0-9]+\.[0-9]{1,2}(?![0-9])',
             re.IGNORECASE
         )
         price_matches = list(price_pattern.finditer(clean_line))
         m_item = price_matches[-1] if price_matches else None
         if m_item:
-            name_raw = clean_line[:m_item.start()].strip(' -:\t#$*Â¥â‚¬Â£â€œ"\'|.,;ï¼Œã€')
-            name_raw = re.sub(r'^(?:RM|MYR|\$|S\$|â‚¬|Â£|Â¥|å††|â‚©)\s*', '', name_raw, flags=re.IGNORECASE)
-            name_raw = re.sub(r'\s*(?:RM|MYR|\$|S\$|â‚¬|Â£|Â¥|å††|â‚©)\s*$', '', name_raw, flags=re.IGNORECASE)
-            name_raw = re.sub(r'^[ï¼ˆ(]?(?:Takeaway|TA|Dine[- ]in)[)ï¼‰]?\s*(?:\([0-9.]+/ea\))?\s*', '', name_raw, flags=re.IGNORECASE)
-            name_raw = re.sub(r'^[ï¼ˆ(]?[0-9.]+/ea[)ï¼‰]?\s*', '', name_raw, flags=re.IGNORECASE)
-            name_raw = name_raw.strip(' -:\t#$*Â¥â€œ"\'|.,;ï¼Œã€')
+            name_raw = clean_line[:m_item.start()].strip(' -:\t#$*¥€£“"\'|.,;，、')
+            name_raw = re.sub(r'^(?:RM|MYR|\$|S\$|€|£|¥|円|₩)\s*', '', name_raw, flags=re.IGNORECASE)
+            name_raw = re.sub(r'\s*(?:RM|MYR|\$|S\$|€|£|¥|円|₩)\s*$', '', name_raw, flags=re.IGNORECASE)
+            name_raw = re.sub(r'^[（(]?(?:Takeaway|TA|Dine[- ]in)[)）]?\s*(?:\([0-9.]+/ea\))?\s*', '', name_raw, flags=re.IGNORECASE)
+            name_raw = re.sub(r'^[（(]?[0-9.]+/ea[)）]?\s*', '', name_raw, flags=re.IGNORECASE)
+            name_raw = name_raw.strip(' -:\t#$*¥“"\'|.,;，、')
 
             num_match = re.search(r'[0-9]+(?:\.[0-9]{1,2})?', m_item.group())
             price_val = float(num_match.group()) if num_match else 0.0
 
-            # è¿‡æ»¤éžå•†å“çš„é‚®ç¼–æˆ–è¿‡å¤§éžå•å“æ•°å­— (éž JPY/KRW/VND/IDR å¸ç§æ—¶ï¼Œå•å“ä»·æ ¼é€šå¸¸ä¸ä¼šè¶…è¿‡ 5000)
-            if currency_symbol in ['$', 'â‚¬', 'Â£', 'RM', 'S$'] and price_val > 5000:
+            # 异常超大金额保护 (非 JPY/KRW/VND/IDR 等大面额货币时，单品价格不应超过 5000)
+            if currency_symbol in ['$', '€', '£', 'RM', 'S$'] and price_val > 5000:
                 continue
 
             if name_raw and len(name_raw) >= 2 and price_val > 0:
@@ -3593,12 +3593,12 @@ def parse_receipt_text_to_items(raw_text):
                     qty = int(m_qty_suffix.group(2))
                     name_raw = m_qty_suffix.group(1).strip(' -:\t#$*')
 
-                # å¸¸è§"æ•°é‡ + å“å + å•ä»· + å°è®¡"åŒä¸€è¡Œçš„æŽ’ç‰ˆï¼ˆå¦‚ "2 Roti Canai 1.10 2.20"ï¼‰ï¼Œ
-                # ä¸Šé¢å·²ç»æŠŠæœ€åŽä¸€ä¸ªæ•°å­—(å°è®¡)æŠ“æˆ priceï¼Œä½†å•ä»·å¯èƒ½è¿˜æ®‹ç•™åœ¨ name_raw å°¾éƒ¨ï¼Œ
-                # ä¾‹å¦‚ name_raw ä¼šå˜æˆ "Roti Canai 1.10"ã€‚è¿™é‡ŒæŠŠè¿™ç§æ®‹ç•™çš„å•ä»·æ•°å­—åŽ»æŽ‰ï¼Œ
-                # ä¸ç„¶å“åä¼šè¢«è¯¯é»ä¸Šä¸€ä¸ªä»·é’±ã€‚
+                # 常见"数量 + 品名 + 单价 + 小计"同一行的排版（如 "2 Roti Canai 1.10 2.20"），
+                # 上面已经把最后一个数字(小计)抓成 price，但单价可能还残留在 name_raw 尾部，
+                # 例如 name_raw 会变成 "Roti Canai 1.10"。这里把这种残留的单价数字去掉，
+                # 不然品名会被误黏上一个价钱。
                 name_raw = re.sub(
-                    r'\s+(?:RM|MYR|\$|S\$|â‚¬|Â£|Â¥|å††|â‚©)?\s*[0-9]+\.[0-9]{2}\s*$',
+                    r'\s+(?:RM|MYR|\$|S\$|€|£|¥|円|₩)?\s*[0-9]+\.[0-9]{2}\s*$',
                     '',
                     name_raw,
                     flags=re.IGNORECASE
@@ -3610,12 +3610,12 @@ def parse_receipt_text_to_items(raw_text):
                     'quantity': qty
                 })
 
-    # è‹¥æœªæ‰¾åˆ° subtotalï¼Œåˆ™ä»Ž items æ±‚å’Œ
+    # 若未找到 subtotal，则从 items 求和
     calc_subtotal = sum(i['price'] for i in items)
     if subtotal == 0:
         subtotal = round(calc_subtotal, 2)
 
-    # æ¯”ä¾‹æ¢ç®—
+    # 比例换算
     if service_charge == 0 and service_rate > 0 and subtotal > 0:
         service_charge = round(subtotal * (service_rate / 100), 2)
     if tax == 0 and tax_rate > 0 and subtotal > 0:
@@ -3638,17 +3638,17 @@ def parse_receipt_text_to_items(raw_text):
 
 @app.route('/split-bill')
 def split_bill_page():
-    """å°ç¥¨æ‹ç…§ AA åˆ†è´¦é¡µé¢"""
+    """小票拍照 AA 分账页面"""
     return render_template('split_bill.html', today=date.today().isoformat())
 
 
 @app.route('/split-bill/parse-text', methods=['POST'])
 @csrf.exempt
 def split_bill_parse_text():
-    """è§£æžå°ç¥¨æ–‡æœ¬æˆ–ç²˜è´´å†…å®¹"""
+    """解析小票文本或粘贴内容"""
     text = request.form.get('text', '').strip()
     if not text:
-        return jsonify({'ok': False, 'message': 'æœªæä¾›å°ç¥¨å†…å®¹'}), 400
+        return jsonify({'ok': False, 'message': '未提供小票内容'}), 400
 
     parsed = parse_receipt_text_to_items(text)
     return jsonify({'ok': True, 'data': parsed})
@@ -3661,8 +3661,12 @@ def get_rapid_ocr():
     if _rapid_ocr_engine is None:
         try:
             from rapidocr_onnxruntime import RapidOCR
-            _rapid_ocr_engine = RapidOCR()
-            app.logger.info("RapidOCR engine initialized successfully")
+            _rapid_ocr_engine = RapidOCR(
+                det_unclip_ratio=1.9,
+                det_db_box_thresh=0.4,
+                det_db_unclip_ratio=1.9
+            )
+            app.logger.info("RapidOCR engine initialized successfully with receipt-optimized params")
         except Exception as e:
             app.logger.warning("RapidOCR engine unavailable: %s", e)
             _rapid_ocr_engine = False
@@ -3716,7 +3720,7 @@ def cluster_ocr_blocks_to_lines(ocr_result):
 
 
 def get_ocr_orientation_stats(ocr_res, img_h):
-    """åˆ†æž OCR è¯†åˆ«æ¡†çš„é•¿å®½æ¯”ä¸Žåº•éƒ¨ç»“ç®—å…³é”®è¯ä½ç½®ï¼Œè¯„ä¼°å½“å‰å›¾ç‰‡çš„æœå‘æ˜¯å¦ä¸ºæ­£ç«‹"""
+    """分析 OCR 识别框的长宽比与底部结算关键词位置，评估当前图片的朝向是否为正立"""
     if not ocr_res:
         return {'horiz': 0, 'vert': 0, 'footer_bottom': 0, 'footer_top': 0, 'count': 0}
     horiz = 0
@@ -3726,8 +3730,8 @@ def get_ocr_orientation_stats(ocr_res, img_h):
     footer_keywords = [
         'total', 'subtotal', 'sub-total', 'grand total', 'net total', 'change', 'rounding',
         'duitnow', 'cash', 'card', 'visa', 'mastercard', 'thank', 'scan', 'pos', 'powered',
-        'feedme', 'tax', 'service', 'balance', 'åˆè®¡', 'æ€»è®¡', 'å°è®¡', 'å®žæ”¶', 'æ‰¾é›¶', 'è°¢è°¢',
-        'ãŠä¼šè¨ˆ', 'åˆè¨ˆ', 'í•©ê³„'
+        'feedme', 'tax', 'service', 'balance', '合计', '总计', '小计', '实收', '找零', '谢谢',
+        'お会計', '合計', '합계'
     ]
     import numpy as np
 
@@ -3756,30 +3760,70 @@ def get_ocr_orientation_stats(ocr_res, img_h):
     }
 
 
-def smart_orient_receipt_ocr(pil_img, engine):
+def preprocess_receipt_for_ocr(pil_img):
     """
-    æ™ºèƒ½è‡ªåŠ¨æ–¹å‘æ ¡æ­£ OCRï¼š
-    åº”å¯¹ç”¨æˆ·æ¨ªæ‹ã€ä¾§å‘ï¼ˆ90Â°/270Â°ï¼‰æˆ–é¢ å€’ï¼ˆ180Â°ï¼‰ä¸Šä¼ çš„å„ç±»å°ç¥¨ï¼ˆåŒ…æ‹¬æ—  EXIF ä¿¡æ¯çš„ WhatsApp åŽ‹ç¼©å›¾ï¼‰ï¼Œ
-    é€šè¿‡æ–‡å­—æ¡†æ¨ªçºµå‡ ä½•æ¯”çŽ‡ä¸Žå°ç¥¨åº•éƒ¨ç»“ç®—å…³é”®è¯åŠ æƒè¯„åˆ†ï¼Œè‡ªåŠ¨çº æ­£è‡³æ­£ç«‹æ–¹å‘åŽå†è¿›è¡Œæ–‡æœ¬è¡Œèšç±»å’Œè¯­ä¹‰è§£æžã€‚
+    针对热敏纸小票的轻量预处理管道：
+    1. 动态自适应缩放（防止字号过小导致漏检）
+    2. 灰度化 + CLAHE（限制对比度自适应直方图均衡化，消除阴影并增强文字反差）
+    3. 轻度保边去噪（避免热敏纸噪点被误检为标点）
     """
+    import cv2
     import numpy as np
 
-    # 1. åˆå§‹è§’åº¦ (0Â°) æµ‹è¯•è¯†åˆ«
-    res0, _ = engine(np.array(pil_img))
+    img = np.array(pil_img)
+
+    # 统一通道：RGBA / RGB 转 BGR
+    if len(img.shape) == 3:
+        if img.shape[2] == 4:
+            img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
+        else:
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    else:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+    h, w = img.shape[:2]
+
+    # 1. 动态缩放：小票宽度如果过小，文字笔画会粘连或丢失，保证短边至少在 1000px 左右
+    min_side = min(h, w)
+    if min_side < 1000 and min_side > 0:
+        scale = 1200.0 / min_side
+        img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC)
+
+    # 2. 转灰度并应用 CLAHE（消除拍小票时的手部阴影与反光）
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced_gray = clahe.apply(gray)
+
+    # 3. 轻度保边去噪（避免热敏纸噪点被误检为标点）
+    denoised = cv2.bilateralFilter(enhanced_gray, d=5, sigmaColor=50, sigmaSpace=50)
+
+    # 转回 3 通道供给 RapidOCR 推理
+    final_img = cv2.cvtColor(denoised, cv2.COLOR_GRAY2BGR)
+    return final_img
+
+
+def smart_orient_receipt_ocr(pil_img, engine):
+    """
+    强化版小票 OCR 管道：
+    加入 CLAHE 增强、动态放大与置信度保护
+    """
+    # 0. 预处理原图
+    processed_0 = preprocess_receipt_for_ocr(pil_img)
+
+    # 1. 初始角度 (0°) 测试识别
+    res0, _ = engine(processed_0)
     if not res0:
         return res0, "", {'items': [], 'subtotal': 0.0, 'total': 0.0, 'service_charge': 0.0, 'tax': 0.0, 'discount': 0.0, 'rounding': 0.0, 'currency_symbol': '$'}, 0
 
-    stats0 = get_ocr_orientation_stats(res0, pil_img.height)
+    stats0 = get_ocr_orientation_stats(res0, processed_0.shape[0])
     raw_text0 = cluster_ocr_blocks_to_lines(res0)
     parsed0 = parse_receipt_text_to_items(raw_text0)
 
-    # å¿«é€Ÿç›´å‡ºæ¡ä»¶ï¼šå¦‚æžœæ¨ªå‘æ–‡å­—æ¡†è¿œå¤šäºŽçºµå‘æ¡†ï¼Œä¸”åº•éƒ¨å…³é”®è¯ä½äºŽä¸‹åŠéƒ¨åˆ†æˆ–å·²æˆåŠŸè§£æžå‡ºå¤šä¸ªå•†å“
+    # 快速直出条件：横向文本占绝对优势，且解析出结构化结果
     if stats0['horiz'] > max(5, stats0['vert'] * 1.5) and (stats0['footer_bottom'] >= stats0['footer_top'] or len(parsed0['items']) > 0):
         return res0, raw_text0, parsed0, 0
 
-    # å€™é€‰è§’åº¦åˆ¤æ–­ï¼š
-    # è‹¥çºµå‘æ–‡å­—æ¡†å ä¼˜ï¼Œè¯´æ˜Žç”¨æˆ·ä¾§å‘æ‰‹æœºæ‹ç…§ï¼ˆ90Â° æˆ– 270Â°ï¼‰
-    # è‹¥æ¨ªå‘å¤šä½†åº•éƒ¨å…³é”®è¯åœ¨ä¸ŠåŠéƒ¨åˆ†ï¼Œè¯´æ˜Žç”¨æˆ·æŠŠå°ç¥¨å€’è¿‡æ¥æ‹äº†ï¼ˆ180Â°ï¼‰
+    # 候选角度策略
     if stats0['vert'] >= stats0['horiz']:
         test_angles = [90, 270]
     else:
@@ -3795,12 +3839,16 @@ def smart_orient_receipt_ocr(pil_img, engine):
     candidates = []
     for angle in test_angles:
         rot_img = pil_img.rotate(angle, expand=True)
-        r_res, _ = engine(np.array(rot_img))
+        # 对旋转后的图片同样走标准化预处理管道
+        rot_processed = preprocess_receipt_for_ocr(rot_img)
+        r_res, _ = engine(rot_processed)
         if not r_res:
             continue
-        r_stats = get_ocr_orientation_stats(r_res, rot_img.height)
+
+        r_stats = get_ocr_orientation_stats(r_res, rot_processed.shape[0])
         r_text = cluster_ocr_blocks_to_lines(r_res)
         r_parsed = parse_receipt_text_to_items(r_text)
+
         score = (
             (r_stats['horiz'] - r_stats['vert'] * 2) +
             (r_stats['footer_bottom'] - r_stats['footer_top']) * 6 +
@@ -3813,7 +3861,7 @@ def smart_orient_receipt_ocr(pil_img, engine):
         candidates.sort(key=lambda x: x[0], reverse=True)
         best = candidates[0]
         if best[0] > score0:
-            app.logger.info("Auto-corrected receipt orientation by %dÂ° (score %d vs original %d)", best[1], best[0], score0)
+            app.logger.info("Auto-corrected receipt orientation by %d° (score %d vs original %d)", best[1], best[0], score0)
             return best[2], best[3], best[4], best[1]
 
     return res0, raw_text0, parsed0, 0
@@ -3822,21 +3870,21 @@ def smart_orient_receipt_ocr(pil_img, engine):
 @app.route('/split-bill/ocr-upload', methods=['POST'])
 @csrf.exempt
 def split_bill_ocr_upload():
-    """æœ¬åœ° RapidOCR æ·±åº¦å­¦ä¹ å°ç¥¨è¯†åˆ«æŽ¥å£ï¼ˆé›¶äº‘ç«¯ä¾èµ–ï¼Œæ”¯æŒå…¨æ–¹å‘è‡ªé€‚åº”çº åä¸ŽåŒè¡Œå¯¹é½ï¼‰"""
+    """本地 RapidOCR 深度学习小票识别接口（零云端依赖，支持全方向自适应纠偏与同行对齐）"""
     file = request.files.get('file') or request.files.get('receipt_image')
     if not file or not file.filename:
-        return jsonify({'ok': False, 'message': 'æœªæ£€æµ‹åˆ°ä¸Šä¼ çš„å°ç¥¨ç…§ç‰‡'}), 400
+        return jsonify({'ok': False, 'message': '未检测到上传的小票照片'}), 400
 
     engine = get_rapid_ocr()
     if not engine:
-        return jsonify({'ok': False, 'message': 'æœ¬åœ° RapidOCR å¼•æ“Žæœªå®‰è£…æˆ–åˆå§‹åŒ–å¤±è´¥'}), 500
+        return jsonify({'ok': False, 'message': '本地 RapidOCR 引擎未安装或初始化失败'}), 500
 
     try:
         img_bytes = file.read()
         import io
         from PIL import Image, ImageOps
         pil_img = Image.open(io.BytesIO(img_bytes))
-        # ä¼˜å…ˆè¯»å– EXIF æ ‡ç­¾çº æ­£æ—‹è½¬
+        # 优先读取 EXIF 标签纠正旋转
         try:
             pil_img = ImageOps.exif_transpose(pil_img)
         except Exception:
@@ -3844,20 +3892,20 @@ def split_bill_ocr_upload():
         if pil_img.mode != 'RGB':
             pil_img = pil_img.convert('RGB')
 
-        # æ ¸å¿ƒï¼šå³ä½¿æ—  EXIF æ ‡ç­¾ï¼ˆå¦‚ WhatsApp åŽ‹ç¼©å›¾ï¼‰ï¼Œä¹Ÿèƒ½ä¾æ®æ–‡å­—æ¡†å‡ ä½•ä¸Žå°ç¥¨å¸ƒå±€è‡ªåŠ¨æ—‹è½¬çº æ­£
+        # 核心：即使无 EXIF 标签（如 WhatsApp 压缩图），也能依据文字框几何与小票布局自动旋转纠正
         result, raw_text, parsed, rot = smart_orient_receipt_ocr(pil_img, engine)
         if not result or not raw_text:
-            return jsonify({'ok': False, 'message': 'æœªèƒ½è¯†åˆ«å‡ºæ–‡å­—ï¼Œè¯·ç¡®ä¿å°ç¥¨æ¸…æ™°å¹³æ•´'}), 200
+            return jsonify({'ok': False, 'message': '未能识别出文字，请确保小票清晰平整'}), 200
 
         return jsonify({'ok': True, 'data': parsed, 'raw_text': raw_text, 'rotation_applied': rot})
     except Exception as e:
         app.logger.error("RapidOCR recognition failed: %s", e)
-        return jsonify({'ok': False, 'message': f'å°ç¥¨è¯†åˆ«å¤±è´¥: {str(e)}'}), 500
+        return jsonify({'ok': False, 'message': f'小票识别失败: {str(e)}'}), 500
 
 
 @app.route('/split-bill/save-record', methods=['POST'])
 def split_bill_save_record():
-    """å°† AA åˆ†è´¦ä¸­å±žäºŽè‡ªå·±çš„éƒ¨åˆ†ä¸€é”®å­˜å…¥ä¸»è´¦æœ¬"""
+    """将 AA 分账中属于自己的部分一键存入主账本"""
     f = request.form
     try:
         amount = float(f.get('amount', 0))
@@ -3866,16 +3914,16 @@ def split_bill_save_record():
 
     if amount <= 0:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': 'è®°è´¦é‡‘é¢å¿…é¡»å¤§äºŽ 0'}), 400
-        flash('è®°è´¦é‡‘é¢å¿…é¡»å¤§äºŽ 0', 'error')
+            return jsonify({'ok': False, 'message': '记账金额必须大于 0'}), 400
+        flash('记账金额必须大于 0', 'error')
         return redirect(url_for('split_bill_page'))
 
     user_id = get_current_user_id()
     db = get_db()
     now = datetime.now().isoformat()
-    note = f.get('note', '').strip() or 'èšé¤ AA åˆ†æ‘Šæ¶ˆè´¹'
+    note = f.get('note', '').strip() or '聚餐 AA 分摊消费'
     tx_date = f.get('date') or date.today().isoformat()
-    category = f.get('category') or 'é¤é¥®'
+    category = f.get('category') or '餐饮'
 
     db.execute(
         'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
@@ -3889,7 +3937,7 @@ def split_bill_save_record():
     if budget_alert and not is_ajax_request():
         flash(budget_alert['message'], 'warning' if budget_alert['threshold'] < 100 else 'error')
 
-    msg = f'å·²æˆåŠŸè®°å…¥æ”¯å‡ºï¼š{note} {money_filter(amount)}'
+    msg = f'已成功记入支出：{note} {money_filter(amount)}'
     if is_ajax_request():
         return jsonify({'ok': True, 'message': msg, 'budget_alert': budget_alert})
     flash(msg, 'success')
@@ -3897,7 +3945,7 @@ def split_bill_save_record():
 
 
 # ============================================================
-# è´Ÿå€ºã€ä¿¡ç”¨å¡ä¸Žåˆ†æœŸä»˜æ¬¾è¿½è¸ªè·¯ç”± (Liabilities & Installment Tracker)
+# 负债、信用卡与分期付款追踪路由 (Liabilities & Installment Tracker)
 # ============================================================
 @app.route('/liabilities')
 def liabilities_page():
@@ -3915,10 +3963,10 @@ def liabilities_page():
         t_year, t_month = today.year, today.month
         target_month_str = f"{t_year:04d}-{t_month:02d}"
 
-    # 1. èŽ·å–å½“æœˆåˆšæ€§è¿˜æ¬¾çŽ°é‡‘æµæŽ’ç¨‹äº‹ä»¶
+    # 1. 获取当月刚性还款现金流排程事件
     cashflow_data = get_monthly_cashflow_events(db, user_id, t_year, t_month)
 
-    # 2. èŽ·å–åˆ†æœŸä»˜æ¬¾åˆ—è¡¨
+    # 2. 获取分期付款列表
     installments = db.execute('''
         SELECT i.*, a.name as card_name, a.due_day as card_due_day
         FROM installments i
@@ -3927,7 +3975,7 @@ def liabilities_page():
         ORDER BY CASE WHEN i.status='active' THEN 0 ELSE 1 END, i.id DESC
     ''', (user_id,)).fetchall()
 
-    # è®¡ç®—å„åˆ†æœŸå®žæ—¶å‰©ä½™æœ¬é‡‘ä¸Žè¿›åº¦
+    # 计算各分期实时剩余本金与进度
     inst_list = []
     total_inst_debt = 0.0
     for inst in installments:
@@ -3939,14 +3987,14 @@ def liabilities_page():
         monthly_amt = item.get('monthly_amount') or 0.0
         rem_bal = max(0.0, round(total_amt - (monthly_amt * paid), 2))
         
-        # é¢„ä¼°ç»“æ¸…å¹´æœˆ
+        # 预估结清年月
         try:
             f_dt = datetime.strptime(item.get('first_due_date'), "%Y-%m-%d").date()
             from liabilities_tracker import add_months_clamped
             settle_dt = add_months_clamped(f_dt, tenure - 1)
             item['settle_month'] = settle_dt.strftime('%Y-%m')
         except Exception:
-            item['settle_month'] = 'â€”'
+            item['settle_month'] = '—'
 
         item['remaining_periods'] = rem_periods
         item['remaining_balance'] = rem_bal
@@ -3955,7 +4003,7 @@ def liabilities_page():
             total_inst_debt += rem_bal
         inst_list.append(item)
 
-    # 3. èŽ·å–å›ºå®šè´·æ¬¾åˆ—è¡¨
+    # 3. 获取固定贷款列表
     loans = db.execute('''
         SELECT l.*, a.name as account_name
         FROM loans l
@@ -3976,7 +4024,7 @@ def liabilities_page():
             total_loan_debt += (item.get('remaining_balance') or 0.0)
         loan_list.append(item)
 
-    # 4. èŽ·å–é“¶è¡Œå¡ä¸Žä¿¡ç”¨å¡åˆ—è¡¨
+    # 4. 获取银行卡与信用卡列表
     accounts = db.execute('''
         SELECT * FROM accounts
         WHERE user_id = ? AND is_active = 1
@@ -4005,7 +4053,7 @@ def api_add_installment():
     
     title = (request.form.get('title') or '').strip()
     if not title:
-        flash('è¯·è¾“å…¥åˆ†æœŸé¡¹ç›®åç§°', 'error')
+        flash('请输入分期项目名称', 'error')
         return redirect(url_for('liabilities_page'))
     
     try:
@@ -4013,14 +4061,14 @@ def api_add_installment():
         tenure_months = int(request.form.get('tenure_months', 1))
         paid_periods = int(request.form.get('paid_periods', 0))
     except (ValueError, TypeError):
-        flash('åˆ†æœŸé‡‘é¢æˆ–æœŸæ•°æ ¼å¼ä¸æ­£ç¡®', 'error')
+        flash('分期金额或期数格式不正确', 'error')
         return redirect(url_for('liabilities_page'))
 
     first_due_date = request.form.get('first_due_date') or date.today().isoformat()
     account_id = request.form.get('account_id') or None
     note = (request.form.get('note') or '').strip()
 
-    # è®¡ç®—æ¯æœˆæ ‡å‡†æ‘Šé”€
+    # 计算每月标准摊销
     monthly_amount = round(total_amount / tenure_months, 2) if tenure_months > 0 else total_amount
     status = 'completed' if paid_periods >= tenure_months else 'active'
 
@@ -4034,7 +4082,7 @@ def api_add_installment():
         monthly_amount, first_due_date, status, note, datetime.now().isoformat()
     ))
     db.commit()
-    flash(f'å·²æˆåŠŸæ·»åŠ å…æ¯åˆ†æœŸé¡¹ç›®ï¼š{title}', 'success')
+    flash(f'已成功添加免息分期项目：{title}', 'success')
     return redirect(url_for('liabilities_page'))
 
 
@@ -4045,7 +4093,7 @@ def api_add_loan():
     
     title = (request.form.get('title') or '').strip()
     if not title:
-        flash('è¯·è¾“å…¥è´·æ¬¾é¡¹ç›®åç§°', 'error')
+        flash('请输入贷款项目名称', 'error')
         return redirect(url_for('liabilities_page'))
     
     try:
@@ -4055,7 +4103,7 @@ def api_add_loan():
         interest_rate = float(request.form.get('annual_interest_rate', 0.0))
         due_day = int(request.form.get('due_day', 5))
     except (ValueError, TypeError):
-        flash('è´·æ¬¾é‡‘é¢ã€åˆ©çŽ‡æˆ–æœŸæ•°æ ¼å¼ä¸æ­£ç¡®', 'error')
+        flash('贷款金额、利率或期数格式不正确', 'error')
         return redirect(url_for('liabilities_page'))
 
     method = request.form.get('method') or 'reducing_balance'
@@ -4063,12 +4111,12 @@ def api_add_loan():
     start_date = request.form.get('start_date') or date.today().isoformat()
     note = (request.form.get('note') or '').strip()
 
-    # è‹¥ç”¨æˆ·æ‰‹åŠ¨è¾“å…¥äº†æœˆä¾›é‡‘é¢ï¼Œåˆ™ä¼˜å…ˆä½¿ç”¨ï¼›å¦åˆ™è‡ªåŠ¨ç”¨è´¢åŠ¡ç®—æ³•æŽ¨ç®—
+    # 若用户手动输入了月供金额，则优先使用；否则自动用财务算法推算
     custom_monthly = request.form.get('monthly_payment')
     try:
         if custom_monthly and float(custom_monthly) > 0:
             monthly_payment = float(custom_monthly)
-            # ç®€å•å‰©ä½™æœ¬é‡‘é¢„ä¼°
+            # 简单剩余本金预估
             remaining_balance = max(0.0, round(loan_amount - (loan_amount / tenure_months * paid_periods), 2))
         else:
             from liabilities_tracker import generate_amortization_schedule
@@ -4095,7 +4143,7 @@ def api_add_loan():
         monthly_payment, due_day, start_date, status, note, datetime.now().isoformat()
     ))
     db.commit()
-    flash(f'å·²æˆåŠŸæ·»åŠ è´·æ¬¾è®°å½•ï¼š{title}', 'success')
+    flash(f'已成功添加贷款记录：{title}', 'success')
     return redirect(url_for('liabilities_page'))
 
 
@@ -4107,7 +4155,7 @@ def api_add_account():
     name = (request.form.get('name') or '').strip()
     acc_type = request.form.get('type') or 'credit_card'
     if not name:
-        flash('è¯·è¾“å…¥è´¦æˆ·/å¡ç‰‡åç§°', 'error')
+        flash('请输入账户/卡片名称', 'error')
         return redirect(url_for('liabilities_page'))
 
     credit_limit = float(request.form.get('credit_limit') or 0.0)
@@ -4120,7 +4168,7 @@ def api_add_account():
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
     ''', (user_id, name, acc_type, credit_limit, statement_day, due_day, datetime.now().isoformat()))
     db.commit()
-    flash(f'å·²æˆåŠŸæ·»åŠ å¡ç‰‡/è´¦æˆ·ï¼š{name}', 'success')
+    flash(f'已成功添加卡片/账户：{name}', 'success')
     return redirect(url_for('liabilities_page'))
 
 
@@ -4130,7 +4178,7 @@ def api_sync_liabilities():
     db = get_db()
     today_str = date.today().isoformat()
     res = sync_installments_to_monthly_statement(db, today_str)
-    msg = f"åŒæ­¥å®Œæˆï¼šå·²è‡ªåŠ¨æŒ‚è´¦ {res['syncedRecords']} ç¬”æµæ°´ï¼Œå·²ç»“æ¸…å½’æ¡£ {res['completedInstallments']} ç¬”åˆ†æœŸã€‚"
+    msg = f"同步完成：已自动挂账 {res['syncedRecords']} 笔流水，已结清归档 {res['completedInstallments']} 笔分期。"
     if is_ajax_request():
         return jsonify({'ok': True, 'message': msg, 'data': res})
     flash(msg, 'success')
@@ -4149,12 +4197,12 @@ def api_delete_liability(item_type, item_id):
     elif item_type == 'account':
         db.execute('DELETE FROM accounts WHERE id = ? AND user_id = ?', (item_id, user_id))
     db.commit()
-    flash('å·²åˆ é™¤è¯¥è´Ÿå€ºè®°å½•', 'success')
+    flash('已删除该负债记录', 'success')
     return redirect(url_for('liabilities_page'))
 
 
 # ---------------------------------------------------------------------------
-# è´¦æˆ·ç®¡ç† (Account Management) - é“¶è¡Œè´¦æˆ·ä¸Žä¿¡ç”¨å¡
+# 账户管理 (Account Management) - 银行账户与信用卡
 # ---------------------------------------------------------------------------
 
 @app.route('/accounts')
@@ -4193,7 +4241,7 @@ def manage_add_account():
     note = request.form.get('note', '').strip() or None
 
     if not name:
-        flash('è´¦æˆ·åç§°ä¸èƒ½ä¸ºç©º', 'error')
+        flash('账户名称不能为空', 'error')
         return redirect(url_for('accounts_page'))
 
     try:
@@ -4213,7 +4261,7 @@ def manage_add_account():
          datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     )
     db.commit()
-    flash(f'è´¦æˆ·ã€Œ{name}ã€å·²æˆåŠŸæ·»åŠ ', 'success')
+    flash(f'账户「{name}」已成功添加', 'success')
     return redirect(url_for('accounts_page'))
 
 
@@ -4230,7 +4278,7 @@ def manage_edit_account(acc_id):
     grace_period_days = request.form.get('grace_period_days', '20') or '20'
 
     if not name:
-        flash('è´¦æˆ·åç§°ä¸èƒ½ä¸ºç©º', 'error')
+        flash('账户名称不能为空', 'error')
         return redirect(url_for('accounts_page'))
 
     try:
@@ -4250,7 +4298,7 @@ def manage_edit_account(acc_id):
          acc_id, user_id)
     )
     db.commit()
-    flash(f'è´¦æˆ·ã€Œ{name}ã€å·²æ›´æ–°', 'success')
+    flash(f'账户「{name}」已更新', 'success')
     return redirect(url_for('accounts_page'))
 
 
@@ -4260,12 +4308,12 @@ def manage_toggle_account(acc_id):
     db = get_db()
     row = db.execute('SELECT is_active FROM accounts WHERE id=? AND user_id=?', (acc_id, user_id)).fetchone()
     if not row:
-        flash('è´¦æˆ·ä¸å­˜åœ¨', 'error')
+        flash('账户不存在', 'error')
         return redirect(url_for('accounts_page'))
     new_state = 0 if row['is_active'] else 1
     db.execute('UPDATE accounts SET is_active=? WHERE id=? AND user_id=?', (new_state, acc_id, user_id))
     db.commit()
-    flash('è´¦æˆ·çŠ¶æ€å·²æ›´æ–°', 'success')
+    flash('账户状态已更新', 'success')
     return redirect(url_for('accounts_page'))
 
 
@@ -4275,19 +4323,19 @@ def manage_delete_account(acc_id):
     db = get_db()
     row = db.execute('SELECT name FROM accounts WHERE id=? AND user_id=?', (acc_id, user_id)).fetchone()
     if not row:
-        flash('è´¦æˆ·ä¸å­˜åœ¨', 'error')
+        flash('账户不存在', 'error')
         return redirect(url_for('accounts_page'))
     # Unlink subscriptions and installments before deletion
     db.execute('UPDATE subscriptions SET payment_method_id=NULL WHERE payment_method_id=? AND user_id=?', (acc_id, user_id))
     db.execute('UPDATE installments SET account_id=NULL WHERE account_id=? AND user_id=?', (acc_id, user_id))
     db.execute('DELETE FROM accounts WHERE id=? AND user_id=?', (acc_id, user_id))
     db.commit()
-    flash(f'è´¦æˆ·ã€Œ{row["name"]}ã€å·²åˆ é™¤', 'success')
+    flash(f'账户「{row["name"]}」已删除', 'success')
     return redirect(url_for('accounts_page'))
 
 
 # ---------------------------------------------------------------------------
-# è®¢é˜…æœåŠ¡å¤§åŽ…ä¸Žç»­è´¹æé†’ (Subscription Management & Renewal Alerts)
+# 订阅服务大厅与续费提醒 (Subscription Management & Renewal Alerts)
 # ---------------------------------------------------------------------------
 
 @app.route('/subscriptions')
@@ -4339,7 +4387,7 @@ def subscriptions_page():
         (user_id,)
     ).fetchall()
 
-    # ç»Ÿè®¡åˆ†ç±»æœˆå‡ç­‰æ•ˆåˆ†å¸ƒ
+    # 统计分类月均等效分布
     category_breakdown = {}
     for s in subs:
         if s.status == SubscriptionStatus.ACTIVE:
@@ -4355,7 +4403,7 @@ def subscriptions_page():
                 m_cost = cost_myr / Decimal("6")
             else:
                 m_cost = cost_myr / Decimal("12")
-            cat = s.category or "å…¶ä»–"
+            cat = s.category or "其他"
             category_breakdown[cat] = (category_breakdown.get(cat, Decimal("0")) + m_cost).quantize(Decimal("0.01"))
 
     return render_template(
@@ -4375,7 +4423,7 @@ def api_add_subscription():
     db = get_db()
 
     name = (request.form.get('name') or '').strip()
-    category = (request.form.get('category') or 'æµåª’ä½“').strip()
+    category = (request.form.get('category') or '流媒体').strip()
     billing_cycle = (request.form.get('billing_cycle') or 'MONTHLY').upper()
     cost_str = (request.form.get('cost') or '0').strip()
     currency = (request.form.get('currency') or 'MYR').upper()
@@ -4390,7 +4438,7 @@ def api_add_subscription():
     note = (request.form.get('note') or '').strip()
 
     if not name:
-        flash('è¯·è¾“å…¥è®¢é˜…æœåŠ¡åç§°', 'error')
+        flash('请输入订阅服务名称', 'error')
         return redirect(url_for('subscriptions_page'))
 
     try:
@@ -4398,7 +4446,7 @@ def api_add_subscription():
         if cost <= 0:
             raise ValueError()
     except ValueError:
-        flash('è¯·è¾“å…¥æœ‰æ•ˆçš„æ‰£è´¹é‡‘é¢', 'error')
+        flash('请输入有效的扣费金额', 'error')
         return redirect(url_for('subscriptions_page'))
 
     try:
@@ -4424,7 +4472,7 @@ def api_add_subscription():
     ))
     db.commit()
     bump_data_version('subscription_add', user_id=user_id)
-    flash(f'æˆåŠŸæ·»åŠ è®¢é˜…æœåŠ¡ï¼š{name}', 'success')
+    flash(f'成功添加订阅服务：{name}', 'success')
     return redirect(url_for('subscriptions_page'))
 
 
@@ -4434,7 +4482,7 @@ def api_edit_subscription(sub_id):
     db = get_db()
 
     name = (request.form.get('name') or '').strip()
-    category = (request.form.get('category') or 'æµåª’ä½“').strip()
+    category = (request.form.get('category') or '流媒体').strip()
     billing_cycle = (request.form.get('billing_cycle') or 'MONTHLY').upper()
     cost_str = (request.form.get('cost') or '0').strip()
     currency = (request.form.get('currency') or 'MYR').upper()
@@ -4448,13 +4496,13 @@ def api_edit_subscription(sub_id):
     note = (request.form.get('note') or '').strip()
 
     if not name:
-        flash('è®¢é˜…åç§°ä¸èƒ½ä¸ºç©º', 'error')
+        flash('订阅名称不能为空', 'error')
         return redirect(url_for('subscriptions_page'))
 
     try:
         cost = float(cost_str)
     except ValueError:
-        flash('é‡‘é¢æ ¼å¼ä¸æ­£ç¡®', 'error')
+        flash('金额格式不正确', 'error')
         return redirect(url_for('subscriptions_page'))
 
     try:
@@ -4477,7 +4525,7 @@ def api_edit_subscription(sub_id):
     ))
     db.commit()
     bump_data_version('subscription_edit', user_id=user_id)
-    flash(f'å·²æ›´æ–°è®¢é˜…æœåŠ¡ï¼š{name}', 'success')
+    flash(f'已更新订阅服务：{name}', 'success')
     return redirect(url_for('subscriptions_page'))
 
 
@@ -4487,15 +4535,15 @@ def api_toggle_subscription_status(sub_id):
     db = get_db()
     row = db.execute("SELECT status, name FROM subscriptions WHERE id = ? AND user_id = ?", (sub_id, user_id)).fetchone()
     if not row:
-        flash('æ‰¾ä¸åˆ°æŒ‡å®šè®¢é˜…è®°å½•', 'error')
+        flash('找不到指定订阅记录', 'error')
         return redirect(url_for('subscriptions_page'))
 
     new_status = 'PAUSED' if row['status'] == 'ACTIVE' else 'ACTIVE'
     db.execute("UPDATE subscriptions SET status = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?", (new_status, sub_id, user_id))
     db.commit()
     bump_data_version('subscription_status', user_id=user_id)
-    state_desc = 'å·²æ¢å¤æ´»è·ƒè®¡è´¹' if new_status == 'ACTIVE' else 'å·²æš‚åœæ‰£æ¬¾ç›‘æŽ§'
-    flash(f"å·²å°†ã€{row['name']}ã€‘{state_desc}", 'success')
+    state_desc = '已恢复活跃计费' if new_status == 'ACTIVE' else '已暂停扣款监控'
+    flash(f"已将【{row['name']}】{state_desc}", 'success')
     return redirect(url_for('subscriptions_page'))
 
 
@@ -4505,15 +4553,15 @@ def api_toggle_cancel_target(sub_id):
     db = get_db()
     row = db.execute("SELECT target_to_cancel, name FROM subscriptions WHERE id = ? AND user_id = ?", (sub_id, user_id)).fetchone()
     if not row:
-        flash('æ‰¾ä¸åˆ°æŒ‡å®šè®¢é˜…è®°å½•', 'error')
+        flash('找不到指定订阅记录', 'error')
         return redirect(url_for('subscriptions_page'))
 
     new_flag = 0 if row['target_to_cancel'] else 1
     db.execute("UPDATE subscriptions SET target_to_cancel = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?", (new_flag, sub_id, user_id))
     db.commit()
     bump_data_version('subscription_cancel_target', user_id=user_id)
-    tip = 'å·²æ ‡è®°ä¸ºã€æ‰“ç®—é€€è®¢ã€‘ï¼Œå°†åœ¨æ‰£æ¬¾å‰é«˜äº®é¢„è­¦æ‹¦æˆªï¼' if new_flag else 'å·²å–æ¶ˆé€€è®¢æ ‡è®°'
-    flash(f"ã€{row['name']}ã€‘{tip}", 'success')
+    tip = '已标记为【打算退订】，将在扣款前高亮预警拦截！' if new_flag else '已取消退订标记'
+    flash(f"【{row['name']}】{tip}", 'success')
     return redirect(url_for('subscriptions_page'))
 
 
@@ -4523,7 +4571,7 @@ def api_roll_subscription(sub_id):
     db = get_db()
     row = db.execute("SELECT * FROM subscriptions WHERE id = ? AND user_id = ?", (sub_id, user_id)).fetchone()
     if not row:
-        flash('æ‰¾ä¸åˆ°æŒ‡å®šè®¢é˜…è®°å½•', 'error')
+        flash('找不到指定订阅记录', 'error')
         return redirect(url_for('subscriptions_page'))
 
     d = dict(row)
@@ -4533,15 +4581,15 @@ def api_roll_subscription(sub_id):
 
     new_date = rollToNextBillingDate(curr_date, cycle, anchor_day)
 
-    # å¯é€‰ï¼šåŒæ­¥è®°å…¥è´¦æœ¬æµæ°´
+    # 可选：同步记入账本流水
     record_expense = request.form.get('record_expense') in ('1', 'on', 'true')
     if record_expense:
         db.execute("""
             INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at)
-            VALUES (?, ?, 'expense', 'è®¢é˜…ä¸Žå‘¨æœŸå›ºå®š', ?, ?, ?, 'subscription', datetime('now'))
+            VALUES (?, ?, 'expense', '订阅与周期固定', ?, ?, ?, 'subscription', datetime('now'))
         """, (
             user_id, curr_date.isoformat(), d['category'], float(d['cost']),
-            f"è®¢é˜…ç»­è´¹: {d['name']} ({d['billing_cycle']})"
+            f"订阅续费: {d['name']} ({d['billing_cycle']})"
         ))
 
     db.execute("""
@@ -4551,8 +4599,8 @@ def api_roll_subscription(sub_id):
     """, (new_date.isoformat(), anchor_day, sub_id, user_id))
     db.commit()
     bump_data_version('subscription_roll', user_id=user_id)
-    extra_msg = 'ï¼Œå¹¶å·²è‡ªåŠ¨ç”Ÿæˆå½“æœŸè®°è´¦æ”¯å‡º' if record_expense else ''
-    flash(f"ã€{d['name']}ã€‘å·²æˆåŠŸç»­æœŸè‡³ {new_date.isoformat()}{extra_msg}ï¼", 'success')
+    extra_msg = '，并已自动生成当期记账支出' if record_expense else ''
+    flash(f"【{d['name']}】已成功续期至 {new_date.isoformat()}{extra_msg}！", 'success')
     return redirect(url_for('subscriptions_page'))
 
 
@@ -4563,11 +4611,11 @@ def api_delete_subscription(sub_id):
     db.execute("DELETE FROM subscriptions WHERE id = ? AND user_id = ?", (sub_id, user_id))
     db.commit()
     bump_data_version('subscription_delete', user_id=user_id)
-    flash('å·²åˆ é™¤è¯¥è®¢é˜…æœåŠ¡è®°å½•', 'success')
+    flash('已删除该订阅服务记录', 'success')
     return redirect(url_for('subscriptions_page'))
 
 
-# å¯åŠ¨æ—¶ç¡®ä¿æ•°æ®åº“åˆå§‹åŒ–
+# 启动时确保数据库初始化
 init_db()
 
 if __name__ == '__main__':

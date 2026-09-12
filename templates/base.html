@@ -1,218 +1,313 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#10213b">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="csrf-token" content="{{ csrf_token() }}">
-<title>{% block title %}我的记账本{% endblock %}</title>
-<link rel="manifest" href="/manifest.json">
-<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
-<link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-<link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260911_v5">
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#10213b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}我的记账本{% endblock %}</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260911_v5">
 </head>
+
 <body>
-<!-- 极速页面加载指示条 -->
-<div id="appProgressBar" class="app-progress-bar"></div>
+    <!-- 极速页面加载指示条 -->
+    <div id="appProgressBar" class="app-progress-bar"></div>
 
-<!-- 顶部沉浸式导航栏 -->
-<header class="app-header">
-    <div class="header-inner">
-        <div class="header-left">
-            <span class="app-avatar-badge">💰</span>
-            <a href="{{ url_for('index') }}" class="brand-link" hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true"><span class="brand">我的账本</span></a>
-        </div>
-        <!-- 桌面端导航链接 (分组下拉式) -->
-        <nav class="desktop-nav-links">
-          <!-- 主要入口 -->
-          <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}" data-nav="index" hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">仪表盘</a>
-          <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records" hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">历史记录</a>
-          <a href="{{ url_for('split_bill_page') }}" class="{{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill" hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">AA 分账</a>
-
-          <div class="nav-sep"></div>
-
-          <!-- 管理 dropdown -->
-          <div class="nav-group">
-            <button class="nav-group-trigger {% if request.endpoint in ('accounts_page','liabilities_page','subscriptions_page','recurring_page') %}active{% endif %}">
-              管理 <span class="nav-chevron">▾</span>
-            </button>
-            <div class="nav-dropdown">
-              <a href="{{ url_for('accounts_page') }}" class="{{ 'active' if request.endpoint == 'accounts_page' }}" data-nav="accounts" hx-get="{{ url_for('accounts_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
-                <span class="nav-icon">🏦</span>账户管理
-              </a>
-              <a href="{{ url_for('liabilities_page') }}" class="{{ 'active' if request.endpoint == 'liabilities_page' }}" data-nav="liabilities" hx-get="{{ url_for('liabilities_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
-                <span class="nav-icon">💳</span>负债分期
-              </a>
-              <a href="{{ url_for('subscriptions_page') }}" class="{{ 'active' if request.endpoint == 'subscriptions_page' }}" data-nav="subscriptions" hx-get="{{ url_for('subscriptions_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
-                <span class="nav-icon">🔄</span>订阅大厅
-              </a>
-              <a href="{{ url_for('recurring_page') }}" class="{{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring" hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
-                <span class="nav-icon">📅</span>固定收支
-              </a>
+    <!-- 顶部沉浸式导航栏 -->
+    <header class="app-header">
+        <div class="header-inner">
+            <div class="header-left">
+                <span class="app-avatar-badge">💰</span>
+                <a href="{{ url_for('index') }}" class="brand-link" hx-get="{{ url_for('index') }}"
+                    hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true"><span
+                        class="brand">我的账本</span></a>
             </div>
-          </div>
+            <!-- 桌面端导航链接 (分组下拉式) -->
+            <nav class="desktop-nav-links">
+                <!-- 主要入口 -->
+                <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}" data-nav="index"
+                    hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
+                    hx-push-url="true">仪表盘</a>
+                <a href="{{ url_for('records') }}"
+                    class="{{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records"
+                    hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
+                    hx-push-url="true">历史记录</a>
+                <a href="{{ url_for('split_bill_page') }}"
+                    class="{{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill"
+                    hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer"
+                    hx-swap="innerHTML show:window:top" hx-push-url="true">AA 分账</a>
 
-          <!-- 分析 dropdown -->
-          <div class="nav-group">
-            <button class="nav-group-trigger {% if request.endpoint in ('categories_page','category_insights_page','import_page','import_upload','import_confirm') %}active{% endif %}">
-              工具 <span class="nav-chevron">▾</span>
-            </button>
-            <div class="nav-dropdown">
-              <a href="{{ url_for('category_insights_page') }}" class="{{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
-                <span class="nav-icon">📊</span>分类洞察
-              </a>
-              <a href="{{ url_for('categories_page') }}" class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories" hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
-                <span class="nav-icon">🏷️</span>分类管理
-              </a>
-              <a href="{{ url_for('import_page') }}" class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
-                <span class="nav-icon">📤</span>批量导入
-              </a>
-            </div>
-          </div>
+                <div class="nav-sep"></div>
 
-          <div class="nav-sep"></div>
+                <!-- 管理 dropdown -->
+                <div class="nav-group">
+                    <button
+                        class="nav-group-trigger {% if request.endpoint in ('accounts_page','liabilities_page','subscriptions_page','recurring_page') %}active{% endif %}">
+                        管理 <span class="nav-chevron">▾</span>
+                    </button>
+                    <div class="nav-dropdown">
+                        <a href="{{ url_for('accounts_page') }}"
+                            class="{{ 'active' if request.endpoint == 'accounts_page' }}" data-nav="accounts"
+                            hx-get="{{ url_for('accounts_page') }}" hx-target="#mainContainer"
+                            hx-swap="innerHTML show:window:top" hx-push-url="true">
+                            <span class="nav-icon">🏦</span>账户管理
+                        </a>
+                        <a href="{{ url_for('liabilities_page') }}"
+                            class="{{ 'active' if request.endpoint == 'liabilities_page' }}" data-nav="liabilities"
+                            hx-get="{{ url_for('liabilities_page') }}" hx-target="#mainContainer"
+                            hx-swap="innerHTML show:window:top" hx-push-url="true">
+                            <span class="nav-icon">💳</span>负债分期
+                        </a>
+                        <a href="{{ url_for('subscriptions_page') }}"
+                            class="{{ 'active' if request.endpoint == 'subscriptions_page' }}" data-nav="subscriptions"
+                            hx-get="{{ url_for('subscriptions_page') }}" hx-target="#mainContainer"
+                            hx-swap="innerHTML show:window:top" hx-push-url="true">
+                            <span class="nav-icon">🔄</span>订阅大厅
+                        </a>
+                        <a href="{{ url_for('recurring_page') }}"
+                            class="{{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring"
+                            hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer"
+                            hx-swap="innerHTML show:window:top" hx-push-url="true">
+                            <span class="nav-icon">📅</span>固定收支
+                        </a>
+                    </div>
+                </div>
 
-          <!-- 用户区 -->
-          {% if session.get('username') %}
-          <span class="nav-user-pill">
-            <span class="nav-user-avatar">👤</span>
-            {{ session.username }}
-          </span>
-          {% endif %}
-          <a href="{{ url_for('logout') }}" class="nav-logout-btn" title="退出登录">登出</a>
-        </nav>
-    </div>
-</header>
+                <!-- 分析 dropdown -->
+                <div class="nav-group">
+                    <button
+                        class="nav-group-trigger {% if request.endpoint in ('categories_page','category_insights_page','import_page','import_upload','import_confirm') %}active{% endif %}">
+                        工具 <span class="nav-chevron">▾</span>
+                    </button>
+                    <div class="nav-dropdown">
+                        <a href="{{ url_for('category_insights_page') }}"
+                            class="{{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights"
+                            hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer"
+                            hx-swap="innerHTML show:window:top" hx-push-url="true">
+                            <span class="nav-icon">📊</span>分类洞察
+                        </a>
+                        <a href="{{ url_for('categories_page') }}"
+                            class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories"
+                            hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer"
+                            hx-swap="innerHTML show:window:top" hx-push-url="true">
+                            <span class="nav-icon">🏷️</span>分类管理
+                        </a>
+                        <a href="{{ url_for('import_page') }}"
+                            class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}"
+                            data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer"
+                            hx-swap="innerHTML show:window:top" hx-push-url="true">
+                            <span class="nav-icon">📤</span>批量导入
+                        </a>
+                    </div>
+                </div>
 
-<!-- 手机端底部 App 导航栏 (原生移动应用体验) -->
-<nav class="mobile-bottom-nav" id="mobileBottomNav">
-    <a href="{{ url_for('index') }}" class="bnav-item {{ 'active' if request.endpoint == 'index' }}" data-nav="index" hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
-        <span class="bnav-icon">📊</span>
-        <span class="bnav-label">概览</span>
-    </a>
-    <a href="{{ url_for('records') }}" class="bnav-item {{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records" hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
-        <span class="bnav-icon">📑</span>
-        <span class="bnav-label">明细</span>
-    </a>
-    <a href="{{ url_for('split_bill_page') }}" class="bnav-item {{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill" hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
-        <span class="bnav-icon">🧾</span>
-        <span class="bnav-label">AA分账</span>
-    </a>
-    <button type="button" class="bnav-item" id="btnMoreSheet" onclick="toggleMoreSheet()">
-        <span class="bnav-icon">⚙️</span>
-        <span class="bnav-label">更多</span>
-    </button>
-</nav>
+                <div class="nav-sep"></div>
 
-<!-- PWA 轻量安装浮动提示条 -->
-<div class="pwa-install-banner" id="pwaInstallBanner">
-    <span class="pwa-banner-icon">📲</span>
-    <div class="pwa-banner-text">
-        <div class="pwa-banner-title">安装为手机应用</div>
-        <div class="pwa-banner-desc">免开浏览器，享受全屏原生 App 体验</div>
-    </div>
-    <div class="pwa-banner-actions">
-        <button type="button" class="pwa-btn-install" onclick="installPwaApp()">安装</button>
-        <button type="button" class="pwa-btn-close" onclick="dismissPwaBanner()" title="暂不安装">✕</button>
-    </div>
-</div>
-
-<!-- 手机端“更多”功能底部弹层 (Bottom Sheet) -->
-<div class="mobile-sheet-backdrop" id="sheetBackdrop" onclick="toggleMoreSheet(false)"></div>
-<div class="mobile-bottom-sheet" id="moreSheet">
-    <div class="sheet-drag-handle" onclick="toggleMoreSheet(false)"></div>
-    <div class="sheet-header">
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <span>更多管理功能</span>
-            {% if session.get('username') %}
-            <span style="font-size: 12px; color: var(--gold); background: rgba(182,144,47,0.15); padding: 2px 8px; border-radius: 12px;">👤 {{ session.username }}</span>
-            {% endif %}
+                <!-- 用户区 -->
+                {% if session.get('username') %}
+                <span class="nav-user-pill">
+                    <span class="nav-user-avatar">👤</span>
+                    {{ session.username }}
+                </span>
+                {% endif %}
+                <a href="{{ url_for('logout') }}" class="nav-logout-btn" title="退出登录">登出</a>
+            </nav>
         </div>
-        <button type="button" class="sheet-close-btn" onclick="toggleMoreSheet(false)">✕</button>
-    </div>
-    <div class="sheet-grid">
-        <a href="{{ url_for('download_apk') }}" id="appDownloadTile" class="sheet-tile" onclick="handleAppDownloadClick(event)" download="我的账本.apk" style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08); position: relative;">
-            <span id="appDownloadBadge" style="display: none; position: absolute; top: 6px; right: 6px; font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 600; line-height: 1.2;"></span>
-            <span class="sheet-icon" id="appDownloadIcon">📱</span>
-            <span class="sheet-title" id="appDownloadTitle" style="font-weight: 600;">下载应用</span>
-            <span class="sheet-desc" id="appDownloadDesc">点击下载 Android 原生应用包</span>
-        </a>
-        <a href="{{ url_for('category_insights_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-            <span class="sheet-icon">📊</span>
-            <span class="sheet-title">分类洞察</span>
-            <span class="sheet-desc">支出环比与走势图</span>
-        </a>
-        <a href="{{ url_for('recurring_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring" hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-            <span class="sheet-icon">🔄</span>
-            <span class="sheet-title">固定收支</span>
-            <span class="sheet-desc">房租工资每月自动</span>
-        </a>
-        <a href="{{ url_for('liabilities_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'liabilities_page' }}" data-nav="liabilities" hx-get="{{ url_for('liabilities_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-            <span class="sheet-icon">💳</span>
-            <span class="sheet-title">负债分期</span>
-            <span class="sheet-desc">房贷车贷与免息分期</span>
-        </a>
-        <a href="{{ url_for('accounts_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'accounts_page' }}" data-nav="accounts" hx-get="{{ url_for('accounts_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-            <span class="sheet-icon">🏦</span>
-            <span class="sheet-title">账户管理</span>
-            <span class="sheet-desc">银行账户与信用卡</span>
-        </a>
-        <a href="{{ url_for('subscriptions_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'subscriptions_page' }}" data-nav="subscriptions" hx-get="{{ url_for('subscriptions_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-            <span class="sheet-icon">🔄</span>
-            <span class="sheet-title">订阅大厅</span>
-            <span class="sheet-desc">周期订阅与续费预警</span>
-        </a>
-        <a href="{{ url_for('categories_page') }}" class="sheet-tile {{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories" hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-            <span class="sheet-icon">🏷️</span>
-            <span class="sheet-title">分类管理</span>
-            <span class="sheet-desc">自定义收支类别</span>
-        </a>
-        <a href="{{ url_for('import_page') }}" class="sheet-tile {{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}" data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-            <span class="sheet-icon">📤</span>
-            <span class="sheet-title">批量导入</span>
-            <span class="sheet-desc">Excel/CSV 账单</span>
-        </a>
-        <a href="{{ url_for('logout') }}" class="sheet-tile">
-            <span class="sheet-icon">🚪</span>
-            <span class="sheet-title">退出登录</span>
-            <span class="sheet-desc">锁定当前账本</span>
-        </a>
-    </div>
-</div>
+    </header>
 
-<main class="container" id="mainContainer">
-    {% set other_msgs = [] %}
-    {% set success_msgs = [] %}
-    {% set error_msgs = [] %}
-    {% for category, message in get_flashed_messages(with_categories=true) %}
+    <!-- 手机端底部 App 导航栏 (原生移动应用体验) -->
+    <nav class="mobile-bottom-nav" id="mobileBottomNav">
+        <a href="{{ url_for('index') }}" class="bnav-item {{ 'active' if request.endpoint == 'index' }}"
+            data-nav="index" hx-get="{{ url_for('index') }}" hx-target="#mainContainer"
+            hx-swap="innerHTML show:window:top" hx-push-url="true">
+            <span class="bnav-icon">📊</span>
+            <span class="bnav-label">概览</span>
+        </a>
+        <a href="{{ url_for('records') }}"
+            class="bnav-item {{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records"
+            hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
+            hx-push-url="true">
+            <span class="bnav-icon">📑</span>
+            <span class="bnav-label">明细</span>
+        </a>
+        <a href="{{ url_for('split_bill_page') }}"
+            class="bnav-item {{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill"
+            hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
+            hx-push-url="true">
+            <span class="bnav-icon">🧾</span>
+            <span class="bnav-label">AA分账</span>
+        </a>
+        <button type="button" class="bnav-item" id="btnMoreSheet" onclick="toggleMoreSheet()">
+            <span class="bnav-icon">⚙️</span>
+            <span class="bnav-label">更多</span>
+        </button>
+    </nav>
+
+    <!-- PWA 轻量安装浮动提示条 -->
+    <div class="pwa-install-banner" id="pwaInstallBanner">
+        <span class="pwa-banner-icon">📲</span>
+        <div class="pwa-banner-text">
+            <div class="pwa-banner-title">安装为手机应用</div>
+            <div class="pwa-banner-desc">免开浏览器，享受全屏原生 App 体验</div>
+        </div>
+        <div class="pwa-banner-actions">
+            <button type="button" class="pwa-btn-install" onclick="installPwaApp()">安装</button>
+            <button type="button" class="pwa-btn-close" onclick="dismissPwaBanner()" title="暂不安装">✕</button>
+        </div>
+    </div>
+
+    <!-- 手机端“更多”功能底部弹层 (Bottom Sheet) -->
+    <div class="mobile-sheet-backdrop" id="sheetBackdrop" onclick="toggleMoreSheet(false)"></div>
+    <div class="mobile-bottom-sheet" id="moreSheet">
+        <div class="sheet-drag-handle" onclick="toggleMoreSheet(false)"></div>
+        <div class="sheet-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span>更多管理功能</span>
+                {% if session.get('username') %}
+                <span
+                    style="font-size: 12px; color: var(--gold); background: rgba(182,144,47,0.15); padding: 2px 8px; border-radius: 12px;">👤
+                    {{ session.username }}</span>
+                {% endif %}
+            </div>
+            <button type="button" class="sheet-close-btn" onclick="toggleMoreSheet(false)">✕</button>
+        </div>
+        <div class="sheet-grid">
+            <a href="{{ url_for('download_apk') }}" id="appDownloadTile" class="sheet-tile"
+                onclick="handleAppDownloadClick(event)" download="我的账本.apk"
+                style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08); position: relative;">
+                <span id="appDownloadBadge"
+                    style="display: none; position: absolute; top: 6px; right: 6px; font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 600; line-height: 1.2;"></span>
+                <span class="sheet-icon" id="appDownloadIcon">📱</span>
+                <span class="sheet-title" id="appDownloadTitle" style="font-weight: 600;">下载应用</span>
+                <span class="sheet-desc" id="appDownloadDesc">点击下载 Android 原生应用包</span>
+            </a>
+            <a href="{{ url_for('category_insights_page') }}"
+                class="sheet-tile {{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights"
+                hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer"
+                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                <span class="sheet-icon">📊</span>
+                <span class="sheet-title">分类洞察</span>
+                <span class="sheet-desc">支出环比与走势图</span>
+            </a>
+            <a href="{{ url_for('recurring_page') }}"
+                class="sheet-tile {{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring"
+                hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
+                hx-push-url="true" onclick="toggleMoreSheet(false)">
+                <span class="sheet-icon">🔄</span>
+                <span class="sheet-title">固定收支</span>
+                <span class="sheet-desc">房租工资每月自动</span>
+            </a>
+            <a href="{{ url_for('liabilities_page') }}"
+                class="sheet-tile {{ 'active' if request.endpoint == 'liabilities_page' }}" data-nav="liabilities"
+                hx-get="{{ url_for('liabilities_page') }}" hx-target="#mainContainer"
+                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                <span class="sheet-icon">💳</span>
+                <span class="sheet-title">负债分期</span>
+                <span class="sheet-desc">房贷车贷与免息分期</span>
+            </a>
+            <a href="{{ url_for('accounts_page') }}"
+                class="sheet-tile {{ 'active' if request.endpoint == 'accounts_page' }}" data-nav="accounts"
+                hx-get="{{ url_for('accounts_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
+                hx-push-url="true" onclick="toggleMoreSheet(false)">
+                <span class="sheet-icon">🏦</span>
+                <span class="sheet-title">账户管理</span>
+                <span class="sheet-desc">银行账户与信用卡</span>
+            </a>
+            <a href="{{ url_for('subscriptions_page') }}"
+                class="sheet-tile {{ 'active' if request.endpoint == 'subscriptions_page' }}" data-nav="subscriptions"
+                hx-get="{{ url_for('subscriptions_page') }}" hx-target="#mainContainer"
+                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                <span class="sheet-icon">🔄</span>
+                <span class="sheet-title">订阅大厅</span>
+                <span class="sheet-desc">周期订阅与续费预警</span>
+            </a>
+            <a href="{{ url_for('categories_page') }}"
+                class="sheet-tile {{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories"
+                hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
+                hx-push-url="true" onclick="toggleMoreSheet(false)">
+                <span class="sheet-icon">🏷️</span>
+                <span class="sheet-title">分类管理</span>
+                <span class="sheet-desc">自定义收支类别</span>
+            </a>
+            <a href="{{ url_for('import_page') }}"
+                class="sheet-tile {{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}"
+                data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer"
+                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                <span class="sheet-icon">📤</span>
+                <span class="sheet-title">批量导入</span>
+                <span class="sheet-desc">Excel/CSV 账单</span>
+            </a>
+            <a href="{{ url_for('logout') }}" class="sheet-tile">
+                <span class="sheet-icon">🚪</span>
+                <span class="sheet-title">退出登录</span>
+                <span class="sheet-desc">锁定当前账本</span>
+            </a>
+        </div>
+    </div>
+
+    <main class="container" id="mainContainer">
+        {% set other_msgs = [] %}
+        {% set success_msgs = [] %}
+        {% set error_msgs = [] %}
+        {% for category, message in get_flashed_messages(with_categories=true) %}
         {% if category == 'success' %}
-            {% set _ = success_msgs.append(message) %}
+        {% set _ = success_msgs.append(message) %}
         {% elif category == 'error' %}
-            {% set _ = error_msgs.append(message) %}
+        {% set _ = error_msgs.append(message) %}
         {% else %}
-            {% set _ = other_msgs.append(message) %}
+        {% set _ = other_msgs.append(message) %}
         {% endif %}
-    {% endfor %}
-    {% if other_msgs %}
-    <div class="flash">
-        {% for m in other_msgs %}<div class="flash-msg">{{ m }}</div>{% endfor %}
-    </div>
-    {% endif %}
+        {% endfor %}
+        {% if other_msgs %}
+        <div class="flash">
+            {% for m in other_msgs %}<div class="flash-msg">{{ m }}</div>{% endfor %}
+        </div>
+        {% endif %}
+        <script>
+            window.FLASH_SUCCESS = {{ success_msgs | tojson }};
+            window.FLASH_ERROR = {{ error_msgs | tojson }};
+            window.INITIAL_DATA_VERSION = {{ data_version | tojson }};
+        </script>
+        {% block content %}{% endblock %}
+    </main>
+    <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260911_v4"></script>
     <script>
-        window.FLASH_SUCCESS = {{ success_msgs | tojson }};
-        window.FLASH_ERROR = {{ error_msgs | tojson }};
-        window.INITIAL_DATA_VERSION = {{ data_version | tojson }};
+        // Nav dropdown: hover (CSS) + click to pin open/close
+        (function () {
+            var groups = document.querySelectorAll('.nav-group');
+            groups.forEach(function (group) {
+                var trigger = group.querySelector('.nav-group-trigger');
+                if (!trigger) return;
+                trigger.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    var wasPinned = group.classList.contains('pinned');
+                    groups.forEach(function (g) { g.classList.remove('pinned'); });
+                    if (!wasPinned) group.classList.add('pinned');
+                });
+                // Clicking a dropdown link unpins
+                group.querySelectorAll('.nav-dropdown a').forEach(function (a) {
+                    a.addEventListener('click', function () { group.classList.remove('pinned'); });
+                });
+            });
+            // Click outside → close all
+            document.addEventListener('click', function () {
+                groups.forEach(function (g) { g.classList.remove('pinned'); });
+            });
+        })();
     </script>
-    {% block content %}{% endblock %}
-</main>
-<script src="{{ url_for('static', filename='vendor/htmx.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-<script src="{{ url_for('static', filename='app.js') }}?v=20260911_v4"></script>
-{% block scripts %}{% endblock %}
+    {% block scripts %}{% endblock %}
 </body>
+
 </html>
