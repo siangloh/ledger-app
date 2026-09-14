@@ -37,18 +37,14 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 import turso_db
 from liabilities_tracker import (
-    generate_amortization_schedule,
     get_monthly_cashflow_events,
     sync_installments_to_monthly_statement
 )
 from subscription_tracker import (
     BillingCycle,
     SubscriptionStatus,
-    AlertLevel,
     Subscription,
-    calculateAnnualAndMonthlyBurnRate,
     rollToNextBillingDate,
-    getUpcomingRenewalsWithAlerts,
     buildSubscriptionDashboardSummary,
     default_mock_exchange_rate_provider
 )
@@ -1764,10 +1760,6 @@ def api_overview():
     avg_savings = total_savings / num_months
     net_savings = total_income - regular_expense - total_savings
 
-    all_savings_in = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = ? AND type='savings'", (user_id,)).fetchone()[0] or 0.0
-    all_savings_out = db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = ? AND type='expense' AND COALESCE(from_savings, 0)=1", (user_id,)).fetchone()[0] or 0.0
-    total_savings_pool = max(float(all_savings_in) - float(all_savings_out), 0.0)
-
     # 支出分类按金额降序排序
     sorted_exp = sorted(expense_cats.items(), key=lambda x: x[1], reverse=True)
     exp_labels = [k for k, v in sorted_exp]
@@ -2489,7 +2481,7 @@ def call_llm_json(prompt, system_instruction=None, timeout=None):
                 parsed = clean_and_parse_json(raw_response)
                 if parsed:
                     return parsed
-        except Exception as e:
+        except Exception:
             pass
 
     return None
@@ -2894,7 +2886,7 @@ def api_sync_transactions():
     synced_ids = []
     for item in txs:
         try:
-            cur = db.execute(
+            db.execute(
                 'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
                 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 (
@@ -3871,6 +3863,7 @@ def smart_orient_receipt_ocr(pil_img, engine):
     暴力 4 方向评测，杜绝任何提前退出的假阳性
     """
     from PIL import Image
+    import numpy as np
 
     # 强制评测 4 个方向: 0°, 顺时针90°(270), 顺时针180°, 顺时针270°(90)
     angle_candidates = [
@@ -4250,7 +4243,6 @@ def api_add_account():
 
 @app.route('/api/liabilities/sync', methods=['POST'])
 def api_sync_liabilities():
-    user_id = get_current_user_id()
     db = get_db()
     today_str = date.today().isoformat()
     res = sync_installments_to_monthly_statement(db, today_str)
@@ -4314,7 +4306,6 @@ def manage_add_account():
     statement_day = request.form.get('statement_day', '') or None
     due_day = request.form.get('due_day', '') or None
     grace_period_days = request.form.get('grace_period_days', '20') or '20'
-    note = request.form.get('note', '').strip() or None
 
     if not name:
         flash('账户名称不能为空', 'error')

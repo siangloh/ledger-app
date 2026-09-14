@@ -161,7 +161,9 @@ class TursoConnection:
                 buf.append(ch)
                 continue
             if ch == ';':
-                statements.append(''.join(buf).strip())
+                stmt = ''.join(buf).strip()
+                if stmt:
+                    statements.append(stmt)
                 buf = []
                 continue
             buf.append(ch)

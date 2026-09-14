@@ -14,3 +14,4 @@ android-companion/app/build/
 local.properties
 android-companion/local.properties
 .flask_secret_key
+.pytest_cache/
