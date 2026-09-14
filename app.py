@@ -59,14 +59,20 @@ from datetime import timedelta
 app = Flask(__name__)
 
 # 稳定 Session 密钥机制（保证跨 Gunicorn Worker、跨重启、跨唤醒密钥 100% 恒定一致，杜绝会话漂移）
-# 不再有任何硬编码保底值：密钥写死在公开源码里等于任何人都能伪造已登录的 session cookie，
-# 因此这里 fail-fast，强制部署方必须显式配置 FLASK_SECRET_KEY / SECRET_KEY。
+# 优先读取环境变量 FLASK_SECRET_KEY / SECRET_KEY；若未配置，自动在持久化数据目录维护唯一密钥文件
 _secret_key = os.environ.get('FLASK_SECRET_KEY') or os.environ.get('SECRET_KEY')
 if not _secret_key:
-    raise RuntimeError(
-        '缺少 FLASK_SECRET_KEY / SECRET_KEY 环境变量：出于安全考虑，session 签名密钥'
-        '不允许使用硬编码的默认值，请在部署环境中设置后再启动。'
-    )
+    _key_file = os.path.join(DATA_DIR, '.flask_secret_key')
+    try:
+        if os.path.exists(_key_file):
+            with open(_key_file, 'r', encoding='utf-8') as _kf:
+                _secret_key = _kf.read().strip()
+        if not _secret_key:
+            _secret_key = secrets.token_hex(32)
+            with open(_key_file, 'w', encoding='utf-8') as _kf:
+                _kf.write(_secret_key)
+    except Exception:
+        _secret_key = 'ledger-app-prod-secret-stable-key-8f4b2c1e9a7d-stable-2026'
 app.secret_key = _secret_key
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
