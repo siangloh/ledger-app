@@ -563,14 +563,22 @@ def scheduleRenewalCronJob(
                     "days_left": days_left
                 })
 
-        # 判定是否到达计费日 (扣款并前滚日期)
-        if days_left == 0 and sub.auto_renew and not sub.target_to_cancel:
-            new_next_date = rollToNextBillingDate(sub.next_billing_date, sub.billing_cycle, sub.anchor_day)
+        # 判定是否到达或错过了计费日 (扣款并前滚日期)
+        # 用 <= 0 而非 == 0：若某天的定时任务没有准时执行（部署中断、时钟漂移、重试延误），
+        # next_billing_date 会变成过去的日期而 days_left 变负，此时仍要前滚，
+        # 并且要循环滚动直到追上当前日期，避免只滚一次仍停留在过去。
+        if days_left <= 0 and sub.auto_renew and not sub.target_to_cancel:
+            new_next_date = sub.next_billing_date
+            new_anchor_day = sub.anchor_day
+            guard = 0
+            while (new_next_date - currentDate).days <= 0 and guard < 60:
+                new_next_date = rollToNextBillingDate(new_next_date, sub.billing_cycle, new_anchor_day)
+                guard += 1
             cursor.execute("""
                 UPDATE subscriptions
                 SET next_billing_date = ?, anchor_day = ?
                 WHERE id = ?
-            """, (new_next_date.isoformat(), sub.anchor_day, sub.id))
+            """, (new_next_date.isoformat(), new_anchor_day, sub.id))
             report["rolled_subscriptions"] += 1
             report["details"].append({
                 "sub_id": sub.id,

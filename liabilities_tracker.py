@@ -285,7 +285,22 @@ def sync_installments_to_monthly_statement(db_conn, current_date_str: str) -> Di
             is_done = (new_paid >= item['tenure_months'])
             new_status = 'completed' if is_done else 'active'
 
-            # 1. 在 transactions 表中写入支出流水
+            # 1. 先"认领"本期同步资格（乐观锁）：Turso 的 commit/rollback 是空操作，
+            # 没有真正的多语句事务保证，若先插入流水再更新状态，两次并发/重试调用会在
+            # 更新完成前的网络往返窗口内都读到旧状态，导致同一期分期被重复插入流水。
+            # 把 WHERE 条件收紧到与查询时相同的"未同步"状态，只有真正抢到这一行的调用
+            # 才会继续写入流水，从而把"重复插入"的风险换成更安全的"极端情况下漏记一条"。
+            claim = db_conn.execute("""
+                UPDATE installments
+                SET paid_periods = ?, status = ?, last_synced_month = ?
+                WHERE id = ? AND status = 'active' AND (last_synced_month IS NULL OR last_synced_month != ?)
+            """, (new_paid, new_status, curr_month_str, item['id'], curr_month_str))
+
+            if getattr(claim, 'rowcount', 1) == 0:
+                # 没抢到（已被另一次调用同步过），跳过，避免重复记账
+                continue
+
+            # 2. 认领成功后，在 transactions 表中写入支出流水
             db_conn.execute("""
                 INSERT INTO transactions (
                     user_id, date, type, group_name, category, amount, note, source, created_at
@@ -297,13 +312,6 @@ def sync_installments_to_monthly_statement(db_conn, current_date_str: str) -> Di
                 f"{item['title']} (第 {new_paid}/{item['tenure_months']} 期)",
                 datetime.now().isoformat()
             ))
-
-            # 2. 更新 installments 状态
-            db_conn.execute("""
-                UPDATE installments 
-                SET paid_periods = ?, status = ?, last_synced_month = ?
-                WHERE id = ?
-            """, (new_paid, new_status, curr_month_str, item['id']))
 
             synced_count += 1
             if is_done:
