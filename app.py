@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import hmac
 import json
 import uuid
 import secrets
@@ -62,11 +63,15 @@ from datetime import timedelta
 app = Flask(__name__)
 
 # 稳定 Session 密钥机制（保证跨 Gunicorn Worker、跨重启、跨唤醒密钥 100% 恒定一致，杜绝会话漂移）
-app.secret_key = (
-    os.environ.get('FLASK_SECRET_KEY')
-    or os.environ.get('SECRET_KEY')
-    or 'ledger-app-prod-secret-stable-key-8f4b2c1e9a7d-stable-2026'
-)
+# 不再有任何硬编码保底值：密钥写死在公开源码里等于任何人都能伪造已登录的 session cookie，
+# 因此这里 fail-fast，强制部署方必须显式配置 FLASK_SECRET_KEY / SECRET_KEY。
+_secret_key = os.environ.get('FLASK_SECRET_KEY') or os.environ.get('SECRET_KEY')
+if not _secret_key:
+    raise RuntimeError(
+        '缺少 FLASK_SECRET_KEY / SECRET_KEY 环境变量：出于安全考虑，session 签名密钥'
+        '不允许使用硬编码的默认值，请在部署环境中设置后再启动。'
+    )
+app.secret_key = _secret_key
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
@@ -114,7 +119,8 @@ def is_valid_api_key(req_key):
     if not effective:
         # 完全没有配置任何 key 时，拒绝所有请求，不回退到任何默认值
         return False
-    return str(req_key).strip() == effective
+    # 使用恒定时间比较，避免基于响应耗时差异推断出正确 key 的计时侧信道攻击
+    return hmac.compare_digest(str(req_key).strip().encode('utf-8'), effective.encode('utf-8'))
 
 # LLM 智能服务配置 (优先 Google Gemini，其次 OpenAI/DeepSeek，再回退本地 Ollama 与快速规则引擎)
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
@@ -3292,9 +3298,15 @@ def import_upload():
 @app.route('/import/confirm', methods=['POST'])
 def import_confirm():
     f = request.form
-    token = f.get('token')
-    ext = f.get('ext')
-    saved_path = os.path.join(UPLOAD_DIR, token + ext) if token and ext else None
+    token = f.get('token') or ''
+    ext = f.get('ext') or ''
+    # token/ext 是普通 hidden 表单字段，客户端可任意篡改；若不校验其格式就直接拼接路径，
+    # 攻击者传入类似 token='/etc/passwd', ext='' 之类的值即可让 saved_path 逃出 UPLOAD_DIR
+    # (os.path.join 遇到绝对路径分量会丢弃前面的目录)，构成任意文件读取。
+    # 因此这里严格校验 token 必须是 uuid4().hex 格式、ext 必须在允许的扩展名白名单内。
+    is_valid_token = bool(re.fullmatch(r'[0-9a-f]{32}', token))
+    is_valid_ext = ext in ('.csv', '.xlsx', '.xls')
+    saved_path = os.path.join(UPLOAD_DIR, token + ext) if is_valid_token and is_valid_ext else None
 
     if not saved_path or not os.path.exists(saved_path):
         flash('导入会话已过期，请重新上传文件', 'error')
@@ -3872,7 +3884,6 @@ def smart_orient_receipt_ocr(pil_img, engine):
     best_res = None
     max_score = -99999
 
-    print("\n========== [OCR Orientation Debugging] ==========", flush=True)
     app.logger.info("========== [OCR Orientation Debugging] ==========")
     for angle, img in angle_candidates:
         # 预处理后送入
@@ -3883,7 +3894,6 @@ def smart_orient_receipt_ocr(pil_img, engine):
 
         score, anchors = score_receipt_orientation(res)
         log_line = f"Angle {angle:3d}° -> Score: {score:5d} | Anchors Hit: {anchors} | Blocks: {len(res) if res else 0}"
-        print(log_line, flush=True)
         app.logger.info(log_line)
 
         if score > max_score:
@@ -3894,14 +3904,12 @@ def smart_orient_receipt_ocr(pil_img, engine):
         # 只要找到了核心结算关键词（如 TOTAL / RM / ORDER），说明方向绝对正了，可直接锁定
         if anchors >= 2:
             confirm_line = f">> Confirmed upright angle: {angle}° with {anchors} anchors."
-            print(confirm_line, flush=True)
             app.logger.info(confirm_line)
             best_angle = angle
             best_res = res
             break
 
     summary_line = f"========== Final Pick: {best_angle}° (Score: {max_score}) ==========\n"
-    print(summary_line, flush=True)
     app.logger.info(summary_line)
 
     if not best_res:

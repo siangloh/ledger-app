@@ -139,10 +139,36 @@ class TursoConnection:
 
     def executescript(self, script_str):
         cur = self.cursor()
-        for statement in script_str.split(';'):
-            stmt = statement.strip()
+        for stmt in self._split_statements(script_str):
             if stmt:
                 cur.execute(stmt)
+
+    @staticmethod
+    def _split_statements(script_str):
+        """按 ';' 切分多条语句，但忽略字符串字面量（'...'/"...")内部的分号，
+        避免像 note TEXT DEFAULT 'a;b' 这类内容被错误地切成两条语句。"""
+        statements = []
+        buf = []
+        quote_char = None
+        for ch in script_str:
+            if quote_char:
+                buf.append(ch)
+                if ch == quote_char:
+                    quote_char = None
+                continue
+            if ch in ("'", '"'):
+                quote_char = ch
+                buf.append(ch)
+                continue
+            if ch == ';':
+                statements.append(''.join(buf).strip())
+                buf = []
+                continue
+            buf.append(ch)
+        tail = ''.join(buf).strip()
+        if tail:
+            statements.append(tail)
+        return statements
 
     def commit(self):
         pass
