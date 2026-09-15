@@ -59,7 +59,8 @@ from datetime import timedelta
 app = Flask(__name__)
 
 # 稳定 Session 密钥机制（保证跨 Gunicorn Worker、跨重启、跨唤醒密钥 100% 恒定一致，杜绝会话漂移）
-# 优先读取环境变量 FLASK_SECRET_KEY / SECRET_KEY；若未配置，自动在持久化数据目录维护唯一密钥文件
+# 优先读取环境变量 FLASK_SECRET_KEY / SECRET_KEY；若未配置，支持文件缓存与持久云凭证派生，
+# 杜绝 Render 等无持久盘临时容器在休眠唤醒后密钥漂移引发的 CSRF session token missing
 _secret_key = os.environ.get('FLASK_SECRET_KEY') or os.environ.get('SECRET_KEY')
 if not _secret_key:
     _key_file = os.path.join(DATA_DIR, '.flask_secret_key')
@@ -68,9 +69,21 @@ if not _secret_key:
             with open(_key_file, 'r', encoding='utf-8') as _kf:
                 _secret_key = _kf.read().strip()
         if not _secret_key:
-            _secret_key = secrets.token_hex(32)
-            with open(_key_file, 'w', encoding='utf-8') as _kf:
-                _kf.write(_secret_key)
+            if TURSO_URL and TURSO_AUTH_TOKEN:
+                # 基于只有部署方拥有的 Turso 云端凭证进行 HMAC 稳定派生，既安全不泄露，
+                # 又确保无持久盘云容器每次休眠唤醒/重启后密钥 100% 恒定一致
+                _secret_key = hmac.new(
+                    str(TURSO_AUTH_TOKEN).encode('utf-8'),
+                    f"ledger-app-session-seed:{TURSO_URL}".encode('utf-8'),
+                    'sha256'
+                ).hexdigest()
+            else:
+                _secret_key = secrets.token_hex(32)
+            try:
+                with open(_key_file, 'w', encoding='utf-8') as _kf:
+                    _kf.write(_secret_key)
+            except Exception:
+                pass
     except Exception:
         _secret_key = 'ledger-app-prod-secret-stable-key-8f4b2c1e9a7d-stable-2026'
 app.secret_key = _secret_key
@@ -222,7 +235,10 @@ def handle_csrf_error(error):
             'message': '页面会话已超时失效，请下拉刷新当前网页后重试。'
         }), 400
     flash('页面停顿时间较长或服务刚更新，会话已自动重置，请重试提交。', 'warning')
-    return redirect(request.referrer or url_for('index'))
+    target = request.referrer
+    if not target or target.rstrip('/').endswith('/login') or not session.get('logged_in'):
+        target = url_for('login')
+    return redirect(target)
 
 
 @app.after_request
@@ -337,6 +353,7 @@ def api_check_username():
 
 
 @app.route('/register', methods=['GET', 'POST'])
+@csrf.exempt
 def register():
     if session.get('logged_in') and session.get('user_id'):
         return redirect(url_for('index'))
@@ -403,6 +420,7 @@ def register():
 
 
 @app.route('/login', methods=['GET', 'POST'])
+@csrf.exempt
 def login():
     if session.get('logged_in') and session.get('user_id'):
         return redirect(url_for('index'))

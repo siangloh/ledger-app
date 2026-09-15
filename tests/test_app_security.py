@@ -106,3 +106,18 @@ def test_import_confirm_rejects_tampered_token_or_extension(logged_in_client, to
     # whatever file the tampered path happened to point at.
     assert resp.status_code in (302, 303)
     assert "/import" in resp.headers["Location"]
+
+
+def test_login_and_register_are_csrf_exempt_to_prevent_login_loops(client):
+    """Regression test: /login and /register must be exempt from CSRF protection
+    to prevent login loop / session token missing errors across idle wakeups and
+    ephemeral container restarts."""
+    resp = client.post(
+        "/login",
+        data={"username": "invalid_user", "password": "WrongPassword123!"},
+        follow_redirects=False,
+    )
+    # Reaches credential verification (not intercepted by CSRF errorhandler)
+    assert resp.status_code == 401
+    assert b"\xe7\x94\xa8\xe6\x88\xb7\xe5\x90\x8d\xe6\x88\x96\xe5\xaf\x86\xe7\xa0\x81\xe9\x94\x99\xe8\xaf\xaf" in resp.data or b"login" in resp.data
+
