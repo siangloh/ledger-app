@@ -18,11 +18,37 @@ object NetworkHelper {
     private const val PREFS_NAME = "ledger_network_prefs"
     private const val KEY_SERVER_URL = "custom_server_url"
 
+    const val DEFAULT_API_KEY = "zo}SxK_}_%0LO8w;"
+    private const val KEY_API_KEY = "custom_api_key"
+
     private var cachedContext: Context? = null
-    private val API_KEY = BuildConfig.API_KEY
 
     fun init(context: Context) {
         cachedContext = context.applicationContext
+    }
+
+    fun getApiKey(context: Context? = null): String {
+        val ctx = context ?: cachedContext
+        val spKey = ctx?.let {
+            try {
+                it.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .getString(KEY_API_KEY, null)?.trim()
+            } catch (_: Exception) { null }
+        }
+        if (!spKey.isNullOrEmpty()) return spKey
+        val buildKey = BuildConfig.API_KEY.trim()
+        if (buildKey.isNotEmpty()) return buildKey
+        return DEFAULT_API_KEY
+    }
+
+    fun setApiKey(context: Context, key: String) {
+        val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val clean = key.trim()
+        if (clean.isEmpty() || clean == DEFAULT_API_KEY) {
+            sp.edit().remove(KEY_API_KEY).apply()
+        } else {
+            sp.edit().putString(KEY_API_KEY, clean).apply()
+        }
     }
 
     fun getServerUrl(context: Context? = null): String {
@@ -66,7 +92,7 @@ object NetworkHelper {
                 val url = URL(fullUrl)
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
-                conn.setRequestProperty("X-API-KEY", API_KEY)
+                conn.setRequestProperty("X-API-KEY", getApiKey(context))
                 conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 conn.connectTimeout = 15000
                 conn.readTimeout = 15000
@@ -114,7 +140,7 @@ object NetworkHelper {
                 val url = URL(fullUrl)
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
-                conn.setRequestProperty("X-API-KEY", API_KEY)
+                conn.setRequestProperty("X-API-KEY", getApiKey())
                 conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 conn.connectTimeout = 15000
                 conn.readTimeout = 15000
@@ -180,7 +206,7 @@ object NetworkHelper {
                 val url = URL(fullUrl)
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"
-                conn.setRequestProperty("X-API-KEY", API_KEY)
+                conn.setRequestProperty("X-API-KEY", getApiKey())
                 conn.connectTimeout = 10000
                 conn.readTimeout = 10000
 

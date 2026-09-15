@@ -80,6 +80,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        tryReconnectNotificationListener()
         // 回到前台时，如果有网络则触发一次后台同步
         if (NetworkHelper.isOnline(this)) {
             SyncWorker.enqueueSync(this)
@@ -283,7 +284,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showQuickMenu() {
-        val options = arrayOf("⚡ 离线快速记账", "⚙️ 监测的应用设置", "📋 查看通知与同步日志", "🔄 手动同步", "🌐 服务器地址设置")
+        val options = arrayOf("⚡ 离线快速记账", "⚙️ 监测的应用设置", "📋 查看通知与同步日志", "🔄 手动同步", "🌐 服务器地址设置", "🔑 自动记账 API Key 设置")
         AlertDialog.Builder(this)
             .setTitle("快捷菜单")
             .setItems(options) { _, which ->
@@ -296,6 +297,7 @@ class MainActivity : AppCompatActivity() {
                         Toast.makeText(this, "已发起后台同步请求", Toast.LENGTH_SHORT).show()
                     }
                     4 -> showServerUrlDialog()
+                    5 -> showApiKeyDialog()
                 }
             }
             .show()
@@ -324,6 +326,39 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("取消", null)
             .show()
+    }
+
+    private fun showApiKeyDialog() {
+        val input = android.widget.EditText(this).apply {
+            setText(NetworkHelper.getApiKey(this@MainActivity))
+            setSelection(text.length)
+            hint = NetworkHelper.DEFAULT_API_KEY
+        }
+        AlertDialog.Builder(this)
+            .setTitle("🔑 自动记账 API Key 设置")
+            .setMessage("请确保与 Web 网页端「Auto Track 自动记账」页面显示的 API Key 一致：")
+            .setView(input)
+            .setPositiveButton("保存") { _, _ ->
+                val newKey = input.text.toString().trim()
+                NetworkHelper.setApiKey(this, newKey)
+                Toast.makeText(this, "API Key 已更新", Toast.LENGTH_SHORT).show()
+            }
+            .setNeutralButton("恢复默认") { _, _ ->
+                NetworkHelper.setApiKey(this, "")
+                Toast.makeText(this, "已恢复为默认 API Key", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun tryReconnectNotificationListener() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isNotificationServiceEnabled()) {
+            try {
+                android.service.notification.NotificationListenerService.requestRebind(
+                    ComponentName(this, NotificationService::class.java)
+                )
+            } catch (_: Exception) {}
+        }
     }
 
     // ---------------------------------------------------------------------

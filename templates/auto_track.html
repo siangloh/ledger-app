@@ -14,19 +14,27 @@
   <section class="panel">
     <h3>🔗 你的专属接收网关 (Webhook URL)</h3>
     <div style="background: var(--surface-soft); padding: 14px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin: 12px 0 18px;">
-      <div style="font-size: 12px; color: var(--navy); font-weight: 600; margin-bottom: 6px;">
-        Webhook 地址（需配合 X-API-KEY 请求头使用，MacroDroid 的 HTTP Request 动作支持自定义 Header）：
+      <div style="font-size: 12.5px; color: var(--navy); font-weight: 700; margin-bottom: 6px;">
+        ⭐ 方式一：一体化免 Header 接收地址（强烈推荐给 MacroDroid / 快捷指令用户，复制即用）：
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px;">
+        <input type="text" id="webhookWithKeyInput" value="{{ webhook_url_with_key }}" readonly style="font-family: var(--font-mono); font-size: 12px; background: #fff;">
+        <button type="button" class="btn-primary" onclick="copyText('webhookWithKeyInput', '免 Header 一体化 Webhook 地址已复制')" style="white-space: nowrap; font-size: 12px;">复制一体化地址</button>
+      </div>
+      <div style="font-size: 11.5px; color: var(--muted); margin-bottom: 12px;">
+        该网址已包含专属 API Key 参数，在 MacroDroid 中只需填入 URL，<strong>无需繁琐配置任何请求头 (Headers)</strong>。
+      </div>
+
+      <div style="font-size: 12px; color: var(--ink-soft); font-weight: 600; margin-bottom: 4px;">
+        方式二：标准 Webhook 地址（配合 X-API-KEY 请求头使用）：
       </div>
       <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px;">
         <input type="text" id="webhookInput" value="{{ webhook_url }}" readonly style="font-family: var(--font-mono); font-size: 12px; background: #fff;">
-        <button type="button" class="btn-secondary" onclick="copyText('webhookInput', '标准 Webhook 地址已复制')" style="white-space: nowrap; font-size: 12px;">复制</button>
-      </div>
-      <div style="font-size: 11.5px; color: var(--muted); margin-bottom: 6px;">
-        出于安全考虑，密钥不再支持放在网址里（?key=...），这种写法容易被 server 日志、浏览器历史记录留下痕迹。请把下方 API Key 设置成一个叫 <code style="font-family: var(--font-mono);">X-API-KEY</code> 的请求头。
+        <button type="button" class="btn-secondary" onclick="copyText('webhookInput', '标准 Webhook 地址已复制')" style="white-space: nowrap; font-size: 12px;">复制标准地址</button>
       </div>
 
       <div style="display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; margin-top: 10px;">
-        <span style="color: var(--green);">✓ 安全保护已激活：API Key = <code style="font-family: var(--font-mono); background: var(--border-soft); padding: 2px 6px; border-radius: 4px;">{{ api_key }}</code></span>
+        <span style="color: var(--green);">✓ API Key = <code style="font-family: var(--font-mono); background: var(--border-soft); padding: 2px 6px; border-radius: 4px;">{{ api_key }}</code></span>
         {% if llm_info %}
         <span style="color: var(--primary); font-weight: 500;">🤖 AI 智能引擎：{{ llm_info.name }} 已就绪</span>
         {% endif %}

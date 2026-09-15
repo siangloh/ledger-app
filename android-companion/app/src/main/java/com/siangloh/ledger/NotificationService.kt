@@ -29,14 +29,15 @@ class NotificationService : NotificationListenerService() {
 
         // 交易动作/动词与标识
         val TRANSACTION_VERBS = listOf(
-            "paid", "spent", "transferred", "transfer", "debited", "payment",
-            "received", "credited", "付款", "扣款", "转账", "收款", "支付", "已支付",
-            "duitnow", "qr pay", "to ", "from ", "successful", "completed", "you have paid",
-            "you've paid", "sent to"
+            "paid", "spent", "transferred", "transfer", "debited", "debit", "payment",
+            "received", "credited", "credit", "purchase", "purchased", "bought", "charge",
+            "charged", "transaction", "txn", "付款", "扣款", "转账", "收款", "支付", "已支付",
+            "消费", "支出", "duitnow", "qr pay", "to ", "from ", "successful", "completed",
+            "you have paid", "you've paid", "sent to", "sent", "reload", "top up"
         )
 
-        // 宽松金额格式正则：支持整数、单小数位、双小数位及千分位逗号 (例如 RM15, RM 15.5, RM 15.50, RM 1,250.00, MYR 20)
-        val AMOUNT_REGEX = Regex("""(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)""", RegexOption.IGNORE_CASE)
+        // 宽松金额格式正则：支持整数、单小数位、双小数位及千分位逗号 (例如 RM15, RM 15.5, RM 15.50, RM 1,250.00, MYR 20, $15.00)
+        val AMOUNT_REGEX = Regex("""(?:RM|MYR|\$)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)""", RegexOption.IGNORE_CASE)
     }
 
     override fun onListenerConnected() {

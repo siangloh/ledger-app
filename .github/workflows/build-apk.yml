@@ -34,6 +34,11 @@ jobs:
         with:
           gradle-version: '8.4'
 
+      - name: Configure Auto Track API Key
+        run: |
+          mkdir -p android-companion
+          echo "AUTO_TRACK_KEY=zo}SxK_}_%0LO8w;" >> android-companion/local.properties
+
       - name: Build Android Debug APK
         working-directory: ./android-companion
         run: gradle assembleDebug --stacktrace
