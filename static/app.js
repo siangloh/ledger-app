@@ -2207,20 +2207,31 @@ function updateActiveNav(urlStr) {
   else if (path.startsWith('/records')) navKey = 'records';
   else if (path.startsWith('/split-bill')) navKey = 'split-bill';
   else if (path.startsWith('/auto-track')) navKey = 'auto-track';
-  else if (path.startsWith('/recurring')) navKey = 'recurring';
+  else if (path.startsWith('/accounts')) navKey = 'accounts';
   else if (path.startsWith('/liabilities')) navKey = 'liabilities';
   else if (path.startsWith('/subscriptions')) navKey = 'subscriptions';
+  else if (path.startsWith('/recurring')) navKey = 'recurring';
   else if (path.startsWith('/categories/insights')) navKey = 'insights';
   else if (path.startsWith('/categories')) navKey = 'categories';
   else if (path.startsWith('/import')) navKey = 'import';
 
-  // 同步桌面端导航高亮
-  document.querySelectorAll('.desktop-nav-links a').forEach(a => {
+  // 同步桌面端导航链接高亮
+  document.querySelectorAll('.desktop-nav-links a[data-nav]').forEach(a => {
     a.classList.toggle('active', a.dataset.nav === navKey);
   });
 
-  // 同步手机端底部导航高亮（如果是二级功能如分类洞察、固定收支、负债分期、订阅大厅、分类管理、批量导入，则高亮“更多”按钮）
-  const isSecondaryPage = ['insights', 'recurring', 'categories', 'import', 'auto-track', 'liabilities', 'subscriptions'].includes(navKey);
+  // 同步桌面端下拉菜单父级按钮高亮 (管理 / 工具)
+  document.querySelectorAll('.nav-group').forEach(group => {
+    const trigger = group.querySelector('.nav-group-trigger');
+    if (trigger) {
+      const hasActiveChild = Array.from(group.querySelectorAll('a[data-nav]'))
+        .some(a => a.dataset.nav === navKey);
+      trigger.classList.toggle('active', hasActiveChild);
+    }
+  });
+
+  // 同步手机端底部导航高亮（如果是二级功能如账户管理、固定收支、负债分期、订阅大厅、分类管理、分类洞察、批量导入，则高亮“更多”按钮）
+  const isSecondaryPage = ['accounts', 'liabilities', 'subscriptions', 'recurring', 'insights', 'categories', 'import', 'auto-track'].includes(navKey);
   document.querySelectorAll('.mobile-bottom-nav .bnav-item').forEach(btn => {
     if (btn.id === 'btnMoreSheet') {
       btn.classList.toggle('active', isSecondaryPage);

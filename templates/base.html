@@ -38,11 +38,11 @@
                     hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
                     hx-push-url="true">仪表盘</a>
                 <a href="{{ url_for('records') }}"
-                    class="{{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records"
+                    class="{{ 'active' if request.endpoint.split('.')[-1] in ('records','edit_record') }}" data-nav="records"
                     hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
                     hx-push-url="true">历史记录</a>
                 <a href="{{ url_for('split_bill_page') }}"
-                    class="{{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill"
+                    class="{{ 'active' if request.endpoint.split('.')[-1] == 'split_bill_page' }}" data-nav="split-bill"
                     hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer"
                     hx-swap="innerHTML show:window:top" hx-push-url="true">AA 分账</a>
 
@@ -51,30 +51,30 @@
                 <!-- 管理 dropdown -->
                 <div class="nav-group">
                     <button
-                        class="nav-group-trigger {% if request.endpoint in ('accounts_page','liabilities_page','subscriptions_page','recurring_page') %}active{% endif %}">
+                        class="nav-group-trigger {% if request.endpoint.split('.')[-1] in ('accounts_page','liabilities_page','subscriptions_page','recurring_page') %}active{% endif %}">
                         管理 <span class="nav-chevron">▾</span>
                     </button>
                     <div class="nav-dropdown">
                         <a href="{{ url_for('accounts_page') }}"
-                            class="{{ 'active' if request.endpoint == 'accounts_page' }}" data-nav="accounts"
+                            class="{{ 'active' if request.endpoint.split('.')[-1] == 'accounts_page' }}" data-nav="accounts"
                             hx-get="{{ url_for('accounts_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
                             <span class="nav-icon">🏦</span>账户管理
                         </a>
                         <a href="{{ url_for('liabilities_page') }}"
-                            class="{{ 'active' if request.endpoint == 'liabilities_page' }}" data-nav="liabilities"
+                            class="{{ 'active' if request.endpoint.split('.')[-1] == 'liabilities_page' }}" data-nav="liabilities"
                             hx-get="{{ url_for('liabilities_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
                             <span class="nav-icon">💳</span>负债分期
                         </a>
                         <a href="{{ url_for('subscriptions_page') }}"
-                            class="{{ 'active' if request.endpoint == 'subscriptions_page' }}" data-nav="subscriptions"
+                            class="{{ 'active' if request.endpoint.split('.')[-1] == 'subscriptions_page' }}" data-nav="subscriptions"
                             hx-get="{{ url_for('subscriptions_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
                             <span class="nav-icon">🔄</span>订阅大厅
                         </a>
                         <a href="{{ url_for('recurring_page') }}"
-                            class="{{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring"
+                            class="{{ 'active' if request.endpoint.split('.')[-1] == 'recurring_page' }}" data-nav="recurring"
                             hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
                             <span class="nav-icon">📅</span>固定收支
@@ -85,24 +85,24 @@
                 <!-- 分析 dropdown -->
                 <div class="nav-group">
                     <button
-                        class="nav-group-trigger {% if request.endpoint in ('categories_page','category_insights_page','import_page','import_upload','import_confirm') %}active{% endif %}">
+                        class="nav-group-trigger {% if request.endpoint.split('.')[-1] in ('categories_page','category_insights_page','import_page','import_upload','import_confirm') %}active{% endif %}">
                         工具 <span class="nav-chevron">▾</span>
                     </button>
                     <div class="nav-dropdown">
                         <a href="{{ url_for('category_insights_page') }}"
-                            class="{{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights"
+                            class="{{ 'active' if request.endpoint.split('.')[-1] == 'category_insights_page' }}" data-nav="insights"
                             hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
                             <span class="nav-icon">📊</span>分类洞察
                         </a>
                         <a href="{{ url_for('categories_page') }}"
-                            class="{{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories"
+                            class="{{ 'active' if request.endpoint.split('.')[-1] == 'categories_page' }}" data-nav="categories"
                             hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
                             <span class="nav-icon">🏷️</span>分类管理
                         </a>
                         <a href="{{ url_for('import_page') }}"
-                            class="{{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}"
+                            class="{{ 'active' if request.endpoint.split('.')[-1] in ('import_page','import_upload','import_confirm') }}"
                             data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
                             <span class="nav-icon">📤</span>批量导入
@@ -133,14 +133,14 @@
             <span class="bnav-label">概览</span>
         </a>
         <a href="{{ url_for('records') }}"
-            class="bnav-item {{ 'active' if request.endpoint in ('records','edit_record') }}" data-nav="records"
+            class="bnav-item {{ 'active' if request.endpoint.split('.')[-1] in ('records','edit_record') }}" data-nav="records"
             hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
             hx-push-url="true">
             <span class="bnav-icon">📑</span>
             <span class="bnav-label">明细</span>
         </a>
         <a href="{{ url_for('split_bill_page') }}"
-            class="bnav-item {{ 'active' if request.endpoint == 'split_bill_page' }}" data-nav="split-bill"
+            class="bnav-item {{ 'active' if request.endpoint.split('.')[-1] == 'split_bill_page' }}" data-nav="split-bill"
             hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
             hx-push-url="true">
             <span class="bnav-icon">🧾</span>
@@ -191,7 +191,7 @@
                 <span class="sheet-desc" id="appDownloadDesc">点击下载 Android 原生应用包</span>
             </a>
             <a href="{{ url_for('category_insights_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint == 'category_insights_page' }}" data-nav="insights"
+                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'category_insights_page' }}" data-nav="insights"
                 hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer"
                 hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">📊</span>
@@ -199,15 +199,15 @@
                 <span class="sheet-desc">支出环比与走势图</span>
             </a>
             <a href="{{ url_for('recurring_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint == 'recurring_page' }}" data-nav="recurring"
-                hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
-                hx-push-url="true" onclick="toggleMoreSheet(false)">
+                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'recurring_page' }}" data-nav="recurring"
+                hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer"
+                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">🔄</span>
                 <span class="sheet-title">固定收支</span>
                 <span class="sheet-desc">房租工资每月自动</span>
             </a>
             <a href="{{ url_for('liabilities_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint == 'liabilities_page' }}" data-nav="liabilities"
+                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'liabilities_page' }}" data-nav="liabilities"
                 hx-get="{{ url_for('liabilities_page') }}" hx-target="#mainContainer"
                 hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">💳</span>
@@ -215,15 +215,15 @@
                 <span class="sheet-desc">房贷车贷与免息分期</span>
             </a>
             <a href="{{ url_for('accounts_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint == 'accounts_page' }}" data-nav="accounts"
-                hx-get="{{ url_for('accounts_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
-                hx-push-url="true" onclick="toggleMoreSheet(false)">
+                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'accounts_page' }}" data-nav="accounts"
+                hx-get="{{ url_for('accounts_page') }}" hx-target="#mainContainer"
+                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">🏦</span>
                 <span class="sheet-title">账户管理</span>
                 <span class="sheet-desc">银行账户与信用卡</span>
             </a>
             <a href="{{ url_for('subscriptions_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint == 'subscriptions_page' }}" data-nav="subscriptions"
+                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'subscriptions_page' }}" data-nav="subscriptions"
                 hx-get="{{ url_for('subscriptions_page') }}" hx-target="#mainContainer"
                 hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">🔄</span>
@@ -231,15 +231,15 @@
                 <span class="sheet-desc">周期订阅与续费预警</span>
             </a>
             <a href="{{ url_for('categories_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint == 'categories_page' }}" data-nav="categories"
-                hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
-                hx-push-url="true" onclick="toggleMoreSheet(false)">
+                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'categories_page' }}" data-nav="categories"
+                hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer"
+                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">🏷️</span>
                 <span class="sheet-title">分类管理</span>
                 <span class="sheet-desc">自定义收支类别</span>
             </a>
             <a href="{{ url_for('import_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint in ('import_page','import_upload','import_confirm') }}"
+                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] in ('import_page','import_upload','import_confirm') }}"
                 data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer"
                 hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">📤</span>
@@ -282,7 +282,7 @@
     <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260911_v4"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260915_v5"></script>
     <script>
         // Nav dropdown: hover (CSS) + click to pin open/close
         (function () {
@@ -305,6 +305,8 @@
             document.addEventListener('click', function () {
                 groups.forEach(function (g) { g.classList.remove('pinned'); });
             });
+        })();
+    </script>
     {% if session.get('username') %}
     <script>
         (function () {
