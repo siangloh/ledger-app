@@ -133,7 +133,7 @@ def is_valid_api_key(req_key):
     req_bytes = str(req_key).strip().encode('utf-8')
     if effective and hmac.compare_digest(req_bytes, effective.encode('utf-8')):
         return True
-    if not AUTO_TRACK_KEY and hmac.compare_digest(req_bytes, DEFAULT_AUTO_TRACK_KEY.encode('utf-8')):
+    if DEFAULT_AUTO_TRACK_KEY and hmac.compare_digest(req_bytes, DEFAULT_AUTO_TRACK_KEY.encode('utf-8')):
         return True
     return False
 

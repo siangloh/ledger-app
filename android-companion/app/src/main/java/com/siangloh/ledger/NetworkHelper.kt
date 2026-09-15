@@ -94,8 +94,8 @@ object NetworkHelper {
                 conn.requestMethod = "POST"
                 conn.setRequestProperty("X-API-KEY", getApiKey(context))
                 conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                conn.connectTimeout = 15000
-                conn.readTimeout = 15000
+                conn.connectTimeout = 30000
+                conn.readTimeout = 30000
                 conn.doOutput = true
 
                 val jsonPayload = JSONObject().apply {

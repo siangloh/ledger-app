@@ -14,7 +14,7 @@ object AppSelectionManager {
         "tng", "touch", "ewallet", "publicbank", "mypb", "maybank",
         "cimb", "rhb", "hongleong", "ambank", "boost", "grabpay",
         "shopeepay", "bigpay", "merchantrade", "hsbc", "ocbc", "uob",
-        "affin", "bankislam", "alliance"
+        "affin", "bankislam", "alliance", "mms", "sms", "messaging"
     )
 
     val DEFAULT_PACKAGES = setOf(
@@ -31,7 +31,10 @@ object AppSelectionManager {
         "com.myboost",
         "com.grabtaxi.passenger",
         "com.shopee.my",
-        "my.bigpay.app"
+        "my.bigpay.app",
+        "com.google.android.apps.messaging",
+        "com.samsung.android.messaging",
+        "com.android.mms"
     )
 
     private fun getPrefs(context: Context): SharedPreferences {

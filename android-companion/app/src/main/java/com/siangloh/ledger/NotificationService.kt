@@ -36,8 +36,8 @@ class NotificationService : NotificationListenerService() {
             "you have paid", "you've paid", "sent to", "sent", "reload", "top up"
         )
 
-        // 宽松金额格式正则：支持整数、单小数位、双小数位及千分位逗号 (例如 RM15, RM 15.5, RM 15.50, RM 1,250.00, MYR 20, $15.00)
-        val AMOUNT_REGEX = Regex("""(?:RM|MYR|\$)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)""", RegexOption.IGNORE_CASE)
+        // 宽松金额格式正则：支持带 RM/MYR/$ 货币符号，或纯数字小数金额 (例如 RM15, RM 15.5, RM 15.50, 15.50, RM 1,250.00, MYR 20, $15.00)
+        val AMOUNT_REGEX = Regex("""(?:(?:RM|MYR|\$)\s*[0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|(?:RM|MYR|\$)\s*[0-9]+|\b[0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{1,2}\b|\b[0-9]+\.[0-9]{1,2}\b)""", RegexOption.IGNORE_CASE)
     }
 
     override fun onListenerConnected() {
@@ -124,7 +124,7 @@ class NotificationService : NotificationListenerService() {
         // 5. 通过 Phase-1 检验，尝试发送给后端（或离线加入 Room 队列）
         if (NetworkHelper.isOnline(this)) {
             Log.i(TAG, "Posting transaction notification to backend...")
-            NetworkHelper.postNotificationAsync(fullContent) { success, msg, verdict ->
+            NetworkHelper.postNotificationAsync(fullContent, this) { success, msg, verdict ->
                 serviceScope.launch {
                     val finalOutcome = if (verdict == "rejected_promo") {
                         "synced_rejected_promo"
