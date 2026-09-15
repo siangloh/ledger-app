@@ -1,0 +1,501 @@
+import os
+import re
+from datetime import datetime, date
+from urllib.parse import unquote
+from flask import Blueprint, request, jsonify, render_template, session, send_from_directory, current_app
+
+from core.db import get_db, bump_data_version, get_current_user_id, seed_learning_samples
+from core.config import (
+    is_valid_api_key,
+    get_auto_track_key,
+    get_active_llm_provider,
+    AUTO_TRACK_DEBUG_LOG
+)
+from services.notification_service import parse_auto_track_notification
+from services.ai_service import classify_notification_with_llm
+from core.utils import money_filter, check_and_record_budget_alerts
+from core.extensions import csrf
+
+auto_track_bp = Blueprint('auto_track', __name__)
+
+
+@auto_track_bp.route('/api/auto-track', methods=['GET', 'POST'], endpoint='api_auto_track')
+@csrf.exempt
+def api_auto_track():
+    req_key = request.headers.get('X-API-KEY')
+    data = {}
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        if not req_key:
+            req_key = data.get('key')
+    else:
+        req_key = req_key or request.form.get('key')
+
+    if not req_key:
+        req_key = request.args.get('key')
+
+    raw_payload = request.get_data(as_text=True)
+    text = request.args.get('text') or ""
+
+    if not text and request.is_json:
+        try:
+            data = request.get_json(silent=True) or {}
+            if isinstance(data, dict):
+                text = data.get('text') or data.get('body') or data.get('message') or ""
+        except Exception:
+            pass
+
+    if not text:
+        text = request.form.get('text') or request.form.get('body') or request.form.get('message') or ""
+
+    if not text and raw_payload and len(raw_payload.strip()) > 3:
+        if raw_payload.strip().startswith('{'):
+            try:
+                m = re.search(r'"(?:text|body|message)"\s*:\s*"(.*?)"(?:\s*,\s*"|\s*})', raw_payload, re.DOTALL)
+                if m:
+                    text = m.group(1).replace('\\"', '"').replace('\\n', '\n')
+            except Exception:
+                pass
+        if not text:
+            text = raw_payload
+
+    text = (text or "").strip()
+    if text.startswith('text='):
+        text = unquote(text[5:]).strip()
+
+    print(f"[AUTO_TRACK] Request from {request.remote_addr}, Method={request.method}, KeyProvided={'YES' if req_key else 'NO'}, ContentType={request.content_type}")
+    print(f"[AUTO_TRACK] Extracted text: {repr(text[:120])}")
+
+    if not is_valid_api_key(req_key):
+        is_legacy_companion = False
+        if not req_key and text:
+            parsed_preview = parse_auto_track_notification(text)
+            if parsed_preview:
+                if parsed_preview.get('is_internal_transfer'):
+                    return jsonify({
+                        'ok': True,
+                        'verdict': 'ignored_internal_transfer',
+                        'message': parsed_preview.get('reason'),
+                        'raw_text': text
+                    }), 200
+                if parsed_preview.get('is_promo'):
+                    return jsonify({
+                        'ok': False,
+                        'verdict': 'rejected_promo',
+                        'message': '通知被识别为营销推广活动或非动账通知，已自动忽略入账',
+                        'raw_text': text
+                    }), 200
+                if parsed_preview.get('amount'):
+                    ua = request.headers.get('User-Agent', '')
+                    if 'Dalvik' in ua or 'Android' in ua or 'Ledger' in ua or not ua:
+                        is_legacy_companion = True
+                        print(f"[AUTO_TRACK] Allowing legacy companion notification without key (Verified transaction: RM {parsed_preview.get('amount')})")
+
+        if not is_legacy_companion:
+            print(f"[AUTO_TRACK] Rejected: Invalid API Key")
+            return jsonify({'ok': False, 'message': 'API Key 无效或未在服务器配置，拒绝访问'}), 401
+
+    if not text or text == "None" or text == "null":
+        return jsonify({
+            'ok': False,
+            'message': '未收到有效的通知文本内容（若为手动测试，请确保当前通知栏存在真实的扣款通知）'
+        }), 400
+
+    parsed = parse_auto_track_notification(text)
+    if AUTO_TRACK_DEBUG_LOG:
+        print(f"[AUTO_TRACK DEBUG] Parsed result: {parsed}")
+
+    if parsed and parsed.get('is_promo'):
+        if AUTO_TRACK_DEBUG_LOG:
+            print(f"[AUTO_TRACK DEBUG] Rejected as promo by blacklist: {parsed.get('reason')}")
+        return jsonify({
+            'ok': False,
+            'verdict': 'rejected_promo',
+            'message': '通知被识别为营销推广活动或非动账通知，已自动忽略入账',
+            'reason': parsed.get('reason'),
+            'raw_text': text
+        }), 200
+
+    if parsed and parsed.get('is_internal_transfer'):
+        if AUTO_TRACK_DEBUG_LOG:
+            print(f"[AUTO_TRACK DEBUG] Ignored internal transfer: {parsed.get('reason')}")
+        return jsonify({
+            'ok': True,
+            'verdict': 'ignored_internal_transfer',
+            'message': parsed.get('reason') or '钱包内部资金划转/充值，已自动忽略',
+            'raw_text': text
+        }), 200
+
+    if not parsed or not parsed.get('amount'):
+        if AUTO_TRACK_DEBUG_LOG:
+            print("[AUTO_TRACK DEBUG] Failed to parse amount! Returning 422")
+        return jsonify({
+            'ok': False,
+            'message': '未能从通知中提取出有效金额或商户信息',
+            'raw_text': text
+        }), 422
+
+    merchant_note = (parsed.get('note') or '').strip()
+    if merchant_note:
+        db = get_db()
+        override = db.execute(
+            'SELECT category FROM merchant_category_overrides WHERE merchant_note = ?',
+            (merchant_note,)
+        ).fetchone()
+        if override and override['category']:
+            parsed['category'] = override['category']
+            if AUTO_TRACK_DEBUG_LOG:
+                print(f"[AUTO_TRACK DEBUG] Applied remembered merchant override: '{merchant_note}' -> '{override['category']}'")
+
+    is_real, llm_data = classify_notification_with_llm(text)
+
+    if not is_real:
+        if AUTO_TRACK_DEBUG_LOG:
+            print(f"[AUTO_TRACK DEBUG] Notification rejected by Phase-2 LLM as promotional: {repr(text)}")
+        return jsonify({
+            'ok': False,
+            'verdict': 'rejected_promo',
+            'message': '通知被识别为营销推广或非真实交易，已忽略入账',
+            'parsed': parsed,
+            'raw_text': text
+        }), 200
+
+    if llm_data and isinstance(llm_data, dict):
+        label_type = llm_data.get('label_type')
+        if label_type == 'income_transfer':
+            parsed['type'] = 'income'
+            if not parsed.get('group_name'):
+                parsed['group_name'] = 'main' if any(k in text.lower() for k in ['salary', 'payroll', '工资', '薪资', '薪水']) else 'side'
+        elif label_type in ('expense', 'expense_transfer'):
+            parsed['type'] = 'expense'
+            parsed['group_name'] = None
+
+        if parsed.get('category') == '其他' and llm_data.get('category') and llm_data['category'] != '其他':
+            parsed['category'] = str(llm_data['category']).strip()
+        if parsed.get('note') in ('自动追踪消费', '自动追踪入账') and llm_data.get('merchant'):
+            parsed['note'] = str(llm_data['merchant']).strip()
+
+    db = get_db()
+    now = datetime.now().isoformat()
+    target_user_id = data.get('user_id') or request.args.get('user_id')
+    target_username = data.get('username') or request.args.get('username')
+    if target_username and not target_user_id:
+        u_row = db.execute("SELECT id FROM users WHERE username = ?", (target_username,)).fetchone()
+        if u_row:
+            target_user_id = u_row['id']
+    if not target_user_id:
+        admin_row = db.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
+        if admin_row:
+            target_user_id = admin_row['id']
+        else:
+            first_row = db.execute("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").fetchone()
+            target_user_id = first_row['id'] if first_row else None
+
+    # 0. 智能退款冲减原预扣支出
+    if parsed.get('is_refund'):
+        matched_expense = None
+        merchant_search = (parsed.get('note') or '').strip()
+        if merchant_search and merchant_search not in ('自动追踪消费', '自动追踪入账'):
+            matched_expense = db.execute('''
+                SELECT id, date, category, amount, note 
+                FROM transactions 
+                WHERE user_id = ? AND type = 'expense' 
+                  AND (note LIKE ? OR ? LIKE '%' || note || '%' OR (category = '交通' AND ? = '交通'))
+                ORDER BY date DESC, created_at DESC, id DESC LIMIT 1
+            ''', (target_user_id, f"%{merchant_search}%", merchant_search, parsed.get('category'))).fetchone()
+
+        if not matched_expense:
+            matched_expense = db.execute('''
+                SELECT id, date, category, amount, note 
+                FROM transactions 
+                WHERE user_id = ? AND type = 'expense' 
+                ORDER BY date DESC, created_at DESC, id DESC LIMIT 1
+            ''', (target_user_id,)).fetchone()
+
+        if matched_expense:
+            old_amount = float(matched_expense['amount'])
+            refund_amount = float(parsed['amount'])
+            new_amount = max(0.0, round(old_amount - refund_amount, 2))
+
+            tag = f"[已扣减退款 {money_filter(refund_amount)}]"
+            old_note = (matched_expense['note'] or '').strip()
+            new_note = f"{old_note} {tag}".strip()
+
+            db.execute('UPDATE transactions SET amount = ?, note = ? WHERE id = ?', (new_amount, new_note, matched_expense['id']))
+            db.commit()
+
+            bump_data_version('transaction_offset', {
+                'offset_expense_id': matched_expense['id'],
+                'original_amount': old_amount,
+                'new_amount': new_amount,
+                'offset_amount': refund_amount,
+                'note': new_note,
+                'category': matched_expense['category'],
+                'user_id': target_user_id
+            })
+
+            notif_title = "加油/消费退款已冲减 ⛽"
+            notif_body = f"收到退款 {money_filter(refund_amount)}，已自动从原【{matched_expense['category']}】支出中扣除（由 {money_filter(old_amount)} 变更为 {money_filter(new_amount)}）"
+            return jsonify({
+                'ok': True,
+                'verdict': 'refund_offset_success',
+                'message': f"收到退款 {money_filter(refund_amount)}，已自动冲减原支出【{matched_expense['category']}】（现为 {money_filter(new_amount)}）！",
+                'offset_expense_id': matched_expense['id'],
+                'original_amount': old_amount,
+                'new_amount': new_amount,
+                'offset_amount': refund_amount,
+                'notification_title': notif_title,
+                'notification_body': notif_body,
+                'parsed': parsed
+            }), 200
+
+    # 1. 智能朋友还款冲抵支出
+    is_repayment = (
+        parsed['type'] == 'income'
+        and any(k in text.lower() for k in [
+            'duitnow transfer', 'transfer from', 'transferred from', 'received from', 'received',
+            '转入', '收到转账', '转账给您', '付款给您', '还款', '还钱'
+        ])
+        and not any(k in text.lower() for k in ['salary', 'payroll', '工资', '薪资', '薪水'])
+    )
+
+    if is_repayment:
+        last_expense = db.execute('''
+            SELECT id, date, category, amount, note 
+            FROM transactions 
+            WHERE user_id = ? AND type = 'expense' 
+            ORDER BY date DESC, created_at DESC, id DESC LIMIT 1
+        ''', (target_user_id,)).fetchone()
+
+        if last_expense:
+            old_amount = float(last_expense['amount'])
+            offset_amount = float(parsed['amount'])
+            new_amount = max(0.0, round(old_amount - offset_amount, 2))
+
+            tag = f"[收到还款冲减 {money_filter(offset_amount)}]"
+            old_note = (last_expense['note'] or '').strip()
+            new_note = f"{old_note} {tag}".strip()
+
+            db.execute('UPDATE transactions SET amount = ?, note = ? WHERE id = ?', (new_amount, new_note, last_expense['id']))
+            db.commit()
+
+            bump_data_version('transaction_offset', {
+                'offset_expense_id': last_expense['id'],
+                'original_amount': old_amount,
+                'new_amount': new_amount,
+                'offset_amount': offset_amount,
+                'note': new_note,
+                'category': last_expense['category'],
+                'user_id': target_user_id
+            })
+
+            notif_title = "已自动冲抵支出 💸"
+            notif_body = f"收到还款 {money_filter(offset_amount)}，已自动冲减上一笔【{last_expense['category']}】支出（由 {money_filter(old_amount)} 扣减为 {money_filter(new_amount)}）"
+            return jsonify({
+                'ok': True,
+                'verdict': 'offset_success',
+                'message': f"收到朋友还款 {money_filter(offset_amount)}，已自动从上一笔支出【{last_expense['category']}】中扣除（现为 {money_filter(new_amount)}）！",
+                'offset_expense_id': last_expense['id'],
+                'original_amount': old_amount,
+                'new_amount': new_amount,
+                'offset_amount': offset_amount,
+                'notification_title': notif_title,
+                'notification_body': notif_body,
+                'parsed': parsed
+            }), 200
+
+    cur = db.execute(
+        'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        (
+            target_user_id,
+            parsed['date'],
+            parsed['type'],
+            parsed['group_name'],
+            parsed['category'],
+            parsed['amount'],
+            parsed['note'],
+            'auto_track',
+            now
+        )
+    )
+    db.commit()
+    bump_data_version('auto_track', {
+        'id': cur.lastrowid,
+        'note': parsed['note'],
+        'amount': parsed['amount'],
+        'category': parsed['category'],
+        'type': parsed['type'],
+        'date': parsed['date'],
+        'source': 'auto_track',
+        'user_id': target_user_id
+    })
+
+    type_text = '支出' if parsed['type'] == 'expense' else '收入' if parsed['type'] == 'income' else '储蓄'
+    note_str = f" ({parsed['note']})" if parsed['note'] else ""
+    notification_title = "自动记账成功 💸"
+    notification_body = f"已自动记入【{type_text} · {parsed['category']}】{money_filter(parsed['amount'])}{note_str}"
+
+    budget_alert = None
+    if parsed['type'] == 'expense':
+        budget_alert = check_and_record_budget_alerts(db, target_user_id, parsed['category'], parsed['date'][:7])
+
+    return jsonify({
+        'ok': True,
+        'verdict': 'accepted',
+        'message': f"成功自动记账：{parsed['note']} {money_filter(parsed['amount'])} ({parsed['category']})",
+        'transaction_id': cur.lastrowid,
+        'parsed': parsed,
+        'notification_title': notification_title,
+        'notification_body': notification_body,
+        'budget_alert': budget_alert
+    }), 201
+
+
+@auto_track_bp.route('/api/categories', methods=['GET'], endpoint='api_get_categories')
+@csrf.exempt
+def api_get_categories():
+    req_key = request.headers.get('X-API-KEY')
+    if not is_valid_api_key(req_key):
+        return jsonify({'ok': False, 'message': 'API Key 无效'}), 401
+
+    user_id = get_current_user_id()
+    db = get_db()
+    rows = db.execute('SELECT id, name, type, group_name FROM categories WHERE user_id = ? ORDER BY type, id', (user_id,)).fetchall()
+    categories = [{'id': r['id'], 'name': r['name'], 'type': r['type'], 'group_name': r['group_name']} for r in rows]
+    return jsonify({'ok': True, 'categories': categories})
+
+
+@auto_track_bp.route('/api/transactions/sync', methods=['POST'], endpoint='api_sync_transactions')
+@csrf.exempt
+def api_sync_transactions():
+    req_key = request.headers.get('X-API-KEY')
+    if not is_valid_api_key(req_key):
+        return jsonify({'ok': False, 'message': 'API Key 无效'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    txs = payload.get('transactions', [])
+    if not txs:
+        return jsonify({'ok': True, 'synced_count': 0, 'synced_ids': []})
+
+    user_id = get_current_user_id()
+    db = get_db()
+    now = datetime.now().isoformat()
+    synced_ids = []
+    for item in txs:
+        try:
+            db.execute(
+                'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
+                'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                (
+                    user_id,
+                    item.get('date') or date.today().isoformat(),
+                    item.get('type') or 'expense',
+                    item.get('group_name') or 'personal',
+                    item.get('category') or '其他',
+                    float(item.get('amount') or 0.0),
+                    item.get('note') or '离线录入',
+                    item.get('source') or 'offline_sync',
+                    now
+                )
+            )
+            local_id = item.get('local_id') or item.get('id')
+            if local_id is not None:
+                synced_ids.append(local_id)
+        except Exception as e:
+            print(f"[SYNC ERROR] Failed to insert offline transaction: {e}")
+
+    db.commit()
+    return jsonify({'ok': True, 'synced_count': len(synced_ids), 'synced_ids': synced_ids})
+
+
+@auto_track_bp.route('/download/apk', endpoint='download_apk')
+def download_apk():
+    root = current_app.root_path
+    download_dir = os.path.join(root, 'static', 'download')
+    return send_from_directory(download_dir, 'ledger-app.apk', as_attachment=True, download_name='我的账本.apk')
+
+
+@auto_track_bp.route('/auto-track', endpoint='auto_track_page')
+def auto_track_page():
+    scheme = request.headers.get('X-Forwarded-Proto', request.scheme)
+    if 'onrender.com' in request.host:
+        scheme = 'https'
+    base_url = f"{scheme}://{request.host}".rstrip('/')
+    api_key = get_auto_track_key()
+    webhook_url = f"{base_url}/api/auto-track"
+    webhook_url_with_key = f"{base_url}/api/auto-track?key={api_key}"
+    db = get_db()
+    samples = db.execute("SELECT * FROM llm_learning_samples ORDER BY id ASC").fetchall()
+    return render_template(
+        'auto_track.html',
+        api_key=api_key,
+        webhook_url=webhook_url,
+        webhook_url_with_key=webhook_url_with_key,
+        llm_info=get_active_llm_provider(),
+        samples=samples
+    )
+
+
+@auto_track_bp.route('/api/llm-samples', methods=['GET'], endpoint='api_llm_samples_list')
+def api_llm_samples_list():
+    db = get_db()
+    rows = db.execute("SELECT * FROM llm_learning_samples ORDER BY id ASC").fetchall()
+    return jsonify({'ok': True, 'samples': [dict(r) for r in rows]})
+
+
+@auto_track_bp.route('/api/llm-samples/add', methods=['POST'], endpoint='api_llm_samples_add')
+def api_llm_samples_add():
+    if not session.get('logged_in'):
+        return jsonify({'ok': False, 'message': '请先登录后再添加样本'}), 401
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+    text = (data.get('text') or '').strip()
+    if not text:
+        return jsonify({'ok': False, 'message': '样本通知文本不能为空'}), 400
+
+    label_type = (data.get('label_type') or 'expense').strip()
+    is_real = 1 if data.get('is_real_transaction') in (True, 1, '1', 'true', 'True') else 0
+    if label_type in ('promo', 'otp_notice'):
+        is_real = 0
+
+    amount = data.get('sample_amount')
+    try:
+        amount = float(amount) if amount not in (None, '', 'null') else None
+    except Exception:
+        amount = None
+
+    merchant = (data.get('sample_merchant') or '').strip() or None
+    category = (data.get('sample_category') or '').strip() or None
+    notes = (data.get('notes') or '').strip() or None
+    now = datetime.now().isoformat()
+    user_id = session.get('user_id')
+
+    db.execute('''
+        INSERT INTO llm_learning_samples (user_id, text, label_type, is_real_transaction, sample_amount, sample_merchant, sample_category, notes, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (user_id, text, label_type, is_real, amount, merchant, category, notes, now))
+    db.commit()
+
+    return jsonify({'ok': True, 'message': '成功录入学习样本库！大模型下次遇到类似通知将照此学习。'})
+
+
+@auto_track_bp.route('/api/llm-samples/delete/<int:sample_id>', methods=['POST'], endpoint='api_llm_samples_delete')
+def api_llm_samples_delete(sample_id):
+    if not session.get('logged_in'):
+        return jsonify({'ok': False, 'message': '请先登录'}), 401
+    db = get_db()
+    db.execute("DELETE FROM llm_learning_samples WHERE id = ?", (sample_id,))
+    db.commit()
+    return jsonify({'ok': True, 'message': '样本已成功删除'})
+
+
+@auto_track_bp.route('/api/llm-samples/reset', methods=['POST'], endpoint='api_llm_samples_reset')
+def api_llm_samples_reset():
+    if not session.get('logged_in'):
+        return jsonify({'ok': False, 'message': '请先登录'}), 401
+    db = get_db()
+    db.execute("DELETE FROM llm_learning_samples")
+    db.commit()
+    seed_learning_samples(db)
+    return jsonify({'ok': True, 'message': '已成功将学习样本库恢复为官方预设语料库！'})
