@@ -31,7 +31,12 @@ PROMO_AND_AD_KEYWORDS = [
     'your password', 'reset password', 'login alert', 'new login',
     'you just got a voucher', 'got a voucher', 'claim your voucher', 'claim voucher',
     'free shipping', '100% cashback', 'cashback, sehingga', 'sehingga rm',
-    'check out in-store now', 'check out now', 'shop now', 'voucher inside'
+    'check out in-store now', 'check out now', 'shop now', 'voucher inside',
+    'tebus baucar', 'tebus', 'baucar', 'rebut', 'voucher', 'vouchers',
+    'super brand day', 'brand day', 'big sale', 'megasale', 'mega sale', 'flash sale', 'shocking sale',
+    '% off', 'off!', 'off on ', 'save up to', 'up to %',
+    'add to cart', 'tawaran padu', 'baucar gempak', 'claim ', 'diskaun', 'discount',
+    'coins cashback', 'shopee coins', 'lazada bonus', 'new arrival'
 ]
 
 # 内部划转与充值（不计入日常外部收支）

@@ -640,6 +640,19 @@ def init_db(app_logger=None):
 
     CREATE INDEX IF NOT EXISTS idx_subscriptions_user_status ON subscriptions(user_id, status);
     CREATE INDEX IF NOT EXISTS idx_subscriptions_next_billing ON subscriptions(status, next_billing_date);
+
+    -- 10. 自动记账防重与幂等记录表 (防止离线排队与网络重试造成重复记账)
+    CREATE TABLE IF NOT EXISTS processed_notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
+        content_hash TEXT NOT NULL,
+        raw_text TEXT,
+        amount REAL,
+        transaction_id INTEGER,
+        created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_processed_notif_hash ON processed_notifications(user_id, content_hash);
     ''')
     db.commit()
 

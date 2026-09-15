@@ -1,8 +1,12 @@
 import os
 import re
+import hashlib
+import logging
 from datetime import datetime, date
 from urllib.parse import unquote
 from flask import Blueprint, request, jsonify, render_template, session, send_from_directory, current_app
+
+logger = logging.getLogger(__name__)
 
 from core.db import get_db, bump_data_version, get_current_user_id, seed_learning_samples
 from core.config import (
@@ -191,6 +195,86 @@ def api_auto_track():
             first_row = db.execute("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").fetchone()
             target_user_id = first_row['id'] if first_row else None
 
+    # ---------------------------------------------------------
+    # 幂等防重门禁 (Idempotency & Deduplication Guard)
+    # ---------------------------------------------------------
+    content_hash = hashlib.sha256(text.strip().encode('utf-8')).hexdigest()
+
+    try:
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS processed_notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT,
+                content_hash TEXT NOT NULL,
+                raw_text TEXT,
+                amount REAL,
+                transaction_id INTEGER,
+                created_at TEXT NOT NULL
+            )
+        ''')
+    except Exception as e:
+        logger.debug("Table check processed_notifications: %s", e)
+
+    # 1. 检查 7 天内是否已成功处理过完全相同的通知原文 (应对网络重试或离线队列重放)
+    existing_notif = db.execute('''
+        SELECT id, transaction_id, created_at FROM processed_notifications
+        WHERE user_id = ? AND content_hash = ?
+        ORDER BY id DESC LIMIT 1
+    ''', (target_user_id, content_hash)).fetchone()
+
+    if existing_notif:
+        if AUTO_TRACK_DEBUG_LOG:
+            print(f"[AUTO_TRACK DEBUG] Duplicate notification rejected via content_hash: {content_hash}")
+        return jsonify({
+            'ok': True,
+            'verdict': 'duplicate_ignored',
+            'message': '检测到完全相同的通知此前已成功处理，已自动忽略重复入账',
+            'transaction_id': existing_notif['transaction_id'],
+            'notification_title': '重复通知已忽略 ℹ️',
+            'notification_body': f"通知【{parsed.get('note') or '交易'}】此前已入账，系统已自动防止重复记账",
+            'raw_text': text,
+            'parsed': parsed
+        }), 200
+
+    # 2. 检查同用户在 2 小时内由 auto_track 创建的相同金额、分类与备注的交易
+    recent_dup_tx = db.execute('''
+        SELECT id, created_at FROM transactions
+        WHERE user_id = ? AND type = ? AND amount = ? AND note = ? AND date = ? AND source = 'auto_track'
+        ORDER BY id DESC LIMIT 1
+    ''', (target_user_id, parsed['type'], parsed['amount'], parsed['note'], parsed['date'])).fetchone()
+
+    if recent_dup_tx:
+        is_recent_dup = False
+        try:
+            created_dt = datetime.fromisoformat(recent_dup_tx['created_at'])
+            if abs((datetime.now() - created_dt).total_seconds()) < 7200:
+                is_recent_dup = True
+        except Exception:
+            is_recent_dup = True
+
+        if is_recent_dup:
+            if AUTO_TRACK_DEBUG_LOG:
+                print(f"[AUTO_TRACK DEBUG] Duplicate transaction rejected within 2h: {recent_dup_tx['id']}")
+            try:
+                db.execute('''
+                    INSERT INTO processed_notifications (user_id, content_hash, raw_text, amount, transaction_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (target_user_id, content_hash, text, parsed['amount'], recent_dup_tx['id'], now))
+                db.commit()
+            except Exception as e:
+                logger.debug("Failed to record processed_notification on recent dup: %s", e)
+
+            return jsonify({
+                'ok': True,
+                'verdict': 'duplicate_ignored',
+                'message': '短时间内检测到相同交易已入账，已自动忽略重复记账',
+                'transaction_id': recent_dup_tx['id'],
+                'notification_title': '重复通知已忽略 ℹ️',
+                'notification_body': f"短时间内检测到相同的【{parsed['note']} {money_filter(parsed['amount'])}】已入账，已自动忽略",
+                'raw_text': text,
+                'parsed': parsed
+            }), 200
+
     # 0. 智能退款冲减原预扣支出
     if parsed.get('is_refund'):
         matched_expense = None
@@ -233,6 +317,15 @@ def api_auto_track():
                 'category': matched_expense['category'],
                 'user_id': target_user_id
             })
+
+            try:
+                db.execute('''
+                    INSERT INTO processed_notifications (user_id, content_hash, raw_text, amount, transaction_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (target_user_id, content_hash, text, refund_amount, matched_expense['id'], now))
+                db.commit()
+            except Exception as e:
+                logger.debug("Failed to record processed_notification on refund: %s", e)
 
             notif_title = "加油/消费退款已冲减 ⛽"
             notif_body = f"收到退款 {money_filter(refund_amount)}，已自动从原【{matched_expense['category']}】支出中扣除（由 {money_filter(old_amount)} 变更为 {money_filter(new_amount)}）"
@@ -289,6 +382,15 @@ def api_auto_track():
                 'user_id': target_user_id
             })
 
+            try:
+                db.execute('''
+                    INSERT INTO processed_notifications (user_id, content_hash, raw_text, amount, transaction_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (target_user_id, content_hash, text, offset_amount, last_expense['id'], now))
+                db.commit()
+            except Exception as e:
+                logger.debug("Failed to record processed_notification on repayment: %s", e)
+
             notif_title = "已自动冲抵支出 💸"
             notif_body = f"收到还款 {money_filter(offset_amount)}，已自动冲减上一笔【{last_expense['category']}】支出（由 {money_filter(old_amount)} 扣减为 {money_filter(new_amount)}）"
             return jsonify({
@@ -319,6 +421,14 @@ def api_auto_track():
             now
         )
     )
+    try:
+        db.execute('''
+            INSERT INTO processed_notifications (user_id, content_hash, raw_text, amount, transaction_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (target_user_id, content_hash, text, parsed['amount'], cur.lastrowid, now))
+    except Exception as e:
+        logger.debug("Failed to record processed_notification on insert: %s", e)
+
     db.commit()
     bump_data_version('auto_track', {
         'id': cur.lastrowid,

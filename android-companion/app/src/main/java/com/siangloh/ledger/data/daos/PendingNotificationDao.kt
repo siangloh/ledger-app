@@ -11,6 +11,9 @@ interface PendingNotificationDao {
     @Query("SELECT * FROM pending_notifications WHERE sync_status = 'pending' ORDER BY timestamp ASC")
     suspend fun getPendingNotifications(): List<PendingNotification>
 
+    @Query("SELECT COUNT(*) FROM pending_notifications WHERE rawText = :rawText AND sync_status = 'pending'")
+    suspend fun countPendingWithText(rawText: String): Int
+
     @Query("UPDATE pending_notifications SET sync_status = 'synced' WHERE id = :id")
     suspend fun markAsSynced(id: Long)
 
