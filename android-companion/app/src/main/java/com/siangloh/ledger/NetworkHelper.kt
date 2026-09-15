@@ -88,17 +88,27 @@ object NetworkHelper {
     fun postNotificationAsync(text: String, context: Context? = null, callback: ((Boolean, String, String?) -> Unit)? = null) {
         Thread {
             try {
-                val fullUrl = "${getServerUrl(context)}/api/auto-track"
+                val key = getApiKey(context)
+                val encodedKey = try { java.net.URLEncoder.encode(key, "UTF-8") } catch (_: Exception) { "" }
+                val fullUrl = if (encodedKey.isNotEmpty()) {
+                    "${getServerUrl(context)}/api/auto-track?key=$encodedKey"
+                } else {
+                    "${getServerUrl(context)}/api/auto-track"
+                }
                 val url = URL(fullUrl)
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
-                conn.setRequestProperty("X-API-KEY", getApiKey(context))
+                conn.setRequestProperty("User-Agent", "LedgerAppCompanion/1.0 (Android; Dalvik)")
+                if (key.isNotEmpty()) {
+                    conn.setRequestProperty("X-API-KEY", key)
+                }
                 conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 conn.connectTimeout = 30000
                 conn.readTimeout = 30000
                 conn.doOutput = true
 
                 val jsonPayload = JSONObject().apply {
+                    put("key", key)
                     put("text", text)
                 }.toString()
 
@@ -133,17 +143,21 @@ object NetworkHelper {
         }.start()
     }
 
-    fun syncPendingTransactions(transactions: List<PendingTransaction>, callback: ((Boolean, List<Long>) -> Unit)? = null) {
+    fun syncPendingTransactions(transactions: List<PendingTransaction>, context: Context? = null, callback: ((Boolean, List<Long>) -> Unit)? = null) {
         Thread {
             try {
-                val fullUrl = "${getServerUrl()}/api/transactions/sync"
+                val fullUrl = "${getServerUrl(context)}/api/transactions/sync"
                 val url = URL(fullUrl)
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
-                conn.setRequestProperty("X-API-KEY", getApiKey())
+                conn.setRequestProperty("User-Agent", "LedgerAppCompanion/1.0 (Android; Dalvik)")
+                val key = getApiKey(context)
+                if (key.isNotEmpty()) {
+                    conn.setRequestProperty("X-API-KEY", key)
+                }
                 conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                conn.connectTimeout = 15000
-                conn.readTimeout = 15000
+                conn.connectTimeout = 30000
+                conn.readTimeout = 30000
                 conn.doOutput = true
 
                 val jsonArray = JSONArray()

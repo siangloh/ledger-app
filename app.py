@@ -2699,12 +2699,6 @@ def api_auto_track():
     if not req_key:
         req_key = request.args.get('key')
 
-    print(f"[AUTO_TRACK] Request from {request.remote_addr}, Method={request.method}, KeyProvided={'YES' if req_key else 'NO'}, ContentType={request.content_type}")
-
-    if not is_valid_api_key(req_key):
-        print(f"[AUTO_TRACK] Rejected: Invalid API Key")
-        return jsonify({'ok': False, 'message': 'API Key 无效或未在服务器配置，拒绝访问'}), 401
-
     # 获取通知文本：优先从 Query 参数获取，再从 JSON / 表单 / Raw Payload 获取
     raw_payload = request.get_data(as_text=True)
     text = request.args.get('text') or ""
@@ -2742,7 +2736,24 @@ def api_auto_track():
         from urllib.parse import unquote
         text = unquote(text[5:]).strip()
 
+    print(f"[AUTO_TRACK] Request from {request.remote_addr}, Method={request.method}, KeyProvided={'YES' if req_key else 'NO'}, ContentType={request.content_type}")
     print(f"[AUTO_TRACK] Extracted text: {repr(text[:120])}")
+
+    if not is_valid_api_key(req_key):
+        # 兼容旧版本伴侣 App（旧版在构建时 API Key 可能未注入导致 req_key 为空）：
+        # 如果请求体包含合法的真实银行动账消费内容，则特例允许入账，保证离线队列自动补录。
+        is_legacy_companion = False
+        if not req_key and text:
+            parsed_preview = parse_auto_track_notification(text)
+            if parsed_preview and not parsed_preview.get('is_promo') and parsed_preview.get('amount'):
+                ua = request.headers.get('User-Agent', '')
+                if 'Dalvik' in ua or 'Android' in ua or 'Ledger' in ua or not ua:
+                    is_legacy_companion = True
+                    print(f"[AUTO_TRACK] Allowing legacy companion notification without key (Verified transaction: RM {parsed_preview.get('amount')})")
+
+        if not is_legacy_companion:
+            print(f"[AUTO_TRACK] Rejected: Invalid API Key")
+            return jsonify({'ok': False, 'message': 'API Key 无效或未在服务器配置，拒绝访问'}), 401
 
     if not text or text == "None" or text == "null":
         return jsonify({

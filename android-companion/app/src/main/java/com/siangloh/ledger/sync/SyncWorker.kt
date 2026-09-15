@@ -48,7 +48,7 @@ class SyncWorker(
             if (pendingTxs.isNotEmpty()) {
                 Log.i(TAG, "Syncing ${pendingTxs.size} pending transactions...")
                 val latch = CountDownLatch(1)
-                NetworkHelper.syncPendingTransactions(pendingTxs) { success, syncedIds ->
+                NetworkHelper.syncPendingTransactions(pendingTxs, applicationContext) { success, syncedIds ->
                     if (success && syncedIds.isNotEmpty()) {
                         kotlinx.coroutines.runBlocking {
                             db.pendingTransactionDao().markAsSynced(syncedIds)
@@ -66,7 +66,7 @@ class SyncWorker(
                 Log.i(TAG, "Retrying ${pendingNotifs.size} pending notifications...")
                 for (notif in pendingNotifs) {
                     val latch = CountDownLatch(1)
-                    NetworkHelper.postNotificationAsync(notif.rawText) { success, msg, verdict ->
+                    NetworkHelper.postNotificationAsync(notif.rawText, applicationContext) { success, msg, verdict ->
                         kotlinx.coroutines.runBlocking {
                             if (success || verdict == "rejected_promo") {
                                 db.pendingNotificationDao().delete(notif.id)
