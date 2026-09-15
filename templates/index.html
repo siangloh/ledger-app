@@ -219,23 +219,27 @@
 
 <script>
 window.CATEGORY_DATA = {
-  expense: {{ expense_categories | tojson }},
-  income_main: {{ income_categories.main | tojson }},
-  income_side: {{ income_categories.side | tojson }},
-  savings: {{ savings_categories | tojson }}
+  expense: {{ expense_categories | default([]) | tojson }},
+  income_main: {{ (income_categories.main if income_categories else []) | default([]) | tojson }},
+  income_side: {{ (income_categories.side if income_categories else []) | default([]) | tojson }},
+  savings: {{ savings_categories | default([]) | tojson }}
 };
 window.CHART_DATA = {
+  month: {{ month | tojson }},
   income: {
     labels: ['主业收入', '副业收入'],
-    values: [{{ income_group.main }}, {{ income_group.side }}]
+    values: {{ [income_group.main|default(0.0)|float, income_group.side|default(0.0)|float] | tojson }}
   },
   expense: {
-    labels: {{ expense_by_category.keys() | list | tojson }},
-    values: {{ expense_by_category.values() | list | tojson }}
+    labels: {{ (expense_by_category.keys() | list) | tojson }},
+    values: {{ (expense_by_category.values() | list) | tojson }}
   }
 };
 if (typeof onTypeChange === 'function') {
   onTypeChange();
+}
+if (typeof renderDonutCharts === 'function') {
+  renderDonutCharts();
 }
 </script>
 {% endblock %}

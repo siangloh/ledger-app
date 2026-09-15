@@ -983,9 +983,11 @@ function switchDashboardView(view) {
     }
     attachTrendChartHover();
   } else {
-    if (typeof renderDonutCharts === 'function') {
-      renderDonutCharts();
-    }
+    requestAnimationFrame(function () {
+      if (typeof renderDonutCharts === 'function') {
+        renderDonutCharts();
+      }
+    });
   }
 }
 
@@ -1358,12 +1360,46 @@ function drawOverviewDoughnut(canvasId, labels, values) {
 // Monthly view Chart.js doughnut renderer
 // ---------------------------------------------------------------------------
 
-function drawMonthlyDoughnut(canvasId, labels, values) {
+// ---------------------------------------------------------------------------
+// Monthly view Chart.js doughnut renderer with auto-recovery & safe fallbacks
+// ---------------------------------------------------------------------------
+
+let _isFetchingChartData = false;
+
+function fetchChartDataAndRender(month) {
+  if (_isFetchingChartData) return;
+  _isFetchingChartData = true;
+  const query = month ? '?month=' + encodeURIComponent(month) : '';
+  fetch('/api/dashboard-charts' + query, { cache: 'no-store' })
+    .then(res => {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    })
+    .then(data => {
+      _isFetchingChartData = false;
+      if (data && data.ok) {
+        window.CHART_DATA = {
+          month: data.month,
+          income: data.income || { labels: ['主业收入', '副业收入'], values: [0, 0] },
+          expense: data.expense || { labels: [], values: [] }
+        };
+        renderDonutCharts();
+      }
+    })
+    .catch(err => {
+      _isFetchingChartData = false;
+      console.warn('[Dashboard Chart] Fallback fetch failed:', err);
+    });
+}
+
+function drawMonthlyDoughnut(canvasId, rawLabels, rawValues) {
   var canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
   var isIncome = (canvasId === 'incomeChart');
-  var total = values.reduce(function (a, b) { return a + (Number(b) || 0); }, 0);
+  var labels = Array.isArray(rawLabels) ? rawLabels.slice() : [];
+  var values = Array.isArray(rawValues) ? rawValues.map(function (v) { return Number(v) || 0; }) : [];
+  var total = values.reduce(function (a, b) { return a + b; }, 0);
   var centerTitle = isIncome ? '本月总收入' : '本月总支出';
   var isDark = isDarkModeActive();
   var palette = getChartPalette();
@@ -1379,7 +1415,7 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
     ? labels.map(function(_, idx) { return palette[idx % palette.length]; })
     : (isDark ? ['#334155'] : ['#e0e0e0']);
 
-  // 1. 实时更新下方图例列表 HTML
+  // 1. 实时更新下方图例列表 HTML（先行渲染，保证空数据时也有优雅提示，杜绝卡片内部空白）
   var legendContainer = document.getElementById(canvasId + 'Legend');
   if (legendContainer) {
     if (!total || values.length === 0) {
@@ -1400,45 +1436,63 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
     }
   }
 
-  // 2. 获取已有 Chart.js 实例
-  var existingChart = isIncome ? _monthlyIncomeChart : _monthlyExpenseChart;
-  if (!existingChart && typeof Chart !== 'undefined' && Chart.getChart) {
-    existingChart = Chart.getChart(canvas);
-  }
-
-  // 3. 如果已有可用图表实例，平滑更新数据与中心文本，避免闪烁
-  if (existingChart && existingChart.ctx && existingChart.canvas === canvas) {
-    existingChart._customCenterTotal = total;
-    existingChart.data.labels = labels;
-    if (!existingChart.data.datasets || existingChart.data.datasets.length === 0) {
-      existingChart.data.datasets = [{}];
-    }
-    existingChart.data.datasets[0].data = values.length > 0 && total > 0 ? values : [1];
-    existingChart.data.datasets[0].backgroundColor = sliceColors;
-    existingChart.data.datasets[0].borderColor = sliceBorder;
-    if (existingChart.options && existingChart.options.plugins && existingChart.options.plugins.tooltip) {
-      existingChart.options.plugins.tooltip.enabled = total > 0;
-    }
-    existingChart.update();
-    if (isIncome) _monthlyIncomeChart = existingChart;
-    else _monthlyExpenseChart = existingChart;
+  // 2. 环境检查：确保 Chart.js 已加载
+  if (typeof Chart === 'undefined') {
+    setTimeout(function () { drawMonthlyDoughnut(canvasId, labels, values); }, 120);
     return;
   }
 
-  // 4. 清理旧图表并重新创建
-  if (existingChart) {
-    try { existingChart.destroy(); } catch (e) {}
+  // 3. 检查容器尺寸，若处于隐藏或未完成 Reflow（宽为0），使用 requestAnimationFrame 延迟重绘
+  if (canvas.parentElement && canvas.parentElement.clientWidth === 0) {
+    requestAnimationFrame(function () {
+      drawMonthlyDoughnut(canvasId, labels, values);
+    });
+    return;
   }
-  if (typeof Chart !== 'undefined' && Chart.getChart) {
-    var residual = Chart.getChart(canvas);
-    if (residual) {
-      try { residual.destroy(); } catch (e) {}
+
+  // 4. 获取已有 Chart.js 实例并尝试复用
+  var existingChart = isIncome ? _monthlyIncomeChart : _monthlyExpenseChart;
+  if (!existingChart && Chart.getChart) {
+    existingChart = Chart.getChart(canvas);
+  }
+
+  // 5. 如果已有可用图表实例且 canvas 节点依然匹配，平滑更新数据与中心文本
+  if (existingChart && existingChart.ctx && existingChart.canvas === canvas) {
+    try {
+      existingChart._customCenterTotal = total;
+      existingChart.data.labels = labels;
+      if (!existingChart.data.datasets || existingChart.data.datasets.length === 0) {
+        existingChart.data.datasets = [{}];
+      }
+      existingChart.data.datasets[0].data = values.length > 0 && total > 0 ? values : [1];
+      existingChart.data.datasets[0].backgroundColor = sliceColors;
+      existingChart.data.datasets[0].borderColor = sliceBorder;
+      if (existingChart.options && existingChart.options.plugins && existingChart.options.plugins.tooltip) {
+        existingChart.options.plugins.tooltip.enabled = total > 0;
+      }
+      existingChart.update();
+      if (isIncome) _monthlyIncomeChart = existingChart;
+      else _monthlyExpenseChart = existingChart;
+      return;
+    } catch (updateErr) {
+      console.warn('[Dashboard Chart] Smooth update failed, falling back to recreation:', updateErr);
+      existingChart = null;
     }
   }
 
-  // 自定义中心文字插件 (高对比度暗色适配)
+  // 6. 清理旧图表并重新创建（安全彻底销毁）
+  if (isIncome) {
+    _monthlyIncomeChart = destroyChart(_monthlyIncomeChart);
+  } else {
+    _monthlyExpenseChart = destroyChart(_monthlyExpenseChart);
+  }
+  if (Chart.getChart) {
+    var residual = Chart.getChart(canvas);
+    if (residual) destroyChart(residual);
+  }
+
+  // 自定义中心文字局部插件（不设置固定全局 id，规避插件多次注册时的冲突异常）
   var centerTextPlugin = {
-    id: 'centerText_' + canvasId,
     beforeDraw: function(chart) {
       if (!chart.chartArea) return;
       var ctx = chart.ctx;
@@ -1464,75 +1518,99 @@ function drawMonthlyDoughnut(canvasId, labels, values) {
     }
   };
 
-  var instance = new Chart(canvas.getContext('2d'), {
-    type: 'doughnut',
-    data: {
-      labels: labels,
-      datasets: [{
-        data: values.length > 0 && total > 0 ? values : [1],
-        backgroundColor: sliceColors,
-        borderWidth: 2,
-        borderColor: sliceBorder,
-        hoverBorderColor: sliceBorder
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '70%',
-      animation: {
-        duration: 500,
-        easing: 'easeOutQuart'
+  try {
+    var instance = new Chart(canvas.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values.length > 0 && total > 0 ? values : [1],
+          backgroundColor: sliceColors,
+          borderWidth: 2,
+          borderColor: sliceBorder,
+          hoverBorderColor: sliceBorder
+        }]
       },
-      layout: {
-        padding: { top: 10, bottom: 10 }
-      },
-      plugins: {
-        legend: {
-          display: false
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '70%',
+        animation: {
+          duration: 450,
+          easing: 'easeOutQuart'
         },
-        tooltip: {
-          enabled: total > 0,
-          backgroundColor: tooltipBg,
-          titleColor: tooltipTitle,
-          bodyColor: tooltipBody,
-          borderColor: tooltipBorder,
-          borderWidth: 1,
-          padding: 10,
-          titleFont: { family: 'Segoe UI, sans-serif', size: 12, weight: '600' },
-          bodyFont: { family: 'ui-monospace, SFMono-Regular, Consolas, monospace', size: 11 },
-          callbacks: {
-            label: function (item) {
-              var val = item.raw || 0;
-              var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
-              return ' ' + formatMoney(val) + ' (' + pct + '%)';
+        layout: {
+          padding: { top: 10, bottom: 10 }
+        },
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            enabled: total > 0,
+            backgroundColor: tooltipBg,
+            titleColor: tooltipTitle,
+            bodyColor: tooltipBody,
+            borderColor: tooltipBorder,
+            borderWidth: 1,
+            padding: 10,
+            titleFont: { family: 'Segoe UI, sans-serif', size: 12, weight: '600' },
+            bodyFont: { family: 'ui-monospace, SFMono-Regular, Consolas, monospace', size: 11 },
+            callbacks: {
+              label: function (item) {
+                var val = item.raw || 0;
+                var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
+                return ' ' + formatMoney(val) + ' (' + pct + '%)';
+              }
             }
           }
         }
-      }
-    },
-    plugins: [centerTextPlugin]
-  });
+      },
+      plugins: [centerTextPlugin]
+    });
 
-  instance._customCenterTotal = total;
+    instance._customCenterTotal = total;
 
-  if (canvasId === 'incomeChart') {
-    _monthlyIncomeChart = instance;
-  } else {
-    _monthlyExpenseChart = instance;
+    if (isIncome) {
+      _monthlyIncomeChart = instance;
+    } else {
+      _monthlyExpenseChart = instance;
+    }
+  } catch (createErr) {
+    console.error('[Dashboard Chart] Failed to create Chart.js instance:', createErr);
   }
 }
 
 function renderDonutCharts() {
-  if (!window.CHART_DATA) return;
-  const isMonthlyVisible = !document.getElementById('monthlySection') || document.getElementById('monthlySection').style.display !== 'none';
+  const hasIncomeCanvas = document.getElementById('incomeChart') !== null;
+  const hasExpenseCanvas = document.getElementById('expenseChart') !== null;
+  if (!hasIncomeCanvas && !hasExpenseCanvas) return;
+
+  const monthlySec = document.getElementById('monthlySection');
+  const isMonthlyVisible = !monthlySec || monthlySec.style.display !== 'none';
   if (!isMonthlyVisible) return;
 
-  if (document.getElementById('incomeChart') && window.CHART_DATA.income) {
-    drawMonthlyDoughnut('incomeChart', window.CHART_DATA.income.labels || [], window.CHART_DATA.income.values || []);
+  // 自愈机制：如果 window.CHART_DATA 不完整，异步兜底拉取当前月份数据并平滑重绘
+  if (!window.CHART_DATA || !window.CHART_DATA.income || !window.CHART_DATA.expense) {
+    const monthElem = document.querySelector('.month-nav-current');
+    const month = monthElem ? monthElem.textContent.trim() : '';
+    fetchChartDataAndRender(month);
+    return;
   }
-  if (document.getElementById('expenseChart') && window.CHART_DATA.expense) {
-    drawMonthlyDoughnut('expenseChart', window.CHART_DATA.expense.labels || [], window.CHART_DATA.expense.values || []);
+
+  if (hasIncomeCanvas && window.CHART_DATA.income) {
+    try {
+      drawMonthlyDoughnut('incomeChart', window.CHART_DATA.income.labels || [], window.CHART_DATA.income.values || []);
+    } catch (e) {
+      console.error('[Dashboard Chart] render income chart failed:', e);
+    }
+  }
+  if (hasExpenseCanvas && window.CHART_DATA.expense) {
+    try {
+      drawMonthlyDoughnut('expenseChart', window.CHART_DATA.expense.labels || [], window.CHART_DATA.expense.values || []);
+    } catch (e) {
+      console.error('[Dashboard Chart] render expense chart failed:', e);
+    }
   }
 }
 
@@ -1887,11 +1965,11 @@ function refreshDashboardPartials(event) {
     .then(res => res.json())
     .then(data => {
       if (!data || !data.ok) return;
-      if (!window.CHART_DATA) {
-        window.CHART_DATA = { income: { labels: [], values: [] }, expense: { labels: [], values: [] } };
-      }
-      window.CHART_DATA.income = data.income;
-      window.CHART_DATA.expense = data.expense;
+      window.CHART_DATA = {
+        month: data.month || month,
+        income: data.income || { labels: ['主业收入', '副业收入'], values: [0, 0] },
+        expense: data.expense || { labels: [], values: [] }
+      };
       if (typeof renderDonutCharts === 'function') {
         renderDonutCharts();
       }
@@ -2483,6 +2561,11 @@ document.addEventListener('DOMContentLoaded', function () {
       const newPath = (evt.detail.pathInfo && evt.detail.pathInfo.requestPath) || window.location.pathname;
       updateActiveNav(newPath);
       initPageLifecycle();
+      requestAnimationFrame(function () {
+        if (typeof renderDonutCharts === 'function') {
+          renderDonutCharts();
+        }
+      });
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
   });
@@ -2499,6 +2582,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     updateActiveNav(window.location.pathname);
     initPageLifecycle();
+    requestAnimationFrame(function () {
+      if (typeof renderDonutCharts === 'function') {
+        renderDonutCharts();
+      }
+    });
   });
 });
 
