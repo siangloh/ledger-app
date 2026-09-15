@@ -27,6 +27,9 @@
       <td data-col="note">{{ r.note }}</td>
       <td data-col="source"><span class="tag">{{ {'manual':'手动','nlp':'智能记账','import':'导入','recurring':'固定收支','auto_track':'自动记账','split_bill':'AA分账'}.get(r.source, r.source) }}</span></td>
       <td data-col="actions" class="actions">
+        {% if r.type == 'income' %}
+        <button type="button" class="btn-link" style="color: var(--primary); font-weight: 600;" onclick="openOffsetModal({{ r.id }}, {{ r.amount }}, '{{ r.note|e }}')" title="冲抵之前的支出（朋友还款）">冲抵</button>
+        {% endif %}
         <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link" hx-get="{{ url_for('edit_record', tx_id=r.id) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">编辑</a>
         <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }} · {{ r.category }} · {{ r.amount|money }}', this)">删除</button>
       </td>

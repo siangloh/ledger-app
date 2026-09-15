@@ -2846,6 +2846,63 @@ def api_auto_track():
             first_row = db.execute("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").fetchone()
             target_user_id = first_row['id'] if first_row else None
 
+    # -----------------------------------------------------------------------
+    # 智能朋友还款冲抵支出 (Auto Offset Repayment against previous expense)
+    # -----------------------------------------------------------------------
+    is_repayment = (
+        parsed['type'] == 'income'
+        and any(k in text.lower() for k in [
+            'duitnow transfer', 'transfer from', 'transferred from', 'received from', 'received',
+            '转入', '收到转账', '转账给您', '付款给您', '还款', '还钱'
+        ])
+        and not any(k in text.lower() for k in ['salary', 'payroll', '工资', '薪资', '薪水'])
+    )
+
+    if is_repayment:
+        last_expense = db.execute('''
+            SELECT id, date, category, amount, note 
+            FROM transactions 
+            WHERE user_id = ? AND type = 'expense' 
+            ORDER BY date DESC, created_at DESC, id DESC LIMIT 1
+        ''', (target_user_id,)).fetchone()
+
+        if last_expense:
+            old_amount = float(last_expense['amount'])
+            offset_amount = float(parsed['amount'])
+            new_amount = max(0.0, round(old_amount - offset_amount, 2))
+
+            tag = f"[收到还款冲减 {money_filter(offset_amount)}]"
+            old_note = (last_expense['note'] or '').strip()
+            new_note = f"{old_note} {tag}".strip()
+
+            db.execute('UPDATE transactions SET amount = ?, note = ? WHERE id = ?', (new_amount, new_note, last_expense['id']))
+            db.commit()
+
+            bump_data_version('transaction_offset', {
+                'offset_expense_id': last_expense['id'],
+                'original_amount': old_amount,
+                'new_amount': new_amount,
+                'offset_amount': offset_amount,
+                'note': new_note,
+                'category': last_expense['category'],
+                'user_id': target_user_id
+            })
+
+            notif_title = "已自动冲抵支出 💸"
+            notif_body = f"收到还款 {money_filter(offset_amount)}，已自动冲减上一笔【{last_expense['category']}】支出（由 {money_filter(old_amount)} 扣减为 {money_filter(new_amount)}）"
+            return jsonify({
+                'ok': True,
+                'verdict': 'offset_success',
+                'message': f"收到朋友还款 {money_filter(offset_amount)}，已自动从上一笔支出【{last_expense['category']}】中扣除（现为 {money_filter(new_amount)}）！",
+                'offset_expense_id': last_expense['id'],
+                'original_amount': old_amount,
+                'new_amount': new_amount,
+                'offset_amount': offset_amount,
+                'notification_title': notif_title,
+                'notification_body': notif_body,
+                'parsed': parsed
+            }), 200
+
     cur = db.execute(
         'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
         'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -2954,6 +3011,88 @@ def api_sync_transactions():
 
     db.commit()
     return jsonify({'ok': True, 'synced_count': len(synced_ids), 'synced_ids': synced_ids})
+
+
+@app.route('/api/transactions/recent-expenses', methods=['GET'])
+def api_recent_expenses():
+    """获取用户近期支出列表，供还款记录手动冲抵选择"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'ok': False, 'message': '未登录'}), 401
+    db = get_db()
+    rows = db.execute('''
+        SELECT id, date, category, amount, note, source 
+        FROM transactions 
+        WHERE user_id = ? AND type = 'expense' 
+        ORDER BY date DESC, created_at DESC, id DESC LIMIT 15
+    ''', (user_id,)).fetchall()
+    expenses = [
+        {
+            'id': r['id'],
+            'date': r['date'],
+            'category': r['category'],
+            'amount': float(r['amount']),
+            'note': r['note'] or '',
+            'source': r['source']
+        }
+        for r in rows
+    ]
+    return jsonify({'ok': True, 'expenses': expenses})
+
+
+@app.route('/api/transactions/<int:tx_id>/offset', methods=['POST'])
+def api_offset_transaction(tx_id):
+    """手动将某笔收入/朋友还款记录冲抵指定的一笔历史支出"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'ok': False, 'message': '未登录'}), 401
+
+    db = get_db()
+    income_tx = db.execute('SELECT * FROM transactions WHERE id = ? AND user_id = ?', (tx_id, user_id)).fetchone()
+    if not income_tx:
+        return jsonify({'ok': False, 'message': '未找到该笔还款/收入记录'}), 404
+    if income_tx['type'] != 'income':
+        return jsonify({'ok': False, 'message': '只有收入记录可以冲抵支出'}), 400
+
+    data = request.get_json(silent=True) or request.form
+    target_expense_id = data.get('target_expense_id')
+    if not target_expense_id:
+        return jsonify({'ok': False, 'message': '请选择要冲抵的目标支出'}), 400
+
+    target_expense = db.execute('SELECT * FROM transactions WHERE id = ? AND user_id = ?', (target_expense_id, user_id)).fetchone()
+    if not target_expense:
+        return jsonify({'ok': False, 'message': '未找到目标支出记录'}), 404
+    if target_expense['type'] != 'expense':
+        return jsonify({'ok': False, 'message': '目标记录必须是支出类型'}), 400
+
+    offset_amt = float(income_tx['amount'])
+    old_amt = float(target_expense['amount'])
+    new_amt = max(0.0, round(old_amt - offset_amt, 2))
+
+    tag = f"[收到还款冲抵 {money_filter(offset_amt)}]"
+    old_note = (target_expense['note'] or '').strip()
+    new_note = f"{old_note} {tag}".strip()
+
+    # 1. 更新目标支出金额与备注
+    db.execute('UPDATE transactions SET amount = ?, note = ? WHERE id = ?', (new_amt, new_note, target_expense_id))
+    # 2. 删除当前已冲抵的还款记录，彻底避免 duplicate
+    db.execute('DELETE FROM transactions WHERE id = ?', (tx_id,))
+    db.commit()
+
+    bump_data_version('transaction_offset', {
+        'offset_expense_id': target_expense_id,
+        'deleted_income_id': tx_id,
+        'new_amount': new_amt,
+        'user_id': user_id
+    })
+
+    return jsonify({
+        'ok': True,
+        'message': f"成功冲抵！已从【{target_expense['category']}】支出中扣除 {money_filter(offset_amt)}（现为 {money_filter(new_amt)}）",
+        'target_id': target_expense_id,
+        'new_amount': new_amt,
+        'deleted_id': tx_id
+    })
 
 
 @app.route('/download/apk')

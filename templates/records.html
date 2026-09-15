@@ -487,5 +487,154 @@ document.addEventListener('click', function(e) {
     updateBatchBar();
   }
 });
+
+async function openOffsetModal(incomeId, incomeAmount, incomeNote) {
+  if (typeof Swal === 'undefined') {
+    alert('当前环境暂不支持弹窗操作');
+    return;
+  }
+
+  Swal.fire({
+    title: '正在加载近期支出...',
+    didOpen: () => { Swal.showLoading(); },
+    allowOutsideClick: false
+  });
+
+  try {
+    const res = await fetch('/api/transactions/recent-expenses');
+    const data = await res.json();
+
+    if (!data.ok || !data.expenses || data.expenses.length === 0) {
+      Swal.fire({
+        icon: 'info',
+        title: '未找到近期支出',
+        text: '暂无可供冲抵的支出记录。'
+      });
+      return;
+    }
+
+    const expenses = data.expenses;
+    let optionsHtml = '';
+    expenses.forEach((exp, idx) => {
+      const isChecked = idx === 0 ? 'checked' : '';
+      const expAmt = parseFloat(exp.amount) || 0;
+      const remaining = Math.max(0, expAmt - incomeAmount);
+      optionsHtml += `
+        <label style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; margin-bottom: 8px; cursor: pointer; text-align: left; background: #fff;">
+          <input type="radio" name="offset_target" value="${exp.id}" ${isChecked} style="margin-top: 3px;">
+          <div style="flex: 1; font-size: 13px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+              <strong style="color: var(--navy); font-size: 13.5px;">${exp.category} · ${exp.date}</strong>
+              <span style="color: #b91c1c; font-weight: 700;">原额 RM ${expAmt.toFixed(2)}</span>
+            </div>
+            <div style="color: var(--ink-soft); font-size: 12px; margin-bottom: 4px;">
+              ${exp.note ? exp.note : '<span style="color:var(--muted)">无备注</span>'}
+            </div>
+            <div style="font-size: 11.5px; color: var(--green); font-weight: 600; background: var(--green-soft); padding: 2px 6px; border-radius: 4px; display: inline-block;">
+              冲抵后剩余：RM ${remaining.toFixed(2)}
+            </div>
+          </div>
+        </label>
+      `;
+    });
+
+    const noteDisplay = incomeNote ? ` (${incomeNote})` : '';
+    const result = await Swal.fire({
+      title: '💸 冲抵之前的支出',
+      html: `
+        <div style="text-align: left; margin-bottom: 12px;">
+          <p style="font-size: 13px; color: var(--ink-soft); margin: 0 0 10px;">
+            将此笔还款 <strong style="color: var(--green);">RM ${incomeAmount.toFixed(2)}${noteDisplay}</strong> 直接扣减某一笔已垫付的支出，避免总收入虚增：
+          </p>
+          <div style="max-height: 280px; overflow-y: auto; padding-right: 4px;">
+            ${optionsHtml}
+          </div>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: '确认扣减冲抵',
+      cancelButtonText: '取消',
+      buttonsStyling: false,
+      customClass: {
+        popup: 'app-swal-popup',
+        confirmButton: 'btn-primary',
+        cancelButton: 'btn-ghost',
+        actions: 'app-swal-actions'
+      },
+      preConfirm: () => {
+        const selected = document.querySelector('input[name="offset_target"]:checked');
+        if (!selected) {
+          Swal.showValidationMessage('请选择要冲抵的目标支出');
+          return false;
+        }
+        return selected.value;
+      }
+    });
+
+    if (result.isConfirmed && result.value) {
+      const targetExpenseId = result.value;
+      if (typeof showProgressBar === 'function') showProgressBar();
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+
+      const postRes = await fetch(`/api/transactions/${incomeId}/offset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ target_expense_id: targetExpenseId })
+      });
+      const postData = await postRes.json();
+      if (typeof finishProgressBar === 'function') finishProgressBar();
+
+      if (postData.ok) {
+        const incomeRow = document.getElementById(`row-${incomeId}`);
+        if (incomeRow) {
+          incomeRow.style.transition = 'all 0.3s ease';
+          incomeRow.style.opacity = '0';
+          incomeRow.style.transform = 'scale(0.95)';
+          setTimeout(() => incomeRow.remove(), 300);
+        }
+
+        const targetRow = document.getElementById(`row-${targetExpenseId}`);
+        if (targetRow) {
+          const amtCell = targetRow.querySelector('.amount-cell');
+          if (amtCell) {
+            amtCell.innerText = `RM ${parseFloat(postData.new_amount).toFixed(2)}`;
+            amtCell.classList.add('row-highlight-new');
+          }
+        }
+
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: postData.message || '已成功冲抵！',
+          showConfirmButton: false,
+          timer: 3000
+        });
+
+        setTimeout(() => {
+          const form = document.querySelector('form.filters');
+          if (form) form.dispatchEvent(new Event('submit'));
+        }, 800);
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: '冲抵失败',
+          text: postData.message || '服务器处理异常'
+        });
+      }
+    }
+  } catch (err) {
+    if (typeof finishProgressBar === 'function') finishProgressBar();
+    Swal.fire({
+      icon: 'error',
+      title: '操作异常',
+      text: err.message || '网络连接超时'
+    });
+  }
+}
 </script>
 {% endblock %}
