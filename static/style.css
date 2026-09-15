@@ -618,7 +618,7 @@ body {
 }
 
 .container {
-  max-width: 980px;
+  max-width: 1080px;
   margin: 32px auto 64px;
   padding: 0 20px;
 }
@@ -1006,12 +1006,14 @@ button { font-family: var(--font-sans); cursor: pointer; }
 
 .table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--surface);
   border-radius: var(--radius-lg);
   padding: 8px 4px;
   margin-bottom: 22px;
   box-shadow: var(--shadow-card);
   border: 1px solid var(--border-soft);
+  position: relative;
 }
 table {
   width: 100%;
@@ -1019,10 +1021,11 @@ table {
   font-size: 13.5px;
 }
 th, td {
-  padding: 12px 16px;
+  padding: 11px 12px;
   border-bottom: 1px solid var(--border-soft);
   text-align: left;
   white-space: nowrap;
+  vertical-align: middle;
 }
 th {
   color: var(--muted);
@@ -1061,8 +1064,85 @@ tbody tr .actions { cursor: default; }
 .tag-active { background: var(--green-soft); color: var(--green); }
 .tag-muted { background: rgba(27, 27, 31, 0.06); color: var(--muted); }
 
-.actions { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+/* 操作列与按钮容器自适应布局 */
+.actions { white-space: nowrap; text-align: right; }
+.actions-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
 .actions form { display: inline; }
+
+/* 交易明细专属高质感自适应排版 */
+table.records-table {
+  width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+}
+table.records-table td[data-col="note"] {
+  max-width: 250px;
+  min-width: 120px;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
+}
+table.records-table td[data-col="date"],
+table.records-table td[data-col="type"],
+table.records-table td[data-col="amount"] {
+  white-space: nowrap;
+}
+table.records-table th:last-child,
+table.records-table td[data-col="actions"] {
+  text-align: right;
+  white-space: nowrap;
+  min-width: 120px;
+  padding-right: 14px;
+}
+table.records-table td[data-col="actions"] .btn-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 6px;
+  line-height: 1.2;
+}
+table.records-table td[data-col="actions"] .btn-danger-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+  border-radius: 999px;
+}
+
+/* 桌面端支持右侧操作列粘性轻吸附，即使在极窄视口下横向滑动也绝不截断操作按钮 */
+@media (min-width: 769px) {
+  table.records-table th:last-child {
+    position: sticky;
+    right: 0;
+    background: var(--surface);
+    z-index: 3;
+    box-shadow: -4px 0 8px -3px rgba(0, 0, 0, 0.08);
+  }
+  table.records-table td[data-col="actions"] {
+    position: sticky;
+    right: 0;
+    background: var(--surface);
+    z-index: 2;
+    box-shadow: -4px 0 8px -3px rgba(0, 0, 0, 0.08);
+  }
+  table.records-table tr:hover td[data-col="actions"] {
+    background: var(--surface-soft);
+  }
+  table.records-table tr.selected-row td[data-col="actions"] {
+    background: var(--gold-soft) !important;
+  }
+}
 
 /* ---------- 分类管理 ---------- */
 
@@ -1674,6 +1754,16 @@ canvas {
     display: flex !important;
     justify-content: flex-end !important;
     gap: 8px !important;
+    position: static !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    min-width: unset !important;
+  }
+  table.records-table tr.record-row td[data-col="actions"] .actions-inner {
+    display: flex !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+    width: 100% !important;
   }
   table.records-table tr.record-row td[data-col="actions"] .btn-link,
   table.records-table tr.record-row td[data-col="actions"] .btn-danger-ghost {
