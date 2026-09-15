@@ -97,3 +97,80 @@ def test_auto_track_automatic_repayment_offset(flask_app, client):
         # 确认没有凭空多出收入记录
         inc = db.execute("SELECT * FROM transactions WHERE note LIKE '%Ali%'").fetchone()
         assert inc is None
+
+
+def test_gasoline_refund_auto_offset(flask_app, client):
+    with flask_app.app.app_context():
+        db = get_db()
+        admin_row = db.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
+        user_id = admin_row['id']
+        now = datetime.now().isoformat()
+        today = date.today().isoformat()
+
+        # 1. 模拟加油站预扣款 RM 100.00
+        cur = db.execute(
+            "INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) "
+            "VALUES (?, ?, 'expense', NULL, '交通', 100.00, 'RON95', 'auto_track', ?)",
+            (user_id, today, now)
+        )
+        target_gas_expense_id = cur.lastrowid
+        db.commit()
+
+    # 2. 收到加油退款通知（例如加完油后退回差额 RM 29.30）
+    refund_text = "Payment refunded You've been refunded RM29.30 for RON95 on 15 Sep 2026."
+    resp = client.post(
+        '/api/auto-track',
+        headers={'X-API-KEY': DEFAULT_AUTO_TRACK_KEY},
+        json={'text': refund_text}
+    )
+
+    assert resp.status_code == 200
+    res_data = resp.get_json()
+    assert res_data['ok'] is True
+    assert res_data['verdict'] == 'refund_offset_success'
+    assert res_data['new_amount'] == 70.70
+    assert "加油/消费退款已冲减" in res_data['notification_title']
+
+    # 3. 验证数据库：原加油支出已自动更新为实际加油金额 70.70，无虚假收入生成
+    with flask_app.app.app_context():
+        db = get_db()
+        exp = db.execute("SELECT * FROM transactions WHERE id = ?", (target_gas_expense_id,)).fetchone()
+        assert exp['amount'] == 70.70
+        assert "已扣减退款" in exp['note']
+        assert "29.30" in exp['note']
+
+        # 确保未生成重复虚假收入
+        inc = db.execute("SELECT * FROM transactions WHERE type = 'income' AND amount = 29.30").fetchone()
+        assert inc is None
+
+
+def test_go_plus_internal_transfer_ignored(client):
+    # 模拟 TnG GO+ 自动零钱/理财转存通知，应被直接忽略且返回 200
+    goplus_text = "Cash In Successful You have successfully cashed in RM29.30 into your GO+ account."
+    resp = client.post(
+        '/api/auto-track',
+        headers={'X-API-KEY': DEFAULT_AUTO_TRACK_KEY},
+        json={'text': goplus_text}
+    )
+
+    assert resp.status_code == 200
+    res_data = resp.get_json()
+    assert res_data['ok'] is True
+    assert res_data['verdict'] == 'ignored_internal_transfer'
+    assert "钱包内部资金划转" in res_data['message']
+
+
+def test_shopee_voucher_ad_rejected(client):
+    # 模拟带有金额与返现的促销广告通知，应被识别并拦截
+    voucher_text = "Shopee: You just got a voucher! 100% Cashback, sehingga RM5. Check out in-store now!"
+    resp = client.post(
+        '/api/auto-track',
+        headers={'X-API-KEY': DEFAULT_AUTO_TRACK_KEY},
+        json={'text': voucher_text}
+    )
+
+    assert resp.status_code == 200
+    res_data = resp.get_json()
+    assert res_data['ok'] is False
+    assert res_data['verdict'] == 'rejected_promo'
+
