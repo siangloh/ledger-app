@@ -305,8 +305,19 @@
             document.addEventListener('click', function () {
                 groups.forEach(function (g) { g.classList.remove('pinned'); });
             });
+    {% if session.get('username') %}
+    <script>
+        (function () {
+            if (window.LedgerNativeBridge && typeof window.LedgerNativeBridge.setCurrentUser === 'function') {
+                try {
+                    window.LedgerNativeBridge.setCurrentUser({{ session.username | tojson }});
+                } catch (e) {
+                    console.debug("Native bridge setCurrentUser error", e);
+                }
+            }
         })();
     </script>
+    {% endif %}
     {% block scripts %}{% endblock %}
 </body>
 

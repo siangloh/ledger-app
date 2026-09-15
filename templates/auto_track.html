@@ -12,7 +12,12 @@
 <div class="panels">
   <!-- 左侧：专属 Webhook 配置与在线快速测试 -->
   <section class="panel">
-    <h3>🔗 你的专属接收网关 (Webhook URL)</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <h3 style="margin: 0;">🔗 你的专属接收网关 (Webhook URL)</h3>
+      <span style="font-size: 12px; background: rgba(37, 99, 235, 0.1); color: var(--primary); padding: 4px 10px; border-radius: 999px; font-weight: 600; border: 1px solid rgba(37, 99, 235, 0.25);">
+        👤 专属绑定用户：{{ current_username }}
+      </span>
+    </div>
     <div style="background: var(--surface-soft); padding: 14px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin: 12px 0 18px;">
       <div style="font-size: 12.5px; color: var(--navy); font-weight: 700; margin-bottom: 6px;">
         ⭐ 方式一：一体化免 Header 接收地址（强烈推荐给 MacroDroid / 快捷指令用户，复制即用）：
@@ -22,7 +27,7 @@
         <button type="button" class="btn-primary" onclick="copyText('webhookWithKeyInput', '免 Header 一体化 Webhook 地址已复制')" style="white-space: nowrap; font-size: 12px;">复制一体化地址</button>
       </div>
       <div style="font-size: 11.5px; color: var(--muted); margin-bottom: 12px;">
-        该网址已包含专属 API Key 参数，在 MacroDroid 中只需填入 URL，<strong>无需繁琐配置任何请求头 (Headers)</strong>。
+        该网址已自动嵌入专属 API Key 与你的用户账号（<code>username={{ current_username }}</code>），自动记账将<strong>100% 独立记入你的个人账本</strong>，多用户数据严格隔离。
       </div>
 
       <div style="font-size: 12px; color: var(--ink-soft); font-weight: 600; margin-bottom: 4px;">
@@ -35,6 +40,7 @@
 
       <div style="display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; margin-top: 10px;">
         <span style="color: var(--green);">✓ API Key = <code style="font-family: var(--font-mono); background: var(--border-soft); padding: 2px 6px; border-radius: 4px;">{{ api_key }}</code></span>
+        <span style="color: var(--navy);">✓ 归属账号 = <code style="font-family: var(--font-mono); background: var(--border-soft); padding: 2px 6px; border-radius: 4px;">{{ current_username }}</code></span>
         {% if llm_info %}
         <span style="color: var(--primary); font-weight: 500;">🤖 AI 智能引擎：{{ llm_info.name }} 已就绪</span>
         {% endif %}
@@ -277,7 +283,10 @@ async function submitTestAutoTrack(e) {
         'Content-Type': 'application/json',
         'X-API-KEY': {{ api_key | tojson }}
       },
-      body: JSON.stringify({ text: text })
+      body: JSON.stringify({
+        text: text,
+        username: {{ current_username | tojson }}
+      })
     });
     const data = await res.json();
     resultBox.style.display = 'block';

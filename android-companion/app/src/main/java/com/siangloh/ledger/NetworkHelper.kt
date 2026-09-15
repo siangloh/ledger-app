@@ -21,10 +21,32 @@ object NetworkHelper {
     const val DEFAULT_API_KEY = "zo}SxK_}_%0LO8w;"
     private const val KEY_API_KEY = "custom_api_key"
 
+    private const val KEY_USERNAME = "custom_username"
+
     private var cachedContext: Context? = null
 
     fun init(context: Context) {
         cachedContext = context.applicationContext
+    }
+
+    fun getUsername(context: Context? = null): String {
+        val ctx = context ?: cachedContext
+        return ctx?.let {
+            try {
+                it.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .getString(KEY_USERNAME, "")?.trim() ?: ""
+            } catch (_: Exception) { "" }
+        } ?: ""
+    }
+
+    fun setUsername(context: Context, username: String) {
+        val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val clean = username.trim()
+        if (clean.isEmpty()) {
+            sp.edit().remove(KEY_USERNAME).apply()
+        } else {
+            sp.edit().putString(KEY_USERNAME, clean).apply()
+        }
     }
 
     fun getApiKey(context: Context? = null): String {
@@ -89,9 +111,16 @@ object NetworkHelper {
         Thread {
             try {
                 val key = getApiKey(context)
+                val username = getUsername(context)
                 val encodedKey = try { java.net.URLEncoder.encode(key, "UTF-8") } catch (_: Exception) { "" }
-                val fullUrl = if (encodedKey.isNotEmpty()) {
-                    "${getServerUrl(context)}/api/auto-track?key=$encodedKey"
+                val encodedUser = try { java.net.URLEncoder.encode(username, "UTF-8") } catch (_: Exception) { "" }
+
+                val queryParams = mutableListOf<String>()
+                if (encodedKey.isNotEmpty()) queryParams.add("key=$encodedKey")
+                if (encodedUser.isNotEmpty()) queryParams.add("username=$encodedUser")
+
+                val fullUrl = if (queryParams.isNotEmpty()) {
+                    "${getServerUrl(context)}/api/auto-track?" + queryParams.joinToString("&")
                 } else {
                     "${getServerUrl(context)}/api/auto-track"
                 }
@@ -110,6 +139,9 @@ object NetworkHelper {
                 val jsonPayload = JSONObject().apply {
                     put("key", key)
                     put("text", text)
+                    if (username.isNotEmpty()) {
+                        put("username", username)
+                    }
                 }.toString()
 
                 OutputStreamWriter(conn.outputStream, "UTF-8").use { out ->
@@ -175,8 +207,12 @@ object NetworkHelper {
                     jsonArray.put(obj)
                 }
 
+                val username = getUsername(context)
                 val body = JSONObject().apply {
                     put("transactions", jsonArray)
+                    if (username.isNotEmpty()) {
+                        put("username", username)
+                    }
                 }.toString()
 
                 OutputStreamWriter(conn.outputStream, "UTF-8").use { out ->
@@ -188,15 +224,17 @@ object NetworkHelper {
                 val responseMsg = if (responseCode in 200..299) {
                     conn.inputStream.bufferedReader().use { it.readText() }
                 } else {
-                    conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                    conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "Error $responseCode"
                 }
 
-                val syncedIds = mutableListOf<Long>()
                 var isSuccess = responseCode in 200..299
+                val syncedIds = mutableListOf<Long>()
                 try {
-                    val resJson = JSONObject(responseMsg)
-                    isSuccess = resJson.optBoolean("ok", isSuccess)
-                    val idsArr = resJson.optJSONArray("synced_ids")
+                    val jsonObj = JSONObject(responseMsg)
+                    if (jsonObj.has("ok")) {
+                        isSuccess = jsonObj.optBoolean("ok")
+                    }
+                    val idsArr = jsonObj.optJSONArray("synced_ids")
                     if (idsArr != null) {
                         for (i in 0 until idsArr.length()) {
                             syncedIds.add(idsArr.getLong(i))
@@ -216,7 +254,13 @@ object NetworkHelper {
     fun fetchCategories(callback: ((Boolean, List<CachedCategory>) -> Unit)? = null) {
         Thread {
             try {
-                val fullUrl = "${getServerUrl()}/api/categories"
+                val username = getUsername()
+                val encodedUser = try { java.net.URLEncoder.encode(username, "UTF-8") } catch (_: Exception) { "" }
+                val fullUrl = if (encodedUser.isNotEmpty()) {
+                    "${getServerUrl()}/api/categories?username=$encodedUser"
+                } else {
+                    "${getServerUrl()}/api/categories"
+                }
                 val url = URL(fullUrl)
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"

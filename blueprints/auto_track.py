@@ -469,8 +469,14 @@ def api_get_categories():
     if not is_valid_api_key(req_key):
         return jsonify({'ok': False, 'message': 'API Key 无效'}), 401
 
-    user_id = get_current_user_id()
     db = get_db()
+    user_id = get_current_user_id()
+    target_username = request.args.get('username')
+    if target_username:
+        u_row = db.execute("SELECT id FROM users WHERE username = ?", (target_username,)).fetchone()
+        if u_row:
+            user_id = u_row['id']
+
     rows = db.execute('SELECT id, name, type, group_name FROM categories WHERE user_id = ? ORDER BY type, id', (user_id,)).fetchall()
     categories = [{'id': r['id'], 'name': r['name'], 'type': r['type'], 'group_name': r['group_name']} for r in rows]
     return jsonify({'ok': True, 'categories': categories})
@@ -488,8 +494,14 @@ def api_sync_transactions():
     if not txs:
         return jsonify({'ok': True, 'synced_count': 0, 'synced_ids': []})
 
-    user_id = get_current_user_id()
     db = get_db()
+    user_id = get_current_user_id()
+    target_username = payload.get('username') or request.args.get('username')
+    if target_username:
+        u_row = db.execute("SELECT id FROM users WHERE username = ?", (target_username,)).fetchone()
+        if u_row:
+            user_id = u_row['id']
+
     now = datetime.now().isoformat()
     synced_ids = []
     for item in txs:
@@ -533,8 +545,9 @@ def auto_track_page():
         scheme = 'https'
     base_url = f"{scheme}://{request.host}".rstrip('/')
     api_key = get_auto_track_key()
-    webhook_url = f"{base_url}/api/auto-track"
-    webhook_url_with_key = f"{base_url}/api/auto-track?key={api_key}"
+    current_username = session.get('username') or 'admin'
+    webhook_url = f"{base_url}/api/auto-track?username={current_username}"
+    webhook_url_with_key = f"{base_url}/api/auto-track?key={api_key}&username={current_username}"
     db = get_db()
     samples = db.execute("SELECT * FROM llm_learning_samples ORDER BY id ASC").fetchall()
     return render_template(
@@ -542,6 +555,7 @@ def auto_track_page():
         api_key=api_key,
         webhook_url=webhook_url,
         webhook_url_with_key=webhook_url_with_key,
+        current_username=current_username,
         llm_info=get_active_llm_provider(),
         samples=samples
     )

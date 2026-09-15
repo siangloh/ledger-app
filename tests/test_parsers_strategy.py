@@ -141,3 +141,55 @@ def test_auto_track_deduplication(client, admin_user_id):
     assert d2["ok"] is True
     assert d2["verdict"] == "duplicate_ignored"
     assert d2["transaction_id"] == tx_id
+
+
+def test_auto_track_multi_user_isolation(client, admin_user_id, flask_app):
+    """验证多用户通过 username 指定记账时，数据严格隔离且不可互相越权查看"""
+    import uuid
+    from werkzeug.security import generate_password_hash
+    import sqlite3
+
+    db = sqlite3.connect(flask_app.DB_PATH)
+    db.row_factory = sqlite3.Row
+    alice_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
+        (alice_id, "alice", generate_password_hash("Pass123!"), "2026-09-15T00:00:00")
+    )
+    db.commit()
+
+    headers = {"X-API-KEY": "test-auto-track-key", "Content-Type": "application/json"}
+    text = "Touch 'n Go eWallet: You have paid RM 15.00 to Kinokuniya Bookstore."
+
+    # 手机端/Webhook 携带 username=alice 上报
+    res = client.post("/api/auto-track", json={"text": text, "username": "alice"}, headers=headers)
+    assert res.status_code == 201
+    d = res.get_json()
+    assert d["ok"] is True
+    assert d["verdict"] == "accepted"
+    tx_id = d["transaction_id"]
+
+    # 1. 验证交易在数据库中严格归属于 alice
+    row = db.execute("SELECT user_id, amount, note FROM transactions WHERE id = ?", (tx_id,)).fetchone()
+    assert row["user_id"] == alice_id
+    assert row["amount"] == 15.00
+    assert "Kinokuniya" in row["note"]
+
+    # 2. 验证 admin 账号的明细中完全没有这笔记录，且 tx_id 绝不在 admin 交易列表中
+    admin_rows = db.execute("SELECT id FROM transactions WHERE user_id = ? AND note LIKE '%Kinokuniya%'", (admin_user_id,)).fetchall()
+    assert len(admin_rows) == 0
+    all_admin_tx_ids = [r["id"] for r in db.execute("SELECT id FROM transactions WHERE user_id = ?", (admin_user_id,)).fetchall()]
+    assert tx_id not in all_admin_tx_ids
+    db.close()
+
+    # 3. 验证 alice 登录后打开 /auto-track 页面时，生成的 Webhook 地址自动包含其专属 username
+    with client.session_transaction() as sess:
+        sess["logged_in"] = True
+        sess["user_id"] = alice_id
+        sess["username"] = "alice"
+
+    page_resp = client.get("/auto-track")
+    assert page_resp.status_code == 200
+    html = page_resp.get_data(as_text=True)
+    assert "username=alice" in html
+    assert "专属绑定用户：alice" in html

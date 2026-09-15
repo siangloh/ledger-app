@@ -156,6 +156,13 @@ class MainActivity : AppCompatActivity() {
             fun isNativeApp(): Boolean = true
             @JavascriptInterface
             fun getVersion(): String = "1.0.0"
+            @JavascriptInterface
+            fun setCurrentUser(username: String) {
+                if (username.isNotBlank()) {
+                    NetworkHelper.setUsername(this@MainActivity, username)
+                    android.util.Log.i("LedgerNativeBridge", "Bound native user to: $username")
+                }
+            }
             // 小票拍照识别入口：由 split_bill.html 侦测到自己跑在原生 App 内时调用。
             // 识别完全在手机本地用 ML Kit 完成，不会把照片传去任何服务器。
             @JavascriptInterface
@@ -284,7 +291,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showQuickMenu() {
-        val options = arrayOf("⚡ 离线快速记账", "⚙️ 监测的应用设置", "📋 查看通知与同步日志", "🔄 手动同步", "🌐 服务器地址设置", "🔑 自动记账 API Key 设置")
+        val options = arrayOf("⚡ 离线快速记账", "⚙️ 监测的应用设置", "📋 查看通知与同步日志", "🔄 手动同步", "👤 绑定记账用户 (Username 设置)", "🌐 服务器地址设置", "🔑 自动记账 API Key 设置")
         AlertDialog.Builder(this)
             .setTitle("快捷菜单")
             .setItems(options) { _, which ->
@@ -296,10 +303,35 @@ class MainActivity : AppCompatActivity() {
                         SyncWorker.enqueueSync(this)
                         Toast.makeText(this, "已发起后台同步请求", Toast.LENGTH_SHORT).show()
                     }
-                    4 -> showServerUrlDialog()
-                    5 -> showApiKeyDialog()
+                    4 -> showUsernameDialog()
+                    5 -> showServerUrlDialog()
+                    6 -> showApiKeyDialog()
                 }
             }
+            .show()
+    }
+
+    private fun showUsernameDialog() {
+        val current = NetworkHelper.getUsername(this)
+        val input = android.widget.EditText(this).apply {
+            setText(current)
+            setSelection(text.length)
+            hint = "例如：admin、user_a"
+        }
+        AlertDialog.Builder(this)
+            .setTitle("👤 绑定记账用户名")
+            .setMessage("设置当前手机抓取通知时归属的记账用户（在 Web 端登录时会自动同步，也可在此手动指定）：")
+            .setView(input)
+            .setPositiveButton("保存") { _, _ ->
+                val newName = input.text.toString().trim()
+                NetworkHelper.setUsername(this, newName)
+                Toast.makeText(this, if (newName.isEmpty()) "已清空绑定，将使用默认用户" else "已绑定记账用户：$newName", Toast.LENGTH_SHORT).show()
+            }
+            .setNeutralButton("清空绑定") { _, _ ->
+                NetworkHelper.setUsername(this, "")
+                Toast.makeText(this, "已恢复为默认用户", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
             .show()
     }
 
