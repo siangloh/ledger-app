@@ -2,88 +2,7 @@
 {% block title %}账户管理 - 我的记账本{% endblock %}
 
 {% block content %}
-<style>
-  :root {
-    --acc-card-bg: rgba(255,255,255,0.04);
-    --acc-border: rgba(255,255,255,0.08);
-    --acc-radius: 16px;
-  }
-  .acc-page-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:28px; flex-wrap:wrap; }
-  .acc-page-title { font-size:22px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:10px; }
-  .acc-page-title .badge-count { font-size:12px; background:rgba(99,102,241,0.2); color:#818cf8; border-radius:20px; padding:2px 10px; font-weight:600; }
-  .btn-add-acc { display:inline-flex; align-items:center; gap:6px; padding:10px 20px; border-radius:10px; background:linear-gradient(135deg,#6366f1,#818cf8); color:#fff; font-size:14px; font-weight:600; border:none; cursor:pointer; transition:opacity 0.2s,transform 0.15s; text-decoration:none; }
-  .btn-add-acc:hover { opacity:0.88; transform:translateY(-1px); }
-  .acc-summary-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:28px; }
-  .acc-kpi { background:var(--acc-card-bg); border:1px solid var(--acc-border); border-radius:12px; padding:16px 18px; display:flex; flex-direction:column; gap:4px; }
-  .acc-kpi-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; }
-  .acc-kpi-val { font-size:22px; font-weight:700; color:var(--ink); }
-  .acc-kpi-sub { font-size:11px; color:var(--muted); }
-  .acc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
-  .acc-card { background:var(--acc-card-bg); border:1px solid var(--acc-border); border-radius:var(--acc-radius); padding:20px; display:flex; flex-direction:column; gap:12px; position:relative; transition:border-color 0.2s,transform 0.15s; }
-  .acc-card:hover { border-color:rgba(99,102,241,0.35); transform:translateY(-2px); }
-  .acc-card.inactive { opacity:0.5; }
-  .acc-card-top { display:flex; align-items:flex-start; gap:12px; }
-  .acc-icon { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
-  .acc-icon.savings { background:rgba(16,185,129,0.15); }
-  .acc-icon.current { background:rgba(59,130,246,0.15); }
-  .acc-icon.credit_card { background:rgba(139,92,246,0.15); }
-  .acc-icon.e_wallet { background:rgba(245,158,11,0.15); }
-  .acc-icon.investment { background:rgba(99,102,241,0.15); }
-  .acc-icon.cash { background:rgba(34,197,94,0.15); }
-  .acc-icon.other { background:rgba(156,163,175,0.15); }
-  .acc-meta { flex:1; min-width:0; }
-  .acc-name { font-size:15px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .acc-type-badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:8px; margin-top:3px; font-weight:500; }
-  .badge-savings { background:rgba(16,185,129,0.15); color:#10b981; }
-  .badge-current { background:rgba(59,130,246,0.15); color:#3b82f6; }
-  .badge-credit_card { background:rgba(139,92,246,0.15); color:#8b5cf6; }
-  .badge-e_wallet { background:rgba(245,158,11,0.15); color:#f59e0b; }
-  .badge-investment { background:rgba(99,102,241,0.15); color:#6366f1; }
-  .badge-cash { background:rgba(34,197,94,0.15); color:#22c55e; }
-  .badge-other { background:rgba(156,163,175,0.15); color:#9ca3af; }
-  .acc-details { display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; }
-  .acc-detail-item { display:flex; flex-direction:column; gap:1px; }
-  .acc-detail-label { font-size:10px; color:var(--muted); }
-  .acc-detail-val { font-size:13px; color:var(--ink); font-weight:500; }
-  .acc-links-row { display:flex; gap:8px; flex-wrap:wrap; }
-  .acc-link-chip { font-size:11px; padding:3px 10px; border-radius:8px; background:rgba(255,255,255,0.06); border:1px solid var(--acc-border); color:var(--muted); }
-  .acc-link-chip.has-links { background:rgba(99,102,241,0.1); border-color:rgba(99,102,241,0.3); color:#818cf8; }
-  .acc-actions { display:flex; gap:6px; border-top:1px solid var(--acc-border); padding-top:12px; flex-wrap:wrap; }
-  .btn-acc-action { flex:1; min-width:60px; padding:7px 10px; border-radius:8px; font-size:12px; font-weight:600; border:1px solid var(--acc-border); background:rgba(255,255,255,0.04); color:var(--muted); cursor:pointer; transition:all 0.15s; }
-  .btn-acc-action:hover { background:rgba(255,255,255,0.08); color:var(--ink); }
-  .btn-acc-edit { border-color:rgba(99,102,241,0.4); color:#818cf8; }
-  .btn-acc-edit:hover { background:rgba(99,102,241,0.12); color:#818cf8; }
-  .btn-acc-toggle.deactivate { border-color:rgba(245,158,11,0.4); color:#f59e0b; }
-  .btn-acc-toggle.deactivate:hover { background:rgba(245,158,11,0.1); }
-  .btn-acc-toggle.activate { border-color:rgba(16,185,129,0.4); color:#10b981; }
-  .btn-acc-toggle.activate:hover { background:rgba(16,185,129,0.1); }
-  .btn-acc-delete { border-color:rgba(239,68,68,0.35); color:#f87171; }
-  .btn-acc-delete:hover { background:rgba(239,68,68,0.1); }
-  .acc-inactive-banner { position:absolute; top:12px; right:12px; font-size:10px; padding:2px 8px; border-radius:6px; background:rgba(156,163,175,0.15); color:#9ca3af; font-weight:600; letter-spacing:0.04em; }
-  .acc-empty { text-align:center; padding:60px 20px; color:var(--muted); grid-column:1 / -1; }
-  .acc-empty .empty-icon { font-size:52px; display:block; margin-bottom:12px; }
-  .acc-empty h3 { font-size:18px; color:var(--ink); margin-bottom:6px; }
-  .acc-section-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin:8px 0 4px; grid-column:1 / -1; }
-  .acc-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); backdrop-filter:blur(4px); z-index:1000; align-items:center; justify-content:center; padding:20px; }
-  .acc-modal-overlay.open { display:flex; }
-  .acc-modal { background:var(--surface,#1a2744); border:1px solid var(--acc-border); border-radius:20px; padding:28px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; box-shadow:0 24px 48px rgba(0,0,0,0.5); }
-  .acc-modal h2 { font-size:18px; font-weight:700; color:var(--ink); margin:0 0 20px; display:flex; align-items:center; gap:8px; }
-  .acc-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-  .acc-form-grid .full-col { grid-column:1 / -1; }
-  .acc-form-group { display:flex; flex-direction:column; gap:5px; }
-  .acc-form-group label { font-size:12px; font-weight:600; color:var(--muted); }
-  .acc-form-group input, .acc-form-group select { padding:9px 12px; border-radius:9px; border:1px solid var(--acc-border); background:rgba(255,255,255,0.04); color:var(--ink); font-size:14px; width:100%; box-sizing:border-box; transition:border-color 0.2s; }
-  .acc-form-group input:focus, .acc-form-group select:focus { outline:none; border-color:#6366f1; }
-  .cc-section { display:contents; }
-  .cc-section.hidden > * { display:none; }
-  .acc-hint { font-size:11px; color:var(--muted); margin-top:2px; }
-  .acc-modal-footer { display:flex; gap:10px; margin-top:22px; justify-content:flex-end; }
-  .btn-cancel-modal { padding:10px 22px; border-radius:9px; border:1px solid var(--acc-border); background:transparent; color:var(--muted); font-size:14px; cursor:pointer; transition:all 0.15s; }
-  .btn-cancel-modal:hover { background:rgba(255,255,255,0.05); color:var(--ink); }
-  .btn-save-acc { padding:10px 26px; border-radius:9px; background:linear-gradient(135deg,#6366f1,#818cf8); color:#fff; font-size:14px; font-weight:600; border:none; cursor:pointer; transition:opacity 0.2s; }
-  .btn-save-acc:hover { opacity:0.88; }
-  @media(max-width:480px){.acc-form-grid{grid-template-columns:1fr;}.acc-modal{padding:20px;}}
-</style>
+
 
 <div class="acc-page-header">
   <div class="acc-page-title">
@@ -228,7 +147,7 @@
 </div>
 
 <!-- ADD MODAL -->
-<div class="acc-modal-overlay" id="addModalOverlay">
+<div class="acc-modal-overlay" id="addModalOverlay" style="display:none;">
   <div class="acc-modal">
     <h2>🏦 添加新账户</h2>
     <form method="POST" action="/api/accounts">
@@ -284,7 +203,7 @@
 </div>
 
 <!-- EDIT MODAL -->
-<div class="acc-modal-overlay" id="editModalOverlay">
+<div class="acc-modal-overlay" id="editModalOverlay" style="display:none;">
   <div class="acc-modal">
     <h2>✏️ 编辑账户</h2>
     <form method="POST" id="editAccountForm">
@@ -346,16 +265,29 @@
 {% block scripts %}
 <script>
 function openAddModal() {
-  document.getElementById('addModalOverlay').classList.add('open');
+  const el = document.getElementById('addModalOverlay');
+  el.style.display = 'flex';
+  el.classList.add('open');
   document.getElementById('addName').focus();
   onTypeChange('add');
 }
-function closeAddModal() { document.getElementById('addModalOverlay').classList.remove('open'); }
-function closeEditModal() { document.getElementById('editModalOverlay').classList.remove('open'); }
+function closeAddModal() {
+  const el = document.getElementById('addModalOverlay');
+  el.classList.remove('open');
+  el.style.display = 'none';
+}
+function closeEditModal() {
+  const el = document.getElementById('editModalOverlay');
+  el.classList.remove('open');
+  el.style.display = 'none';
+}
 
 ['addModalOverlay','editModalOverlay'].forEach(id => {
   document.getElementById(id).addEventListener('click', function(e){
-    if(e.target === this) this.classList.remove('open');
+    if(e.target === this) {
+      this.classList.remove('open');
+      this.style.display = 'none';
+    }
   });
 });
 
@@ -378,7 +310,9 @@ function openEditModal(id, name, type, currency, creditLimit, statementDay, dueD
   document.getElementById('editStatementDay').value = statementDay !== null ? statementDay : '';
   document.getElementById('editDueDay').value = dueDay !== null ? dueDay : '';
   document.getElementById('editGracePeriod').value = gracePeriod || 20;
-  document.getElementById('editModalOverlay').classList.add('open');
+  const el = document.getElementById('editModalOverlay');
+  el.style.display = 'flex';
+  el.classList.add('open');
   document.getElementById('editName').focus();
 }
 
