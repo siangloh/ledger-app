@@ -51,6 +51,8 @@ from core.db import (  # noqa: F401
     close_db,
     init_db,
     bump_data_version,
+    get_data_version,
+    get_latest_event,
     get_categories,
     get_current_user_id,
     init_user_default_categories,
@@ -380,8 +382,9 @@ def index():
 def api_realtime_check():
     user_id = get_current_user_id()
     client_v = request.args.get('v', type=int)
-    current_v = USER_DATA_VERSIONS.get(user_id, DATA_VERSION)
-    latest_evt = USER_LATEST_EVENTS.get(user_id, LATEST_EVENT)
+    db = get_db()
+    current_v = get_data_version(user_id, db=db)
+    latest_evt = get_latest_event(user_id, db=db)
     has_update = False
     if client_v is not None and client_v < current_v:
         has_update = True

@@ -33,6 +33,11 @@ LLM_TIMEOUT = float(os.environ.get('LLM_TIMEOUT', '4.5'))
 APP_PASSWORD = os.environ.get('APP_PASSWORD')
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def get_auto_track_key(db=None):
     """获取有效的 AUTO_TRACK_KEY（优先环境变量，次选数据库 system_settings，保底系统默认配套 key）"""
     if AUTO_TRACK_KEY and AUTO_TRACK_KEY.strip():
@@ -42,8 +47,8 @@ def get_auto_track_key(db=None):
             row = db.execute("SELECT value FROM system_settings WHERE key='auto_track_key'").fetchone()
             if row and row['value'] and str(row['value']).strip():
                 return str(row['value']).strip()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Read system_settings auto_track_key skipped: %s", e)
     return DEFAULT_AUTO_TRACK_KEY
 
 
@@ -70,8 +75,8 @@ def get_app_password(db=None):
             row = db.execute("SELECT value FROM system_settings WHERE key='app_password'").fetchone()
             if row and row['value']:
                 return row['value']
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Read system_settings app_password skipped: %s", e)
     return None
 
 

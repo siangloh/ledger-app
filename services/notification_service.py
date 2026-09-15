@@ -53,164 +53,24 @@ MERCHANT_CATEGORY_MAPPING = {
 }
 
 
+from services.parsers import NotificationParserComposite
+
+_default_composite = NotificationParserComposite()
+
+
 def parse_auto_track_notification(raw_text):
     """
     解析来自 TnG eWallet / Maybank MAE / Public Bank (MyPB) / 银行短信 / 通知栏的文本。
-    提取：金额 (RM)、商户名/接收方、时间、自动匹配分类。
-    自动过滤：营销广告、信用卡/贷款推广、返现活动宣传、安全提醒、OTP/TAC验证码等非动账通知。
+    通过 NotificationParserComposite 策略责任链模式进行模块化调度与解耦。
     """
-    text = raw_text.strip()
-    if not text:
+    if not raw_text or not str(raw_text).strip():
         return None
-
-    lower_text = text.lower()
-
-    # 0. 强力过滤非动账类通知（营销推广、信用卡/贷款推销、返现活动宣传、抽奖、条款、OTP/TAC验证码、安全提醒等）
-    PROMO_AND_AD_KEYWORDS = [
-        'apply online', 'apply & get', 'apply for', 'apply now', 'apply today', 'application for',
-        'cardmember yet', 'credit cardmember', 'not a pb', 'not a member', 'eligible for',
-        'double cashback', 'cash back', 'stand a chance', 'lucky draw', 'win a', 'win up to',
-        'contest', 'rewards point', 'free gift', 'luggage set', 'gift voucher', 'earn entries',
-        't&cs apply', "t&c's apply", 'terms and conditions apply', 'terms and conditions', 'spend requirements', 'campaign period',
-        'exclusive offer', 'special offer', 'limited time offer', 'limited time only',
-        'balance transfer', 'flexi payment', 'personal loan', 'home loan', 'car loan', 'hire purchase',
-        'unit trust', 'fixed deposit promo', 'interest rate',
-        'maintenance notice', 'system maintenance', 'system upgrade', 'scheduled downtime',
-        'security reminder', 'stay alert', 'scam alert', 'fraud alert',
-        'otp', 'tac', 'one-time password', 'verification code', 'authorization code', 'do not share',
-        'your password', 'reset password', 'login alert', 'new login',
-        # 电商优惠券与营销促销推送（如 Shopee / Lazada 等）
-        'you just got a voucher', 'got a voucher', 'claim your voucher', 'claim voucher',
-        'free shipping', '100% cashback', 'cashback, sehingga', 'sehingga rm',
-        'check out in-store now', 'check out now', 'shop now', 'voucher inside'
-    ]
-    if any(k in lower_text for k in PROMO_AND_AD_KEYWORDS):
-        return {'is_promo': True, 'reason': '命中营销推广活动或非动账安全词库'}
-
-    # 0.1 识别并忽略钱包内部资金划转与充值（例如 TnG GO+ 自动收益转存、余额转入理财、电子钱包充值）
-    INTERNAL_TRANSFER_KEYWORDS = [
-        'into your go+ account', 'into your go+', 'cashed in', 'cash in successful',
-        'reload successful', 'top up successful', 'top up into', 'reload into',
-        '转存进入', '转入余额宝', '钱包充值成功'
-    ]
-    if any(k in lower_text for k in INTERNAL_TRANSFER_KEYWORDS):
-        return {
-            'is_internal_transfer': True,
-            'reason': '钱包内部资金划转/充值（如 GO+ 转存），已自动忽略不记入财务收支'
-        }
-
-    # 1. 动账行为动词硬性检查（必须具备明确真实的财务收支动作，杜绝普通资讯/广告被误记账）
-    is_expense = any(k in lower_text for k in [
-        'paid', 'spent', 'payment to', 'payment of', 'payment successful', 'payment has been made',
-        'deducted', 'debited', 'charged', 'transfer to', 'transferred to', 'transfer of',
-        'purchase at', 'purchase of', 'withdrawal', 'withdrawn', 'duitnow qr', 'duitnow transfer to',
-        '付款', '支出', '扣款', '转账给', '已支付', '买单', '消费', '成功支付', '成功转账', '成功扣款'
-    ])
-
-    is_refund = any(k in lower_text for k in [
-        'payment refunded', 'refunded', 'refund of', 'refund', '退款', '撤销', '退回'
-    ])
-
-    is_income = is_refund or any(k in lower_text for k in [
-        'received from', 'received', 'credited', 'deposit', 'salary', 'dividend',
-        'duitnow transfer from', 'transfer from',
-        '转入', '收款', '存入', '到账', '收到转账', '入账'
-    ])
-
-    # 若既不是明确的支出动词，也不是明确的收入动词，直接判定为非交易动账通知并忽略
-    if not is_expense and not is_income:
-        return None
-
-    tx_type = 'income' if is_income and not is_expense else 'expense'
-
-    # 2. 提取金额：支持 "RM 15.00", "RM15.50", "RM 1,250.00", "MYR 20", "15.00"
-    amount = None
-    # 优先匹配带 RM / MYR 的格式 (允许千分位逗号)
-    m_rm = re.search(r'(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)', text, re.IGNORECASE)
-    if m_rm:
-        try:
-            val_str = m_rm.group(1).replace(',', '')
-            amount = float(val_str)
-        except ValueError:
-            amount = None
-
-    if amount is None:
-        # 回退提取普通数字（允许千分位）
-        nums = list(re.finditer(r'\b([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\b', text))
-        if nums:
-            try:
-                val_str = nums[-1].group(1).replace(',', '')
-                amount = float(val_str)
-            except ValueError:
-                pass
-
-    if not amount or amount <= 0:
-        return None
-
-    # 3. 提取商户 / 交易对手 / 项目（支持 for RON95 / to FamilyMart 等）
-    merchant = ''
-    m_to = re.search(r'(?:to|at|from|for|paid to|transfer to|payment to)\s+([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{2,35})', text, re.IGNORECASE)
-    if m_to:
-        m_str = m_to.group(1).strip()
-        # 清理后续干扰词如 on, via, using, ref, date, claim, cashback, voucher 等以及句号/换行
-        m_cleaned = re.split(r'[\.\n\r]|\s+(?:on|via|ref|using|with|at|date|txid|claim|get|earn|earned|cashback|voucher|was|is|successful)\b', m_str, flags=re.IGNORECASE)[0]
-        merchant = m_cleaned.strip(' .,-')
-
-    if not merchant:
-        # 尝试中文格式：“在【全家】消费”、“向【张三】转账”
-        m_cn = re.search(r'(?:在|向)\s*([A-Za-z0-9\u4e00-\u9fa5\s&]{2,20})\s*(?:消费|转账|付款)', text)
-        if m_cn:
-            merchant = m_cn.group(1).strip()
-
-    if not merchant:
-        merchant = '自动追踪消费' if tx_type == 'expense' else '自动追踪入账'
-
-    # 4. 自动归类分类 (Category)
-    category = '其他'
-    if tx_type == 'income':
-        category = '其他'
-        group_name = 'side'
-    else:
-        group_name = None
-        # 优先通过商户名匹配映射表
-        matched_cat = None
-        m_lower = merchant.lower()
-        for kw, cat in MERCHANT_CATEGORY_MAPPING.items():
-            if kw in m_lower or kw in lower_text:
-                matched_cat = cat
-                break
-
-        if not matched_cat:
-            # 次优按通用支出分类关键词词库匹配
-            for cat, kws in EXPENSE_CATEGORY_KEYWORDS.items():
-                if any(k in m_lower or k in lower_text for k in kws):
-                    matched_cat = cat
-                    break
-
-        category = matched_cat if matched_cat else '其他'
-
-    # 5. 提取日期（若无法从文本中解析出 YYYY-MM-DD，则默认当前日期）
-    tx_date = date.today().isoformat()
-    m_date = re.search(r'(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})', text)
-    if m_date:
-        try:
-            d_str = m_date.group(1).replace('/', '-').replace('.', '-')
-            # 格式化统一为 YYYY-MM-DD
-            parts = d_str.split('-')
-            tx_date = f'{int(parts[0]):04d}-{int(parts[1]):02d}-{int(parts[2]):02d}'
-        except Exception:
-            pass
-
-    return {
-        'date': tx_date,
-        'type': tx_type,
-        'group_name': group_name,
-        'category': category,
-        'amount': amount,
-        'note': merchant,
-        'is_refund': is_refund,
-        'raw_text': text
-    }
+    parsed = _default_composite.parse(
+        str(raw_text),
+        merchant_mapping=MERCHANT_CATEGORY_MAPPING,
+        category_keywords=EXPENSE_CATEGORY_KEYWORDS
+    )
+    return parsed.to_dict() if parsed else None
 
 
 def parse_nlp_text(text):

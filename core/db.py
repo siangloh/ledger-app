@@ -2,6 +2,8 @@ import time
 import uuid
 import secrets
 import sqlite3
+import json
+import logging
 from datetime import datetime
 from flask import g, has_request_context, session
 from werkzeug.security import generate_password_hash
@@ -16,8 +18,10 @@ from core.config import (
     get_app_password
 )
 
+logger = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
-# 实时同步与局部更新状态版本控制
+# 实时同步与局部更新状态版本控制（支持多 Worker DB 持久化与内存热读缓存）
 # ---------------------------------------------------------------------------
 DATA_VERSION = int(time.time() * 1000)
 LATEST_EVENT = None
@@ -25,13 +29,14 @@ USER_DATA_VERSIONS = {}
 USER_LATEST_EVENTS = {}
 
 
-def bump_data_version(event_type='update', data=None, user_id=None):
+def bump_data_version(event_type='update', data=None, user_id=None, db=None):
     global DATA_VERSION, LATEST_EVENT
     DATA_VERSION = int(time.time() * 1000)
+    now_iso = datetime.now().isoformat()
     LATEST_EVENT = {
         'version': DATA_VERSION,
         'type': event_type,
-        'timestamp': datetime.now().isoformat(),
+        'timestamp': now_iso,
         'data': data or {}
     }
     if not user_id and data and isinstance(data, dict):
@@ -41,6 +46,73 @@ def bump_data_version(event_type='update', data=None, user_id=None):
     if user_id:
         USER_DATA_VERSIONS[user_id] = DATA_VERSION
         USER_LATEST_EVENTS[user_id] = LATEST_EVENT
+
+    # 持久化到 system_metadata 表，确保多 Worker / 跨重启状态强一致
+    try:
+        conn = db or (get_db() if has_request_context() else None)
+        if conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO system_metadata (key, val, updated_at) VALUES ('global_data_version', ?, ?)",
+                (str(DATA_VERSION), now_iso)
+            )
+            if user_id:
+                conn.execute(
+                    "INSERT OR REPLACE INTO system_metadata (key, val, updated_at) VALUES (?, ?, ?)",
+                    (f'user_data_version:{user_id}', str(DATA_VERSION), now_iso)
+                )
+                conn.execute(
+                    "INSERT OR REPLACE INTO system_metadata (key, val, updated_at) VALUES (?, ?, ?)",
+                    (f'user_latest_event:{user_id}', json.dumps(LATEST_EVENT), now_iso)
+                )
+            conn.commit()
+    except Exception as e:
+        logger.warning("Failed to persist data version to system_metadata: %s", e, exc_info=True)
+
+
+def get_data_version(user_id=None, db=None):
+    """获取最新数据版本号（优先从 system_metadata 读取以消除多 Worker 漂移，回退内存缓存）"""
+    global DATA_VERSION, USER_DATA_VERSIONS
+    try:
+        conn = db or (get_db() if has_request_context() else None)
+        if conn:
+            target_key = f'user_data_version:{user_id}' if user_id else 'global_data_version'
+            row = conn.execute("SELECT val FROM system_metadata WHERE key = ?", (target_key,)).fetchone()
+            if row and row['val']:
+                v = int(row['val'])
+                if user_id:
+                    USER_DATA_VERSIONS[user_id] = v
+                else:
+                    DATA_VERSION = v
+                return v
+            elif user_id:
+                row_g = conn.execute("SELECT val FROM system_metadata WHERE key = 'global_data_version'").fetchone()
+                if row_g and row_g['val']:
+                    return int(row_g['val'])
+    except Exception as e:
+        logger.debug("Failed to read system_metadata version: %s", e)
+
+    if user_id and user_id in USER_DATA_VERSIONS:
+        return USER_DATA_VERSIONS[user_id]
+    return DATA_VERSION
+
+
+def get_latest_event(user_id=None, db=None):
+    """获取最新事件 payload（优先从 system_metadata 保证多进程一致性）"""
+    global LATEST_EVENT, USER_LATEST_EVENTS
+    try:
+        conn = db or (get_db() if has_request_context() else None)
+        if conn and user_id:
+            row = conn.execute("SELECT val FROM system_metadata WHERE key = ?", (f'user_latest_event:{user_id}',)).fetchone()
+            if row and row['val']:
+                evt = json.loads(row['val'])
+                USER_LATEST_EVENTS[user_id] = evt
+                return evt
+    except Exception as e:
+        logger.debug("Failed to read system_metadata event: %s", e)
+
+    if user_id and user_id in USER_LATEST_EVENTS:
+        return USER_LATEST_EVENTS[user_id]
+    return LATEST_EVENT
 
 
 def get_db():
@@ -256,13 +328,20 @@ def init_db(app_logger=None):
         db = sqlite3.connect(DB_PATH)
         db.row_factory = sqlite3.Row
 
-    # 1. 用户表
+    # 1. 用户表与系统元数据表
     db.execute('''
     CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         created_at TEXT NOT NULL
+    );
+    ''')
+    db.execute('''
+    CREATE TABLE IF NOT EXISTS system_metadata (
+        key TEXT PRIMARY KEY,
+        val TEXT,
+        updated_at TEXT NOT NULL
     );
     ''')
     db.commit()
@@ -280,19 +359,20 @@ def init_db(app_logger=None):
                     admin_pw
                 )
             else:
-                print(f"[INIT_DB] Generated one-time password for admin: {admin_pw}")
+                logger.warning("[INIT_DB] Generated one-time password for admin: %s", admin_pw)
         db.execute(
             "INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
             (admin_id, 'admin', generate_password_hash(admin_pw), datetime.now().isoformat())
         )
         db.commit()
     else:
-        admin_id = admin_row['id'] if (isinstance(admin_row, sqlite3.Row) or isinstance(admin_row, dict)) else admin_row[0]
+        admin_id = admin_row['id']
 
-    # 2. 分类表与迁移
+    # 2. 分类表与多用户迁移
     try:
         col_names = [r[1] for r in db.execute("PRAGMA table_info(categories)").fetchall()]
-    except Exception:
+    except Exception as e:
+        logger.debug("PRAGMA table_info(categories) skipped: %s", e)
         col_names = []
 
     if not col_names:
@@ -306,6 +386,7 @@ def init_db(app_logger=None):
             UNIQUE(user_id, type, group_name, name)
         );
         ''')
+        init_user_default_categories(db, admin_id)
         db.commit()
     elif 'user_id' not in col_names:
         db.execute("ALTER TABLE categories RENAME TO categories_old")
@@ -345,14 +426,15 @@ def init_db(app_logger=None):
 
     try:
         tx_cols = [r[1] for r in db.execute("PRAGMA table_info(transactions)").fetchall()]
-    except Exception:
+    except Exception as e:
+        logger.debug("PRAGMA table_info(transactions) error: %s", e)
         tx_cols = []
     if 'user_id' not in tx_cols:
         try:
             db.execute("ALTER TABLE transactions ADD COLUMN user_id TEXT")
             db.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ALTER transactions ADD user_id skipped: %s", e)
     db.execute("UPDATE transactions SET user_id = ? WHERE user_id IS NULL OR user_id = ''", (admin_id,))
     db.commit()
 
@@ -376,14 +458,15 @@ def init_db(app_logger=None):
 
     try:
         rec_cols = [r[1] for r in db.execute("PRAGMA table_info(recurring_rules)").fetchall()]
-    except Exception:
+    except Exception as e:
+        logger.debug("PRAGMA table_info(recurring_rules) error: %s", e)
         rec_cols = []
     if 'user_id' not in rec_cols:
         try:
             db.execute("ALTER TABLE recurring_rules ADD COLUMN user_id TEXT")
             db.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ALTER recurring_rules ADD user_id skipped: %s", e)
     db.execute("UPDATE recurring_rules SET user_id = ? WHERE user_id IS NULL OR user_id = ''", (admin_id,))
     db.commit()
 
@@ -405,20 +488,20 @@ def init_db(app_logger=None):
     try:
         db.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES ('auto_track_key', ?)", (DEFAULT_AUTO_TRACK_KEY,))
         db.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Init auto_track_key skipped: %s", e)
 
     try:
         db.execute("ALTER TABLE transactions ADD COLUMN from_savings INTEGER DEFAULT 0")
         db.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("ALTER transactions ADD from_savings skipped: %s", e)
 
     try:
         db.execute("ALTER TABLE transactions ADD COLUMN from_savings_category TEXT")
         db.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("ALTER transactions ADD from_savings_category skipped: %s", e)
 
     # 索引优化
     try:
@@ -426,8 +509,8 @@ def init_db(app_logger=None):
         db.execute("CREATE INDEX IF NOT EXISTS idx_categories_user ON categories(user_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_recurring_user ON recurring_rules(user_id)")
         db.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Index creation skipped: %s", e)
 
     # 6. LLM 学习样本表
     try:
