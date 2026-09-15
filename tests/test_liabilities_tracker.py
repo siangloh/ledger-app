@@ -143,3 +143,17 @@ def test_sync_processes_next_month_after_already_synced(db_conn):
     row = db_conn.execute("SELECT * FROM installments").fetchone()
     assert row["paid_periods"] == 2
     assert row["last_synced_month"] == "2026-03"
+
+
+def test_accounts_page_renders_partial_on_htmx(logged_in_client):
+    """Ensure /accounts uses partial layout under HTMX without duplicating app header/navbar."""
+    full_resp = logged_in_client.get("/accounts")
+    assert full_resp.status_code == 200
+    assert b'<header class="app-header">' in full_resp.data
+
+    htmx_resp = logged_in_client.get("/accounts", headers={"HX-Request": "true"})
+    assert htmx_resp.status_code == 200
+    assert b'<header class="app-header">' not in htmx_resp.data
+    assert b"desktop-nav-links" not in htmx_resp.data
+    assert "账户管理" in htmx_resp.data.decode("utf-8")
+
