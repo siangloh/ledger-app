@@ -247,10 +247,15 @@ body {
   background: rgba(255, 255, 255, 0.1);
 }
 
-.desktop-nav-links a.active {
+.desktop-nav-links a.active,
+.desktop-nav-links .nav-group-trigger.active {
   color: #0b1120 !important;
   background: var(--gold) !important;
   font-weight: 700;
+}
+
+.desktop-nav-links .nav-group-trigger.active .nav-chevron {
+  opacity: 0.9;
 }
 
 /* Nav separator */
@@ -279,24 +284,46 @@ body {
 }
 
 .nav-group:hover .nav-chevron,
-.nav-group:focus-within .nav-chevron {
+.nav-group:focus-within .nav-chevron,
+.nav-group.pinned .nav-chevron {
   transform: rotate(180deg);
+}
+
+.nav-group.pinned .nav-group-trigger {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+.nav-group.pinned .nav-group-trigger.active {
+  color: #0b1120 !important;
+  background: var(--gold) !important;
 }
 
 .nav-dropdown {
   display: none;
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  min-width: 168px;
+  min-width: 172px;
   background: #0f1e36;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.12);
   border-radius: 12px;
   padding: 6px;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.45);
   z-index: 200;
   animation: dropIn 0.14s cubic-bezier(0.16,1,0.3,1) forwards;
+}
+
+/* 隐形防抖桥梁：填补按钮与下拉面板之间的间距，鼠标平滑下滑绝不闪退收回 */
+.nav-dropdown::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: 0;
+  right: 0;
+  height: 12px;
+  background: transparent;
+  display: block;
 }
 
 @keyframes dropIn {
@@ -305,7 +332,8 @@ body {
 }
 
 .nav-group:hover .nav-dropdown,
-.nav-group:focus-within .nav-dropdown {
+.nav-group:focus-within .nav-dropdown,
+.nav-group.pinned .nav-dropdown {
   display: block;
 }
 
