@@ -100,6 +100,7 @@ from blueprints.liabilities import liabilities_bp, ACCOUNT_TYPES, ACCOUNT_CURREN
 from blueprints.subscriptions import subscriptions_bp
 from blueprints.split_bill import split_bill_bp
 from blueprints.analytics import analytics_bp, get_category_insights_data  # noqa: F401
+from blueprints.settings import settings_bp
 
 # 创建 Flask 应用实例
 app = Flask(__name__)
@@ -454,6 +455,7 @@ app.register_blueprint(liabilities_bp)
 app.register_blueprint(subscriptions_bp)
 app.register_blueprint(split_bill_bp)
 app.register_blueprint(analytics_bp)
+app.register_blueprint(settings_bp)
 
 # 确保启动或导入时数据库初始化
 init_db()

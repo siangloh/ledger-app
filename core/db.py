@@ -653,9 +653,118 @@ def init_db(app_logger=None):
     );
 
     CREATE INDEX IF NOT EXISTS idx_processed_notif_hash ON processed_notifications(user_id, content_hash);
+
+    -- 11. 用户个性化偏好与系统设置表
+    CREATE TABLE IF NOT EXISTS user_settings (
+        user_id TEXT PRIMARY KEY,
+        theme_mode TEXT DEFAULT 'system',
+        currency_symbol TEXT DEFAULT 'RM',
+        default_account_id INTEGER,
+        default_group TEXT DEFAULT 'main',
+        budget_start_day INTEGER DEFAULT 1,
+        default_dashboard_view TEXT DEFAULT 'monthly',
+        dedup_window_minutes INTEGER DEFAULT 120,
+        table_density TEXT DEFAULT 'comfortable',
+        haptic_feedback INTEGER DEFAULT 1,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
     ''')
     db.commit()
 
     # 确保 admin 用户具备默认分类
     init_user_default_categories(db, admin_id)
     db.close()
+
+
+DEFAULT_USER_SETTINGS = {
+    'theme_mode': 'system',
+    'currency_symbol': 'RM',
+    'default_account_id': None,
+    'default_group': 'main',
+    'budget_start_day': 1,
+    'default_dashboard_view': 'monthly',
+    'dedup_window_minutes': 120,
+    'table_density': 'comfortable',
+    'haptic_feedback': 1,
+}
+
+
+def get_user_settings(user_id, db=None):
+    """获取指定用户的偏好配置，自动合并默认值"""
+    if not user_id:
+        return dict(DEFAULT_USER_SETTINGS)
+    if db is None:
+        db = get_db()
+    try:
+        row = db.execute(
+            "SELECT * FROM user_settings WHERE user_id = ?",
+            (str(user_id),)
+        ).fetchone()
+        res = dict(DEFAULT_USER_SETTINGS)
+        if row:
+            if hasattr(row, 'keys'):
+                for k in row.keys():
+                    if k in res and row[k] is not None:
+                        res[k] = row[k]
+            else:
+                for k in res:
+                    try:
+                        val = row[k]
+                        if val is not None:
+                            res[k] = val
+                    except Exception:
+                        pass
+        return res
+    except Exception as e:
+        logger.debug("Failed to read user_settings for %s: %s", user_id, e)
+        return dict(DEFAULT_USER_SETTINGS)
+
+
+def update_user_settings(user_id, new_settings, db=None):
+    """更新指定用户的偏好配置"""
+    if not user_id:
+        return False
+    if db is None:
+        db = get_db()
+    current = get_user_settings(user_id, db=db)
+    current.update({k: v for k, v in new_settings.items() if k in DEFAULT_USER_SETTINGS})
+
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    try:
+        db.execute('''
+            INSERT INTO user_settings (
+                user_id, theme_mode, currency_symbol, default_account_id,
+                default_group, budget_start_day, default_dashboard_view,
+                dedup_window_minutes, table_density, haptic_feedback, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                theme_mode=excluded.theme_mode,
+                currency_symbol=excluded.currency_symbol,
+                default_account_id=excluded.default_account_id,
+                default_group=excluded.default_group,
+                budget_start_day=excluded.budget_start_day,
+                default_dashboard_view=excluded.default_dashboard_view,
+                dedup_window_minutes=excluded.dedup_window_minutes,
+                table_density=excluded.table_density,
+                haptic_feedback=excluded.haptic_feedback,
+                updated_at=excluded.updated_at
+        ''', (
+            str(user_id),
+            current['theme_mode'],
+            current['currency_symbol'],
+            current['default_account_id'],
+            current['default_group'],
+            int(current['budget_start_day']),
+            current['default_dashboard_view'],
+            int(current['dedup_window_minutes']),
+            current['table_density'],
+            int(current['haptic_feedback']),
+            now_str
+        ))
+        db.commit()
+        bump_data_version("settings_update", user_id=user_id, db=db)
+        return True
+    except Exception as e:
+        logger.error("Failed to update user_settings for %s: %s", user_id, e, exc_info=True)
+        return False
+

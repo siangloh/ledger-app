@@ -51,7 +51,7 @@
                 <!-- 管理 dropdown -->
                 <div class="nav-group">
                     <button
-                        class="nav-group-trigger {% if request.endpoint.split('.')[-1] in ('accounts_page','liabilities_page','subscriptions_page','recurring_page') %}active{% endif %}">
+                        class="nav-group-trigger {% if request.endpoint.split('.')[-1] in ('accounts_page','liabilities_page','subscriptions_page','recurring_page','settings_page') %}active{% endif %}">
                         管理 <span class="nav-chevron">▾</span>
                     </button>
                     <div class="nav-dropdown">
@@ -78,6 +78,12 @@
                             hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
                             <span class="nav-icon">📅</span>固定收支
+                        </a>
+                        <a href="{{ url_for('settings.settings_page') }}"
+                            class="{{ 'active' if request.endpoint.split('.')[-1] == 'settings_page' }}" data-nav="settings"
+                            hx-get="{{ url_for('settings.settings_page') }}" hx-target="#mainContainer"
+                            hx-swap="innerHTML show:window:top" hx-push-url="true">
+                            <span class="nav-icon">⚙️</span>偏好设置
                         </a>
                     </div>
                 </div>
@@ -245,6 +251,14 @@
                 <span class="sheet-icon">📤</span>
                 <span class="sheet-title">批量导入</span>
                 <span class="sheet-desc">Excel/CSV 账单</span>
+            </a>
+            <a href="{{ url_for('settings.settings_page') }}"
+                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'settings_page' }}" data-nav="settings"
+                hx-get="{{ url_for('settings.settings_page') }}" hx-target="#mainContainer"
+                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                <span class="sheet-icon">⚙️</span>
+                <span class="sheet-title">偏好设置</span>
+                <span class="sheet-desc">个性化与数据备份</span>
             </a>
             <a href="{{ url_for('logout') }}" class="sheet-tile">
                 <span class="sheet-icon">🚪</span>
