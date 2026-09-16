@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" {% if current_user_theme in ('dark', 'light') %}data-theme="{{ current_user_theme }}"{% endif %} {% if current_table_density == 'compact' %}data-density="compact"{% endif %}>
 
 <head>
     <meta charset="UTF-8">
@@ -11,11 +11,31 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}我的记账本{% endblock %}</title>
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('ledger_theme_mode') || '{{ current_user_theme|default("system") }}';
+                if (theme === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else if (theme === 'light') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                }
+                var density = localStorage.getItem('ledger_table_density') || '{{ current_table_density|default("comfortable") }}';
+                if (density === 'compact') {
+                    document.documentElement.setAttribute('data-density', 'compact');
+                } else {
+                    document.documentElement.removeAttribute('data-density');
+                }
+            } catch (e) { }
+        })();
+    </script>
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
     <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260915_v5">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260916_v7">
 </head>
 
 <body>

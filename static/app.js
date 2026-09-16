@@ -2958,3 +2958,16 @@ window.toggleBudgetDashExpand = function () {
     btn.innerHTML = `<span>展开全部 ${total} 项预算 ▾</span>`;
   }
 };
+
+// 监听操作系统暗黑模式切换（当用户设置为跟随系统时自动响应）
+if (window.matchMedia) {
+  try {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      const mode = localStorage.getItem('ledger_theme_mode') || 'system';
+      if (mode === 'system') {
+        document.documentElement.removeAttribute('data-theme');
+      }
+    });
+  } catch (e) {}
+}
+

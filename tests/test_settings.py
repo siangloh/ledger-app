@@ -120,3 +120,29 @@ def test_user_settings_isolation(flask_app):
 
         assert settings_b['currency_symbol'] == 'JPY'
         assert settings_b['budget_start_day'] == 28
+
+
+def test_theme_and_density_rendered_in_html(logged_in_client):
+    """测试用户偏好的 theme_mode 和 table_density 正确注入基础模板 html 标签"""
+    # 设为 dark 和 compact
+    logged_in_client.post(
+        '/api/settings/update',
+        data={'theme_mode': 'dark', 'table_density': 'compact'},
+        headers={'X-Requested-With': 'XMLHttpRequest'}
+    )
+    res_dark = logged_in_client.get('/settings')
+    html_dark = res_dark.get_data(as_text=True)
+    assert 'data-theme="dark"' in html_dark
+    assert 'data-density="compact"' in html_dark
+
+    # 设为 light 和 comfortable
+    logged_in_client.post(
+        '/api/settings/update',
+        data={'theme_mode': 'light', 'table_density': 'comfortable'},
+        headers={'X-Requested-With': 'XMLHttpRequest'}
+    )
+    res_light = logged_in_client.get('/settings')
+    html_light = res_light.get_data(as_text=True)
+    assert 'data-theme="light"' in html_light
+    assert 'data-density="compact"' not in html_light
+

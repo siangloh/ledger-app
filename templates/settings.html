@@ -56,11 +56,11 @@
           <label class="settings-label">明细表格密度</label>
           <div class="settings-pill-group">
             <label class="pill-radio">
-              <input type="radio" name="table_density" value="comfortable" {{ 'checked' if settings.table_density == 'comfortable' }}>
+              <input type="radio" name="table_density" value="comfortable" {{ 'checked' if settings.table_density == 'comfortable' }} onchange="previewDensity('comfortable')">
               <span>🛋️ 舒适模式 (推荐)</span>
             </label>
             <label class="pill-radio">
-              <input type="radio" name="table_density" value="compact" {{ 'checked' if settings.table_density == 'compact' }}>
+              <input type="radio" name="table_density" value="compact" {{ 'checked' if settings.table_density == 'compact' }} onchange="previewDensity('compact')">
               <span>📑 紧凑高效模式</span>
             </label>
           </div>
@@ -398,6 +398,17 @@ function previewTheme(mode) {
   } catch (e) {}
 }
 
+function previewDensity(density) {
+  try {
+    localStorage.setItem('ledger_table_density', density);
+    if (density === 'compact') {
+      document.documentElement.setAttribute('data-density', 'compact');
+    } else {
+      document.documentElement.removeAttribute('data-density');
+    }
+  } catch (e) {}
+}
+
 async function handleSettingsSave(e) {
   e.preventDefault();
   const form = e.target;
@@ -453,6 +464,10 @@ async function resetToDefaults() {
     });
     const data = await res.json();
     if (data.ok) {
+      try {
+        localStorage.removeItem('ledger_theme_mode');
+        localStorage.removeItem('ledger_table_density');
+      } catch (err) {}
       window.location.reload();
     } else {
       alert(data.message || '恢复默认失败');

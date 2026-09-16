@@ -57,6 +57,7 @@ from core.db import (  # noqa: F401
     get_current_user_id,
     init_user_default_categories,
     seed_learning_samples,
+    get_user_settings,
     DATA_VERSION,
     LATEST_EVENT,
     USER_DATA_VERSIONS,
@@ -203,10 +204,22 @@ def add_cache_control_headers(response):
 @app.context_processor
 def inject_globals():
     is_hx = bool(request.headers.get('HX-Request'))
+    uid = session.get('user_id')
+    user_theme = 'system'
+    table_density = 'comfortable'
+    if uid:
+        try:
+            settings = get_user_settings(uid)
+            user_theme = settings.get('theme_mode', 'system')
+            table_density = settings.get('table_density', 'comfortable')
+        except Exception:
+            pass
     return {
         'layout': 'partial.html' if is_hx else 'base.html',
         'is_hx': is_hx,
-        'data_version': DATA_VERSION
+        'data_version': DATA_VERSION,
+        'current_user_theme': user_theme,
+        'current_table_density': table_density
     }
 
 
