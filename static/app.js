@@ -1134,6 +1134,14 @@ var _monthlyIncomeChart = null;
 var _monthlyExpenseChart = null;
 
 function isDarkModeActive() {
+  var theme = document.documentElement.getAttribute('data-theme');
+  if (theme === 'dark') return true;
+  if (theme === 'light') return false;
+  try {
+    var saved = localStorage.getItem('ledger_theme_mode');
+    if (saved === 'dark') return true;
+    if (saved === 'light') return false;
+  } catch (e) {}
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
@@ -1456,10 +1464,16 @@ function drawMonthlyDoughnut(canvasId, rawLabels, rawValues) {
     existingChart = Chart.getChart(canvas);
   }
 
+  // 如果已有实例的主题模式与当前不符，彻底销毁并重新建立以保证色系完全匹配
+  if (existingChart && existingChart._customThemeMode !== (isDark ? 'dark' : 'light')) {
+    existingChart = destroyChart(existingChart);
+  }
+
   // 5. 如果已有可用图表实例且 canvas 节点依然匹配，平滑更新数据与中心文本
   if (existingChart && existingChart.ctx && existingChart.canvas === canvas) {
     try {
       existingChart._customCenterTotal = total;
+      existingChart._customThemeMode = isDark ? 'dark' : 'light';
       existingChart.data.labels = labels;
       if (!existingChart.data.datasets || existingChart.data.datasets.length === 0) {
         existingChart.data.datasets = [{}];
@@ -1469,6 +1483,10 @@ function drawMonthlyDoughnut(canvasId, rawLabels, rawValues) {
       existingChart.data.datasets[0].borderColor = sliceBorder;
       if (existingChart.options && existingChart.options.plugins && existingChart.options.plugins.tooltip) {
         existingChart.options.plugins.tooltip.enabled = total > 0;
+        existingChart.options.plugins.tooltip.backgroundColor = tooltipBg;
+        existingChart.options.plugins.tooltip.titleColor = tooltipTitle;
+        existingChart.options.plugins.tooltip.bodyColor = tooltipBody;
+        existingChart.options.plugins.tooltip.borderColor = tooltipBorder;
       }
       existingChart.update();
       if (isIncome) _monthlyIncomeChart = existingChart;
@@ -1504,15 +1522,16 @@ function drawMonthlyDoughnut(canvasId, rawLabels, rawValues) {
       var centerY = (chart.chartArea.top + chart.chartArea.bottom) / 2;
 
       var currentTotal = chart._customCenterTotal !== undefined ? chart._customCenterTotal : total;
+      var curDark = isDarkModeActive();
 
       // 标题 (本月总收入 / 本月总支出)
       ctx.font = '500 12px "Segoe UI", sans-serif';
-      ctx.fillStyle = centerTitleColor;
+      ctx.fillStyle = curDark ? '#94a3b8' : '#6f6c66';
       ctx.fillText(centerTitle, centerX, centerY - 10);
 
       // 金额
       ctx.font = '700 15.5px ui-monospace, SFMono-Regular, Consolas, monospace';
-      ctx.fillStyle = centerAmountColor;
+      ctx.fillStyle = curDark ? '#ffffff' : '#10213b';
       ctx.fillText(formatMoney(currentTotal), centerX, centerY + 10);
       ctx.restore();
     }
@@ -1570,6 +1589,7 @@ function drawMonthlyDoughnut(canvasId, rawLabels, rawValues) {
     });
 
     instance._customCenterTotal = total;
+    instance._customThemeMode = isDark ? 'dark' : 'light';
 
     if (isIncome) {
       _monthlyIncomeChart = instance;
@@ -1826,17 +1846,28 @@ window.addEventListener('resize', function () {
   }
 });
 
+function refreshChartsOnThemeChange() {
+  _monthlyIncomeChart = destroyChart(_monthlyIncomeChart);
+  _monthlyExpenseChart = destroyChart(_monthlyExpenseChart);
+  _ovTrendChart = destroyChart(_ovTrendChart);
+  _ovExpenseChart = destroyChart(_ovExpenseChart);
+  _ovIncomeChart = destroyChart(_ovIncomeChart);
+
+  if (window.CHART_DATA && document.getElementById('incomeChart') && (!document.getElementById('monthlySection') || document.getElementById('monthlySection').style.display !== 'none')) {
+    drawMonthlyDoughnut('incomeChart', window.CHART_DATA.income.labels || [], window.CHART_DATA.income.values || []);
+    drawMonthlyDoughnut('expenseChart', window.CHART_DATA.expense.labels || [], window.CHART_DATA.expense.values || []);
+  }
+  if (currentOverviewData && document.getElementById('overviewSection') && document.getElementById('overviewSection').style.display !== 'none') {
+    renderOverview(currentOverviewData);
+  }
+}
+window.addEventListener('app:theme-changed', refreshChartsOnThemeChange);
+
 // 监听系统/浏览器浅色与暗色模式切换，自动重新渲染图表与高对比度调色盘
 if (window.matchMedia) {
   try {
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
-      if (window.CHART_DATA && document.getElementById('incomeChart') && (!document.getElementById('monthlySection') || document.getElementById('monthlySection').style.display !== 'none')) {
-        drawMonthlyDoughnut('incomeChart', window.CHART_DATA.income.labels, window.CHART_DATA.income.values);
-        drawMonthlyDoughnut('expenseChart', window.CHART_DATA.expense.labels, window.CHART_DATA.expense.values);
-      }
-      if (currentOverviewData && document.getElementById('overviewSection') && document.getElementById('overviewSection').style.display !== 'none') {
-        renderOverview(currentOverviewData);
-      }
+      refreshChartsOnThemeChange();
     });
   } catch (e) {}
 }
