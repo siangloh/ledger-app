@@ -56,6 +56,8 @@ def split_bill_ocr_upload():
             pil_img = pil_img.convert('RGB')
 
         result, raw_text, parsed, rot = smart_orient_receipt_ocr(pil_img, engine)
+        from flask import g
+        sym = getattr(g, 'current_currency_symbol', 'RM') or 'RM'
         default_parsed = {
             'items': [],
             'subtotal': 0.0,
@@ -64,7 +66,7 @@ def split_bill_ocr_upload():
             'tax': 0.0,
             'discount': 0.0,
             'rounding': 0.0,
-            'currency_symbol': 'RM'
+            'currency_symbol': sym
         }
         if not result or not raw_text:
             return jsonify({

@@ -181,3 +181,34 @@ def test_p0_user_settings_update_and_filters(logged_in_client, flask_app, admin_
     assert "window.LEDGER_CURRENCY_CODE = 'USD'" in html
     assert "window.LEDGER_DATE_FORMAT = 'DD/MM/YYYY'" in html
 
+
+def test_custom_currency_renders_on_liabilities_and_subscriptions_and_accounts(logged_in_client, flask_app, admin_user_id):
+    """验证自定义货币能正确渗透到负债分期、订阅大厅与账户管理页面"""
+    with flask_app.app.app_context():
+        update_user_settings(admin_user_id, {
+            'default_currency': 'SGD',
+            'currency_symbol': 'S$'
+        })
+
+    # 1. 负债追踪页
+    res_liab = logged_in_client.get('/liabilities')
+    assert res_liab.status_code == 200
+    html_liab = res_liab.get_data(as_text=True)
+    assert '全景未还总负债本金' in html_liab
+    assert 'S$ ' in html_liab or 'S$' in html_liab
+
+    # 2. 订阅大厅页
+    res_sub = logged_in_client.get('/subscriptions')
+    assert res_sub.status_code == 200
+    html_sub = res_sub.get_data(as_text=True)
+    assert '月度平均订阅支出' in html_sub
+    assert 'S$ ' in html_sub or 'S$' in html_sub
+
+    # 3. 账户管理页
+    res_acc = logged_in_client.get('/accounts')
+    assert res_acc.status_code == 200
+    html_acc = res_acc.get_data(as_text=True)
+    assert '总信用额度' in html_acc
+    assert 'SGD' in html_acc
+
+

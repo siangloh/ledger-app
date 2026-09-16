@@ -36,7 +36,7 @@
   <div class="acc-kpi">
     <span class="acc-kpi-label">总信用额度</span>
     <span class="acc-kpi-val">{{ "%.0f" | format(total_cl.val) }}</span>
-    <span class="acc-kpi-sub">MYR</span>
+    <span class="acc-kpi-sub">{{ current_user_currency_code|default('MYR') }}</span>
   </div>
   <div class="acc-kpi">
     <span class="acc-kpi-label">绑定订阅</span>
@@ -70,12 +70,12 @@
     <div class="acc-details">
       <div class="acc-detail-item">
         <span class="acc-detail-label">币种</span>
-        <span class="acc-detail-val">{{ a.currency or 'MYR' }}</span>
+        <span class="acc-detail-val">{{ a.currency or current_user_currency_code|default('MYR') }}</span>
       </div>
       {% if a.type == 'credit_card' %}
       <div class="acc-detail-item">
         <span class="acc-detail-label">信用额度</span>
-        <span class="acc-detail-val">{{ "%.0f" | format(a.credit_limit or 0) }} {{ a.currency or 'MYR' }}</span>
+        <span class="acc-detail-val">{{ "%.0f" | format(a.credit_limit or 0) }} {{ a.currency or current_user_currency_code|default('MYR') }}</span>
       </div>
       <div class="acc-detail-item">
         <span class="acc-detail-label">账单日</span>
@@ -98,7 +98,7 @@
     </div>
     <div class="acc-actions">
       <button class="btn-acc-action btn-acc-edit"
-        onclick="openEditModal({{ a.id }}, '{{ a.name|e }}', '{{ a.type }}', '{{ a.currency or 'MYR' }}', {{ a.credit_limit or 0 }}, {{ a.statement_day if a.statement_day else 'null' }}, {{ a.due_day if a.due_day else 'null' }}, {{ a.grace_period_days or 20 }})">
+        onclick="openEditModal({{ a.id }}, '{{ a.name|e }}', '{{ a.type }}', '{{ a.currency or current_user_currency_code|default('MYR') }}', {{ a.credit_limit or 0 }}, {{ a.statement_day if a.statement_day else 'null' }}, {{ a.due_day if a.due_day else 'null' }}, {{ a.grace_period_days or 20 }})">
         ✏️ 编辑
       </button>
       <form method="POST" action="/api/accounts/{{ a.id }}/toggle" style="display:contents;">
@@ -128,7 +128,7 @@
     </div>
     <div class="acc-actions">
       <button class="btn-acc-action btn-acc-edit"
-        onclick="openEditModal({{ a.id }}, '{{ a.name|e }}', '{{ a.type }}', '{{ a.currency or 'MYR' }}', {{ a.credit_limit or 0 }}, {{ a.statement_day if a.statement_day else 'null' }}, {{ a.due_day if a.due_day else 'null' }}, {{ a.grace_period_days or 20 }})">
+        onclick="openEditModal({{ a.id }}, '{{ a.name|e }}', '{{ a.type }}', '{{ a.currency or current_user_currency_code|default('MYR') }}', {{ a.credit_limit or 0 }}, {{ a.statement_day if a.statement_day else 'null' }}, {{ a.due_day if a.due_day else 'null' }}, {{ a.grace_period_days or 20 }})">
         ✏️ 编辑
       </button>
       <form method="POST" action="/api/accounts/{{ a.id }}/toggle" style="display:contents;">
@@ -169,7 +169,7 @@
           <label>结算币种</label>
           <select name="currency" id="addCurrency">
             {% for c in currencies %}
-            <option value="{{ c }}" {% if c == 'MYR' %}selected{% endif %}>{{ c }}</option>
+            <option value="{{ c }}" {% if c == (current_user_currency_code|default('MYR')) %}selected{% endif %}>{{ c }}</option>
             {% endfor %}
           </select>
         </div>

@@ -56,8 +56,10 @@ def subscriptions_page():
             note=d.get("note")
         ))
 
+    from flask import g
+    user_curr_code = getattr(g, 'current_currency_code', 'MYR') or 'MYR'
     today = date.today()
-    dashboard_summary = buildSubscriptionDashboardSummary(subs, currentDate=today, targetCurrency="MYR")
+    dashboard_summary = buildSubscriptionDashboardSummary(subs, currentDate=today, targetCurrency=user_curr_code)
 
     accounts = db.execute(
         "SELECT id, name, type, currency FROM accounts WHERE user_id = ? AND is_active = 1 ORDER BY name ASC",
@@ -67,18 +69,18 @@ def subscriptions_page():
     category_breakdown = {}
     for s in subs:
         if s.status == SubscriptionStatus.ACTIVE:
-            rate = default_mock_exchange_rate_provider(s.currency, "MYR")
-            cost_myr = s.cost * rate
+            rate = default_mock_exchange_rate_provider(s.currency, user_curr_code)
+            cost_target = s.cost * rate
             if s.billing_cycle == BillingCycle.MONTHLY:
-                m_cost = cost_myr
+                m_cost = cost_target
             elif s.billing_cycle == BillingCycle.WEEKLY:
-                m_cost = (cost_myr * Decimal("52")) / Decimal("12")
+                m_cost = (cost_target * Decimal("52")) / Decimal("12")
             elif s.billing_cycle == BillingCycle.QUARTERLY:
-                m_cost = cost_myr / Decimal("3")
+                m_cost = cost_target / Decimal("3")
             elif s.billing_cycle == BillingCycle.SEMI_ANNUAL:
-                m_cost = cost_myr / Decimal("6")
+                m_cost = cost_target / Decimal("6")
             else:
-                m_cost = cost_myr / Decimal("12")
+                m_cost = cost_target / Decimal("12")
             cat = s.category or "其他"
             category_breakdown[cat] = (category_breakdown.get(cat, Decimal("0")) + m_cost).quantize(Decimal("0.01"))
 
@@ -97,12 +99,14 @@ def subscriptions_page():
 def api_add_subscription():
     user_id = get_current_user_id()
     db = get_db()
+    from flask import g
+    user_curr_code = getattr(g, 'current_currency_code', 'MYR') or 'MYR'
 
     name = (request.form.get('name') or '').strip()
     category = (request.form.get('category') or '流媒体').strip()
     billing_cycle = (request.form.get('billing_cycle') or 'MONTHLY').upper()
     cost_str = (request.form.get('cost') or '0').strip()
-    currency = (request.form.get('currency') or 'MYR').upper()
+    currency = (request.form.get('currency') or user_curr_code).upper()
     start_date = request.form.get('start_date') or date.today().isoformat()
     next_billing_date = request.form.get('next_billing_date') or start_date
     payment_method_id = request.form.get('payment_method_id') or None

@@ -197,7 +197,7 @@
           </td>
           <td style="font-size: 12px;">
             {% if s.is_real_transaction %}
-              <div style="color: var(--navy); font-weight: 600;">RM {{ "%.2f"|format(s.sample_amount or 0) }}</div>
+              <div style="color: var(--navy); font-weight: 600;">{{ current_user_currency|default('RM') }} {{ "%.2f"|format(s.sample_amount or 0) }}</div>
               <div style="color: var(--ink-soft);">{{ s.sample_merchant or '未知商户' }}</div>
               <div style="font-size: 11px; color: var(--muted);">分类: {{ s.sample_category or '其他' }}</div>
             {% else %}

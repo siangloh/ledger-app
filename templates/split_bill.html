@@ -205,7 +205,7 @@ Total 75.21"></textarea>
           <div>
             <div style="font-size: 12px; color: rgba(255,255,255,0.78); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">小票实付总金额 (Grand Total)</div>
             <div class="hero-amount-val">
-              <span style="font-size: 22px; opacity: 0.85;" id="reviewModalCurrency">RM</span>
+              <span style="font-size: 22px; opacity: 0.85;" id="reviewModalCurrency">{{ current_user_currency|default('RM') }}</span>
               <input type="number" step="0.01" min="0" id="reviewGrandTotal" oninput="onReviewAmountChanged()" style="background: rgba(255,255,255,0.18); border: 1.5px solid rgba(255,255,255,0.35); color: #fff; font-size: 28px; font-weight: 800; font-family: var(--font-mono); width: 160px; padding: 2px 8px; border-radius: var(--radius-sm); outline: none;">
             </div>
           </div>
@@ -219,16 +219,16 @@ Total 75.21"></textarea>
         <div class="hero-stats-row">
           <div class="hero-stat-item">
             <span>单品小计 (Subtotal):</span>
-            <strong id="reviewSubtotalText">RM 0.00</strong>
+            <strong id="reviewSubtotalText">{{ current_user_currency|default('RM') }} 0.00</strong>
           </div>
           <div class="hero-stat-item">
             <span>服务费 / Tip:</span>
-            <span style="font-size: 11px;" class="review-curr-symbol">RM</span>
+            <span style="font-size: 11px;" class="review-curr-symbol">{{ current_user_currency|default('RM') }}</span>
             <input type="number" step="0.01" min="0" id="reviewServiceCharge" oninput="onReviewAmountChanged()" style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.25); color: #fff; width: 68px; padding: 2px 4px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px;">
           </div>
           <div class="hero-stat-item">
             <span>税费 (Tax/VAT):</span>
-            <span style="font-size: 11px;" class="review-curr-symbol">RM</span>
+            <span style="font-size: 11px;" class="review-curr-symbol">{{ current_user_currency|default('RM') }}</span>
             <input type="number" step="0.01" min="0" id="reviewTax" oninput="onReviewAmountChanged()" style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.25); color: #fff; width: 68px; padding: 2px 4px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px;">
           </div>
         </div>
@@ -251,7 +251,7 @@ Total 75.21"></textarea>
             <thead style="background: var(--surface-soft); position: sticky; top: 0; z-index: 1;">
               <tr style="border-bottom: 1px solid var(--border);">
                 <th style="padding: 8px 12px; text-align: left; width: 55%;">消费单品名称 (点击可修正)</th>
-                <th style="padding: 8px 12px; text-align: right; width: 30%;">单价 (<span class="review-curr-symbol">RM</span>)</th>
+                <th style="padding: 8px 12px; text-align: right; width: 30%;">单价 (<span class="review-curr-symbol">{{ current_user_currency|default('RM') }}</span>)</th>
                 <th style="padding: 8px 12px; text-align: center; width: 15%;">操作</th>
               </tr>
             </thead>
@@ -294,7 +294,7 @@ let people = ['我'];
 let items = [];
 let serviceCharge = 0.00;
 let tax = 0.00;
-var currentCurrency = 'RM';
+var currentCurrency = (typeof window !== 'undefined' && window.LEDGER_CURRENCY_SYMBOL) || '{{ current_user_currency|default("RM") }}';
 
 // 核对弹窗的草稿临时数据
 let reviewItems = [];

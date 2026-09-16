@@ -28,10 +28,10 @@
   <div class="card" style="padding: 18px 20px; border-left: 4px solid var(--navy); position: relative;">
     <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">月度平均订阅支出</div>
     <div style="font-size: 26px; font-weight: 700; color: var(--navy); margin-top: 6px;">
-      RM {{ "{:,.2f}".format(summary.total_monthly_burn) }} <span style="font-size: 13px; font-weight: 500; color: var(--muted);">/月</span>
+      {{ summary.total_monthly_burn|money }} <span style="font-size: 13px; font-weight: 500; color: var(--muted);">/月</span>
     </div>
     <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">
-      折算年度总开销: <strong>RM {{ "{:,.2f}".format(summary.total_annual_burn) }}</strong>
+      折算年度总开销: <strong>{{ summary.total_annual_burn|money }}</strong>
     </div>
   </div>
 
@@ -113,9 +113,9 @@
             <div style="font-size: 17px; font-weight: 700; color: {{ '#e11d48' if item.alert_level.value == 'CRITICAL' else 'var(--navy)' }};">
               {{ item.currency }} {{ "{:,.2f}".format(item.cost) }}
             </div>
-            {% if item.currency != 'MYR' %}
+            {% if item.currency != (current_user_currency_code|default('MYR')) %}
               <div style="font-size: 11px; color: var(--muted);">
-                ≈ RM {{ "{:,.2f}".format(item.converted_cost) }}
+                ≈ {{ item.converted_cost|money }}
               </div>
             {% endif %}
           </div>
@@ -197,7 +197,7 @@
           <th style="padding: 10px 12px;">服务名称与分类</th>
           <th style="padding: 10px 12px;">计费周期</th>
           <th style="padding: 10px 12px; text-align: right;">单期费用</th>
-          <th style="padding: 10px 12px; text-align: right;">月均等效 (MYR)</th>
+          <th style="padding: 10px 12px; text-align: right;">月均等效 ({{ current_user_currency_code|default('MYR') }})</th>
           <th style="padding: 10px 12px;">下期扣款日</th>
           <th style="padding: 10px 12px;">扣款账户/卡片</th>
           <th style="padding: 10px 12px;">状态/标记</th>
@@ -247,7 +247,7 @@
           <!-- 月均等效开销 -->
           <td style="padding: 12px; text-align: right; font-weight: 600; color: #4f46e5;">
             {% if s.billing_cycle.value == 'MONTHLY' %}
-              RM {{ "{:,.2f}".format(s.cost) if s.currency == 'MYR' else '换算中' }}
+              {{ current_user_currency|default('RM') }} {{ "{:,.2f}".format(s.cost) if s.currency == (current_user_currency_code|default('MYR')) else '换算中' }}
             {% else %}
               <span style="font-size: 12.5px;">分摊测算中</span>
             {% endif %}
@@ -390,10 +390,11 @@
         <div class="form-group">
           <label style="font-size:13px; font-weight:600; color:var(--ink);">结算币种</label>
           <select name="currency" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
-            <option value="MYR" selected>MYR (令吉)</option>
-            <option value="USD">USD (美元)</option>
-            <option value="SGD">SGD (新币)</option>
-            <option value="CNY">CNY (人民币)</option>
+            {% set user_curr = current_user_currency_code|default('MYR') %}
+            <option value="{{ user_curr }}" selected>{{ user_curr }} (当前账本货币)</option>
+            {% for c in ['MYR', 'USD', 'SGD', 'CNY', 'EUR', 'GBP'] if c != user_curr %}
+            <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
           </select>
         </div>
       </div>
@@ -517,6 +518,8 @@
             <option value="USD">USD (美元)</option>
             <option value="SGD">SGD (新币)</option>
             <option value="CNY">CNY (人民币)</option>
+            <option value="EUR">EUR (欧元)</option>
+            <option value="GBP">GBP (英镑)</option>
           </select>
         </div>
       </div>

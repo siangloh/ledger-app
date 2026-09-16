@@ -31,9 +31,9 @@
     </div>
     {% endif %}
   </div>
-  <div class="card card-highlight card-live-pulse {{ 'positive' if balance >= 0 else 'negative' }}">
+  <div class="card card-live-pulse" id="monthlyBalanceCard">
     <span class="card-label">本月净结余</span>
-    <span class="amount">{{ balance|money }}</span>
-    <div style="font-size: 10.5px; color: rgba(255,255,255,0.6); margin-top: 4px;">已扣减本月储蓄</div>
+    <span class="amount {{ 'income' if balance >= 0 else 'expense' }}">{{ balance|money }}</span>
+    <div style="font-size: 10.5px; color: var(--muted); margin-top: 4px;">已扣减本月储蓄</div>
   </div>
 </div>

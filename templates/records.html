@@ -519,32 +519,34 @@ async function openOffsetModal(incomeId, incomeAmount, incomeNote) {
       const isChecked = idx === 0 ? 'checked' : '';
       const expAmt = parseFloat(exp.amount) || 0;
       const remaining = Math.max(0, expAmt - incomeAmount);
+      const sym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
       optionsHtml += `
-        <label style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; margin-bottom: 8px; cursor: pointer; text-align: left; background: #fff;">
+        <label style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; margin-bottom: 8px; cursor: pointer; text-align: left; background: var(--surface);">
           <input type="radio" name="offset_target" value="${exp.id}" ${isChecked} style="margin-top: 3px;">
           <div style="flex: 1; font-size: 13px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
               <strong style="color: var(--navy); font-size: 13.5px;">${exp.category} · ${exp.date}</strong>
-              <span style="color: #b91c1c; font-weight: 700;">原额 RM ${expAmt.toFixed(2)}</span>
+              <span style="color: #b91c1c; font-weight: 700;">原额 ${sym} ${expAmt.toFixed(2)}</span>
             </div>
             <div style="color: var(--ink-soft); font-size: 12px; margin-bottom: 4px;">
               ${exp.note ? exp.note : '<span style="color:var(--muted)">无备注</span>'}
             </div>
             <div style="font-size: 11.5px; color: var(--green); font-weight: 600; background: var(--green-soft); padding: 2px 6px; border-radius: 4px; display: inline-block;">
-              冲抵后剩余：RM ${remaining.toFixed(2)}
+              冲抵后剩余：${sym} ${remaining.toFixed(2)}
             </div>
           </div>
         </label>
       `;
     });
 
+    const sym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
     const noteDisplay = incomeNote ? ` (${incomeNote})` : '';
     const result = await Swal.fire({
       title: '💸 冲抵之前的支出',
       html: `
         <div style="text-align: left; margin-bottom: 12px;">
           <p style="font-size: 13px; color: var(--ink-soft); margin: 0 0 10px;">
-            将此笔还款 <strong style="color: var(--green);">RM ${incomeAmount.toFixed(2)}${noteDisplay}</strong> 直接扣减某一笔已垫付的支出，避免总收入虚增：
+            将此笔还款 <strong style="color: var(--green);">${sym} ${incomeAmount.toFixed(2)}${noteDisplay}</strong> 直接扣减某一笔已垫付的支出，避免总收入虚增：
           </p>
           <div style="max-height: 280px; overflow-y: auto; padding-right: 4px;">
             ${optionsHtml}
@@ -601,7 +603,7 @@ async function openOffsetModal(incomeId, incomeAmount, incomeNote) {
         if (targetRow) {
           const amtCell = targetRow.querySelector('.amount-cell');
           if (amtCell) {
-            amtCell.innerText = `RM ${parseFloat(postData.new_amount).toFixed(2)}`;
+            amtCell.innerText = `${sym} ${parseFloat(postData.new_amount).toFixed(2)}`;
             amtCell.classList.add('row-highlight-new');
           }
         }

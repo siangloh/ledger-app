@@ -675,8 +675,9 @@ def set_category_budget(cat_id):
                 (user_id, cat['name'], limit, now, now)
             )
         db.commit()
-        bump_data_version('budget', {'category': cat['name'], 'limit': limit, 'user_id': user_id})
-        msg = f'已设置「{cat["name"]}」的月度预算为 RM{limit:.2f}'
+        from flask import g
+        sym = getattr(g, 'current_currency_symbol', 'RM') or 'RM'
+        msg = f'已设置「{cat["name"]}」的月度预算为 {sym}{limit:.2f}'
 
     if is_ajax_request():
         return jsonify({'ok': True, 'message': msg})

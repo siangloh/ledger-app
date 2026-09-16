@@ -46,10 +46,10 @@
   <div class="card" style="padding: 18px 20px; border-left: 4px solid var(--navy); position: relative;">
     <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">全景未还总负债本金</div>
     <div style="font-size: 26px; font-weight: 700; color: var(--navy); margin-top: 6px;">
-      RM {{ "{:,.2f}".format(total_debt) }}
+      {{ total_debt|money }}
     </div>
     <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">
-      贷款剩余: RM {{ "{:,.2f}".format(total_loan_debt) }} · 分期未还: RM {{ "{:,.2f}".format(total_inst_debt) }}
+      贷款剩余: {{ total_loan_debt|money }} · 分期未还: {{ total_inst_debt|money }}
     </div>
   </div>
 
@@ -59,7 +59,7 @@
       {{ target_month }} 刚性现金流总支出
     </div>
     <div style="font-size: 26px; font-weight: 700; color: #e11d48; margin-top: 6px;">
-      RM {{ "{:,.2f}".format(cashflow.totalRigidPayment) }}
+      {{ cashflow.totalRigidPayment|money }}
     </div>
     <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">
       固定贷款供款 + 信用卡分期必付合计
@@ -76,7 +76,7 @@
         {% for rel in cashflow.upcomingReleases %}
         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; padding: 2px 0;">
           <span style="font-weight: 600; color: var(--ink);">{{ rel.title }}</span>
-          <span style="color: var(--green); font-weight: 700;">+RM {{ "{:,.2f}".format(rel.monthly_amount) }}/月 ({{ rel.settle_month }})</span>
+          <span style="color: var(--green); font-weight: 700;">+{{ rel.monthly_amount|money }}/月 ({{ rel.settle_month }})</span>
         </div>
         {% endfor %}
       </div>
@@ -110,7 +110,7 @@
           <th>分类/类型</th>
           <th>扣款账户/卡号</th>
           <th style="text-align: center;">期数进度</th>
-          <th style="text-align: right;">当期金额 (RM)</th>
+          <th style="text-align: right;">当期金额 ({{ current_user_currency|default('RM') }})</th>
           <th style="text-align: center;">状态 / 提醒</th>
         </tr>
       </thead>
@@ -201,8 +201,8 @@
                 {% endif %}
               </td>
               <td><span style="color: var(--ink-soft); font-size: 13px;">{{ inst.card_name or '—' }}</span></td>
-              <td style="text-align: right;">RM {{ "{:,.2f}".format(inst.total_amount) }}</td>
-              <td style="text-align: right; font-weight: 600;">RM {{ "{:,.2f}".format(inst.monthly_amount) }}</td>
+              <td style="text-align: right;">{{ inst.total_amount|money }}</td>
+              <td style="text-align: right; font-weight: 600;">{{ inst.monthly_amount|money }}</td>
               <td>
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <div style="flex: 1; background: var(--border); height: 6px; border-radius: 4px; overflow: hidden;">
@@ -212,13 +212,13 @@
                 </div>
               </td>
               <td style="text-align: right; font-weight: 700; color: #e11d48;">
-                RM {{ "{:,.2f}".format(inst.remaining_balance) }}
+                {{ inst.remaining_balance|money }}
               </td>
               <td style="text-align: center; font-size: 12.5px; font-weight: 500;">
                 {{ inst.settle_month }}
               </td>
               <td style="text-align: center; font-weight: 600; color: var(--green);">
-                +RM {{ "{:,.2f}".format(inst.monthly_amount) }}/月
+                +{{ inst.monthly_amount|money }}/月
               </td>
               <td style="text-align: center;">
                 <form method="post" action="{{ url_for('api_delete_liability', item_type='installment', item_id=inst.id) }}" style="display:inline;" onsubmit="return confirm('确定删除该分期记录吗？');">
@@ -268,7 +268,7 @@
             <tr>
               <td><strong>{{ loan.title }}</strong></td>
               <td><span style="color: var(--ink-soft); font-size: 13px;">{{ loan.account_name or '主账户' }}</span></td>
-              <td style="text-align: right;">RM {{ "{:,.2f}".format(loan.loan_amount) }}</td>
+              <td style="text-align: right;">{{ loan.loan_amount|money }}</td>
               <td style="text-align: center; font-weight: 600;">{{ loan.annual_interest_rate }}%</td>
               <td style="text-align: center;">
                 {% if loan.method == 'flat_rate' %}
@@ -278,11 +278,11 @@
                 {% endif %}
               </td>
               <td style="text-align: right; font-weight: 700; color: #e11d48;">
-                RM {{ "{:,.2f}".format(loan.monthly_payment) }}
+                {{ loan.monthly_payment|money }}
               </td>
               <td style="text-align: center;">每月 {{ "%02d"|format(loan.due_day) }} 日</td>
               <td style="text-align: right; font-weight: 700; color: var(--navy);">
-                RM {{ "{:,.2f}".format(loan.remaining_balance) }}
+                {{ loan.remaining_balance|money }}
               </td>
               <td style="text-align: center;">
                 <form method="post" action="{{ url_for('api_delete_liability', item_type='loan', item_id=loan.id) }}" style="display:inline;" onsubmit="return confirm('确定删除该贷款项目吗？');">
@@ -321,7 +321,7 @@
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">商品总额 (RM) *</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">商品总额 ({{ current_user_currency|default('RM') }}) *</label>
           <input type="number" step="0.01" name="total_amount" id="inst_total" required placeholder="3600.00" oninput="calcInstMonthly()" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
         <div>
@@ -355,7 +355,7 @@
         </select>
       </div>
       <div style="padding: 10px; background: var(--bg-soft); border-radius: 6px; margin-bottom: 16px; font-size: 13px; color: var(--ink-soft);">
-        预估每月摊销：<strong id="inst_preview" style="color: #e11d48;">RM 0.00</strong> (尾差自动在首期平摊)
+        预估每月摊销：<strong id="inst_preview" style="color: #e11d48;">{{ current_user_currency|default('RM') }} 0.00</strong> (尾差自动在首期平摊)
       </div>
       <div style="display: flex; justify-content: flex-end; gap: 10px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal('modalInstallment')">取消</button>
@@ -380,7 +380,7 @@
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">贷款总本金 (RM) *</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">贷款总本金 ({{ current_user_currency|default('RM') }}) *</label>
           <input type="number" step="0.01" name="loan_amount" required placeholder="500000.00" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
         <div>
@@ -394,7 +394,7 @@
           <input type="number" step="0.01" name="annual_interest_rate" value="4.25" placeholder="4.25" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">每月固定月供 (RM)</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">每月固定月供 ({{ current_user_currency|default('RM') }})</label>
           <input type="number" step="0.01" name="monthly_payment" placeholder="留空则按公式自动算" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
       </div>
@@ -481,7 +481,8 @@ function calcInstMonthly() {
   const total = parseFloat(document.getElementById('inst_total').value) || 0;
   const tenure = parseInt(document.getElementById('inst_tenure').value) || 12;
   const m = (total / tenure).toFixed(2);
-  document.getElementById('inst_preview').textContent = `RM ${m}`;
+  const sym = (typeof window !== 'undefined' && window.LEDGER_CURRENCY_SYMBOL) || 'RM';
+  document.getElementById('inst_preview').textContent = `${sym} ${m}`;
 }
 
 // 点击遮罩外部关闭弹窗

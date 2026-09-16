@@ -1078,7 +1078,10 @@ function renderOverview(data) {
 
   if (totalInc) totalInc.textContent = formatMoney(m.total_income);
   if (totalExp) totalExp.textContent = formatMoney(m.total_expense);
-  if (netSav) netSav.textContent = formatMoney(m.net_savings);
+  if (netSav) {
+    netSav.textContent = formatMoney(m.net_savings);
+    netSav.className = 'amount ' + (m.net_savings >= 0 ? 'income' : 'expense');
+  }
   if (netCard) {
     netCard.classList.toggle('positive', m.net_savings >= 0);
     netCard.classList.toggle('negative', m.net_savings < 0);
@@ -1163,9 +1166,12 @@ function destroyChart(instance) {
 
 function rmMoneyFmt(value) {
   var n = Number(value) || 0;
-  if (n >= 1000000) return 'RM ' + (n / 1000000).toFixed(1) + 'M';
-  if (n >= 1000) return 'RM ' + (n / 1000).toFixed(1) + 'k';
-  return 'RM ' + n.toFixed(2);
+  var sym = (typeof window !== 'undefined' && window.LEDGER_CURRENCY_SYMBOL) || 'RM';
+  var absN = Math.abs(n);
+  var sign = n < 0 ? '-' : '';
+  if (absN >= 1000000) return sign + sym + ' ' + (absN / 1000000).toFixed(1) + 'M';
+  if (absN >= 1000) return sign + sym + ' ' + (absN / 1000).toFixed(1) + 'k';
+  return sign + sym + ' ' + absN.toFixed(2);
 }
 
 function drawOverviewBarChart(trendData) {
@@ -1181,7 +1187,7 @@ function drawOverviewBarChart(trendData) {
   var incomeHover = isDark ? 'rgba(56, 189, 248, 1)' : 'rgba(30, 63, 111, 0.95)';
   var expenseColor = isDark ? 'rgba(248, 113, 113, 0.88)' : 'rgba(168, 71, 90, 0.88)';
   var expenseHover = isDark ? 'rgba(248, 113, 113, 1)' : 'rgba(191, 83, 104, 0.95)';
-  var tickColor = isDark ? '#94a3b8' : '#6f6c66';
+  var tickColor = isDark ? '#94a3b8' : '#334155';
   var gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(27, 27, 31, 0.06)';
   var gridBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(27, 27, 31, 0.18)';
   var tooltipBg = isDark ? 'rgba(19, 29, 49, 0.96)' : 'rgba(255, 255, 255, 0.97)';
@@ -1296,14 +1302,40 @@ function drawOverviewDoughnut(canvasId, labels, values) {
   var tooltipBody = isDark ? '#cbd5e1' : '#46453f';
   var tooltipBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(27, 27, 31, 0.1)';
 
+  var centerTitle = (canvasId === 'overviewExpenseChart') ? '长期总支出' : '累计总收入';
+  var centerTextPlugin = {
+    beforeDraw: function(chart) {
+      if (!chart.chartArea) return;
+      var ctx = chart.ctx;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      var centerX = (chart.chartArea.left + chart.chartArea.right) / 2;
+      var centerY = (chart.chartArea.top + chart.chartArea.bottom) / 2;
+      var curDark = isDarkModeActive();
+
+      // 标题
+      ctx.font = '500 12px "Segoe UI", sans-serif';
+      ctx.fillStyle = curDark ? '#94a3b8' : '#64748b';
+      ctx.fillText(centerTitle, centerX, centerY - 10);
+
+      // 金额数字 (浅色模式下 #0f172a, 深色模式下 #ffffff)
+      ctx.font = '700 15px ui-monospace, SFMono-Regular, Consolas, monospace';
+      ctx.fillStyle = curDark ? '#ffffff' : '#0f172a';
+      ctx.fillText(formatMoney(total), centerX, centerY + 10);
+      ctx.restore();
+    }
+  };
+
   var instance = new Chart(canvas.getContext('2d'), {
     type: 'doughnut',
     data: {
       labels: labels,
       datasets: [{
-        data: values,
-        backgroundColor: palette.slice(0, labels.length),
-        hoverBackgroundColor: palette.slice(0, labels.length),
+        data: values.length > 0 && total > 0 ? values : [1],
+        backgroundColor: values.length > 0 && total > 0 ? palette.slice(0, labels.length) : (isDark ? ['#334155'] : ['#e2e8f0']),
+        hoverBackgroundColor: values.length > 0 && total > 0 ? palette.slice(0, labels.length) : (isDark ? ['#334155'] : ['#e2e8f0']),
         borderWidth: 2,
         borderColor: sliceBorder,
         hoverBorderColor: sliceBorder
@@ -1312,12 +1344,13 @@ function drawOverviewDoughnut(canvasId, labels, values) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '65%',
+      cutout: '68%',
       plugins: {
         legend: {
           display: false
         },
         tooltip: {
+          enabled: total > 0,
           backgroundColor: tooltipBg,
           titleColor: tooltipTitle,
           bodyColor: tooltipBody,
@@ -1335,7 +1368,8 @@ function drawOverviewDoughnut(canvasId, labels, values) {
           }
         }
       }
-    }
+    },
+    plugins: [centerTextPlugin]
   });
 
   var legendContainer = document.getElementById(canvasId + 'Legend');
