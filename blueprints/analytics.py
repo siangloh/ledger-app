@@ -94,6 +94,9 @@ def get_category_insights_data(db, time_range='all', start_date=None, end_date=N
         else:
             cat_stats[cat]['monthly'][m] = amt
 
+    cat_rows = db.execute("SELECT name, color FROM categories WHERE user_id = ?", (user_id,)).fetchall()
+    cat_colors = {r['name']: r['color'] for r in cat_rows if r['color']}
+
     categories_list = []
     for cat, info in cat_stats.items():
         total_amt = round(info['total'], 2)
@@ -126,6 +129,7 @@ def get_category_insights_data(db, time_range='all', start_date=None, end_date=N
 
         categories_list.append({
             'category': cat,
+            'color': cat_colors.get(cat, '#fb7185'),
             'total_amt': total_amt,
             'this_month': cur_amt,
             'last_month': prev_amt,

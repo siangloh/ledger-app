@@ -143,26 +143,26 @@
   <div class="cards cards-four">
     <div class="card">
       <span class="card-label">累计总收入</span>
-      <span class="amount income" id="ovTotalIncome">RM 0.00</span>
+      <span class="amount income" id="ovTotalIncome">{{ current_user_currency }} 0.00</span>
     </div>
     <div class="card">
       <span class="card-label">累计总支出</span>
-      <span class="amount expense" id="ovTotalExpense">RM 0.00</span>
+      <span class="amount expense" id="ovTotalExpense">{{ current_user_currency }} 0.00</span>
     </div>
     <div class="card card-highlight positive" id="ovNetSavingsCard">
       <span class="card-label">累计总结余</span>
-      <span class="amount" id="ovNetSavings">RM 0.00</span>
+      <span class="amount" id="ovNetSavings">{{ current_user_currency }} 0.00</span>
     </div>
     <div class="card">
       <span class="card-label">月均收支</span>
       <div class="card-sub-stats">
         <div class="sub-stat-row">
           <span class="sub-stat-label">月均收入</span>
-          <span class="sub-stat-val income" id="ovAvgIncome">RM 0.00</span>
+          <span class="sub-stat-val income" id="ovAvgIncome">{{ current_user_currency }} 0.00</span>
         </div>
         <div class="sub-stat-row">
           <span class="sub-stat-label">月均支出</span>
-          <span class="sub-stat-val expense" id="ovAvgExpense">RM 0.00</span>
+          <span class="sub-stat-val expense" id="ovAvgExpense">{{ current_user_currency }} 0.00</span>
         </div>
       </div>
     </div>

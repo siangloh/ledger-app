@@ -14,16 +14,16 @@
       {% for c in income_main %}
       <li style="display: flex; justify-content: space-between; align-items: center;">
         <span style="display: inline-flex; align-items: center; gap: 8px;">
-          <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#34d399' }};"></span>
+          <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#34d399' }}; flex-shrink: 0;"></span>
           <strong>{{ c.name }}</strong>
         </span>
         <div style="display: flex; gap: 6px; align-items: center;">
-          <button type="button" class="btn-ghost btn-sm" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#34d399' }}')">编辑</button>
+          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#34d399' }}')">编辑</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
                 data-confirm-title="删除分类「{{ c.name }}」？"
-                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
+                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
+            <button type="submit" class="cat-action-btn danger">删除</button>
           </form>
         </div>
       </li>
@@ -46,16 +46,16 @@
       {% for c in income_side %}
       <li style="display: flex; justify-content: space-between; align-items: center;">
         <span style="display: inline-flex; align-items: center; gap: 8px;">
-          <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#38bdf8' }};"></span>
+          <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#38bdf8' }}; flex-shrink: 0;"></span>
           <strong>{{ c.name }}</strong>
         </span>
         <div style="display: flex; gap: 6px; align-items: center;">
-          <button type="button" class="btn-ghost btn-sm" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#38bdf8' }}')">编辑</button>
+          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#38bdf8' }}')">编辑</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
                 data-confirm-title="删除分类「{{ c.name }}」？"
-                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
+                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
+            <button type="submit" class="cat-action-btn danger">删除</button>
           </form>
         </div>
       </li>
@@ -72,7 +72,7 @@
   </section>
 
   <!-- 3. 支出分类 -->
-  <section class="panel">
+  <section class="panel" style="flex: 1.6; min-width: 380px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
       <h3 style="margin:0;">支出分类</h3>
       <span class="hint" style="font-size:12px;">可自定义代表颜色与月度限额</span>
@@ -81,12 +81,11 @@
       {% for c in expense %}
       {% set b = budget_map.get(c.name) %}
       <li class="cat-item-clean">
-        <div class="cat-name-box" style="display: inline-flex; align-items: center; gap: 8px;">
-          <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#fb923c' }};"></span>
-          <span class="cat-name-text">{{ c.name }}</span>
+        <div class="cat-name-box">
+          <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#fb923c' }}; flex-shrink: 0;"></span>
+          <span class="cat-name-text" title="{{ c.name }}">{{ c.name }}</span>
         </div>
         <div class="cat-actions-box">
-          <button type="button" class="btn-ghost btn-sm" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#fb923c' }}')" title="修改分类名称与代表颜色">编辑</button>
           {% if b %}
           <button type="button" class="btn-budget-pill level-{{ b.level }}"
                   data-id="{{ c.id }}"
@@ -115,11 +114,12 @@
             + 设限额
           </button>
           {% endif %}
+          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#fb923c' }}')" title="修改分类名称与代表颜色">编辑</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
                 data-confirm-title="删除分类「{{ c.name }}」？"
-                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
+                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
+            <button type="submit" class="cat-action-btn danger">删除</button>
           </form>
         </div>
       </li>
@@ -141,16 +141,16 @@
       {% for c in savings %}
       <li style="display: flex; justify-content: space-between; align-items: center;">
         <span style="display: inline-flex; align-items: center; gap: 8px;">
-          <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#059669' }};"></span>
+          <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#059669' }}; flex-shrink: 0;"></span>
           <strong>{{ c.name }}</strong>
         </span>
         <div style="display: flex; gap: 6px; align-items: center;">
-          <button type="button" class="btn-ghost btn-sm" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#059669' }}')">编辑</button>
+          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#059669' }}')">编辑</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
                 data-confirm-title="删除储蓄分类「{{ c.name }}」？"
-                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
+                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
+            <button type="submit" class="cat-action-btn danger">删除</button>
           </form>
         </div>
       </li>

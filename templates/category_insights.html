@@ -57,9 +57,9 @@
     <span class="amount" style="color:var(--ink-soft);" id="kpiLastMonth">{{
       (insights.categories|map(attribute='last_month')|sum)|money }}</span>
   </div>
-  <div class="card card-highlight">
+  <div class="card">
     <span class="card-label">活跃支出分类</span>
-    <span class="amount" style="color:var(--navy);" id="kpiCatCount">{{ insights.total_categories }} 个</span>
+    <span class="amount" style="color:var(--ink);" id="kpiCatCount">{{ insights.total_categories }} 个</span>
   </div>
 </div>
 
@@ -94,7 +94,7 @@
           <td class="col-name">
             <div style="display:flex; align-items:center; gap:8px;">
               <span class="chart-legend-dot"
-                style="background-color: var(--navy); width:9px; height:9px; border-radius:50%;"></span>
+                style="background-color: {{ cat.color or '#fb7185' }}; width:10px; height:10px; border-radius:50%; flex-shrink:0;"></span>
               <strong style="font-size:14px; color:var(--ink);">{{ cat.category }}</strong>
             </div>
           </td>
@@ -175,9 +175,12 @@
       _catChartInstances[idx].destroy();
     }
 
-    const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const htmlTheme = document.documentElement.getAttribute('data-theme');
+    const isDark = htmlTheme === 'dark' || (!htmlTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
     const tickColor = isDark ? '#94a3b8' : '#6f6c66';
     const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(27,27,31,0.06)';
+    const currencySym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
+    const barColor = cat.color || '#fb7185';
 
     const ctx = canvas.getContext('2d');
     _catChartInstances[idx] = new Chart(ctx, {
@@ -185,10 +188,10 @@
       data: {
         labels: cat.months,
         datasets: [{
-          label: cat.category + ' 支出 (RM)',
+          label: cat.category + ' 支出 (' + currencySym + ')',
           data: cat.monthly_values,
-          backgroundColor: 'rgba(251, 113, 133, 0.75)',
-          borderColor: '#fb7185',
+          backgroundColor: barColor + (barColor.length === 7 ? 'bf' : ''),
+          borderColor: barColor,
           borderWidth: 1.5,
           borderRadius: 4,
           maxBarThickness: 36
@@ -210,7 +213,7 @@
           tooltip: {
             callbacks: {
               label: function (c) {
-                return ' 支出: ' + formatMoney(c.parsed.y);
+                return ' 支出: ' + formatMoney(c.parsed.y, currencySym);
               }
             }
           }
@@ -227,8 +230,8 @@
               color: tickColor,
               font: { size: 10 },
               callback: function (v) {
-                if (v >= 1000) return 'RM ' + (v / 1000).toFixed(1) + 'k';
-                return 'RM ' + v;
+                if (v >= 1000) return currencySym + ' ' + (v / 1000).toFixed(1) + 'k';
+                return currencySym + ' ' + v;
               }
             }
           }
