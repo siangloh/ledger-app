@@ -3492,5 +3492,62 @@ html[data-theme="dark"] {
   .acc-modal { padding: 20px; }
 }
 
+/* ==========================================================================
+   Privacy Masking Mode (金额隐私遮罩模式)
+   ========================================================================== */
+.nav-privacy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface-soft, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--border);
+  color: var(--ink-soft);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm, 8px);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.nav-privacy-btn:hover {
+  background: var(--surface);
+  color: var(--navy);
+  border-color: var(--navy);
+}
+.privacy-mode .nav-privacy-btn {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #6366f1;
+}
+
+/* 全局敏感金额高斯模糊 */
+.privacy-mode .amount,
+.privacy-mode .stat-value,
+.privacy-mode .kpi-val,
+.privacy-mode .kpi-num,
+.privacy-mode .balance-val,
+.privacy-mode .money-val,
+.privacy-mode .b-card-pct,
+.privacy-mode td[data-col="amount"],
+.privacy-mode [data-sensitive],
+.privacy-mode .sensitive-val {
+  filter: blur(6px) !important;
+  user-select: none !important;
+  transition: filter 0.2s ease;
+}
+
+/* 鼠标悬停窥视解冻 (可临时查看单笔数值) */
+.privacy-mode .amount:hover,
+.privacy-mode .stat-value:hover,
+.privacy-mode .kpi-val:hover,
+.privacy-mode .kpi-num:hover,
+.privacy-mode .balance-val:hover,
+.privacy-mode .money-val:hover,
+.privacy-mode td[data-col="amount"]:hover,
+.privacy-mode [data-sensitive]:hover,
+.privacy-mode .sensitive-val:hover {
+  filter: blur(0px) !important;
+}
+
 
 

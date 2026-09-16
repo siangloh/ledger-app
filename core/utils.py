@@ -1,5 +1,5 @@
 from calendar import monthrange
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from core.db import get_db, get_current_user_id, bump_data_version
 
 
@@ -7,6 +7,49 @@ import zoneinfo
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def get_billing_cycle_dates(month=None, start_day=1):
+    """
+    根据给定的年月（YYYY-MM）及用户设定的起始日（1-31），计算账单周期的起始与结束日期。
+    返回 (start_date_str, end_date_str, range_label)
+    例如:
+      month='2026-09', start_day=1 -> ('2026-09-01', '2026-09-30', '09-01 ~ 09-30')
+      month='2026-09', start_day=15 -> ('2026-09-15', '2026-10-14', '09-15 ~ 10-14')
+    边界处理:
+      若某月天数不足 start_day（如2月遇到 30），自动 clamp 为当月最后一天。
+      结束日期为下个周期起始日的前一天。
+    """
+    if not month:
+        month = date.today().strftime('%Y-%m')
+    try:
+        start_day = int(start_day)
+    except (ValueError, TypeError):
+        start_day = 1
+    start_day = max(1, min(start_day, 31))
+
+    year, mon = map(int, month.split('-'))
+    last_day = monthrange(year, mon)[1]
+
+    if start_day == 1:
+        start_date = date(year, mon, 1)
+        end_date = date(year, mon, last_day)
+    else:
+        actual_start_day = min(start_day, last_day)
+        start_date = date(year, mon, actual_start_day)
+        if mon == 12:
+            next_year, next_mon = year + 1, 1
+        else:
+            next_year, next_mon = year, mon + 1
+        next_last_day = monthrange(next_year, next_mon)[1]
+        next_actual_start_day = min(start_day, next_last_day)
+        next_start_date = date(next_year, next_mon, next_actual_start_day)
+        end_date = next_start_date - timedelta(days=1)
+
+    start_str = start_date.strftime('%Y-%m-%d')
+    end_str = end_date.strftime('%Y-%m-%d')
+    range_label = f"{start_date.strftime('%m-%d')} ~ {end_date.strftime('%m-%d')}"
+    return start_str, end_str, range_label
 
 
 def money_filter(value, symbol=None, number_format=None):
@@ -158,15 +201,24 @@ def get_savings_breakdown(db, user_id=None):
     return sorted_pool, round(total_savings_pool, 2)
 
 
-def get_category_budget_status(db, user_id=None, month=None):
+def get_category_budget_status(db, user_id=None, month=None, start_day=None):
     """
     返回当前用户每个已设置月度预算的支出分类的花费进度：
     [{category, limit, spent, remaining, pct, level}], 按 pct 从高到低排序。
+    支持账单周期起始日（默认读取用户配置 budget_start_day）。
     """
     if not user_id:
         user_id = get_current_user_id()
     if not month:
         month = date.today().strftime('%Y-%m')
+
+    if start_day is None:
+        try:
+            from core.db import get_user_settings
+            s = get_user_settings(user_id, db=db)
+            start_day = s.get('budget_start_day', 1)
+        except Exception:
+            start_day = 1
 
     budgets = db.execute(
         'SELECT category, monthly_limit FROM category_budgets WHERE user_id = ?', (user_id,)
@@ -174,10 +226,7 @@ def get_category_budget_status(db, user_id=None, month=None):
     if not budgets:
         return []
 
-    year, mon = map(int, month.split('-'))
-    last_day = monthrange(year, mon)[1]
-    start = f'{month}-01'
-    end = f'{month}-{last_day:02d}'
+    start, end, _ = get_billing_cycle_dates(month, start_day)
 
     spent_rows = db.execute(
         "SELECT category, SUM(amount) as total FROM transactions "
@@ -212,14 +261,23 @@ def get_category_budget_status(db, user_id=None, month=None):
     return result
 
 
-def check_and_record_budget_alerts(db, user_id, category, month=None):
+def check_and_record_budget_alerts(db, user_id, category, month=None, start_day=None):
     """
     检查某个分类本月花费是否新跨越了一个提醒阈值（70% / 100% / 150%）。
+    支持账单周期起始日（默认读取用户配置 budget_start_day）。
     """
     if not category:
         return None
     if not month:
         month = date.today().strftime('%Y-%m')
+
+    if start_day is None:
+        try:
+            from core.db import get_user_settings
+            s = get_user_settings(user_id, db=db)
+            start_day = s.get('budget_start_day', 1)
+        except Exception:
+            start_day = 1
 
     budget = db.execute(
         'SELECT monthly_limit FROM category_budgets WHERE user_id = ? AND category = ?',
@@ -231,10 +289,7 @@ def check_and_record_budget_alerts(db, user_id, category, month=None):
     if limit <= 0:
         return None
 
-    year, mon = map(int, month.split('-'))
-    last_day = monthrange(year, mon)[1]
-    start = f'{month}-01'
-    end = f'{month}-{last_day:02d}'
+    start, end, _ = get_billing_cycle_dates(month, start_day)
     spent_row = db.execute(
         "SELECT SUM(amount) as total FROM transactions "
         "WHERE user_id = ? AND type = 'expense' AND category = ? AND date BETWEEN ? AND ?",

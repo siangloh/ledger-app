@@ -14,7 +14,12 @@
 <div id="monthlySection" class="dashboard-view">
   <div class="month-nav">
     <a href="{{ url_for('index', month=prev_month) }}" class="month-nav-arrow" hx-get="{{ url_for('index', month=prev_month) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">&larr; 上月</a>
-    <strong class="month-nav-current">{{ month }}</strong>
+    <div style="display: inline-flex; flex-direction: column; align-items: center; gap: 2px;">
+      <strong class="month-nav-current">{{ month }}</strong>
+      {% if cycle_range_label and budget_start_day and budget_start_day > 1 %}
+        <span style="font-size: 11.5px; color: var(--muted); font-weight: 500;">账单周期: {{ cycle_range_label }}</span>
+      {% endif %}
+    </div>
     <a href="{{ url_for('index', month=next_month) }}" class="month-nav-arrow" hx-get="{{ url_for('index', month=next_month) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">下月 &rarr;</a>
   </div>
 
@@ -58,7 +63,7 @@
             {% endif %}
             {% for scat in savings_categories %}
               {% if not savings_pool_by_category or scat not in savings_pool_by_category %}
-                <option value="{{ scat }}">{{ scat }} (结余: RM 0.00)</option>
+                <option value="{{ scat }}">{{ scat }} (结余: {{ 0|money }})</option>
               {% endif %}
             {% endfor %}
             {% if not savings_pool_by_category and not savings_categories %}
@@ -68,23 +73,41 @@
         </div>
         <div class="row">
           <label>日期 <input type="date" name="date" value="{{ today }}" required></label>
-          <label>金额 <input type="number" step="0.01" min="0.01" name="amount" required></label>
+          <label>金额 <input type="number" step="0.01" min="0.01" name="amount" id="quickAddAmount" required></label>
         </div>
         <div class="row">
           <label>分类 <select name="category" id="categorySelect"></select></label>
-          <label>备注 <input type="text" name="note" placeholder="可选"></label>
+          <label>账户
+            <select name="account_id" id="quickAddAccountSelect">
+              <option value="">默认账户</option>
+              {% if accounts %}
+                {% for acc in accounts %}
+                  <option value="{{ acc.id }}">{{ acc.name }} ({{ acc.currency }})</option>
+                {% endfor %}
+              {% endif %}
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <label style="flex: 1;">备注 <input type="text" name="note" id="quickAddNote" placeholder="可选"></label>
         </div>
         <div class="row">
           <label style="flex: 1;">自定义标签 <input type="text" name="tags" id="quickAddTags" placeholder="多个标签用逗号分隔，如：出差, 报销, 聚餐"></label>
         </div>
         <div class="quick-chips" id="quickChipsRow">
-          <button type="button" class="chip-btn" onclick="quickFillForm(10, '餐饮', '早餐')">早餐 RM10</button>
-          <button type="button" class="chip-btn" onclick="quickFillForm(15, '餐饮', '午餐')">午餐 RM15</button>
-          <button type="button" class="chip-btn" onclick="quickFillForm(12, '餐饮', '咖啡')">咖啡 RM12</button>
-          <button type="button" class="chip-btn" onclick="quickFillForm(50, '交通', 'Petronas加油')">加油 RM50</button>
-          <button type="button" class="chip-btn" onclick="quickFillForm(30, '购物', '超市日常')">超市 RM30</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(10, '餐饮', '早餐')">早餐 {{ current_user_currency }}10</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(15, '餐饮', '午餐')">午餐 {{ current_user_currency }}15</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(12, '餐饮', '咖啡')">咖啡 {{ current_user_currency }}12</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(50, '交通', 'Petronas加油')">加油 {{ current_user_currency }}50</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(30, '购物', '超市日常')">超市 {{ current_user_currency }}30</button>
         </div>
-        <button type="submit" class="btn-primary">保存</button>
+        <div class="row" style="margin-top: 10px; align-items: center; justify-content: space-between;">
+          <label class="checkbox-label" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="continuousEntryCheckbox">
+            <span>连续记账 (保存后保持表单并聚焦金额)</span>
+          </label>
+          <button type="submit" class="btn-primary" id="quickAddSubmitBtn">保存记账</button>
+        </div>
       </form>
     </section>
 

@@ -1,3 +1,6 @@
+import csv
+import codecs
+import io
 import json
 import logging
 from datetime import datetime
@@ -166,6 +169,11 @@ def api_update_settings():
         except Exception:
             pass
 
+    # 13. 自然语言免确认直接入账
+    if 'nlp_confirm_required' in data:
+        val = str(data.get('nlp_confirm_required', '')).strip().lower()
+        updates['nlp_confirm_required'] = 1 if val in ('1', 'true', 'on', 'yes') else 0
+
     if not updates:
         return jsonify({'ok': False, 'message': '未检测到需更新的有效字段'}), 400
 
@@ -205,8 +213,63 @@ def api_export_data():
     user_id = get_current_user_id()
     username = session.get('username') or f'user_{user_id}'
     db = get_db()
+    export_format = request.args.get('format', 'json').strip().lower()
 
-    # 导出个人全量结构化数据
+    if export_format == 'csv':
+        try:
+            rows = db.execute('''
+                SELECT t.id, t.date, t.type, t.group_name, t.category, t.amount,
+                       COALESCE(a.name, '默认账户') as account_name,
+                       t.note, t.tags, t.source,
+                       t.from_savings, t.from_savings_category, t.created_at
+                FROM transactions t
+                LEFT JOIN accounts a ON t.account_id = a.id
+                WHERE t.user_id = ?
+                ORDER BY t.date DESC, t.id DESC
+            ''', (str(user_id),)).fetchall()
+
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow([
+                '流水号', '记账日期', '收支类型', '分组', '分类', '金额',
+                '账户', '备注/商户', '标签', '录入渠道', '储蓄支出', '储蓄分类', '创建时间'
+            ])
+            type_map = {'income': '收入', 'expense': '支出', 'savings': '储蓄'}
+            group_map = {'main': '主业', 'side': '副业'}
+            source_map = {
+                'manual': '手动录入', 'nlp': '智能记账', 'import': '批量导入',
+                'recurring': '固定收支', 'auto_track': '自动记账', 'split_bill': 'AA分账'
+            }
+            for r in rows:
+                writer.writerow([
+                    r['id'],
+                    r['date'],
+                    type_map.get(r['type'], r['type']),
+                    group_map.get(r['group_name'], r['group_name'] or ''),
+                    r['category'] or '',
+                    f"{float(r['amount'] or 0):.2f}",
+                    r['account_name'],
+                    r['note'] or '',
+                    r['tags'] or '',
+                    source_map.get(r['source'], r['source'] or ''),
+                    '是' if r['from_savings'] else '否',
+                    r['from_savings_category'] or '',
+                    r['created_at'] or ''
+                ])
+            csv_bytes = codecs.BOM_UTF8 + output.getvalue().encode('utf-8')
+            csv_filename = f"ledger_transactions_{username}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            return Response(
+                csv_bytes,
+                mimetype='text/csv; charset=utf-8-sig',
+                headers={
+                    'Content-Disposition': f'attachment; filename="{csv_filename}"'
+                }
+            )
+        except Exception as e:
+            logger.error("CSV export error for user %s: %s", user_id, e, exc_info=True)
+            return jsonify({'ok': False, 'message': f'CSV 导出失败: {str(e)}'}), 500
+
+    # 导出个人全量结构化数据 (JSON)
     export_payload = {
         'export_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'user_id': user_id,

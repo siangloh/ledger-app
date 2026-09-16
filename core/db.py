@@ -424,7 +424,8 @@ def init_db(app_logger=None):
         created_at TEXT NOT NULL,
         from_savings INTEGER DEFAULT 0,
         from_savings_category TEXT,
-        tags TEXT
+        tags TEXT,
+        account_id INTEGER
     );
     ''')
     db.commit()
@@ -520,11 +521,18 @@ def init_db(app_logger=None):
     except Exception as e:
         logger.debug("ALTER transactions ADD tags skipped: %s", e)
 
+    try:
+        db.execute("ALTER TABLE transactions ADD COLUMN account_id INTEGER")
+        db.commit()
+    except Exception as e:
+        logger.debug("ALTER transactions ADD account_id skipped: %s", e)
+
     for col_name, col_sql in [
         ("default_currency", "TEXT DEFAULT 'MYR'"),
         ("date_format", "TEXT DEFAULT 'YYYY-MM-DD'"),
         ("number_format", "TEXT DEFAULT 'comma'"),
         ("timezone", "TEXT DEFAULT 'Asia/Kuala_Lumpur'"),
+        ("nlp_confirm_required", "INTEGER DEFAULT 1"),
     ]:
         try:
             db.execute(f"ALTER TABLE user_settings ADD COLUMN {col_name} {col_sql}")
@@ -699,6 +707,7 @@ def init_db(app_logger=None):
         date_format TEXT DEFAULT 'YYYY-MM-DD',
         number_format TEXT DEFAULT 'comma',
         timezone TEXT DEFAULT 'Asia/Kuala_Lumpur',
+        nlp_confirm_required INTEGER DEFAULT 1,
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     ''')
@@ -723,6 +732,7 @@ DEFAULT_USER_SETTINGS = {
     'date_format': 'YYYY-MM-DD',
     'number_format': 'comma',
     'timezone': 'Asia/Kuala_Lumpur',
+    'nlp_confirm_required': 1,
 }
 
 
@@ -773,8 +783,8 @@ def update_user_settings(user_id, new_settings, db=None):
                 user_id, theme_mode, currency_symbol, default_currency, default_account_id,
                 default_group, budget_start_day, default_dashboard_view,
                 dedup_window_minutes, table_density, haptic_feedback,
-                date_format, number_format, timezone, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                date_format, number_format, timezone, nlp_confirm_required, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 theme_mode=excluded.theme_mode,
                 currency_symbol=excluded.currency_symbol,
@@ -789,6 +799,7 @@ def update_user_settings(user_id, new_settings, db=None):
                 date_format=excluded.date_format,
                 number_format=excluded.number_format,
                 timezone=excluded.timezone,
+                nlp_confirm_required=excluded.nlp_confirm_required,
                 updated_at=excluded.updated_at
         ''', (
             str(user_id),
@@ -805,6 +816,7 @@ def update_user_settings(user_id, new_settings, db=None):
             current['date_format'],
             current['number_format'],
             current['timezone'],
+            int(current.get('nlp_confirm_required', 1)),
             now_str
         ))
         db.commit()

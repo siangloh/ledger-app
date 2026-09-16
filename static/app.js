@@ -4,6 +4,47 @@ function formatMoney(value, symbol) {
   return sym + ' ' + n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// ===========================================================================
+// 金额隐私遮罩模式 (Privacy Masking Mode)
+// ===========================================================================
+function updatePrivacyModeUI(isPrivacy) {
+  const icon = document.getElementById('privacyIcon');
+  const mIcon = document.getElementById('mobileSheetPrivacyIcon');
+  const mDesc = document.getElementById('mobileSheetPrivacyDesc');
+  const btn = document.getElementById('privacyToggleBtn');
+  if (icon) icon.textContent = isPrivacy ? '🙈' : '👁';
+  if (mIcon) mIcon.textContent = isPrivacy ? '🙈' : '👁';
+  if (mDesc) mDesc.textContent = isPrivacy ? '已开启隐私遮罩' : '一键隐藏金额与资产';
+  if (btn) {
+    btn.title = isPrivacy ? '隐私遮罩已开启 (点击或 Ctrl+Shift+P 恢复)' : '隐私遮罩 (快捷键: Ctrl+Shift+P)';
+    btn.classList.toggle('active', isPrivacy);
+  }
+}
+
+function togglePrivacyMode(forceState) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  const isPrivacy = typeof forceState === 'boolean' ? forceState : !root.classList.contains('privacy-mode');
+  root.classList.toggle('privacy-mode', isPrivacy);
+  try {
+    localStorage.setItem('ledger_privacy_mode', isPrivacy ? 'true' : 'false');
+  } catch (e) {}
+  updatePrivacyModeUI(isPrivacy);
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+      e.preventDefault();
+      togglePrivacyMode();
+    }
+  });
+  window.addEventListener('DOMContentLoaded', function () {
+    const isPrivacy = document.documentElement.classList.contains('privacy-mode');
+    updatePrivacyModeUI(isPrivacy);
+  });
+}
+
 function syncSegStyles() {
   document.querySelectorAll('.seg').forEach(function (label) {
     const input = label.querySelector('input');
@@ -444,6 +485,36 @@ function attachQuickAddFormAjax() {
   const form = document.getElementById('quickAddForm');
   if (!form || form.dataset.ajaxBound) return;
   form.dataset.ajaxBound = '1';
+
+  const accountSelect = document.getElementById('quickAddAccountSelect');
+  const continuousCheckbox = document.getElementById('continuousEntryCheckbox');
+
+  if (continuousCheckbox) {
+    try {
+      const savedContinuous = localStorage.getItem('ledger_continuous_entry');
+      if (savedContinuous !== null) {
+        continuousCheckbox.checked = (savedContinuous === 'true');
+      }
+      continuousCheckbox.addEventListener('change', function () {
+        localStorage.setItem('ledger_continuous_entry', this.checked ? 'true' : 'false');
+      });
+    } catch (e) {}
+  }
+
+  if (accountSelect) {
+    try {
+      const savedAccId = localStorage.getItem('ledger_last_account_id');
+      if (savedAccId && accountSelect.querySelector(`option[value="${savedAccId}"]`)) {
+        accountSelect.value = savedAccId;
+      }
+      accountSelect.addEventListener('change', function () {
+        if (this.value) {
+          localStorage.setItem('ledger_last_account_id', this.value);
+        }
+      });
+    } catch (e) {}
+  }
+
   form.addEventListener('submit', function (e) {
     const amountInput = form.querySelector('input[name="amount"]');
     const categorySelect = form.querySelector('select[name="category"]');
@@ -479,21 +550,29 @@ function attachQuickAddFormAjax() {
     .then(data => {
       if (typeof finishProgressBar === 'function') finishProgressBar();
       if (data.ok) {
+        if (accountSelect && accountSelect.value) {
+          try {
+            localStorage.setItem('ledger_last_account_id', accountSelect.value);
+          } catch (e) {}
+        }
+
         if (data.transaction) {
           const tx = data.transaction;
-          const amt = tx.amount ? `RM ${Number(tx.amount).toFixed(2)}` : '';
+          const sym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
+          const amt = tx.amount ? `${sym} ${Number(tx.amount).toFixed(2)}` : '';
           const cat = tx.category ? `【${tx.category}】` : '';
           const note = tx.note ? ` ${tx.note}` : '';
           sendPhoneNotification('记账成功 📝', `${cat} ${amt}${note}`.trim());
         }
 
+        const isContinuous = continuousCheckbox && continuousCheckbox.checked;
         Swal.fire({
           toast: true,
           position: 'top-end',
           icon: 'success',
-          title: data.message || '操作成功',
+          title: isContinuous ? (data.message ? `${data.message} (可继续录入下一笔)` : '记账成功，可继续录入下一笔') : (data.message || '操作成功'),
           showConfirmButton: false,
-          timer: 2500,
+          timer: isContinuous ? 2000 : 2500,
           timerProgressBar: true,
           customClass: { popup: 'app-swal-toast' }
         });
@@ -523,6 +602,13 @@ function attachQuickAddFormAjax() {
           if (amountInput) amountInput.value = '';
           const noteInput = form.querySelector('input[name="note"]');
           if (noteInput) noteInput.value = '';
+          const tagsInput = form.querySelector('input[name="tags"]');
+          if (tagsInput) tagsInput.value = '';
+
+          // 连续记账：自动重新聚焦金额输入框
+          if (isContinuous && amountInput) {
+            setTimeout(() => amountInput.focus(), 60);
+          }
 
           if (data.version) {
             _currentDataVersion = data.version;
@@ -547,11 +633,12 @@ function attachQuickAddFormAjax() {
           if (data.savings_pool) {
             const savingsSelect = document.getElementById('fromSavingsCategorySelect');
             if (savingsSelect) {
+              const curSym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
               Array.from(savingsSelect.options).forEach(opt => {
                 const catName = opt.value;
                 if (catName) {
                   const bal = data.savings_pool[catName] !== undefined ? data.savings_pool[catName] : 0;
-                  opt.textContent = `${catName} (结余: RM ${Number(bal).toFixed(2)})`;
+                  opt.textContent = `${catName} (结余: ${curSym} ${Number(bal).toFixed(2)})`;
                 }
               });
             }
@@ -935,6 +1022,68 @@ function attachNlpForm() {
           errorAlert(data.message, '解析失败');
           return;
         }
+
+        const confirmRequired = (typeof window.LEDGER_NLP_CONFIRM_REQUIRED !== 'undefined') ? (window.LEDGER_NLP_CONFIRM_REQUIRED !== 0 && window.LEDGER_NLP_CONFIRM_REQUIRED !== false) : true;
+        const hasWarnings = data.warnings && data.warnings.length > 0;
+        const hasValidAmount = data.parsed && Number(data.parsed.amount) > 0;
+
+        if (!confirmRequired && !hasWarnings && hasValidAmount) {
+          // 免确认直接自动入账
+          const v = data.parsed;
+          const params = new URLSearchParams({
+            csrf_token: csrfToken,
+            source: 'nlp',
+            type: v.type || 'expense',
+            group_name: v.group_name || '',
+            date: v.date || '',
+            category: v.category || '',
+            amount: v.amount || '0',
+            note: v.note || text,
+            from_savings: v.from_savings ? '1' : '0',
+            from_savings_category: v.from_savings_category || ''
+          });
+
+          fetch('/add', {
+            method: 'POST',
+            body: params,
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+          })
+            .then(function (res) { return res.json(); })
+            .then(function (addRes) {
+              if (addRes.ok) {
+                Swal.fire({
+                  toast: true,
+                  position: 'top-end',
+                  icon: 'success',
+                  title: '智能记账直接入账成功 (' + formatMoney(v.amount) + ')',
+                  showConfirmButton: false,
+                  timer: 2500,
+                  timerProgressBar: true,
+                  customClass: { popup: 'app-swal-toast' }
+                });
+                if (textInput) textInput.value = '';
+                const isDashboard = document.getElementById('dashboardSummaryCardsWrap') !== null;
+                if (isDashboard && typeof refreshDashboardPartials === 'function') {
+                  if (addRes.chart_data) {
+                    window.CHART_DATA = addRes.chart_data;
+                    if (typeof renderDonutCharts === 'function') renderDonutCharts();
+                  }
+                  refreshDashboardPartials(addRes.transaction);
+                } else if (typeof htmx !== 'undefined') {
+                  htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
+                } else {
+                  window.location.reload();
+                }
+              } else {
+                openNlpConfirmDialog(data.parsed, data.warnings);
+              }
+            })
+            .catch(function () {
+              openNlpConfirmDialog(data.parsed, data.warnings);
+            });
+          return;
+        }
+
         openNlpConfirmDialog(data.parsed, data.warnings);
       })
       .catch(function () {

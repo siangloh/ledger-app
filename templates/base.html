@@ -28,9 +28,15 @@
                 } else {
                     document.documentElement.removeAttribute('data-density');
                 }
+                var privacy = localStorage.getItem('ledger_privacy_mode');
+                if (privacy === 'true') {
+                    document.documentElement.classList.add('privacy-mode');
+                }
                 window.LEDGER_CURRENCY_SYMBOL = '{{ current_user_currency|default("RM") }}';
                 window.LEDGER_CURRENCY_CODE = '{{ current_user_currency_code|default("MYR") }}';
                 window.LEDGER_DATE_FORMAT = '{{ current_date_format|default("YYYY-MM-DD") }}';
+                window.LEDGER_NLP_CONFIRM_REQUIRED = {{ current_nlp_confirm_required|default(1) }};
+                window.LEDGER_BUDGET_START_DAY = {{ current_budget_start_day|default(1) }};
             } catch (e) { }
         })();
     </script>
@@ -140,6 +146,12 @@
                 </div>
 
                 <div class="nav-sep"></div>
+
+                <!-- 隐私模式切换 -->
+                <button type="button" class="nav-privacy-btn" id="privacyToggleBtn" title="隐私遮罩 (快捷键: Ctrl+Shift+P)" aria-label="切换隐私遮罩模式" onclick="togglePrivacyMode()">
+                    <span id="privacyIcon">👁</span>
+                    <span class="privacy-label">隐私</span>
+                </button>
 
                 <!-- 用户区 -->
                 {% if session.get('username') %}
@@ -275,6 +287,11 @@
                 <span class="sheet-title">批量导入</span>
                 <span class="sheet-desc">Excel/CSV 账单</span>
             </a>
+            <div class="sheet-tile" onclick="togglePrivacyMode(); toggleMoreSheet(false);" style="cursor: pointer;">
+                <span class="sheet-icon" id="mobileSheetPrivacyIcon">👁</span>
+                <span class="sheet-title">隐私遮罩</span>
+                <span class="sheet-desc" id="mobileSheetPrivacyDesc">一键隐藏金额与资产</span>
+            </div>
             <a href="{{ url_for('settings.settings_page') }}"
                 class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'settings_page' }}" data-nav="settings"
                 hx-get="{{ url_for('settings.settings_page') }}" hx-target="#mainContainer"

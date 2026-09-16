@@ -64,11 +64,17 @@ def add_transaction():
 
     tx_date = f.get('date') or date.today().isoformat()
     tags = (f.get('tags') or '').strip()
+    account_id = f.get('account_id')
+    try:
+        account_id = int(account_id) if account_id else None
+    except (ValueError, TypeError):
+        account_id = None
+
     cur = db.execute(
-        'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at, from_savings, from_savings_category, tags) '
-        'VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+        'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at, from_savings, from_savings_category, tags, account_id) '
+        'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
         (user_id, tx_date, tx_type, group_name, f.get('category'), amount, f.get('note', ''),
-         f.get('source', 'manual'), datetime.now().isoformat(), from_savings, from_savings_category, tags)
+         f.get('source', 'manual'), datetime.now().isoformat(), from_savings, from_savings_category, tags, account_id)
     )
     db.commit()
     bump_data_version('add', {

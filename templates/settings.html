@@ -256,6 +256,20 @@
           </div>
           <span class="settings-tip">需要设备支持 Vibration API 或运行在 Android 原生伴侣端。</span>
         </div>
+
+        <div class="settings-item">
+          <label class="settings-label">自然语言智能记账确认</label>
+          <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
+            <label class="toggle-switch">
+              <input type="checkbox" name="nlp_confirm_required" value="1" id="nlpConfirmToggle" {{ 'checked' if settings.nlp_confirm_required == 1 }} onchange="document.getElementById('nlpConfirmLabel').textContent = this.checked ? '自然语言解析后弹出二次确认弹窗 (推荐)' : '自然语言解析后直接自动入账 (免确认)';">
+              <span class="toggle-slider"></span>
+            </label>
+            <span style="font-size: 13.5px; color: var(--ink);" id="nlpConfirmLabel">
+              {{ '自然语言解析后弹出二次确认弹窗 (推荐)' if settings.nlp_confirm_required == 1 else '自然语言解析后直接自动入账 (免确认)' }}
+            </span>
+          </div>
+          <span class="settings-tip">关闭后，智能记账将在解析完成后直接保存入账；若遇到解析警告或金额不明确，系统仍会自动弹出确认以策安全。</span>
+        </div>
       </div>
     </section>
 
@@ -279,13 +293,23 @@
         <span class="settings-desc">随时导出当前账户名下全部财务数据，拥有完整离线数据控制权</span>
       </div>
     </div>
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 12px 0 6px 0;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 12px 0 16px 0; border-bottom: 1px solid var(--border);">
       <div>
         <div style="font-size: 14px; font-weight: 600; color: var(--ink);">导出全量个人记账档案 (JSON 格式)</div>
         <div style="font-size: 12.5px; color: var(--muted); margin-top: 4px;">包含全部历史交易明细、多币种账户、分类预算、固定收支、分期与周期订阅。</div>
       </div>
       <a href="{{ url_for('settings.api_export_data') }}" class="btn-secondary" download style="display: inline-flex; align-items: center; gap: 6px;">
-        <span>📥</span> 导出全量备份
+        <span>📥</span> 导出 JSON 备份
+      </a>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 16px 0 6px 0;">
+      <div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--ink);">导出交易流水明细 (UTF-8 CSV 格式)</div>
+        <div style="font-size: 12.5px; color: var(--muted); margin-top: 4px;">标准 UTF-8 with BOM 编码格式，完美兼容 Microsoft Excel、WPS Office、Numbers 直接双击打开，中文及多币种符号绝不乱码。</div>
+      </div>
+      <a href="{{ url_for('settings.api_export_data', format='csv') }}" class="btn-secondary" download style="display: inline-flex; align-items: center; gap: 6px; border-color: rgba(16, 185, 129, 0.4); color: var(--income);">
+        <span>📊</span> 导出 Excel/CSV
       </a>
     </div>
   </section>

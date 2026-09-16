@@ -75,7 +75,8 @@ from core.utils import (  # noqa: F401
     get_savings_breakdown,
     get_category_budget_status,
     check_and_record_budget_alerts,
-    generate_due_recurring
+    generate_due_recurring,
+    get_billing_cycle_dates
 )
 from core.extensions import csrf
 
@@ -217,6 +218,8 @@ def inject_globals():
     date_format = 'YYYY-MM-DD'
     number_format = 'comma'
     user_timezone = 'Asia/Kuala_Lumpur'
+    budget_start_day = 1
+    nlp_confirm_required = 1
 
     if uid:
         try:
@@ -228,12 +231,16 @@ def inject_globals():
             date_format = settings.get('date_format', 'YYYY-MM-DD')
             number_format = settings.get('number_format', 'comma')
             user_timezone = settings.get('timezone', 'Asia/Kuala_Lumpur')
+            budget_start_day = settings.get('budget_start_day', 1)
+            nlp_confirm_required = settings.get('nlp_confirm_required', 1)
 
             g.current_currency_symbol = currency_symbol
             g.current_currency_code = currency_code
             g.current_date_format = date_format
             g.current_number_format = number_format
             g.current_timezone = user_timezone
+            g.current_budget_start_day = budget_start_day
+            g.current_nlp_confirm_required = nlp_confirm_required
         except Exception as e:
             logger.debug("Failed to load user settings in context processor: %s", e, exc_info=True)
     return {
@@ -247,6 +254,8 @@ def inject_globals():
         'current_date_format': date_format,
         'current_number_format': number_format,
         'current_user_timezone': user_timezone,
+        'current_budget_start_day': budget_start_day,
+        'current_nlp_confirm_required': nlp_confirm_required,
     }
 
 
@@ -356,10 +365,9 @@ def index():
     month = request.args.get('month') or date.today().strftime('%Y-%m')
     db = get_db()
 
-    year, mon = map(int, month.split('-'))
-    last_day = monthrange(year, mon)[1]
-    start = f'{month}-01'
-    end = f'{month}-{last_day:02d}'
+    user_settings = get_user_settings(user_id, db=db)
+    budget_start_day = user_settings.get('budget_start_day', 1)
+    start, end, cycle_range_label = get_billing_cycle_dates(month, budget_start_day)
 
     rows = db.execute(
         'SELECT type, group_name, category, amount, COALESCE(from_savings, 0) as from_savings FROM transactions WHERE user_id = ? AND date BETWEEN ? AND ?',
@@ -397,12 +405,19 @@ def index():
     }
     expense_categories = get_categories(db, 'expense', None, user_id)
     savings_categories = get_categories(db, 'savings', None, user_id)
-    budget_status = get_category_budget_status(db, user_id, month)
+    budget_status = get_category_budget_status(db, user_id, month, start_day=budget_start_day)
+    accounts = db.execute(
+        "SELECT id, name, currency, type FROM accounts WHERE user_id = ? ORDER BY type, name",
+        (str(user_id),)
+    ).fetchall()
 
     return render_template(
         'index.html',
         month=month,
+        cycle_range_label=cycle_range_label,
+        budget_start_day=budget_start_day,
         budget_status=budget_status,
+        accounts=accounts,
         prev_month=shift_month(month, -1),
         next_month=shift_month(month, 1),
         total_income=total_income,
