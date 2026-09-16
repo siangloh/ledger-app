@@ -16,7 +16,7 @@
       <td data-col="checkbox" style="text-align: center;">
         <input type="checkbox" name="ids" value="{{ r.id }}" class="record-checkbox" onchange="updateBatchBar()">
       </td>
-      <td data-col="date">{{ r.date }}</td>
+      <td data-col="date">{{ r.date|user_date }}</td>
       <td data-col="type">
         <span class="tag {{ 'tag-income' if r.type=='income' else ('tag-savings' if r.type=='savings' else 'tag-expense') }}">{{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }}</span>
         {% if r.from_savings %}<span class="tag tag-savings" style="margin-left: 4px; font-size: 10px; padding: 2px 6px;" title="从储蓄储备扣除">扣: {{ r.from_savings_category or '储蓄' }}</span>{% endif %}
@@ -24,7 +24,18 @@
       <td data-col="group">{{ {'main':'主业','side':'副业'}.get(r.group_name, '') }}</td>
       <td data-col="category"><strong>{{ r.category }}</strong></td>
       <td data-col="amount" class="amount-cell {{ 'income' if r.type=='income' else ('savings' if r.type=='savings' else 'expense') }}">{{ r.amount|money }}</td>
-      <td data-col="note">{{ r.note }}</td>
+      <td data-col="note">
+        {{ r.note }}
+        {% if r.tags %}
+          <div class="record-tags-box" style="margin-top: 3px; display: flex; gap: 4px; flex-wrap: wrap;">
+            {% for t in r.tags.split(',') %}
+              {% if t.strip() %}
+                <span class="tag tag-pill-sm" style="font-size: 10px; padding: 1px 6px; background: var(--surface-soft); color: var(--muted); border-radius: 10px; border: 1px solid var(--border);">#{{ t.strip() }}</span>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% endif %}
+      </td>
       <td data-col="source"><span class="tag">{{ {'manual':'手动','nlp':'智能记账','import':'导入','recurring':'固定收支','auto_track':'自动记账','split_bill':'AA分账'}.get(r.source, r.source) }}</span></td>
       <td data-col="actions" class="actions">
         <div class="actions-inner">

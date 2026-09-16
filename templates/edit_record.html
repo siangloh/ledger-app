@@ -47,6 +47,9 @@
     <label>分类 <select name="category" id="categorySelect" data-preselect="{{ row.category }}"></select></label>
     <label>备注 <input type="text" name="note" value="{{ row.note }}"></label>
   </div>
+  <div class="row">
+    <label style="flex: 1;">自定义标签 <input type="text" name="tags" value="{{ row.tags or '' }}" placeholder="多个标签用逗号分隔，如：出差, 报销, 聚餐"></label>
+  </div>
   <button type="submit" class="btn-primary">保存修改</button>
   <a href="{{ url_for('records') }}" class="btn-cancel" hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">取消</a>
 </form>

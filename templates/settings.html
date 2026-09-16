@@ -81,18 +81,91 @@
 
       <div class="settings-grid">
         <div class="settings-item">
-          <label class="settings-label" for="currencySymbolInput">常用货币符号</label>
+          <label class="settings-label" for="defaultCurrencySelect">默认结算货币与符号</label>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <input type="text" id="currencySymbolInput" name="currency_symbol" value="{{ settings.currency_symbol }}" maxlength="8" style="width: 100px; font-weight: 700; text-align: center;" required>
+            <select id="defaultCurrencySelect" name="default_currency" style="width: 140px; font-weight: 600;" onchange="onCurrencySelectChange(this)">
+              {% for code, label in [
+                ('MYR', 'MYR - 马币 (RM)'),
+                ('SGD', 'SGD - 新元 (S$)'),
+                ('USD', 'USD - 美元 ($)'),
+                ('CNY', 'CNY - 人民币 (¥)'),
+                ('EUR', 'EUR - 欧元 (€)'),
+                ('GBP', 'GBP - 英镑 (£)'),
+                ('JPY', 'JPY - 日元 (¥)'),
+                ('HKD', 'HKD - 港币 (HK$)'),
+                ('AUD', 'AUD - 澳元 (A$)'),
+                ('CAD', 'CAD - 加元 (C$)'),
+                ('THB', 'THB - 泰铢 (฿)'),
+                ('KRW', 'KRW - 韩元 (₩)'),
+                ('TWD', 'TWD - 新台币 (NT$)')
+              ] %}
+              <option value="{{ code }}" {{ 'selected' if settings.default_currency == code }}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <input type="text" id="currencySymbolInput" name="currency_symbol" value="{{ settings.currency_symbol }}" maxlength="8" style="width: 90px; font-weight: 700; text-align: center;" title="前置货币符号" required>
             <div class="quick-currency-chips">
               <button type="button" class="chip-btn" onclick="setCurrencySymbol('RM')">RM</button>
-              <button type="button" class="chip-btn" onclick="setCurrencySymbol('SGD')">SGD</button>
-              <button type="button" class="chip-btn" onclick="setCurrencySymbol('USD')">$ USD</button>
-              <button type="button" class="chip-btn" onclick="setCurrencySymbol('CNY')">¥ CNY</button>
-              <button type="button" class="chip-btn" onclick="setCurrencySymbol('EUR')">€ EUR</button>
+              <button type="button" class="chip-btn" onclick="setCurrencySymbol('S$')">S$</button>
+              <button type="button" class="chip-btn" onclick="setCurrencySymbol('$')">$</button>
+              <button type="button" class="chip-btn" onclick="setCurrencySymbol('¥')">¥</button>
+              <button type="button" class="chip-btn" onclick="setCurrencySymbol('€')">€</button>
             </div>
           </div>
-          <span class="settings-tip">界面金额、自动记账及导出报告中采用的前置货币标识。</span>
+          <span class="settings-tip">账本核心币种代号及前端金额、报表与自动记账的前置货币符号。</span>
+        </div>
+
+        <div class="settings-item">
+          <label class="settings-label" for="dateFormatSelect">日期显示格式</label>
+          <select id="dateFormatSelect" name="date_format">
+            <option value="YYYY-MM-DD" {{ 'selected' if settings.date_format == 'YYYY-MM-DD' }}>YYYY-MM-DD (例如 2026-09-16 · ISO 标准)</option>
+            <option value="DD/MM/YYYY" {{ 'selected' if settings.date_format == 'DD/MM/YYYY' }}>DD/MM/YYYY (例如 16/09/2026 · 英式/大马)</option>
+            <option value="MM/DD/YYYY" {{ 'selected' if settings.date_format == 'MM/DD/YYYY' }}>MM/DD/YYYY (例如 09/16/2026 · 美式规范)</option>
+            <option value="YYYY/MM/DD" {{ 'selected' if settings.date_format == 'YYYY/MM/DD' }}>YYYY/MM/DD (例如 2026/09/16)</option>
+          </select>
+          <span class="settings-tip">控制账目列表、报表卡片中交易日期的格式化展示。</span>
+        </div>
+
+        <div class="settings-item">
+          <label class="settings-label">数字千分位规范</label>
+          <div class="settings-pill-group">
+            <label class="pill-radio">
+              <input type="radio" name="number_format" value="comma" {{ 'checked' if settings.number_format != 'space' }}>
+              <span>1,234.56 (逗号分隔 · 推荐)</span>
+            </label>
+            <label class="pill-radio">
+              <input type="radio" name="number_format" value="space" {{ 'checked' if settings.number_format == 'space' }}>
+              <span>1 234.56 (空格分隔)</span>
+            </label>
+          </div>
+          <span class="settings-tip">全局数值千分位间隔规范。</span>
+        </div>
+
+        <div class="settings-item">
+          <label class="settings-label" for="timezoneSelect">时区管理</label>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <select id="timezoneSelect" name="timezone" style="flex: 1; min-width: 220px;">
+              {% for tz_val, tz_lbl in [
+                ('Asia/Kuala_Lumpur', 'Asia/Kuala_Lumpur (UTC+8 · 吉隆坡)'),
+                ('Asia/Singapore', 'Asia/Singapore (UTC+8 · 新加坡)'),
+                ('Asia/Shanghai', 'Asia/Shanghai (UTC+8 · 北京/上海)'),
+                ('Asia/Hong_Kong', 'Asia/Hong_Kong (UTC+8 · 香港)'),
+                ('Asia/Taipei', 'Asia/Taipei (UTC+8 · 台北)'),
+                ('Asia/Tokyo', 'Asia/Tokyo (UTC+9 · 东京)'),
+                ('Asia/Bangkok', 'Asia/Bangkok (UTC+7 · 曼谷)'),
+                ('UTC', 'UTC (世界协调时间)'),
+                ('Europe/London', 'Europe/London (UTC+0/+1 · 伦敦)'),
+                ('America/New_York', 'America/New_York (UTC-5/-4 · 纽约)'),
+                ('America/Los_Angeles', 'America/Los_Angeles (UTC-8/-7 · 洛杉矶)'),
+                ('Australia/Sydney', 'Australia/Sydney (UTC+10/+11 · 悉尼)')
+              ] %}
+              <option value="{{ tz_val }}" {{ 'selected' if settings.timezone == tz_val }}>{{ tz_lbl }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" class="btn-secondary btn-sm" onclick="detectUserTimezone()" title="读取当前浏览器时区">
+              🌐 自动探测
+            </button>
+          </div>
+          <span class="settings-tip">用于锁定记账日期基准，防止月末或跨国时因时区错位造成跨月数据漂移。</span>
         </div>
 
         <div class="settings-item">
@@ -382,6 +455,62 @@
 function setCurrencySymbol(sym) {
   const el = document.getElementById('currencySymbolInput');
   if (el) el.value = sym;
+}
+
+function onCurrencySelectChange(sel) {
+  const code = sel.value;
+  const symbolMap = {
+    'MYR': 'RM',
+    'SGD': 'S$',
+    'USD': '$',
+    'CNY': '¥',
+    'EUR': '€',
+    'GBP': '£',
+    'JPY': '¥',
+    'HKD': 'HK$',
+    'AUD': 'A$',
+    'CAD': 'C$',
+    'THB': '฿',
+    'KRW': '₩',
+    'TWD': 'NT$'
+  };
+  const symInput = document.getElementById('currencySymbolInput');
+  if (symInput && symbolMap[code]) {
+    symInput.value = symbolMap[code];
+  }
+}
+
+function detectUserTimezone() {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tzSelect = document.getElementById('timezoneSelect');
+    if (tzSelect && tz) {
+      let found = false;
+      for (let i = 0; i < tzSelect.options.length; i++) {
+        if (tzSelect.options[i].value === tz) {
+          tzSelect.selectedIndex = i;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        const opt = new Option(tz + ' (浏览器侦测)', tz, true, true);
+        tzSelect.add(opt);
+      }
+      if (typeof Swal !== 'undefined') {
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: '已侦测到本地时区: ' + tz,
+          showConfirmButton: false,
+          timer: 2000
+        });
+      }
+    }
+  } catch (e) {
+    console.error('Timezone detect failed:', e);
+  }
 }
 
 function previewTheme(mode) {

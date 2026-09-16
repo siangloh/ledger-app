@@ -28,6 +28,9 @@
                 } else {
                     document.documentElement.removeAttribute('data-density');
                 }
+                window.LEDGER_CURRENCY_SYMBOL = '{{ current_user_currency|default("RM") }}';
+                window.LEDGER_CURRENCY_CODE = '{{ current_user_currency_code|default("MYR") }}';
+                window.LEDGER_DATE_FORMAT = '{{ current_date_format|default("YYYY-MM-DD") }}';
             } catch (e) { }
         })();
     </script>

@@ -2,70 +2,91 @@
 {% block title %}分类管理 - 我的记账本{% endblock %}
 {% block content %}
 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-  <h2 style="margin:0;">分类管理</h2>
+  <h2 style="margin:0;">分类与标签管理</h2>
   <a href="{{ url_for('category_insights_page') }}" class="btn-primary btn-sm" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">📊 支出分类深度洞察报告</a>
 </div>
 
 <div class="panels">
+  <!-- 1. 主业收入子分类 -->
   <section class="panel">
     <h3>主业收入子分类</h3>
     <ul class="cat-list">
       {% for c in income_main %}
-      <li>{{ c.name }}
-        <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
-              data-confirm-title="删除分类「{{ c.name }}」？"
-              data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
-        </form>
+      <li style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="display: inline-flex; align-items: center; gap: 8px;">
+          <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#34d399' }};"></span>
+          <strong>{{ c.name }}</strong>
+        </span>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <button type="button" class="btn-ghost btn-sm" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#34d399' }}')">编辑</button>
+          <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
+                data-confirm-title="删除分类「{{ c.name }}」？"
+                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
+          </form>
+        </div>
       </li>
       {% else %}<li class="hint">暂无</li>{% endfor %}
     </ul>
-    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category">
+    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="income">
       <input type="hidden" name="group_name" value="main">
-      <input type="text" name="name" placeholder="新增子分类名称" required>
+      <input type="color" name="color" value="#34d399" title="分类代表颜色" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
+      <input type="text" name="name" placeholder="新增子分类名称" required style="flex: 1;">
       <button type="submit" class="btn-primary btn-sm">添加</button>
     </form>
   </section>
 
+  <!-- 2. 副业收入子分类 -->
   <section class="panel">
     <h3>副业收入子分类</h3>
     <ul class="cat-list">
       {% for c in income_side %}
-      <li>{{ c.name }}
-        <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
-              data-confirm-title="删除分类「{{ c.name }}」？"
-              data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
-        </form>
+      <li style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="display: inline-flex; align-items: center; gap: 8px;">
+          <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#38bdf8' }};"></span>
+          <strong>{{ c.name }}</strong>
+        </span>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <button type="button" class="btn-ghost btn-sm" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#38bdf8' }}')">编辑</button>
+          <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
+                data-confirm-title="删除分类「{{ c.name }}」？"
+                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
+          </form>
+        </div>
       </li>
       {% else %}<li class="hint">暂无</li>{% endfor %}
     </ul>
-    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category">
+    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="income">
       <input type="hidden" name="group_name" value="side">
-      <input type="text" name="name" placeholder="新增子分类名称" required>
+      <input type="color" name="color" value="#38bdf8" title="分类代表颜色" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
+      <input type="text" name="name" placeholder="新增子分类名称" required style="flex: 1;">
       <button type="submit" class="btn-primary btn-sm">添加</button>
     </form>
   </section>
 
+  <!-- 3. 支出分类 -->
   <section class="panel">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
       <h3 style="margin:0;">支出分类</h3>
-      <span class="hint" style="font-size:12px;">可为分类设置月度限额</span>
+      <span class="hint" style="font-size:12px;">可自定义代表颜色与月度限额</span>
     </div>
     <ul class="cat-list-compact">
       {% for c in expense %}
       {% set b = budget_map.get(c.name) %}
       <li class="cat-item-clean">
-        <div class="cat-name-box">
+        <div class="cat-name-box" style="display: inline-flex; align-items: center; gap: 8px;">
+          <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#fb923c' }};"></span>
           <span class="cat-name-text">{{ c.name }}</span>
         </div>
         <div class="cat-actions-box">
+          <button type="button" class="btn-ghost btn-sm" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#fb923c' }}')" title="修改分类名称与代表颜色">编辑</button>
           {% if b %}
           <button type="button" class="btn-budget-pill level-{{ b.level }}"
                   data-id="{{ c.id }}"
@@ -74,7 +95,7 @@
                   onclick="openSetBudgetModal(this)"
                   title="点击修改「{{ c.name }}」月度限额">
             <span class="pill-dot"></span>
-            <span class="pill-text">RM{{ '%.0f' | format(b.spent) }}/{{ '%.0f' | format(b.limit) }}</span>
+            <span class="pill-text">{{ current_user_currency }}{{ '%.0f' | format(b.spent) }}/{{ '%.0f' | format(b.limit) }}</span>
             <span class="pill-pct">({{ b.pct }}%)</span>
             {% if b.level == 'over' %}
               <span class="pill-status status-over">超</span>
@@ -104,34 +125,125 @@
       </li>
       {% else %}<li class="hint">暂无</li>{% endfor %}
     </ul>
-    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category">
+    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="expense">
-      <input type="text" name="name" placeholder="新增分类名称" required>
+      <input type="color" name="color" value="#fb923c" title="分类代表颜色" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
+      <input type="text" name="name" placeholder="新增分类名称" required style="flex: 1;">
       <button type="submit" class="btn-primary btn-sm">添加</button>
     </form>
   </section>
 
+  <!-- 4. 结余储蓄分类 -->
   <section class="panel">
     <h3>结余储蓄分类</h3>
     <ul class="cat-list">
       {% for c in savings %}
-      <li>{{ c.name }}
-        <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
-              data-confirm-title="删除储蓄分类「{{ c.name }}」？"
-              data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
-        </form>
+      <li style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="display: inline-flex; align-items: center; gap: 8px;">
+          <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#059669' }};"></span>
+          <strong>{{ c.name }}</strong>
+        </span>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <button type="button" class="btn-ghost btn-sm" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#059669' }}')">编辑</button>
+          <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
+                data-confirm-title="删除储蓄分类「{{ c.name }}」？"
+                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-danger-ghost btn-sm">删除</button>
+          </form>
+        </div>
       </li>
       {% else %}<li class="hint">暂无</li>{% endfor %}
     </ul>
-    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category">
+    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="savings">
-      <input type="text" name="name" placeholder="新增储蓄分类名称" required>
+      <input type="color" name="color" value="#059669" title="分类代表颜色" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
+      <input type="text" name="name" placeholder="新增储蓄分类名称" required style="flex: 1;">
       <button type="submit" class="btn-primary btn-sm">添加</button>
     </form>
   </section>
 </div>
+
+<script>
+function openEditCategoryModal(catId, currentName, currentColor) {
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  if (typeof Swal === 'undefined') {
+    const newName = prompt('修改分类名称:', currentName);
+    if (!newName) return;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/categories/${catId}/edit`;
+    form.innerHTML = `<input type="hidden" name="csrf_token" value="${csrfToken}"><input type="hidden" name="name" value="${newName}">`;
+    document.body.appendChild(form);
+    form.submit();
+    return;
+  }
+
+  Swal.fire({
+    title: '编辑收支分类',
+    html: `
+      <div style="text-align: left; display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+        <div>
+          <label style="font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: block;">分类名称</label>
+          <input type="text" id="swalEditCatName" class="swal2-input" value="${currentName}" style="margin: 0; width: 100%; box-sizing: border-box;" required>
+        </div>
+        <div>
+          <label style="font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: block;">代表颜色</label>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="color" id="swalEditCatColor" value="${currentColor || '#38bdf8'}" style="width: 44px; height: 40px; border-radius: 8px; border: 1px solid var(--border); padding: 2px; cursor: pointer;">
+            <span style="font-size: 12px; color: var(--muted);">用于图表切片、图例点与统计报告代表色</span>
+          </div>
+        </div>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: '💾 保存修改',
+    cancelButtonText: '取消',
+    focusConfirm: false,
+    preConfirm: () => {
+      const name = document.getElementById('swalEditCatName').value.trim();
+      const color = document.getElementById('swalEditCatColor').value;
+      if (!name) {
+        Swal.showValidationMessage('分类名称不能为空');
+        return false;
+      }
+      return { name, color };
+    }
+  }).then(async (result) => {
+    if (result.isConfirmed && result.value) {
+      try {
+        const formData = new FormData();
+        formData.append('csrf_token', csrfToken);
+        formData.append('name', result.value.name);
+        formData.append('color', result.value.color);
+
+        const res = await fetch(`/categories/${catId}/edit`, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        });
+        const data = await res.json();
+        if (data.ok) {
+          Swal.fire({
+            icon: 'success',
+            title: '分类已更新',
+            timer: 1000,
+            showConfirmButton: false
+          }).then(() => {
+            window.location.reload();
+          });
+        } else {
+          Swal.fire('更新失败', data.message || '未知错误', 'error');
+        }
+      } catch (err) {
+        Swal.fire('操作失败', '网络请求超时或服务错误', 'error');
+      }
+    }
+  });
+}
+</script>
 {% endblock %}

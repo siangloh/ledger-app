@@ -2,10 +2,13 @@ import os
 import re
 import uuid
 import sqlite3
+import logging
 from calendar import monthrange
 from datetime import datetime, date
 import pandas as pd
 from flask import Blueprint, request, redirect, url_for, render_template, flash, jsonify
+
+logger = logging.getLogger(__name__)
 
 from core.config import UPLOAD_DIR
 from core.db import (
@@ -60,11 +63,12 @@ def add_transaction():
         from_savings_category = f.get('category') or '储蓄'
 
     tx_date = f.get('date') or date.today().isoformat()
+    tags = (f.get('tags') or '').strip()
     cur = db.execute(
-        'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at, from_savings, from_savings_category) '
-        'VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+        'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at, from_savings, from_savings_category, tags) '
+        'VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
         (user_id, tx_date, tx_type, group_name, f.get('category'), amount, f.get('note', ''),
-         f.get('source', 'manual'), datetime.now().isoformat(), from_savings, from_savings_category)
+         f.get('source', 'manual'), datetime.now().isoformat(), from_savings, from_savings_category, tags)
     )
     db.commit()
     bump_data_version('add', {
@@ -231,9 +235,10 @@ def edit_record(tx_id):
         if from_savings and not from_savings_category:
             from_savings_category = f.get('category') or '储蓄'
 
+        tags = (f.get('tags') or '').strip()
         db.execute(
-            'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=?, from_savings=?, from_savings_category=? WHERE id=? AND user_id=?',
-            (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), from_savings, from_savings_category, tx_id, user_id)
+            'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=?, from_savings=?, from_savings_category=?, tags=? WHERE id=? AND user_id=?',
+            (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), from_savings, from_savings_category, tags, tx_id, user_id)
         )
         db.commit()
         bump_data_version('edit', {'id': tx_id, 'from_savings': from_savings, 'from_savings_category': from_savings_category})
@@ -550,8 +555,11 @@ def add_category():
             return jsonify({'ok': False, 'message': '分类名称不能为空'}), 400
         flash('分类名称不能为空', 'error')
         return redirect(url_for('categories_page'))
+    color = (f.get('color') or '').strip()
+    if color and not re.match(r'^#[0-9a-fA-F]{3,8}$', color):
+        color = None
     try:
-        db.execute('INSERT INTO categories (user_id, type, group_name, name) VALUES (?,?,?,?)', (user_id, type_, group_name, name))
+        db.execute('INSERT INTO categories (user_id, type, group_name, name, color) VALUES (?,?,?,?,?)', (user_id, type_, group_name, name, color))
         db.commit()
         if is_ajax_request():
             return jsonify({'ok': True, 'message': '分类已添加'})
@@ -560,6 +568,55 @@ def add_category():
         if is_ajax_request():
             return jsonify({'ok': False, 'message': '该分类已存在'}), 400
         flash('该分类已存在', 'error')
+    return redirect(url_for('categories_page'))
+
+
+@transactions_bp.route('/categories/<int:cat_id>/edit', methods=['POST'], endpoint='edit_category')
+def edit_category(cat_id):
+    user_id = get_current_user_id()
+    db = get_db()
+    f = request.form
+    new_name = (f.get('name') or '').strip()
+    new_color = (f.get('color') or '').strip()
+
+    cat = db.execute('SELECT * FROM categories WHERE id = ? AND user_id = ?', (cat_id, user_id)).fetchone()
+    if not cat:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '分类不存在'}), 404
+        flash('分类不存在', 'error')
+        return redirect(url_for('categories_page'))
+
+    old_name = cat['name']
+    if not new_name:
+        new_name = old_name
+
+    if new_color and not re.match(r'^#[0-9a-fA-F]{3,8}$', new_color):
+        new_color = None
+
+    try:
+        db.execute(
+            'UPDATE categories SET name = ?, color = ? WHERE id = ? AND user_id = ?',
+            (new_name, new_color, cat_id, user_id)
+        )
+        if new_name != old_name:
+            db.execute('UPDATE transactions SET category = ? WHERE user_id = ? AND category = ?', (new_name, user_id, old_name))
+            db.execute('UPDATE category_budgets SET category = ? WHERE user_id = ? AND category = ?', (new_name, user_id, old_name))
+            db.execute('UPDATE recurring_rules SET category = ? WHERE user_id = ? AND category = ?', (new_name, user_id, old_name))
+
+        db.commit()
+        bump_data_version('category_edit', {'category': new_name, 'user_id': user_id})
+        if is_ajax_request():
+            return jsonify({'ok': True, 'message': '分类已更新', 'id': cat_id, 'name': new_name, 'color': new_color})
+        flash('分类已更新', 'success')
+    except sqlite3.IntegrityError:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '已存在同名分类'}), 400
+        flash('已存在同名分类', 'error')
+    except Exception as e:
+        logger.error('Failed to edit category %s: %s', cat_id, e, exc_info=True)
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': '更新分类失败'}), 500
+        flash('更新分类失败', 'error')
     return redirect(url_for('categories_page'))
 
 

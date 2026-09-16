@@ -154,25 +154,25 @@ def init_user_default_categories(db, user_id):
     count = row[0] if row else 0
     if count == 0:
         defaults = [
-            (user_id, 'income', 'main', '工资'),
-            (user_id, 'income', 'main', '奖金'),
-            (user_id, 'income', 'side', '自由职业'),
-            (user_id, 'income', 'side', '兼职'),
-            (user_id, 'income', 'side', '投资'),
-            (user_id, 'expense', None, '餐饮'),
-            (user_id, 'expense', None, '交通'),
-            (user_id, 'expense', None, '房租'),
-            (user_id, 'expense', None, '购物'),
-            (user_id, 'expense', None, '娱乐'),
-            (user_id, 'expense', None, '医疗'),
-            (user_id, 'expense', None, '通讯'),
-            (user_id, 'expense', None, '其他'),
-            (user_id, 'savings', None, '定期存款'),
-            (user_id, 'savings', None, '应急基金'),
-            (user_id, 'savings', None, '投资理财'),
-            (user_id, 'savings', None, '心愿基金'),
+            (user_id, 'income', 'main', '工资', '#34d399'),
+            (user_id, 'income', 'main', '奖金', '#fbbf24'),
+            (user_id, 'income', 'side', '自由职业', '#38bdf8'),
+            (user_id, 'income', 'side', '兼职', '#a3e635'),
+            (user_id, 'income', 'side', '投资', '#60a5fa'),
+            (user_id, 'expense', None, '餐饮', '#fb923c'),
+            (user_id, 'expense', None, '交通', '#38bdf8'),
+            (user_id, 'expense', None, '房租', '#818cf8'),
+            (user_id, 'expense', None, '购物', '#f472b6'),
+            (user_id, 'expense', None, '娱乐', '#a78bfa'),
+            (user_id, 'expense', None, '医疗', '#f87171'),
+            (user_id, 'expense', None, '通讯', '#2dd4bf'),
+            (user_id, 'expense', None, '其他', '#94a3b8'),
+            (user_id, 'savings', None, '定期存款', '#059669'),
+            (user_id, 'savings', None, '应急基金', '#0d9488'),
+            (user_id, 'savings', None, '投资理财', '#2563eb'),
+            (user_id, 'savings', None, '心愿基金', '#ec4899'),
         ]
-        db.executemany('INSERT INTO categories (user_id, type, group_name, name) VALUES (?,?,?,?)', defaults)
+        db.executemany('INSERT INTO categories (user_id, type, group_name, name, color) VALUES (?,?,?,?,?)', defaults)
         db.commit()
 
 
@@ -383,6 +383,7 @@ def init_db(app_logger=None):
             type TEXT NOT NULL,
             group_name TEXT,
             name TEXT NOT NULL,
+            color TEXT,
             UNIQUE(user_id, type, group_name, name)
         );
         ''')
@@ -397,6 +398,7 @@ def init_db(app_logger=None):
             type TEXT NOT NULL,
             group_name TEXT,
             name TEXT NOT NULL,
+            color TEXT,
             UNIQUE(user_id, type, group_name, name)
         );
         ''')
@@ -419,7 +421,10 @@ def init_db(app_logger=None):
         amount REAL NOT NULL,
         note TEXT,
         source TEXT DEFAULT 'manual',
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        from_savings INTEGER DEFAULT 0,
+        from_savings_category TEXT,
+        tags TEXT
     );
     ''')
     db.commit()
@@ -502,6 +507,30 @@ def init_db(app_logger=None):
         db.commit()
     except Exception as e:
         logger.debug("ALTER transactions ADD from_savings_category skipped: %s", e)
+
+    try:
+        db.execute("ALTER TABLE categories ADD COLUMN color TEXT")
+        db.commit()
+    except Exception as e:
+        logger.debug("ALTER categories ADD color skipped: %s", e)
+
+    try:
+        db.execute("ALTER TABLE transactions ADD COLUMN tags TEXT")
+        db.commit()
+    except Exception as e:
+        logger.debug("ALTER transactions ADD tags skipped: %s", e)
+
+    for col_name, col_sql in [
+        ("default_currency", "TEXT DEFAULT 'MYR'"),
+        ("date_format", "TEXT DEFAULT 'YYYY-MM-DD'"),
+        ("number_format", "TEXT DEFAULT 'comma'"),
+        ("timezone", "TEXT DEFAULT 'Asia/Kuala_Lumpur'"),
+    ]:
+        try:
+            db.execute(f"ALTER TABLE user_settings ADD COLUMN {col_name} {col_sql}")
+            db.commit()
+        except Exception as e:
+            logger.debug("ALTER user_settings ADD %s skipped: %s", col_name, e)
 
     # 索引优化
     try:
@@ -659,6 +688,7 @@ def init_db(app_logger=None):
         user_id TEXT PRIMARY KEY,
         theme_mode TEXT DEFAULT 'system',
         currency_symbol TEXT DEFAULT 'RM',
+        default_currency TEXT DEFAULT 'MYR',
         default_account_id INTEGER,
         default_group TEXT DEFAULT 'main',
         budget_start_day INTEGER DEFAULT 1,
@@ -666,6 +696,9 @@ def init_db(app_logger=None):
         dedup_window_minutes INTEGER DEFAULT 120,
         table_density TEXT DEFAULT 'comfortable',
         haptic_feedback INTEGER DEFAULT 1,
+        date_format TEXT DEFAULT 'YYYY-MM-DD',
+        number_format TEXT DEFAULT 'comma',
+        timezone TEXT DEFAULT 'Asia/Kuala_Lumpur',
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     ''')
@@ -679,6 +712,7 @@ def init_db(app_logger=None):
 DEFAULT_USER_SETTINGS = {
     'theme_mode': 'system',
     'currency_symbol': 'RM',
+    'default_currency': 'MYR',
     'default_account_id': None,
     'default_group': 'main',
     'budget_start_day': 1,
@@ -686,6 +720,9 @@ DEFAULT_USER_SETTINGS = {
     'dedup_window_minutes': 120,
     'table_density': 'comfortable',
     'haptic_feedback': 1,
+    'date_format': 'YYYY-MM-DD',
+    'number_format': 'comma',
+    'timezone': 'Asia/Kuala_Lumpur',
 }
 
 
@@ -733,13 +770,15 @@ def update_user_settings(user_id, new_settings, db=None):
     try:
         db.execute('''
             INSERT INTO user_settings (
-                user_id, theme_mode, currency_symbol, default_account_id,
+                user_id, theme_mode, currency_symbol, default_currency, default_account_id,
                 default_group, budget_start_day, default_dashboard_view,
-                dedup_window_minutes, table_density, haptic_feedback, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                dedup_window_minutes, table_density, haptic_feedback,
+                date_format, number_format, timezone, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 theme_mode=excluded.theme_mode,
                 currency_symbol=excluded.currency_symbol,
+                default_currency=excluded.default_currency,
                 default_account_id=excluded.default_account_id,
                 default_group=excluded.default_group,
                 budget_start_day=excluded.budget_start_day,
@@ -747,11 +786,15 @@ def update_user_settings(user_id, new_settings, db=None):
                 dedup_window_minutes=excluded.dedup_window_minutes,
                 table_density=excluded.table_density,
                 haptic_feedback=excluded.haptic_feedback,
+                date_format=excluded.date_format,
+                number_format=excluded.number_format,
+                timezone=excluded.timezone,
                 updated_at=excluded.updated_at
         ''', (
             str(user_id),
             current['theme_mode'],
             current['currency_symbol'],
+            current['default_currency'],
             current['default_account_id'],
             current['default_group'],
             int(current['budget_start_day']),
@@ -759,6 +802,9 @@ def update_user_settings(user_id, new_settings, db=None):
             int(current['dedup_window_minutes']),
             current['table_density'],
             int(current['haptic_feedback']),
+            current['date_format'],
+            current['number_format'],
+            current['timezone'],
             now_str
         ))
         db.commit()

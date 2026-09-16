@@ -1,6 +1,7 @@
-function formatMoney(value) {
+function formatMoney(value, symbol) {
   const n = Number(value) || 0;
-  return 'RM ' + n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const sym = symbol || (typeof window !== 'undefined' && window.LEDGER_CURRENCY_SYMBOL) || 'RM';
+  return sym + ' ' + n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function syncSegStyles() {

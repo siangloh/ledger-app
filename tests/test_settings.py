@@ -15,7 +15,7 @@ def test_settings_page_renders_logged_in(logged_in_client):
     assert res.status_code == 200
     html = res.get_data(as_text=True)
     assert '个性化与偏好设置' in html
-    assert '常用货币符号' in html
+    assert '默认结算货币与符号' in html
     assert '月度预算与账单起始日' in html
     assert '数据备份与隐私主权' in html
 
@@ -145,4 +145,39 @@ def test_theme_and_density_rendered_in_html(logged_in_client):
     html_light = res_light.get_data(as_text=True)
     assert 'data-theme="light"' in html_light
     assert 'data-density="compact"' not in html_light
+
+
+def test_p0_user_settings_update_and_filters(logged_in_client, flask_app, admin_user_id):
+    """测试 P0 定制配置：默认货币、日期格式、数字格式、时区更新及过滤器表现"""
+    payload = {
+        'default_currency': 'USD',
+        'currency_symbol': '$',
+        'date_format': 'DD/MM/YYYY',
+        'number_format': 'space',
+        'timezone': 'America/New_York'
+    }
+
+    res = logged_in_client.post(
+        '/api/settings/update',
+        data=payload,
+        headers={'X-Requested-With': 'XMLHttpRequest'}
+    )
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data['ok'] is True
+
+    with flask_app.app.app_context():
+        settings = get_user_settings(admin_user_id)
+        assert settings['default_currency'] == 'USD'
+        assert settings['currency_symbol'] == '$'
+        assert settings['date_format'] == 'DD/MM/YYYY'
+        assert settings['number_format'] == 'space'
+        assert settings['timezone'] == 'America/New_York'
+
+    # 访问页面，检查 window 全局配置注入
+    res = logged_in_client.get('/settings')
+    html = res.get_data(as_text=True)
+    assert "window.LEDGER_CURRENCY_SYMBOL = '$'" in html
+    assert "window.LEDGER_CURRENCY_CODE = 'USD'" in html
+    assert "window.LEDGER_DATE_FORMAT = 'DD/MM/YYYY'" in html
 

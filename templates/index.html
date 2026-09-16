@@ -74,6 +74,9 @@
           <label>分类 <select name="category" id="categorySelect"></select></label>
           <label>备注 <input type="text" name="note" placeholder="可选"></label>
         </div>
+        <div class="row">
+          <label style="flex: 1;">自定义标签 <input type="text" name="tags" id="quickAddTags" placeholder="多个标签用逗号分隔，如：出差, 报销, 聚餐"></label>
+        </div>
         <div class="quick-chips" id="quickChipsRow">
           <button type="button" class="chip-btn" onclick="quickFillForm(10, '餐饮', '早餐')">早餐 RM10</button>
           <button type="button" class="chip-btn" onclick="quickFillForm(15, '餐饮', '午餐')">午餐 RM15</button>

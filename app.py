@@ -2,12 +2,14 @@ import os
 import sys
 import hmac
 import secrets
+import logging
 from calendar import monthrange
 from datetime import date, timedelta
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_wtf.csrf import CSRFError
 from flask import (
     Flask,
+    g,
     request,
     redirect,
     url_for,
@@ -18,6 +20,8 @@ from flask import (
     send_from_directory,
     make_response
 )
+
+logger = logging.getLogger(__name__)
 
 # 确保在 Windows 控制台环境下输出中文不发生 charmap 编码崩溃
 if hasattr(sys.stdout, 'reconfigure'):
@@ -66,6 +70,7 @@ from core.db import (  # noqa: F401
 from core.auth import is_ajax_request  # noqa: F401
 from core.utils import (  # noqa: F401
     money_filter,
+    date_filter,
     shift_month,
     get_savings_breakdown,
     get_category_budget_status,
@@ -207,19 +212,41 @@ def inject_globals():
     uid = session.get('user_id')
     user_theme = 'system'
     table_density = 'comfortable'
+    currency_symbol = 'RM'
+    currency_code = 'MYR'
+    date_format = 'YYYY-MM-DD'
+    number_format = 'comma'
+    user_timezone = 'Asia/Kuala_Lumpur'
+
     if uid:
         try:
             settings = get_user_settings(uid)
             user_theme = settings.get('theme_mode', 'system')
             table_density = settings.get('table_density', 'comfortable')
-        except Exception:
-            pass
+            currency_symbol = settings.get('currency_symbol', 'RM')
+            currency_code = settings.get('default_currency', 'MYR')
+            date_format = settings.get('date_format', 'YYYY-MM-DD')
+            number_format = settings.get('number_format', 'comma')
+            user_timezone = settings.get('timezone', 'Asia/Kuala_Lumpur')
+
+            g.current_currency_symbol = currency_symbol
+            g.current_currency_code = currency_code
+            g.current_date_format = date_format
+            g.current_number_format = number_format
+            g.current_timezone = user_timezone
+        except Exception as e:
+            logger.debug("Failed to load user settings in context processor: %s", e, exc_info=True)
     return {
         'layout': 'partial.html' if is_hx else 'base.html',
         'is_hx': is_hx,
         'data_version': DATA_VERSION,
         'current_user_theme': user_theme,
-        'current_table_density': table_density
+        'current_table_density': table_density,
+        'current_user_currency': currency_symbol,
+        'current_user_currency_code': currency_code,
+        'current_date_format': date_format,
+        'current_number_format': number_format,
+        'current_user_timezone': user_timezone,
     }
 
 
@@ -279,8 +306,13 @@ def app_close_db(exception=None):
 # ---------------------------------------------------------------------------
 
 @app.template_filter('money')
-def jinja_money_filter(value):
-    return money_filter(value)
+def jinja_money_filter(value, symbol=None, number_format=None):
+    return money_filter(value, symbol=symbol, number_format=number_format)
+
+
+@app.template_filter('user_date')
+def jinja_date_filter(value, fmt=None):
+    return date_filter(value, fmt=fmt)
 
 
 # ---------------------------------------------------------------------------

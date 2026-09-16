@@ -3,13 +3,100 @@ from datetime import date, datetime
 from core.db import get_db, get_current_user_id, bump_data_version
 
 
-def money_filter(value):
-    """格式化为林吉特金额，如 RM 3,900.00"""
+import zoneinfo
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def money_filter(value, symbol=None, number_format=None):
+    """格式化金额，支持动态货币符号与千分位规范，如 RM 3,900.00 或 $ 3,900.00"""
     try:
         value = float(value)
     except (TypeError, ValueError):
         value = 0.0
-    return f"RM {value:,.2f}"
+
+    if symbol is None:
+        try:
+            from flask import g, has_request_context
+            if has_request_context() and hasattr(g, 'current_currency_symbol') and g.current_currency_symbol:
+                symbol = g.current_currency_symbol
+        except Exception:
+            pass
+    if not symbol:
+        symbol = 'RM'
+
+    if number_format is None:
+        try:
+            from flask import g, has_request_context
+            if has_request_context() and hasattr(g, 'current_number_format') and g.current_number_format:
+                number_format = g.current_number_format
+        except Exception:
+            pass
+    if not number_format:
+        number_format = 'comma'
+
+    if number_format == 'space':
+        formatted = f"{value:,.2f}".replace(',', ' ')
+    elif number_format == 'none':
+        formatted = f"{value:.2f}"
+    else:
+        formatted = f"{value:,.2f}"
+
+    return f"{symbol} {formatted}"
+
+
+def date_filter(date_val, fmt=None):
+    """格式化日期，支持 YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY, YYYY/MM/DD"""
+    if not date_val:
+        return ''
+    try:
+        if isinstance(date_val, (datetime, date)):
+            d = date_val
+        else:
+            s = str(date_val).strip()
+            if len(s) >= 10 and s[4] in ('-', '/') and s[7] in ('-', '/'):
+                d = datetime.strptime(s[:10].replace('/', '-'), '%Y-%m-%d').date()
+            else:
+                d = datetime.fromisoformat(s).date()
+    except Exception:
+        return str(date_val)
+
+    if fmt is None:
+        try:
+            from flask import g, has_request_context
+            if has_request_context() and hasattr(g, 'current_date_format') and g.current_date_format:
+                fmt = g.current_date_format
+        except Exception:
+            pass
+    if not fmt:
+        fmt = 'YYYY-MM-DD'
+
+    if fmt == 'DD/MM/YYYY':
+        return d.strftime('%d/%m/%Y')
+    elif fmt == 'MM/DD/YYYY':
+        return d.strftime('%m/%d/%Y')
+    elif fmt == 'YYYY/MM/DD':
+        return d.strftime('%Y/%m/%d')
+    return d.strftime('%Y-%m-%d')
+
+
+def get_user_now(user_id=None, db=None):
+    """根据用户配置的时区返回当前带时区的 datetime（默认 Asia/Kuala_Lumpur）"""
+    tz_name = 'Asia/Kuala_Lumpur'
+    if user_id:
+        try:
+            from core.db import get_user_settings
+            s = get_user_settings(user_id, db=db)
+            if s and s.get('timezone'):
+                tz_name = s['timezone']
+        except Exception as e:
+            logger.debug("Failed to read user timezone: %s", e)
+    try:
+        tz = zoneinfo.ZoneInfo(tz_name)
+        return datetime.now(tz)
+    except Exception:
+        return datetime.now()
 
 
 def shift_month(month_str, delta):

@@ -81,7 +81,12 @@ def api_update_settings():
         if tm in ('system', 'dark', 'light'):
             updates['theme_mode'] = tm
 
-    # 2. 货币符号
+    # 2. 货币与符号
+    if 'default_currency' in data:
+        dc = str(data.get('default_currency', '')).strip().upper()
+        if dc and len(dc) <= 6:
+            updates['default_currency'] = dc
+
     if 'currency_symbol' in data:
         sym = str(data.get('currency_symbol', '')).strip()
         if sym and len(sym) <= 8:
@@ -138,6 +143,28 @@ def api_update_settings():
     if 'haptic_feedback' in data:
         val = str(data.get('haptic_feedback', '')).strip()
         updates['haptic_feedback'] = 1 if val in ('1', 'true', 'on', 'yes') else 0
+
+    # 10. 日期格式
+    if 'date_format' in data:
+        df_val = str(data.get('date_format', '')).strip()
+        if df_val in ('YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY/MM/DD'):
+            updates['date_format'] = df_val
+
+    # 11. 数字千分位格式
+    if 'number_format' in data:
+        nf_val = str(data.get('number_format', '')).strip().lower()
+        if nf_val in ('comma', 'space'):
+            updates['number_format'] = nf_val
+
+    # 12. 时区管理
+    if 'timezone' in data:
+        tz_val = str(data.get('timezone', '')).strip()
+        try:
+            import zoneinfo
+            zoneinfo.ZoneInfo(tz_val)
+            updates['timezone'] = tz_val
+        except Exception:
+            pass
 
     if not updates:
         return jsonify({'ok': False, 'message': '未检测到需更新的有效字段'}), 400
