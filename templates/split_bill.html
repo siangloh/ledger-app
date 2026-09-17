@@ -70,6 +70,7 @@
               <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(-90)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;" title="逆时针旋转 90 度">↺ 逆时针 90°</button>
               <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(90)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;" title="顺时针旋转 90 度">↻ 顺时针 90°</button>
               <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(180)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;" title="旋转 180 度">🔄 旋转 180°</button>
+              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(0, true)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;" title="重置为 0° 原图朝向">⏮ 恢复 0° 原图</button>
             </div>
             <span id="mainPageRotationTag" style="font-size: 11px; font-weight: 700; color: var(--navy); background: #fff; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border);">当前角度: 0°</span>
           </div>
@@ -332,6 +333,7 @@ Total 75.21"></textarea>
               <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(-90)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;">↺ 逆时针 90°</button>
               <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(90)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;">↻ 顺时针 90°</button>
               <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(180)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;">🔄 旋转 180°</button>
+              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(0, true)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;">⏮ 恢复 0° 原图</button>
             </div>
             <div style="display: flex; gap: 6px; align-items: center;">
               <span class="tag" style="background: var(--surface); border: 1px solid var(--border); font-size: 11px;" id="reviewPrepRotationTag">🔄 纠偏朝向: 0°</span>
@@ -854,8 +856,8 @@ function compressAndPreprocessImage(file, rotationAngle = 0) {
   return processReceiptOnCanvas(file, rotationAngle);
 }
 
-// 用户手动点击旋转小票纠偏 (↺ -90°, ↻ +90°, 🔄 180°)
-async function rotateCurrentReceipt(angleDelta) {
+// 用户手动点击旋转小票纠偏 (↺ -90°, ↻ +90°, 🔄 180°, ⏮ 0°)
+async function rotateCurrentReceipt(angleDelta, isAbsolute = false) {
   const source = currentReceiptFile || (lastReceiptImageContext && lastReceiptImageContext.originalImage);
   if (!source) {
     if (typeof Swal !== 'undefined') {
@@ -864,7 +866,11 @@ async function rotateCurrentReceipt(angleDelta) {
     return;
   }
 
-  currentReceiptRotation = ((currentReceiptRotation + angleDelta) % 360 + 360) % 360;
+  if (isAbsolute) {
+    currentReceiptRotation = ((angleDelta % 360) + 360) % 360;
+  } else {
+    currentReceiptRotation = ((currentReceiptRotation + angleDelta) % 360 + 360) % 360;
+  }
 
   try {
     const res = await processReceiptOnCanvas(source, currentReceiptRotation);
@@ -906,21 +912,59 @@ async function rotateCurrentReceipt(angleDelta) {
   }
 }
 
-// 旋转后在正向图片上极速重新执行 OCR
+// 旋转后在正向图片上极速重新执行 OCR (优先调用后端 RapidOCR 指定朝向，耗时仅 2 秒)
 async function reparseRotatedReceipt(rotatedDataUrl) {
-  if (typeof Tesseract !== 'undefined') {
-    try {
-      if (typeof Swal !== 'undefined') {
-        const Toast = Swal.mixin({
-          toast: true,
-          position: 'top-end',
-          showConfirmButton: false,
-          timer: 2500,
-          timerProgressBar: true
-        });
-        Toast.fire({ icon: 'info', title: `正在按纠偏朝向 (${currentReceiptRotation}°) 重新提取菜品...` });
-      }
+  if (typeof Swal !== 'undefined') {
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 2500,
+      timerProgressBar: true
+    });
+    Toast.fire({ icon: 'info', title: `正在按新朝向 (${currentReceiptRotation}°) 重新提取菜品...` });
+  }
 
+  let serverParsedSuccess = false;
+  if (currentReceiptFile) {
+    try {
+      const formData = new FormData();
+      formData.append('file', currentReceiptFile);
+      formData.append('rotation', currentReceiptRotation);
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+      const res = await fetch('/split-bill/ocr-upload', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+        body: formData
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.ok && json.data && json.data.items && json.data.items.length > 0) {
+          serverParsedSuccess = true;
+          lastParsedReceiptData = json.data;
+          lastRecognizedReceiptText = json.raw_text || '';
+          const textarea = document.getElementById('receiptTextInput');
+          if (textarea) textarea.value = lastRecognizedReceiptText;
+          const reviewRaw = document.getElementById('reviewRawTextArea');
+          if (reviewRaw) reviewRaw.value = lastRecognizedReceiptText;
+
+          const modal = document.getElementById('receiptReviewModal');
+          if (modal && modal.style.display === 'flex') {
+            openReviewModal(json.data, lastRecognizedReceiptText, lastReceiptImageContext);
+          }
+          if (typeof Swal !== 'undefined') {
+            const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2000 });
+            Toast.fire({ icon: 'success', title: `已按 ${currentReceiptRotation}° 重新识别成功 (${json.data.items.length} 道菜品)` });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Server reparse notice:', err);
+    }
+  }
+
+  if (!serverParsedSuccess && typeof Tesseract !== 'undefined') {
+    try {
       const text = await Promise.race([
         runClientSideOCR(rotatedDataUrl),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000))

@@ -99,7 +99,17 @@ def split_bill_ocr_upload():
         if pil_img.mode != 'RGB':
             pil_img = pil_img.convert('RGB')
 
-        result, raw_text, parsed, rot, preprocessed_b64, prep_meta = smart_orient_receipt_ocr(pil_img, engine)
+        forced_angle = None
+        angle_param = request.form.get('rotation') or request.form.get('angle')
+        if angle_param is not None and str(angle_param).strip() != '' and str(angle_param).strip().lower() != 'auto':
+            try:
+                forced_angle = int(angle_param) % 360
+            except ValueError:
+                forced_angle = None
+
+        result, raw_text, parsed, rot, preprocessed_b64, prep_meta = smart_orient_receipt_ocr(
+            pil_img, engine, forced_angle=forced_angle
+        )
         from flask import g
         sym = getattr(g, 'current_currency_symbol', 'RM') or 'RM'
         default_parsed = {
