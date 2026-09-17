@@ -130,3 +130,13 @@ def test_privacy_mode_templates_and_css():
     assert 'window._catChartInstances' in insights_html
     assert 'privacy-mode' in insights_html
 
+    # 5. 验证负债管理与订阅管理页面已配齐 sensitive-val 隐私遮罩类
+    with open('templates/liabilities.html', 'r', encoding='utf-8') as f:
+        liab_html = f.read()
+    assert 'sensitive-val' in liab_html
+
+    with open('templates/subscriptions.html', 'r', encoding='utf-8') as f:
+        sub_html = f.read()
+    assert 'sensitive-val' in sub_html
+
+

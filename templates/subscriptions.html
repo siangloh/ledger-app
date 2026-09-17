@@ -28,10 +28,10 @@
   <div class="card" style="padding: 18px 20px; border-left: 4px solid var(--navy); position: relative;">
     <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">月度平均订阅支出</div>
     <div style="font-size: 26px; font-weight: 700; color: var(--navy); margin-top: 6px;">
-      {{ summary.total_monthly_burn|money }} <span style="font-size: 13px; font-weight: 500; color: var(--muted);">/月</span>
+      <span class="sensitive-val">{{ summary.total_monthly_burn|money }}</span> <span style="font-size: 13px; font-weight: 500; color: var(--muted);">/月</span>
     </div>
     <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">
-      折算年度总开销: <strong>{{ summary.total_annual_burn|money }}</strong>
+      折算年度总开销: <strong class="sensitive-val">{{ summary.total_annual_burn|money }}</strong>
     </div>
   </div>
 
@@ -110,11 +110,11 @@
             </h4>
           </div>
           <div style="text-align: right;">
-            <div style="font-size: 17px; font-weight: 700; color: {{ '#e11d48' if item.alert_level.value == 'CRITICAL' else 'var(--navy)' }};">
+            <div class="sensitive-val" style="font-size: 17px; font-weight: 700; color: {{ '#e11d48' if item.alert_level.value == 'CRITICAL' else 'var(--navy)' }};">
               {{ item.currency }} {{ "{:,.2f}".format(item.cost) }}
             </div>
             {% if item.currency != (current_user_currency_code|default('MYR')) %}
-              <div style="font-size: 11px; color: var(--muted);">
+              <div class="sensitive-val" style="font-size: 11px; color: var(--muted);">
                 ≈ {{ item.converted_cost|money }}
               </div>
             {% endif %}
@@ -240,12 +240,12 @@
           </td>
 
           <!-- 单期费用 -->
-          <td style="padding: 12px; text-align: right; font-weight: 700; color: var(--navy);">
+          <td class="sensitive-val" style="padding: 12px; text-align: right; font-weight: 700; color: var(--navy);">
             {{ s.currency }} {{ "{:,.2f}".format(s.cost) }}
           </td>
 
           <!-- 月均等效开销 -->
-          <td style="padding: 12px; text-align: right; font-weight: 600; color: #4f46e5;">
+          <td class="sensitive-val" style="padding: 12px; text-align: right; font-weight: 600; color: #4f46e5;">
             {% if s.billing_cycle.value == 'MONTHLY' %}
               {{ current_user_currency|default('RM') }} {{ "{:,.2f}".format(s.cost) if s.currency == (current_user_currency_code|default('MYR')) else '换算中' }}
             {% else %}

@@ -45,11 +45,11 @@
   <!-- 1. 全景未还总本金 -->
   <div class="card" style="padding: 18px 20px; border-left: 4px solid var(--navy); position: relative;">
     <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">全景未还总负债本金</div>
-    <div style="font-size: 26px; font-weight: 700; color: var(--navy); margin-top: 6px;">
+    <div class="sensitive-val" style="font-size: 26px; font-weight: 700; color: var(--navy); margin-top: 6px;">
       {{ total_debt|money }}
     </div>
     <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">
-      贷款剩余: {{ total_loan_debt|money }} · 分期未还: {{ total_inst_debt|money }}
+      贷款剩余: <span class="sensitive-val">{{ total_loan_debt|money }}</span> · 分期未还: <span class="sensitive-val">{{ total_inst_debt|money }}</span>
     </div>
   </div>
 
@@ -58,7 +58,7 @@
     <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">
       {{ target_month }} 刚性现金流总支出
     </div>
-    <div style="font-size: 26px; font-weight: 700; color: #e11d48; margin-top: 6px;">
+    <div class="sensitive-val" style="font-size: 26px; font-weight: 700; color: #e11d48; margin-top: 6px;">
       {{ cashflow.totalRigidPayment|money }}
     </div>
     <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">
@@ -76,7 +76,7 @@
         {% for rel in cashflow.upcomingReleases %}
         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; padding: 2px 0;">
           <span style="font-weight: 600; color: var(--ink);">{{ rel.title }}</span>
-          <span style="color: var(--green); font-weight: 700;">+{{ rel.monthly_amount|money }}/月 ({{ rel.settle_month }})</span>
+          <span class="sensitive-val" style="color: var(--green); font-weight: 700;">+{{ rel.monthly_amount|money }}/月 ({{ rel.settle_month }})</span>
         </div>
         {% endfor %}
       </div>
@@ -135,7 +135,7 @@
             <td style="text-align: center; font-weight: 600; font-family: monospace; font-size: 13px;">
               {{ ev.periodProgress }}
             </td>
-            <td style="text-align: right; font-weight: 700; color: #e11d48; font-size: 14px;">
+            <td class="sensitive-val" style="text-align: right; font-weight: 700; color: #e11d48; font-size: 14px;">
               {{ "{:,.2f}".format(ev.amount) }}
             </td>
             <td style="text-align: center;">
@@ -201,8 +201,8 @@
                 {% endif %}
               </td>
               <td><span style="color: var(--ink-soft); font-size: 13px;">{{ inst.card_name or '—' }}</span></td>
-              <td style="text-align: right;">{{ inst.total_amount|money }}</td>
-              <td style="text-align: right; font-weight: 600;">{{ inst.monthly_amount|money }}</td>
+              <td class="sensitive-val" style="text-align: right;">{{ inst.total_amount|money }}</td>
+              <td class="sensitive-val" style="text-align: right; font-weight: 600;">{{ inst.monthly_amount|money }}</td>
               <td>
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <div style="flex: 1; background: var(--border); height: 6px; border-radius: 4px; overflow: hidden;">
@@ -211,13 +211,13 @@
                   <span style="font-size: 12px; font-weight: 600; min-width: 42px; text-align: right;">{{ inst.paid_periods }}/{{ inst.tenure_months }}</span>
                 </div>
               </td>
-              <td style="text-align: right; font-weight: 700; color: #e11d48;">
+              <td class="sensitive-val" style="text-align: right; font-weight: 700; color: #e11d48;">
                 {{ inst.remaining_balance|money }}
               </td>
               <td style="text-align: center; font-size: 12.5px; font-weight: 500;">
                 {{ inst.settle_month }}
               </td>
-              <td style="text-align: center; font-weight: 600; color: var(--green);">
+              <td class="sensitive-val" style="text-align: center; font-weight: 600; color: var(--green);">
                 +{{ inst.monthly_amount|money }}/月
               </td>
               <td style="text-align: center;">
@@ -268,7 +268,7 @@
             <tr>
               <td><strong>{{ loan.title }}</strong></td>
               <td><span style="color: var(--ink-soft); font-size: 13px;">{{ loan.account_name or '主账户' }}</span></td>
-              <td style="text-align: right;">{{ loan.loan_amount|money }}</td>
+              <td class="sensitive-val" style="text-align: right;">{{ loan.loan_amount|money }}</td>
               <td style="text-align: center; font-weight: 600;">{{ loan.annual_interest_rate }}%</td>
               <td style="text-align: center;">
                 {% if loan.method == 'flat_rate' %}
@@ -277,11 +277,11 @@
                   <span class="tag" style="background: #eef2ff; color: #4338ca;">等额本息</span>
                 {% endif %}
               </td>
-              <td style="text-align: right; font-weight: 700; color: #e11d48;">
+              <td class="sensitive-val" style="text-align: right; font-weight: 700; color: #e11d48;">
                 {{ loan.monthly_payment|money }}
               </td>
               <td style="text-align: center;">每月 {{ "%02d"|format(loan.due_day) }} 日</td>
-              <td style="text-align: right; font-weight: 700; color: var(--navy);">
+              <td class="sensitive-val" style="text-align: right; font-weight: 700; color: var(--navy);">
                 {{ loan.remaining_balance|money }}
               </td>
               <td style="text-align: center;">
