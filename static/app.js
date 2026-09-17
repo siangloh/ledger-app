@@ -21,6 +21,30 @@ function updatePrivacyModeUI(isPrivacy) {
   }
 }
 
+function refreshAllChartsPrivacy() {
+  var chartList = [
+    typeof _monthlyIncomeChart !== 'undefined' ? _monthlyIncomeChart : null,
+    typeof _monthlyExpenseChart !== 'undefined' ? _monthlyExpenseChart : null,
+    typeof _ovTrendChart !== 'undefined' ? _ovTrendChart : null,
+    typeof _ovExpenseChart !== 'undefined' ? _ovExpenseChart : null,
+    typeof _ovIncomeChart !== 'undefined' ? _ovIncomeChart : null
+  ];
+  chartList.forEach(function (c) {
+    if (c && typeof c.update === 'function') {
+      try {
+        c.update('none');
+      } catch (e) {}
+    }
+  });
+  if (typeof window !== 'undefined' && window._catChartInstances) {
+    Object.values(window._catChartInstances).forEach(function (c) {
+      if (c && typeof c.update === 'function') {
+        try { c.update('none'); } catch (e) {}
+      }
+    });
+  }
+}
+
 function togglePrivacyMode(forceState) {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
@@ -30,6 +54,7 @@ function togglePrivacyMode(forceState) {
     localStorage.setItem('ledger_privacy_mode', isPrivacy ? 'true' : 'false');
   } catch (e) {}
   updatePrivacyModeUI(isPrivacy);
+  refreshAllChartsPrivacy();
 }
 
 if (typeof window !== 'undefined') {
@@ -1397,9 +1422,15 @@ function drawOverviewBarChart(trendData) {
               return trendData[idx].month;
             },
             label: function (item) {
+              if (document.documentElement.classList.contains('privacy-mode')) {
+                return ' ' + item.dataset.label + ': ••••••';
+              }
               return ' ' + item.dataset.label + ': ' + formatMoney(item.raw);
             },
             afterBody: function (items) {
+              if (document.documentElement.classList.contains('privacy-mode')) {
+                return ['结余: ••••••'];
+              }
               var idx = items[0].dataIndex;
               var bal = balanceVals[idx];
               return ['结余: ' + formatMoney(bal)];
@@ -1424,7 +1455,12 @@ function drawOverviewBarChart(trendData) {
           ticks: {
             color: tickColor,
             font: { family: 'ui-monospace, SFMono-Regular, Consolas, monospace', size: 11 },
-            callback: function (value) { return rmMoneyFmt(value); }
+            callback: function (value) {
+              if (document.documentElement.classList.contains('privacy-mode')) {
+                return '••••';
+              }
+              return rmMoneyFmt(value);
+            }
           }
         }
       }
@@ -1472,7 +1508,8 @@ function drawOverviewDoughnut(canvasId, labels, values) {
       // 金额数字 (浅色模式下 #0f172a, 深色模式下 #ffffff)
       ctx.font = '700 15px ui-monospace, SFMono-Regular, Consolas, monospace';
       ctx.fillStyle = curDark ? '#ffffff' : '#0f172a';
-      ctx.fillText(formatMoney(total), centerX, centerY + 10);
+      var isPrivacy = document.documentElement.classList.contains('privacy-mode');
+      ctx.fillText(isPrivacy ? '••••••' : formatMoney(total), centerX, centerY + 10);
       ctx.restore();
     }
   };
@@ -1510,6 +1547,9 @@ function drawOverviewDoughnut(canvasId, labels, values) {
           bodyFont: { family: 'ui-monospace, SFMono-Regular, Consolas, monospace', size: 11 },
           callbacks: {
             label: function (item) {
+              if (document.documentElement.classList.contains('privacy-mode')) {
+                return ' ' + (item.label || '') + ': ••••••';
+              }
               var val = item.raw || 0;
               var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
               return ' ' + formatMoney(val) + ' (' + pct + '%)';
@@ -1716,7 +1756,8 @@ function drawMonthlyDoughnut(canvasId, rawLabels, rawValues) {
       // 金额
       ctx.font = '700 15.5px ui-monospace, SFMono-Regular, Consolas, monospace';
       ctx.fillStyle = curDark ? '#ffffff' : '#10213b';
-      ctx.fillText(formatMoney(currentTotal), centerX, centerY + 10);
+      var isPrivacy = document.documentElement.classList.contains('privacy-mode');
+      ctx.fillText(isPrivacy ? '••••••' : formatMoney(currentTotal), centerX, centerY + 10);
       ctx.restore();
     }
   };
@@ -1761,6 +1802,9 @@ function drawMonthlyDoughnut(canvasId, rawLabels, rawValues) {
             bodyFont: { family: 'ui-monospace, SFMono-Regular, Consolas, monospace', size: 11 },
             callbacks: {
               label: function (item) {
+                if (document.documentElement.classList.contains('privacy-mode')) {
+                  return ' ' + (item.label || '') + ': ••••••';
+                }
                 var val = item.raw || 0;
                 var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
                 return ' ' + formatMoney(val) + ' (' + pct + '%)';

@@ -148,6 +148,7 @@
 <script>
   window.INSIGHTS_DATA = {{ insights | tojson }};
   const _catChartInstances = {};
+  window._catChartInstances = _catChartInstances;
 
   function toggleCategoryChart(idx) {
     const row = document.getElementById('chart-row-' + idx);
@@ -213,6 +214,9 @@
           tooltip: {
             callbacks: {
               label: function (c) {
+                if (document.documentElement.classList.contains('privacy-mode')) {
+                  return ' 支出: ••••••';
+                }
                 return ' 支出: ' + formatMoney(c.parsed.y, currencySym);
               }
             }
@@ -230,6 +234,9 @@
               color: tickColor,
               font: { size: 10 },
               callback: function (v) {
+                if (document.documentElement.classList.contains('privacy-mode')) {
+                  return '••••';
+                }
                 if (v >= 1000) return currencySym + ' ' + (v / 1000).toFixed(1) + 'k';
                 return currencySym + ' ' + v;
               }

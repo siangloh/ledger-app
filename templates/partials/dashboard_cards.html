@@ -7,7 +7,7 @@
     <span class="card-label">本月支出</span>
     <span class="amount expense">{{ total_expense|money }}</span>
     {% if savings_expense and savings_expense > 0 %}
-    <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">含储蓄支付 {{ savings_expense|money }}</div>
+    <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">含储蓄支付 <span class="sensitive-val">{{ savings_expense|money }}</span></div>
     {% endif %}
   </div>
   <div class="card card-live-pulse">

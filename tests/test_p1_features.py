@@ -97,3 +97,34 @@ def test_csv_export_format(logged_in_client, flask_app, admin_user_id):
     assert '咖啡饮品' in csv_text
     assert '25.50' in csv_text
     assert '出差,下午茶' in csv_text
+
+
+def test_privacy_mode_templates_and_css():
+    """验证隐私遮罩模式下的全局选择器扩展与严格防窥防泄密规则"""
+    with open('static/style.css', 'r', encoding='utf-8') as f:
+        css = f.read()
+
+    # 1. 验证关键敏感类已被加入高斯模糊清单
+    assert '.privacy-mode .sub-stat-val' in css
+    assert '.privacy-mode .b-card-bottom' in css
+    assert '.privacy-mode .b-card-rem' in css
+    assert '.privacy-mode .chart-legend-right' in css
+    assert '.privacy-mode .side-badge' in css
+    assert '.privacy-mode .acc-kpi-val' in css
+
+    # 2. 验证彻底隐藏模式：hover 时绝不解除模糊 (不应存在针对敏感金额的 filter: blur(0px))
+    assert 'filter: blur(0px)' not in css
+
+    # 3. 验证 static/app.js 中的图表遮罩与联动刷新函数
+    with open('static/app.js', 'r', encoding='utf-8') as f:
+        js = f.read()
+    assert 'refreshAllChartsPrivacy()' in js
+    assert 'refreshAllChartsPrivacy' in js
+    assert '••••••' in js
+
+    # 4. 验证 category_insights.html 中图表及数值支持
+    with open('templates/category_insights.html', 'r', encoding='utf-8') as f:
+        insights_html = f.read()
+    assert 'window._catChartInstances' in insights_html
+    assert 'privacy-mode' in insights_html
+
