@@ -262,7 +262,57 @@ Total 75.21"></textarea>
         </div>
       </div>
 
-      <!-- 4. 查看原始小票文本（可折叠） -->
+      <!-- 4. 系统预处理图像与送审核查 (Preprocessed Image Before OCR Detection) -->
+      <details id="reviewPreprocessedSection" style="display: none; margin-bottom: 16px; font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; background: var(--surface-soft);" open>
+        <summary style="cursor: pointer; font-weight: 700; color: var(--navy); display: flex; align-items: center; justify-content: space-between; user-select: none;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16px;">🖼️</span>
+            <span>系统预处理送审图像 (OCR 识别前处理结果)</span>
+            <span id="reviewPrepBadge" style="font-size: 10.5px; background: var(--green-soft); color: var(--green); padding: 2px 8px; border-radius: 10px; font-weight: 600;">已自适应纠偏增强</span>
+          </div>
+          <span style="font-size: 11px; color: var(--muted); font-weight: normal;">点击折叠/展开 ▾</span>
+        </summary>
+        
+        <div style="margin-top: 10px;">
+          <!-- 处理参数徽标 -->
+          <div id="reviewPrepMetaTags" style="display: flex; flex-wrap: gap; gap: 6px; margin-bottom: 10px; flex-wrap: wrap;">
+            <span class="tag" style="background: var(--surface); border: 1px solid var(--border); font-size: 11px;" id="reviewPrepRotationTag">🔄 纠偏朝向: 0°</span>
+            <span class="tag" style="background: var(--surface); border: 1px solid var(--border); font-size: 11px;" id="reviewPrepResolutionTag">📐 规格: 动态自适应缩放</span>
+            <span class="tag" style="background: var(--surface); border: 1px solid var(--border); font-size: 11px;">✨ CLAHE 动态对比度增强</span>
+            <span class="tag" style="background: var(--surface); border: 1px solid var(--border); font-size: 11px;">🛡️ 双边保边降噪</span>
+          </div>
+
+          <!-- 双图对比展示容器 -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 8px;">
+            <!-- 原图卡片 -->
+            <div id="reviewOriginalImgCard" style="border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); padding: 8px; text-align: center;">
+              <div style="font-size: 11.5px; font-weight: 600; color: var(--navy); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <span>📸 用户上传原相片</span>
+                <span style="font-size: 10px; color: var(--muted);">原拍摄视角</span>
+              </div>
+              <div style="max-height: 220px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #0f172a; border-radius: 4px; padding: 4px;">
+                <img id="reviewOriginalImg" src="" alt="原图" style="max-width: 100%; max-height: 210px; object-fit: contain; cursor: zoom-in; border-radius: 2px;" onclick="openImageZoom(this.src, '用户上传原图')">
+              </div>
+            </div>
+
+            <!-- 系统预处理后送审图卡片 -->
+            <div id="reviewPreprocessedImgCard" style="border: 1.5px solid var(--navy); border-radius: var(--radius-sm); background: var(--surface); padding: 8px; text-align: center;">
+              <div style="font-size: 11.5px; font-weight: 700; color: var(--navy); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <span>⚙️ 送入 OCR 识别前图像 (Preprocessed)</span>
+                <a id="reviewDownloadPrepBtn" href="javascript:void(0)" target="_blank" style="font-size: 11px; color: var(--navy); text-decoration: underline;" download="preprocessed_receipt.jpg">高清图 ↗</a>
+              </div>
+              <div style="max-height: 220px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #0f172a; border-radius: 4px; padding: 4px;">
+                <img id="reviewPreprocessedImg" src="" alt="预处理图像" style="max-width: 100%; max-height: 210px; object-fit: contain; cursor: zoom-in; border-radius: 2px;" onclick="openImageZoom(this.src, 'OCR 识别前送审预处理图像')">
+              </div>
+            </div>
+          </div>
+          <p style="font-size: 11px; color: var(--muted); margin: 0; line-height: 1.5;">
+            💡 <b>逻辑说明</b>：系统在将图像丢给 RapidOCR 深度学习模型检测文字前，自动执行自适应旋转纠偏、局部阴影消除与双边滤波降噪。点击图片可放大检视。
+          </p>
+        </div>
+      </details>
+
+      <!-- 5. 查看原始小票文本（可折叠） -->
       <details style="font-size: 12px; color: var(--muted); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 8px 12px; background: var(--surface-soft);">
         <summary style="cursor: pointer; font-weight: 600; user-select: none;">🔍 查看/微调识别出的原始文本 (可重新提取)</summary>
         <textarea id="reviewRawTextArea" rows="4" style="width: 100%; margin-top: 8px; font-family: var(--font-mono); font-size: 11px; padding: 6px; border: 1px solid var(--border); border-radius: 4px;"></textarea>
@@ -408,6 +458,8 @@ async function handleReceiptFileSelect(files) {
   let parsedData = null;
   let recognizedText = '';
   let backendNotice = '';
+  let preprocessedImgUrl = null;
+  let preprocessedMeta = null;
 
   try {
     updateOcrProgress(35, '① 正在准备小票图像...');
@@ -434,6 +486,10 @@ async function handleReceiptFileSelect(files) {
       });
       if (res.ok) {
         const json = await res.json();
+        if (json.preprocessed_image) {
+          preprocessedImgUrl = json.preprocessed_image;
+          preprocessedMeta = json.preprocessed_meta || null;
+        }
         if (json.ok && json.data) {
           parsedData = json.data;
           parsedData.engine = 'rapidocr';
@@ -483,8 +539,12 @@ async function handleReceiptFileSelect(files) {
     const textarea = document.getElementById('receiptTextInput');
     if (textarea) textarea.value = recognizedText || '';
 
-    // 唤起“预填弹窗 + 大字号金额确认”
-    openReviewModal(parsedData, recognizedText || '');
+    // 唤起“预填弹窗 + 大字号金额确认”，同时附带系统预处理图像
+    openReviewModal(parsedData, recognizedText || '', {
+      originalImage: localDataUrl,
+      preprocessedImage: preprocessedImgUrl,
+      preprocessedMeta: preprocessedMeta
+    });
 
     // 若未识别出单品或金额为0，轻量 Toast 提示用户可直接手动输入或调整
     if ((!parsedData.items || parsedData.items.length === 0) && (parsedData.total || 0) === 0) {
@@ -812,7 +872,7 @@ function parseReceiptTextClientSide(rawText) {
 // ============================================================
 // 核心 UI 功能：“预填弹窗 + 大字号金额确认与核验” (Review Modal)
 // ============================================================
-function openReviewModal(parsed, rawText) {
+function openReviewModal(parsed, rawText, imgContext) {
   parsed = parsed || {};
   currentCurrency = parsed.currency_symbol || 'RM';
   
@@ -825,6 +885,56 @@ function openReviewModal(parsed, rawText) {
       engineBadge.innerHTML = '✨ RapidOCR 深度学习解析 · 请核验账目平衡';
     } else {
       engineBadge.innerHTML = '⚡ 智能录入核验 · 请核验账目平衡';
+    }
+  }
+
+  // 更新预处理图像送审查看板块
+  const prepSection = document.getElementById('reviewPreprocessedSection');
+  const origImg = document.getElementById('reviewOriginalImg');
+  const prepImg = document.getElementById('reviewPreprocessedImg');
+  const origCard = document.getElementById('reviewOriginalImgCard');
+  const prepCard = document.getElementById('reviewPreprocessedImgCard');
+  const downloadBtn = document.getElementById('reviewDownloadPrepBtn');
+  const rotTag = document.getElementById('reviewPrepRotationTag');
+  const resTag = document.getElementById('reviewPrepResolutionTag');
+  const prepBadge = document.getElementById('reviewPrepBadge');
+
+  if (prepSection) {
+    if (imgContext && (imgContext.preprocessedImage || imgContext.originalImage)) {
+      prepSection.style.display = 'block';
+      prepSection.open = true;
+
+      if (imgContext.originalImage && origImg) {
+        origImg.src = imgContext.originalImage;
+        if (origCard) origCard.style.display = 'block';
+      } else if (origCard) {
+        origCard.style.display = 'none';
+      }
+
+      if (imgContext.preprocessedImage && prepImg) {
+        prepImg.src = imgContext.preprocessedImage;
+        if (downloadBtn) downloadBtn.href = imgContext.preprocessedImage;
+        if (prepCard) prepCard.style.display = 'block';
+      } else if (prepCard) {
+        prepCard.style.display = 'none';
+      }
+
+      if (rotTag) {
+        const rotVal = (imgContext.preprocessedMeta && imgContext.preprocessedMeta.rotation !== undefined) ? imgContext.preprocessedMeta.rotation : (parsed.orientation_corrected ? '已旋转' : 0);
+        rotTag.textContent = '🔄 纠偏朝向: ' + rotVal + (typeof rotVal === 'number' ? '°' : '');
+      }
+
+      if (resTag) {
+        const w = imgContext.preprocessedMeta && imgContext.preprocessedMeta.width;
+        const h = imgContext.preprocessedMeta && imgContext.preprocessedMeta.height;
+        resTag.textContent = (w && h) ? `📐 规格: ${w} × ${h} px` : '📐 规格: 动态自适应高清';
+      }
+
+      if (prepBadge) {
+        prepBadge.textContent = imgContext.preprocessedImage ? '已生成送审图像' : '原图已就绪';
+      }
+    } else {
+      prepSection.style.display = 'none';
     }
   }
 
@@ -861,6 +971,22 @@ function openReviewModal(parsed, rawText) {
       document.body.appendChild(modal);
     }
     modal.style.display = 'flex';
+  }
+}
+
+function openImageZoom(src, title) {
+  if (!src) return;
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: title || '小票图像预览',
+      imageUrl: src,
+      imageAlt: title || '小票图像',
+      showCloseButton: true,
+      confirmButtonText: '关闭',
+      width: 'auto'
+    });
+  } else {
+    window.open(src, '_blank');
   }
 }
 

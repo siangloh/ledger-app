@@ -392,9 +392,60 @@ def parse_receipt_text_to_items(raw_text):
     }
 
 
+def encode_cv2_image_to_base64(cv2_img, quality=85):
+    """将 OpenCV 图像数组快速压缩编码为 Base64 Data URL 字符串"""
+    if cv2_img is None:
+        return ""
+    import cv2
+    import base64
+    try:
+        success, enc_buf = cv2.imencode('.jpg', cv2_img, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
+        if success:
+            return "data:image/jpeg;base64," + base64.b64encode(enc_buf).decode('utf-8')
+    except Exception as e:
+        logger.warning("encode_cv2_image_to_base64 failed: %s", e)
+    return ""
+
+
+def get_preprocessed_receipt_preview(pil_img, angle=0):
+    """
+    仅执行图像预处理管线（自适应旋转、灰度化、CLAHE对比度均衡、双边滤波保边降噪），
+    返回处理后的 numpy 数组、Base64 Data URL 字符串与处理元数据。
+    用于在送入 OCR 引擎前直接预览和诊断图像处理质量。
+    """
+    from PIL import Image
+
+    if angle == 90:
+        target_img = pil_img.transpose(Image.Transpose.ROTATE_90)
+    elif angle == 180:
+        target_img = pil_img.transpose(Image.Transpose.ROTATE_180)
+    elif angle == 270:
+        target_img = pil_img.transpose(Image.Transpose.ROTATE_270)
+    else:
+        target_img = pil_img
+
+    proc_arr = preprocess_receipt_for_ocr(target_img)
+    h, w = proc_arr.shape[:2]
+    meta = {
+        'rotation': angle,
+        'width': w,
+        'height': h,
+        'filters': [
+            '自适应尺寸缩放 (Min 1200px)',
+            '灰度化转换 (Grayscale)',
+            'CLAHE 自适应局部对比度增强 (ClipLimit=2.0)',
+            '双边保边滤波去噪 (BilateralFilter)'
+        ]
+    }
+    b64 = encode_cv2_image_to_base64(proc_arr)
+    return proc_arr, b64, meta
+
+
 def smart_orient_receipt_ocr(pil_img, engine):
     """
-    暴力 4 方向评测，杜绝任何提前退出的假阳性
+    暴力 4 方向评测，杜绝任何提前退出的假阳性。
+    在执行预处理（缩放、灰度化、CLAHE、去噪）后且在送入 OCR 识别文字前，
+    捕获最终送审图像并返回 Base64 预览图与处理元数据。
     """
     from PIL import Image
     import numpy as np
@@ -408,6 +459,7 @@ def smart_orient_receipt_ocr(pil_img, engine):
 
     best_angle = 0
     best_res = None
+    best_proc_arr = None
     max_score = -99999
 
     logger.info("========== [OCR Orientation Debugging] ==========")
@@ -421,25 +473,40 @@ def smart_orient_receipt_ocr(pil_img, engine):
         log_line = f"Angle {angle:3d}° -> Score: {score:5d} | Anchors Hit: {anchors} | Blocks: {len(res) if res else 0}"
         logger.info(log_line)
 
-        if score > max_score:
+        if score > max_score or best_proc_arr is None:
             max_score = score
             best_angle = angle
             best_res = res
+            best_proc_arr = proc_arr
 
         if anchors >= 2:
             confirm_line = f">> Confirmed upright angle: {angle}° with {anchors} anchors."
             logger.info(confirm_line)
             best_angle = angle
             best_res = res
+            best_proc_arr = proc_arr
             break
 
     summary_line = f"========== Final Pick: {best_angle}° (Score: {max_score}) ==========\n"
     logger.info(summary_line)
 
+    preprocessed_b64 = encode_cv2_image_to_base64(best_proc_arr)
+    meta = {
+        'rotation': best_angle,
+        'width': int(best_proc_arr.shape[1]) if best_proc_arr is not None else 0,
+        'height': int(best_proc_arr.shape[0]) if best_proc_arr is not None else 0,
+        'filters': [
+            '自适应尺寸缩放 (Min 1200px)',
+            '灰度化转换 (Grayscale)',
+            'CLAHE 自适应局部对比度增强 (ClipLimit=2.0)',
+            '双边保边滤波降噪 (BilateralFilter)'
+        ]
+    }
+
     if not best_res:
-        return [], "", {'items': [], 'total': 0.0}, 0
+        return [], "", {'items': [], 'total': 0.0}, best_angle, preprocessed_b64, meta
 
     raw_text = cluster_ocr_blocks_to_lines(best_res)
     parsed = parse_receipt_text_to_items(raw_text)
 
-    return best_res, raw_text, parsed, best_angle
+    return best_res, raw_text, parsed, best_angle, preprocessed_b64, meta

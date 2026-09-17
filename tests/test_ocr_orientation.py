@@ -30,9 +30,13 @@ def test_smart_orient_receipt_ocr_numpy_fallback_does_not_raise_nameerror(flask_
     engine, calls = _fake_engine()
     img = Image.new("RGB", (40, 40), color="white")
 
-    result, raw_text, parsed, angle = flask_app.smart_orient_receipt_ocr(img, engine)
+    result, raw_text, parsed, angle, preprocessed_b64, meta = flask_app.smart_orient_receipt_ocr(img, engine)
 
     assert calls["count"] >= 2, "the numpy-array fallback branch must actually run"
     assert angle == 0
     assert result and len(result) == 2
     assert parsed is not None
+    assert preprocessed_b64.startswith("data:image/jpeg;base64,")
+    assert meta["width"] > 0 and meta["height"] > 0
+    assert "filters" in meta
+

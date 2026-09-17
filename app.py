@@ -266,13 +266,14 @@ def require_login():
     exempt_endpoints = (
         'login', 'register', 'logout', 'static', 'health', 'api_realtime_check',
         'manifest', 'service_worker', 'offline_page', 'api_check_username',
-        'download_apk', 'split_bill_ocr_upload', 'split_bill_parse_text'
+        'download_apk', 'split_bill_ocr_upload', 'split_bill_parse_text',
+        'split_bill_ocr_preprocess_preview'
     )
     # 允许静态资源、登录/注册/登出路由、健康检查、PWA 核心资源以及外部自动记账 Webhook 豁免 Session 检查
     if (
         ep in exempt_endpoints
         or ep_short in exempt_endpoints
-        or request.path in ('/login', '/register', '/logout', '/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html', '/api/check-username', '/download/apk', '/split-bill/ocr-upload', '/split-bill/parse-text')
+        or request.path in ('/login', '/register', '/logout', '/health', '/api/realtime/check', '/manifest.json', '/sw.js', '/offline.html', '/api/check-username', '/download/apk', '/split-bill/ocr-upload', '/split-bill/parse-text', '/split-bill/ocr-preprocess-preview')
         or (request.path and request.path.startswith('/static/'))
     ):
         return
