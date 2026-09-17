@@ -611,7 +611,12 @@ async function handleReceiptFileSelect(files) {
     updateOcrProgress(65, '② 启动 RapidOCR 深度学习引擎，自动纠偏图片朝向与识别...');
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      // 性能核心提升：如果 Canvas 预压缩图已就绪，直接上传 ~200KB 的高清压缩 Blob，避免手机原图 10MB+ 导致上传超时或 Render 502
+      if (canvasRes && canvasRes.originalDataUrl) {
+        formData.append('file', dataURLtoBlob(canvasRes.originalDataUrl), file.name || 'receipt.jpg');
+      } else {
+        formData.append('file', file);
+      }
       const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
       const res = await fetch('/split-bill/ocr-upload', {
         method: 'POST',
@@ -858,6 +863,19 @@ function compressAndPreprocessImage(file, rotationAngle = 0) {
   return processReceiptOnCanvas(file, rotationAngle);
 }
 
+function dataURLtoBlob(dataurl) {
+  if (!dataurl) return null;
+  const parts = dataurl.split(',');
+  const mime = parts[0].match(/:(.*?);/)[1];
+  const bstr = atob(parts[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
+
 // 用户手动点击旋转小票纠偏 (↺ -90°, ↻ +90°, 🔄 180°, ⏮ 0°)
 async function rotateCurrentReceipt(angleDelta, isAbsolute = false) {
   const source = currentReceiptFile || (lastReceiptImageContext && lastReceiptImageContext.originalImage);
@@ -928,11 +946,18 @@ async function reparseRotatedReceipt(rotatedDataUrl) {
   }
 
   let serverParsedSuccess = false;
-  if (currentReceiptFile) {
+  if (currentReceiptFile || rotatedDataUrl) {
     try {
       const formData = new FormData();
-      formData.append('file', currentReceiptFile);
-      formData.append('rotation', currentReceiptRotation);
+      if (rotatedDataUrl) {
+        // 画布已物理旋转完成，直接以正向图上传，后端指定 rotation=0 免除多余翻转，耗时 < 1 秒！
+        const blob = dataURLtoBlob(rotatedDataUrl);
+        if (blob) formData.append('file', blob, 'rotated_receipt.jpg');
+        formData.append('rotation', '0');
+      } else {
+        formData.append('file', currentReceiptFile);
+        formData.append('rotation', currentReceiptRotation);
+      }
       const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
       const res = await fetch('/split-bill/ocr-upload', {
         method: 'POST',
