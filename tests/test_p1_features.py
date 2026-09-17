@@ -111,6 +111,8 @@ def test_privacy_mode_templates_and_css():
     assert '.privacy-mode .chart-legend-right' in css
     assert '.privacy-mode .side-badge' in css
     assert '.privacy-mode .acc-kpi-val' in css
+    assert '.privacy-mode .btn-budget-pill:not(.btn-budget-unset)' in css
+    assert '.privacy-mode .pill-text' in css
 
     # 2. 验证彻底隐藏模式：hover 时绝不解除模糊 (不应存在针对敏感金额的 filter: blur(0px))
     assert 'filter: blur(0px)' not in css
