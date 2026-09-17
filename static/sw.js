@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ledger-pwa-v6';
+const CACHE_NAME = 'ledger-pwa-v7';
 const PRECACHE_ASSETS = [
   '/static/manifest.json',
   '/static/style.css',
@@ -53,7 +53,7 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/transactions/') ||
     url.pathname.startsWith('/nlp/') ||
     url.pathname.startsWith('/auto-track') ||
-    url.pathname.startsWith('/split-bill/') ||
+    url.pathname.startsWith('/split-bill') ||
     url.pathname.startsWith('/recurring/') ||
     url.pathname.startsWith('/import/') ||
     url.pathname.startsWith('/categories/') ||

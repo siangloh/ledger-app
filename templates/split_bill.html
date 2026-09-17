@@ -101,7 +101,10 @@ Latte 12.00
 Service Charge 10% 6.45
 SST 6% 4.26
 Total 75.21"></textarea>
-        <div style="display: flex; justify-content: flex-end; margin-top: 8px; gap: 8px;">
+        <div style="display: flex; justify-content: flex-end; margin-top: 8px; gap: 8px; flex-wrap: wrap;">
+          <button type="button" id="btnViewReceiptImages" class="btn-ghost btn-sm" onclick="reopenReviewModalWithCurrentData()" style="display: none; font-size: 12px; border: 1.5px solid var(--navy); color: var(--navy); font-weight: 600;">
+            🖼️ 查看小票送审对比图
+          </button>
           <button type="button" class="btn-secondary btn-sm" onclick="parseTextReceipt()">智能解析并核对</button>
         </div>
       </div>
@@ -541,10 +544,10 @@ async function handleReceiptFileSelect(files) {
   let backendNotice = '';
   let preprocessedImgUrl = null;
   let preprocessedMeta = null;
+  let localDataUrl = null;
 
   try {
     updateOcrProgress(35, '① 正在准备小票图像...');
-    let localDataUrl = null;
     try {
       const processedImg = await compressAndPreprocessImage(file);
       if (processedImg && processedImg.dataUrl) {
@@ -606,6 +609,29 @@ async function handleReceiptFileSelect(files) {
       }
     }
 
+    // 若 OCR 识别过程未返回预处理图，自动通过独立接口极速生成兜底
+    if (!preprocessedImgUrl && file) {
+      try {
+        const previewForm = new FormData();
+        previewForm.append('file', file);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const pRes = await fetch('/split-bill/ocr-preprocess-preview', {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrfToken },
+          body: previewForm
+        });
+        if (pRes.ok) {
+          const pJson = await pRes.json();
+          if (pJson.ok && pJson.preprocessed_image) {
+            preprocessedImgUrl = pJson.preprocessed_image;
+            preprocessedMeta = pJson.preprocessed_meta || null;
+          }
+        }
+      } catch (pErr) {
+        console.warn('Preprocess preview fallback notice:', pErr);
+      }
+    }
+
   } catch (err) {
     console.error('OCR pipeline notice:', err);
   } finally {
@@ -628,6 +654,12 @@ async function handleReceiptFileSelect(files) {
       preprocessedImage: preprocessedImgUrl,
       preprocessedMeta: preprocessedMeta
     };
+
+    // 显示文本框下方的查看图片快捷按钮
+    const viewBtn = document.getElementById('btnViewReceiptImages');
+    if (viewBtn && (localDataUrl || preprocessedImgUrl)) {
+      viewBtn.style.display = 'inline-flex';
+    }
 
     // 同步更新主页面第 1 步的常驻小票预览卡片
     const mainCard = document.getElementById('mainPageReceiptPreviewCard');
@@ -979,6 +1011,7 @@ function parseReceiptTextClientSide(rawText) {
 // 核心 UI 功能：“预填弹窗 + 大字号金额确认与核验” (Review Modal)
 // ============================================================
 function openReviewModal(parsed, rawText, imgContext) {
+  imgContext = imgContext || lastReceiptImageContext;
   parsed = parsed || {};
   currentCurrency = parsed.currency_symbol || 'RM';
   
