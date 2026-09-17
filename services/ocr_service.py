@@ -538,85 +538,69 @@ def smart_orient_receipt_ocr(pil_img, engine, forced_angle=None):
     if forced_angle is not None:
         best_angle = ((int(forced_angle) % 360) + 360) % 360
         logger.info("Using forced receipt orientation: %d°", best_angle)
-        winning_res = None
     else:
-        # 阶段一：极速版面主轴粗筛（仅跑 480px 文本检测，耗时 <0.5秒，剔除 50% 无效角度）
-        candidates = [0, 270, 90, 180]
+        best_angle = 0
         try:
+            # 阶段一：极速版面主轴粗筛（仅跑 480px 文本检测 text_det，耗时 ~0.3秒）
             axis_thumb = pil_img.copy()
             axis_thumb.thumbnail((480, 480))
-            dt_boxes, _ = engine.text_det(np.array(axis_thumb.convert('RGB')))
-            if dt_boxes is not None and len(dt_boxes) >= 4:
-                h_cnt = 0
-                v_cnt = 0
+            arr_0 = np.array(axis_thumb.convert('RGB'))
+            dt_boxes, _ = engine.text_det(arr_0)
+
+            h_cnt = 0
+            v_cnt = 0
+            if dt_boxes is not None and len(dt_boxes) > 0:
                 for b in dt_boxes:
                     xs = [p[0] for p in b]
                     ys = [p[1] for p in b]
                     bw = max(xs) - min(xs)
                     bh = max(ys) - min(ys)
-                    if bw > bh * 1.25:
+                    if bw > bh * 1.2:
                         h_cnt += 1
-                    elif bh > bw * 1.25:
+                    elif bh > bw * 1.2:
                         v_cnt += 1
                 logger.info("Orientation Axis Pre-check -> Horiz: %d | Vert: %d", h_cnt, v_cnt)
-                if v_cnt > h_cnt * 1.3:
-                    # 绝大多数文本框呈竖长条，小票 100% 处于横卧状态，仅需评估 270° 与 90°！
-                    candidates = [270, 90]
-                elif h_cnt > v_cnt * 1.3:
-                    # 绝大多数文本框呈横长条，小票处于竖立状态，仅需评估 0° 与 180°！
-                    candidates = [0, 180]
-        except Exception as axis_err:
-            logger.warning("Axis pre-check failed, fallback to full evaluation: %s", axis_err)
 
-        logger.info("========== [OCR Orientation Evaluation Candidates: %s] ==========", candidates)
-        best_angle = candidates[0]
-        max_score = -99999
-        winning_res = None
+            base_angle = 270 if v_cnt > h_cnt * 1.2 else 0
+            opposite_angle = (base_angle + 180) % 360
 
-        for angle in candidates:
-            candidate_img = get_rotated_pil_image(pil_img, angle)
+            # 阶段二：使用 RapidOCR 内置超轻量方向分类器 text_cls 进行毫秒级朝向判别（耗时 ~0.02秒）
+            cand_img = get_rotated_pil_image(pil_img, base_angle)
+            thumb = cand_img.copy()
+            thumb.thumbnail((540, 540))
+            arr_cand = np.array(thumb.convert('RGB'))
+            cand_boxes, _ = engine.text_det(arr_cand)
+            crops = []
+            if cand_boxes is not None and len(cand_boxes) > 0:
+                for b in cand_boxes[:15]:
+                    xs = [int(p[0]) for p in b]
+                    ys = [int(p[1]) for p in b]
+                    x1, x2 = max(0, min(xs)), min(arr_cand.shape[1], max(xs))
+                    y1, y2 = max(0, min(ys)), min(arr_cand.shape[0], max(ys))
+                    if x2 > x1 + 8 and y2 > y1 + 5:
+                        crops.append(arr_cand[y1:y2, x1:x2])
 
-            # 640px 缩略图评测，毫秒级完成单角度评估
-            thumb = candidate_img.copy()
-            thumb.thumbnail((640, 640))
-            proc_arr = preprocess_receipt_for_ocr(thumb, min_dimension=0)
-            res, _ = engine(proc_arr)
-            if not res:
-                res, _ = engine(np.array(thumb.convert('RGB')))
+            if crops:
+                _, cls_res, _ = engine.text_cls(crops)
+                zeros = sum(1 for c in cls_res if c[0] == '0')
+                one_eighties = sum(1 for c in cls_res if c[0] == '180')
+                logger.info("Text direction check on angle %d° -> 0°(正向): %d, 180°(倒置): %d",
+                            base_angle, zeros, one_eighties)
+                best_angle = base_angle if zeros >= one_eighties else opposite_angle
+            else:
+                best_angle = base_angle
+        except Exception as orient_err:
+            logger.warning("Orientation detection failed, fallback to 0°: %s", orient_err)
+            best_angle = 0
 
-            score, anchors, h_ratio, f_top, h_btm = score_receipt_orientation(
-                res, img_h=thumb.height, return_details=True
-            )
-            logger.info("Angle %3d° -> Score: %5d | Anchors: %d | HRatio: %.2f | FTop: %d | HBtm: %d | Blocks: %d",
-                        angle, score, anchors, h_ratio, f_top, h_btm, len(res) if res else 0)
+        logger.info("========== Final Picked Orientation: %d° ==========", best_angle)
 
-            if score > max_score:
-                max_score = score
-                best_angle = angle
-                winning_res = res
-
-            # 高置信胜出提前截断：得分 >= 800、至少 3 个核心锚点、横排占比 >= 80%、无顶部 Footer 倒错
-            if score >= 800 and anchors >= 3 and h_ratio >= 0.80 and f_top <= 1 and h_btm == 0:
-                logger.info("Angle %d° is decisively upright (Score: %d, Anchors: %d). Concluding early.",
-                            angle, score, anchors)
-                break
-
-        logger.info("========== Final Pick: %d° (Score: %d) ==========", best_angle, max_score)
-
-    # 确定胜出朝向后，获取正向图像
+    # 阶段三：对胜出角度执行正向图像预处理并进行单次精准识别
     best_img = get_rotated_pil_image(pil_img, best_angle)
-
-    # 生成正向预处理图（耗时仅 0.03 秒）供前端送审对比卡片展示与下载
     best_proc_arr = preprocess_receipt_for_ocr(best_img, min_dimension=800)
-
-    # 性能核心优化：如果探测阶段胜出的识别结果已经足够完整（>=6行），直接复用！
-    # 彻底省去第二轮重复 OCR 推理，将全流程耗时从 40+ 秒压缩至 8~10 秒，100% 杜绝 Render 网关超时！
-    if winning_res and len(winning_res) >= 6:
-        best_res = winning_res
-    else:
-        best_res, _ = engine(best_proc_arr)
-        if not best_res:
-            best_res, _ = engine(np.array(best_img.convert('RGB')))
+    best_res, _ = engine(best_proc_arr)
+    if not best_res:
+        best_res, _ = engine(np.array(best_img.convert('RGB')))
 
     preprocessed_b64 = encode_cv2_image_to_base64(best_proc_arr)
     meta = {
