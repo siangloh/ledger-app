@@ -384,8 +384,11 @@ def parse_receipt_text_to_items(raw_text):
             if re.search(r'\b\d{4,6}\b\s*$', clean_line):
                 continue
 
+        # 如果整行仅仅是纯单价说明（没有行末独立结算单价），则跳过；若包含菜品及行末单价则保留并清洗
         if re.search(r'[0-9]+\.?[0-9]*\s*/\s*ea\b', lower):
-            continue
+            trailing_price = re.search(r'(?:RM|MYR|\$|S\$|€|£|¥)?\s*[0-9]+\.[0-9]{2}\s*$', clean_line, re.IGNORECASE)
+            if not trailing_price:
+                continue
 
         price_pattern = re.compile(
             r'(?:RM|MYR|\$|S\$|€|EUR|£|GBP|¥|円|₩|원|฿|Rp|₫)\s*[0-9]+(?:\.[0-9]{1,2})?'
@@ -400,6 +403,8 @@ def parse_receipt_text_to_items(raw_text):
             name_raw = re.sub(r'\s*(?:RM|MYR|\$|S\$|€|£|¥|円|₩)\s*$', '', name_raw, flags=re.IGNORECASE)
             name_raw = re.sub(r'^[（(]?(?:Takeaway|TA|Dine[- ]in)[)）]?\s*(?:\([0-9.]+/ea\))?\s*', '', name_raw, flags=re.IGNORECASE)
             name_raw = re.sub(r'^[（(]?[0-9.]+/ea[)）]?\s*', '', name_raw, flags=re.IGNORECASE)
+            name_raw = re.sub(r'[（(]?[0-9.]+/ea[)）]?', '', name_raw, flags=re.IGNORECASE)
+            name_raw = re.sub(r'\b(?:Takeaway|TA|Dine[- ]in)\b', '', name_raw, flags=re.IGNORECASE)
             name_raw = name_raw.strip(' -:\t#$*¥“"\'|.,;，、\\/<>=~_+`')
 
             num_match = re.search(r'[0-9]+(?:\.[0-9]{1,2})?', m_item.group())

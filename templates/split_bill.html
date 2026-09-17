@@ -631,6 +631,18 @@ async function handleReceiptFileSelect(files) {
         }
         if (json.rotation_applied !== undefined && json.rotation_applied !== null) {
           currentReceiptRotation = json.rotation_applied;
+          // 自动同步将前端 Canvas 画布旋转至胜出的朝向角度，让用户界面上的预览相片 100% 物理立正！
+          if (currentReceiptRotation !== 0) {
+            try {
+              const rotRes = await processReceiptOnCanvas(file, currentReceiptRotation);
+              if (rotRes) {
+                localDataUrl = rotRes.originalDataUrl;
+                if (!preprocessedImgUrl) preprocessedImgUrl = rotRes.preprocessedDataUrl;
+              }
+            } catch (rErr) {
+              console.warn('Canvas rotate to winning angle notice:', rErr);
+            }
+          }
         }
         if (json.ok && json.data) {
           parsedData = json.data;

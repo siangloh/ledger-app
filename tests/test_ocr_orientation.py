@@ -103,3 +103,26 @@ def test_smart_orient_forced_angle():
     assert meta["rotation"] == 270
 
 
+def test_parse_receipt_text_with_inline_ea_comments():
+    """Verify that dishes with inline (xx/ea) comments are parsed correctly and not skipped."""
+    from services.ocr_service import parse_receipt_text_to_items
+    text = (
+        "GOOD MOOD KITCHEN\n"
+        "Qty Item Price(MYR)\n"
+        "1 Lemon Chicken Rice Set 柠檬鸡丁饭 14.90\n"
+        ".TA 套餐（Takeaway）（14.90/ea）\n"
+        "(Takeaway)(11.90/ea) LuncheonMeatFried Rice 午餐肉炒饭 11.90\n"
+        "2 Qty\n"
+        "Subtotal 26.80\n"
+        "Total (MYR) 26.80\n"
+    )
+    res = parse_receipt_text_to_items(text)
+    assert len(res["items"]) == 2, f"Expected 2 items, got {len(res['items'])}"
+    assert res["items"][0]["price"] == 14.90
+    assert "柠檬鸡丁饭" in res["items"][0]["name"]
+    assert res["items"][1]["price"] == 11.90
+    assert "午餐肉炒饭" in res["items"][1]["name"]
+    assert res["total"] == 26.80
+
+
+
