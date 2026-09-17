@@ -36,6 +36,7 @@ class NotificationLogActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         toolbar.setNavigationOnClickListener { finish() }
+        updateToolbarSubtitle()
 
         recyclerView = findViewById(R.id.logRecyclerView)
         emptyView = findViewById(R.id.emptyLogView)
@@ -45,6 +46,56 @@ class NotificationLogActivity : AppCompatActivity() {
         recyclerView.adapter = adapter
 
         loadLogs()
+    }
+
+    private fun updateToolbarSubtitle() {
+        val current = com.siangloh.ledger.NetworkHelper.getUsername(this)
+        supportActionBar?.subtitle = if (current.isEmpty()) "当前绑定：默认 admin" else "当前绑定：$current"
+    }
+
+    override fun onCreateOptionsMenu(menu: android.view.Menu?): Boolean {
+        menu?.add(0, 101, 0, "👤 绑定用户")?.apply {
+            setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS)
+        }
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
+        if (item.itemId == 101) {
+            showUsernameDialog()
+            return true
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    private fun showUsernameDialog() {
+        val current = com.siangloh.ledger.NetworkHelper.getUsername(this)
+        val input = android.widget.EditText(this).apply {
+            setText(current)
+            setSelection(text.length)
+            hint = "例如：admin、user_b"
+        }
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("👤 绑定记账用户名")
+            .setMessage("设置当前手机抓取通知时归属的记账账号（多端隔离记账）：")
+            .setView(input)
+            .setPositiveButton("保存") { _, _ ->
+                val newName = input.text.toString().trim()
+                com.siangloh.ledger.NetworkHelper.setUsername(this, newName)
+                updateToolbarSubtitle()
+                android.widget.Toast.makeText(
+                    this,
+                    if (newName.isEmpty()) "已恢复为默认 admin 账号" else "已成功绑定账号：$newName",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            .setNeutralButton("清空(默认admin)") { _, _ ->
+                com.siangloh.ledger.NetworkHelper.setUsername(this, "")
+                updateToolbarSubtitle()
+                android.widget.Toast.makeText(this, "已恢复为默认 admin 账号", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun loadLogs() {
