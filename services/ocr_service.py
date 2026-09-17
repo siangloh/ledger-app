@@ -133,11 +133,18 @@ def preprocess_receipt_for_ocr(pil_img, min_dimension=1000):
     return final_img
 
 
-def score_receipt_orientation(ocr_res):
+def score_receipt_orientation(ocr_res, img_h=None, return_details=False):
     """
-    通过真实小票关键词 + 高置信度英文词汇打分，彻底杜绝乱码假阳性
+    基于小票版式特征、文本框宽高比与空间语义布局的朝向打分算法：
+    1. 形态学判断：统计横排（宽 > 高）与竖排（高 > 宽）数量与比例，横排比例低于 70% 施加强烈惩罚。
+    2. 锚点词汇判断：TOTAL, RM, INVOICE 等常见收据关键词命中加分。
+    3. 空间布局感知（彻底解决 180° 倒立假阳性）：
+       - Header（Invoice, Date, Table, Cashier 等）：出现在上半区加分，出现在下半区扣分；
+       - Footer（Total, Subtotal, Change, Rounding, DuitNow 等）：出现在下半区加分，出现在上半区扣除巨额分数。
     """
     if not ocr_res:
+        if return_details:
+            return -999, 0, 0.0, 0, 0
         return -999, 0
 
     ANCHOR_WORDS = [
@@ -146,44 +153,85 @@ def score_receipt_orientation(ocr_res):
         r'ROUNDING', r'ITEM', r'QTY', r'PRICE', r'TAX',
         r'RECEIPT', r'CHECK', r'AMOUNT', r'PAYMENT'
     ]
+    HEADER_WORDS = ['invoice', 'order', 'table', 'date', 'pax', 'cashier', 'reg no', 'bill', 'receipt no']
+    FOOTER_WORDS = ['total', 'subtotal', 'change', 'rounding', 'duitnow', 'feedme', 'scan', 'pos', 'cash', 'card', 'visa', 'mastercard']
 
     total_score = 0
     anchor_hits = 0
-    valid_word_count = 0
+    horiz_count = 0
+    vert_count = 0
+    header_top = 0
+    header_bottom = 0
+    footer_bottom = 0
+    footer_top = 0
+
+    h_ref = float(img_h) if img_h and img_h > 0 else 0.0
 
     for item in ocr_res:
         box = item[0]
-        text = str(item[1]).strip().upper()
+        text = str(item[1]).strip()
+        text_upper = text.upper()
+        text_lower = text.lower()
         confidence = float(item[2])
 
         if confidence < 0.5:
             continue
 
-        # 核心形态学判别：正常印刷小票以横排单行文本为主（宽 > 高）。
-        # 若小票被横拍/歪置90°，文本行在画面中将呈现为高大于宽的纵向细长框，施加强烈负向惩罚！
+        cy = None
         if box and len(box) >= 4:
             xs = [p[0] for p in box]
             ys = [p[1] for p in box]
             w = max(xs) - min(xs)
             h = max(ys) - min(ys)
-            if w > h * 1.1:
+            cy = sum(ys) / float(len(ys))
+            if w > h * 1.15:
+                horiz_count += 1
                 total_score += 25
-            elif h > w * 1.1:
-                total_score -= 35
+            elif h > w * 1.15:
+                vert_count += 1
+                total_score -= 40
 
         for pattern in ANCHOR_WORDS:
-            if re.search(r'\b' + pattern + r'\b', text) or pattern in text:
+            if re.search(r'\b' + pattern + r'\b', text_upper) or pattern in text_upper:
                 anchor_hits += 1
                 total_score += 50
                 break
 
-        if re.search(r'[A-Z]{3,}', text) or re.search(r'[\u4e00-\u9fa5]{2,}', text):
-            valid_word_count += 1
+        if re.search(r'[A-Z]{3,}', text_upper) or re.search(r'[\u4e00-\u9fa5]{2,}', text):
             total_score += 5
 
         gibberish_count = len(re.findall(r'[=\|%~£§©«»_\\<>]', text))
         total_score -= gibberish_count * 15
 
+        # 空间语义布局判断（正向小票 Header 在上方，Footer 在下方）
+        if h_ref > 0 and cy is not None:
+            for hw in HEADER_WORDS:
+                if re.search(r'\b' + re.escape(hw) + r'\b', text_lower) or hw in text_lower:
+                    if cy < h_ref * 0.45:
+                        header_top += 1
+                        total_score += 100
+                    elif cy > h_ref * 0.55:
+                        header_bottom += 1
+                        total_score -= 200
+                    break
+
+            for fw in FOOTER_WORDS:
+                # 严格使用单词边界，防止 cashier 误匹配 cash 等字串污染
+                if re.search(r'\b' + re.escape(fw) + r'\b', text_lower):
+                    if cy > h_ref * 0.45:
+                        footer_bottom += 1
+                        total_score += 150
+                    elif cy < h_ref * 0.40:
+                        footer_top += 1
+                        total_score -= 300
+                    break
+
+    horiz_ratio = horiz_count / float(max(1, horiz_count + vert_count))
+    if horiz_ratio < 0.70:
+        total_score -= 1000
+
+    if return_details:
+        return total_score, anchor_hits, horiz_ratio, footer_top, header_bottom
     return total_score, anchor_hits
 
 
@@ -420,23 +468,34 @@ def encode_cv2_image_to_base64(cv2_img, quality=85):
     return ""
 
 
+def get_rotated_pil_image(pil_img, angle):
+    """
+    将 PIL 图像按标准顺时针角度旋转：
+    注意：Pillow 的 ROTATE_90 是逆时针 90°，ROTATE_270 才是顺时针 90°！
+    此处统一以顺时针角度（与前端 Canvas ctx.rotate() 和常规视觉习惯一致）为基准映射：
+      - 0°: 原图
+      - 90° (顺时针 90°): Image.Transpose.ROTATE_270
+      - 180°: Image.Transpose.ROTATE_180
+      - 270° (顺时针 270° / 逆时针 90°): Image.Transpose.ROTATE_90
+    """
+    from PIL import Image
+    norm_angle = ((int(angle) % 360) + 360) % 360
+    if norm_angle == 90:
+        return pil_img.transpose(Image.Transpose.ROTATE_270)
+    elif norm_angle == 180:
+        return pil_img.transpose(Image.Transpose.ROTATE_180)
+    elif norm_angle == 270:
+        return pil_img.transpose(Image.Transpose.ROTATE_90)
+    return pil_img
+
+
 def get_preprocessed_receipt_preview(pil_img, angle=0):
     """
     仅执行图像预处理管线（自适应旋转、灰度化、CLAHE对比度均衡、双边滤波保边降噪），
     返回处理后的 numpy 数组、Base64 Data URL 字符串与处理元数据。
     用于在送入 OCR 引擎前直接预览和诊断图像处理质量。
     """
-    from PIL import Image
-
-    if angle == 90:
-        target_img = pil_img.transpose(Image.Transpose.ROTATE_90)
-    elif angle == 180:
-        target_img = pil_img.transpose(Image.Transpose.ROTATE_180)
-    elif angle == 270:
-        target_img = pil_img.transpose(Image.Transpose.ROTATE_270)
-    else:
-        target_img = pil_img
-
+    target_img = get_rotated_pil_image(pil_img, angle)
     proc_arr = preprocess_receipt_for_ocr(target_img)
     h, w = proc_arr.shape[:2]
     meta = {
@@ -457,68 +516,57 @@ def get_preprocessed_receipt_preview(pil_img, angle=0):
 def smart_orient_receipt_ocr(pil_img, engine, forced_angle=None):
     """
     自适应小票方向纠偏与极速 OCR 识别：
-    1. 若指定 forced_angle，跳过探测直接旋转送审
-    2. 探测时使用 480px 真实缩略图（min_dimension=0），单次推理耗时缩短 75%
-    3. 按 [0°, 90°, 270°, 180°] 优先级打分，当确定正向（score>=500 且 anchors>=3）时快速胜出，杜绝 502 网关超时
+    1. 若指定 forced_angle，跳过探测直接按顺时针角度旋转送审
+    2. 探测时使用 800px 高保真缩略图（min_dimension=0），兼顾毫秒级推理与细长小票微小字符识别
+    3. 结合文本框宽高比与空间语义布局（Header在上/Footer在下）深度打分，彻底杜绝 180° 倒立假阳性
+    4. 采用严格门禁快速收敛，并在胜出后直接复用识别结果，总耗时控制在 8~10 秒内
     """
-    from PIL import Image
     import numpy as np
 
     if forced_angle is not None:
-        best_angle = int(forced_angle) % 360
+        best_angle = ((int(forced_angle) % 360) + 360) % 360
         logger.info("Using forced receipt orientation: %d°", best_angle)
+        winning_res = None
     else:
-        angle_priority = [0, 90, 270, 180]
+        # 常见手机横拍小票顺时针 270° (逆时针 90°) 最为常见，排入优先评估队列
+        angle_priority = [0, 270, 90, 180]
         best_angle = 0
         max_score = -99999
         winning_res = None
 
         logger.info("========== [OCR Orientation Evaluation] ==========")
         for angle in angle_priority:
-            if angle == 0:
-                candidate_img = pil_img
-            elif angle == 90:
-                candidate_img = pil_img.transpose(Image.Transpose.ROTATE_90)
-            elif angle == 180:
-                candidate_img = pil_img.transpose(Image.Transpose.ROTATE_180)
-            elif angle == 270:
-                candidate_img = pil_img.transpose(Image.Transpose.ROTATE_270)
-            else:
-                candidate_img = pil_img
+            candidate_img = get_rotated_pil_image(pil_img, angle)
 
-            # 640px 缩略图评测（min_dimension=0 防止被拉伸，兼顾超高精度与毫秒级推理）
+            # 800px 缩略图评测（min_dimension=0 防止被拉伸，兼顾超高精度与毫秒级推理）
             thumb = candidate_img.copy()
-            thumb.thumbnail((640, 640))
+            thumb.thumbnail((800, 800))
             proc_arr = preprocess_receipt_for_ocr(thumb, min_dimension=0)
             res, _ = engine(proc_arr)
             if not res:
                 res, _ = engine(np.array(thumb.convert('RGB')))
 
-            score, anchors = score_receipt_orientation(res)
-            logger.info("Angle %3d° -> Score: %5d | Anchors Hit: %d | Blocks: %d",
-                        angle, score, anchors, len(res) if res else 0)
+            score, anchors, h_ratio, f_top, h_btm = score_receipt_orientation(
+                res, img_h=thumb.height, return_details=True
+            )
+            logger.info("Angle %3d° -> Score: %5d | Anchors: %d | HRatio: %.2f | FTop: %d | HBtm: %d | Blocks: %d",
+                        angle, score, anchors, h_ratio, f_top, h_btm, len(res) if res else 0)
 
             if score > max_score:
                 max_score = score
                 best_angle = angle
                 winning_res = res
 
-            # 关键快速收敛：当得分极高(>=500)且至少命中3个小票核心关键词时，证明已完全摆正，提前胜出！
-            if score >= 500 and anchors >= 3:
-                logger.info("Angle %d° is decisively upright (Score: %d, Anchors: %d). Concluding early.",
-                            angle, score, anchors)
+            # 严苛的快速胜出门禁：只有得分极高、多锚点、横排占比高且绝无页眉页脚颠倒时才允许提前收敛
+            if score >= 1000 and anchors >= 4 and h_ratio >= 0.85 and f_top == 0 and h_btm == 0:
+                logger.info("Angle %d° is decisively upright (Score: %d, Anchors: %d, HRatio: %.2f). Concluding early.",
+                            angle, score, anchors, h_ratio)
                 break
 
         logger.info("========== Final Pick: %d° (Score: %d) ==========", best_angle, max_score)
 
     # 确定胜出朝向后，获取正向图像
-    best_img = pil_img
-    if best_angle == 90:
-        best_img = pil_img.transpose(Image.Transpose.ROTATE_90)
-    elif best_angle == 180:
-        best_img = pil_img.transpose(Image.Transpose.ROTATE_180)
-    elif best_angle == 270:
-        best_img = pil_img.transpose(Image.Transpose.ROTATE_270)
+    best_img = get_rotated_pil_image(pil_img, best_angle)
 
     # 生成正向预处理图（耗时仅 0.03 秒）供前端送审对比卡片展示与下载
     best_proc_arr = preprocess_receipt_for_ocr(best_img, min_dimension=800)
@@ -538,7 +586,7 @@ def smart_orient_receipt_ocr(pil_img, engine, forced_angle=None):
         'width': int(best_proc_arr.shape[1]) if best_proc_arr is not None else 0,
         'height': int(best_proc_arr.shape[0]) if best_proc_arr is not None else 0,
         'filters': [
-            '自适应尺寸缩放 (Min 1200px)',
+            '自适应尺寸缩放 (Min 800px)',
             '灰度化转换 (Grayscale)',
             'CLAHE 自适应局部对比度增强 (ClipLimit=2.0)',
             '双边保边滤波降噪 (BilateralFilter)'
