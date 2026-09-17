@@ -182,12 +182,17 @@ def api_auto_track():
     db = get_db()
     now = datetime.now().isoformat()
     target_user_id = data.get('user_id') or request.args.get('user_id')
-    target_username = data.get('username') or request.args.get('username')
-    if target_username and not target_user_id:
-        u_row = db.execute("SELECT id FROM users WHERE username = ?", (target_username,)).fetchone()
+    raw_target_username = str(data.get('username') or request.args.get('username') or '').strip()
+    if raw_target_username and not target_user_id:
+        u_row = db.execute("SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)", (raw_target_username,)).fetchone()
         if u_row:
             target_user_id = u_row['id']
+            logger.info("[AUTO_TRACK] Request bound to username '%s' (user_id: %s)", u_row['username'], target_user_id)
+        else:
+            logger.warning("[AUTO_TRACK] Username '%s' not found in database! Falling back to admin.", raw_target_username)
+
     if not target_user_id:
+        logger.info("[AUTO_TRACK] No user specified in notification request. Falling back to admin/primary user.")
         admin_row = db.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
         if admin_row:
             target_user_id = admin_row['id']

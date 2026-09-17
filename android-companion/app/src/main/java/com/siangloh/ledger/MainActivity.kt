@@ -192,6 +192,18 @@ class MainActivity : AppCompatActivity() {
                 progressBar.visibility = View.GONE
                 swipeRefreshLayout.isRefreshing = false
                 CookieManager.getInstance().flush()
+
+                // 主动从当前页面嗅探已登录用户名并同步给原生常驻服务，确保多设备/多账户 100% 独立绑定
+                view?.evaluateJavascript("(function() { return document.querySelector('meta[name=\"current-username\"]')?.getAttribute('content') || ''; })()") { rawResult ->
+                    val user = rawResult?.replace("\"", "")?.trim() ?: ""
+                    if (user.isNotBlank() && user != "null" && user != "None") {
+                        val current = NetworkHelper.getUsername(this@MainActivity)
+                        if (current != user) {
+                            NetworkHelper.setUsername(this@MainActivity, user)
+                            Log.i("LedgerNativeBridge", "Auto-synced native user from page: $user (was: $current)")
+                        }
+                    }
+                }
             }
 
             override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
@@ -291,7 +303,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showQuickMenu() {
-        val options = arrayOf("⚡ 离线快速记账", "⚙️ 监测的应用设置", "📋 查看通知与同步日志", "🔄 手动同步", "👤 绑定记账用户 (Username 设置)", "🌐 服务器地址设置", "🔑 自动记账 API Key 设置")
+        val currentBound = NetworkHelper.getUsername(this).ifEmpty { "未绑定(默认admin)" }
+        val options = arrayOf(
+            "⚡ 离线快速记账",
+            "⚙️ 监测的应用设置",
+            "📋 查看通知与同步日志",
+            "🔄 手动同步",
+            "👤 绑定记账用户 (当前: $currentBound)",
+            "🌐 服务器地址设置",
+            "🔑 自动记账 API Key 设置"
+        )
         AlertDialog.Builder(this)
             .setTitle("快捷菜单")
             .setItems(options) { _, which ->
