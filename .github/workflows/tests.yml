@@ -21,7 +21,15 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Lint for real errors (syntax errors, undefined names, unused imports)
-        run: flake8 . --count --select=E9,F63,F7,F82,F401,F841 --show-source --statistics
+        run: |
+          if ! flake8 . --count --select=E9,F63,F7,F82,F401,F841 --exclude=.git,__pycache__,android-companion,scratch,uploads,static --show-source --statistics > flake8_report.txt 2>&1; then
+            cat flake8_report.txt
+            echo "### Flake8 Lint Failures" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat flake8_report.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
       - name: Run tests
         run: pytest -v
