@@ -152,11 +152,24 @@ def score_receipt_orientation(ocr_res):
     valid_word_count = 0
 
     for item in ocr_res:
+        box = item[0]
         text = str(item[1]).strip().upper()
         confidence = float(item[2])
 
-        if confidence < 0.6:
+        if confidence < 0.5:
             continue
+
+        # 核心形态学判别：正常印刷小票以横排单行文本为主（宽 > 高）。
+        # 若小票被横拍/歪置90°，文本行在画面中将呈现为高大于宽的纵向细长框，施加强烈负向惩罚！
+        if box and len(box) >= 4:
+            xs = [p[0] for p in box]
+            ys = [p[1] for p in box]
+            w = max(xs) - min(xs)
+            h = max(ys) - min(ys)
+            if w > h * 1.1:
+                total_score += 25
+            elif h > w * 1.1:
+                total_score -= 35
 
         for pattern in ANCHOR_WORDS:
             if re.search(r'\b' + pattern + r'\b', text) or pattern in text:
@@ -479,12 +492,6 @@ def smart_orient_receipt_ocr(pil_img, engine):
         if best_angle is None or score > max_score:
             max_score = score
             best_angle = angle
-
-        if anchors >= 2:
-            confirm_line = f">> Confirmed upright angle: {angle}° with {anchors} anchors."
-            logger.info(confirm_line)
-            best_angle = angle
-            break
 
     summary_line = f"========== Final Pick: {best_angle}° (Score: {max_score}) ==========\n"
     logger.info(summary_line)
