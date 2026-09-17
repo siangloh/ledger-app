@@ -1,0 +1,11 @@
+./core/db.py:74:5: F824 `global USER_DATA_VERSIONS` is unused: name is never assigned in scope
+    global DATA_VERSION, USER_DATA_VERSIONS
+    ^
+./core/db.py:101:5: F824 `global LATEST_EVENT` is unused: name is never assigned in scope
+    global LATEST_EVENT, USER_LATEST_EVENTS
+    ^
+./core/db.py:101:5: F824 `global USER_LATEST_EVENTS` is unused: name is never assigned in scope
+    global LATEST_EVENT, USER_LATEST_EVENTS
+    ^
+3     F824 `global USER_DATA_VERSIONS` is unused: name is never assigned in scope
+3
