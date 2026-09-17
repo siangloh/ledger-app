@@ -50,6 +50,44 @@
           <span style="display:inline-block; width:6px; height:6px; background:var(--green); border-radius:50%;"></span>
           <span>纯离线推理 · 预填弹窗 + 大字号金额确认</span>
         </div>
+
+        <!-- 主页面常驻小票预览卡片（当用户上传相片后直接在主界面显示原图与 OCR 前预处理图） -->
+        <div id="mainPageReceiptPreviewCard" style="display: none; margin-top: 14px; background: var(--surface); border: 1.5px solid var(--navy); border-radius: var(--radius-sm); padding: 12px; text-align: left; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 14px;">🖼️</span>
+              <strong style="font-size: 12.5px; color: var(--navy);">已生成 OCR 前预处理送审图</strong>
+            </div>
+            <button type="button" class="btn-secondary btn-sm" onclick="reopenReviewModalWithCurrentData()" style="font-size: 11.5px; padding: 3px 8px;">
+              🔍 打开核验与分账弹窗 ↗
+            </button>
+          </div>
+          
+          <div id="mainPagePrepMeta" style="font-size: 11px; color: var(--muted); margin-bottom: 8px;">
+            规格与纠偏信息加载中...
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <!-- 原图 -->
+            <div style="text-align: center;">
+              <span style="font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px;">📸 上传原图</span>
+              <div style="background: #0f172a; border-radius: 4px; height: 130px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <img id="mainPageOriginalImg" src="" alt="原图" style="max-width: 100%; max-height: 130px; object-fit: contain; cursor: zoom-in;" onclick="openImageZoom(this.src, '用户上传原相片')">
+              </div>
+            </div>
+            <!-- 送审图 -->
+            <div style="text-align: center;">
+              <span style="font-size: 11px; color: var(--navy); font-weight: 600; display: block; margin-bottom: 4px;">⚙️ 系统送审图 (Before OCR)</span>
+              <div style="background: #0f172a; border-radius: 4px; height: 130px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
+                <img id="mainPagePreprocessedImg" src="" alt="系统预处理送审图" style="max-width: 100%; max-height: 130px; object-fit: contain; cursor: zoom-in;" onclick="openImageZoom(this.src, '系统预处理送审图 (Before OCR)')">
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+            <span style="font-size: 10.5px; color: var(--green); font-weight: 600;">✔ 已完成 CLAHE 对比度增强与保边去噪</span>
+            <a id="mainPageDownloadPrepBtn" href="javascript:void(0)" target="_blank" style="font-size: 11px; color: var(--navy); text-decoration: underline;" download="preprocessed_receipt.jpg">下载送审原图 ↗</a>
+          </div>
+        </div>
       </div>
 
       <!-- 文本粘贴卡片 -->
@@ -346,8 +384,19 @@ let serviceCharge = 0.00;
 let tax = 0.00;
 var currentCurrency = (typeof window !== 'undefined' && window.LEDGER_CURRENCY_SYMBOL) || '{{ current_user_currency|default("RM") }}';
 
-// 核对弹窗的草稿临时数据
+// 核对弹窗的草稿临时数据与小票图像上下文
 let reviewItems = [];
+let lastParsedReceiptData = null;
+let lastRecognizedReceiptText = '';
+let lastReceiptImageContext = null;
+
+function reopenReviewModalWithCurrentData() {
+  if (lastParsedReceiptData || lastReceiptImageContext) {
+    openReviewModal(lastParsedReceiptData || {}, lastRecognizedReceiptText || '', lastReceiptImageContext);
+  } else {
+    openReviewModal({}, '', null);
+  }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   renderPeople();
@@ -368,6 +417,38 @@ function setupReceiptScanEntry() {
       hint.innerHTML = '已连接手机原生硬件加速识别引擎（Google ML Kit / ONNX NPU），拍照后即刻在手机芯片离线完成识别，不上传任何照片。';
     }
   }
+
+  // 支持拖拽图片至卡片快速上传
+  const card = document.getElementById('receiptScanCard');
+  if (card) {
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      card.style.borderColor = 'var(--navy)';
+      card.style.background = 'var(--surface)';
+    });
+    card.addEventListener('dragleave', () => {
+      card.style.borderColor = 'var(--border)';
+      card.style.background = 'var(--surface-soft)';
+    });
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      card.style.borderColor = 'var(--border)';
+      card.style.background = 'var(--surface-soft)';
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleReceiptFileSelect(e.dataTransfer.files);
+      }
+    });
+  }
+
+  // 支持在页面任意处直接粘贴图片 (Ctrl+V)
+  window.addEventListener('paste', (e) => {
+    if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+      const file = e.clipboardData.files[0];
+      if (file.type && file.type.startsWith('image/')) {
+        handleReceiptFileSelect([file]);
+      }
+    }
+  });
 }
 
 function startReceiptScan() {
@@ -539,12 +620,37 @@ async function handleReceiptFileSelect(files) {
     const textarea = document.getElementById('receiptTextInput');
     if (textarea) textarea.value = recognizedText || '';
 
-    // 唤起“预填弹窗 + 大字号金额确认”，同时附带系统预处理图像
-    openReviewModal(parsedData, recognizedText || '', {
+    // 保存全局上下文
+    lastParsedReceiptData = parsedData;
+    lastRecognizedReceiptText = recognizedText || '';
+    lastReceiptImageContext = {
       originalImage: localDataUrl,
       preprocessedImage: preprocessedImgUrl,
       preprocessedMeta: preprocessedMeta
-    });
+    };
+
+    // 同步更新主页面第 1 步的常驻小票预览卡片
+    const mainCard = document.getElementById('mainPageReceiptPreviewCard');
+    const mainOrig = document.getElementById('mainPageOriginalImg');
+    const mainPrep = document.getElementById('mainPagePreprocessedImg');
+    const mainMeta = document.getElementById('mainPagePrepMeta');
+    const mainDl = document.getElementById('mainPageDownloadPrepBtn');
+
+    if (mainCard && (localDataUrl || preprocessedImgUrl)) {
+      mainCard.style.display = 'block';
+      if (mainOrig && localDataUrl) mainOrig.src = localDataUrl;
+      if (mainPrep && preprocessedImgUrl) mainPrep.src = preprocessedImgUrl;
+      if (mainDl && preprocessedImgUrl) mainDl.href = preprocessedImgUrl;
+      if (mainMeta) {
+        const rot = (preprocessedMeta && preprocessedMeta.rotation !== undefined) ? preprocessedMeta.rotation : 0;
+        const w = (preprocessedMeta && preprocessedMeta.width) ? preprocessedMeta.width : '自适应';
+        const h = (preprocessedMeta && preprocessedMeta.height) ? preprocessedMeta.height : '高清';
+        mainMeta.textContent = `🔄 纠偏朝向: ${rot}° | 📐 分辨率: ${w}×${h} px | 滤镜: CLAHE 对比度均衡 + 双边保边滤波降噪`;
+      }
+    }
+
+    // 唤起“预填弹窗 + 大字号金额确认”，同时附带系统预处理图像
+    openReviewModal(parsedData, recognizedText || '', lastReceiptImageContext);
 
     // 若未识别出单品或金额为0，轻量 Toast 提示用户可直接手动输入或调整
     if ((!parsedData.items || parsedData.items.length === 0) && (parsedData.total || 0) === 0) {
