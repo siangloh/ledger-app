@@ -71,7 +71,7 @@ def bump_data_version(event_type='update', data=None, user_id=None, db=None):
 
 def get_data_version(user_id=None, db=None):
     """获取最新数据版本号（优先从 system_metadata 读取以消除多 Worker 漂移，回退内存缓存）"""
-    global DATA_VERSION, USER_DATA_VERSIONS
+    global DATA_VERSION
     try:
         conn = db or (get_db() if has_request_context() else None)
         if conn:
@@ -98,7 +98,6 @@ def get_data_version(user_id=None, db=None):
 
 def get_latest_event(user_id=None, db=None):
     """获取最新事件 payload（优先从 system_metadata 保证多进程一致性）"""
-    global LATEST_EVENT, USER_LATEST_EVENTS
     try:
         conn = db or (get_db() if has_request_context() else None)
         if conn and user_id:
