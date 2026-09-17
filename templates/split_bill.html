@@ -653,12 +653,16 @@ async function handleReceiptFileSelect(files) {
           backendNotice = json.message || '未能从照片中提取到清晰文字';
           if (json.raw_text) recognizedText = json.raw_text;
         }
+      } else {
+        console.warn('RapidOCR upload responded with non-200 status:', res.status);
+        backendNotice = '服务器深度学习识别繁忙或超时，您可在此直接录入或调整。';
       }
     } catch (apiErr) {
       console.warn('RapidOCR request notice:', apiErr);
+      backendNotice = '网络连接超时，请核验小票明细。';
     }
 
-    // ③ 若服务器未提取到有效单品且有前端离线库，尝试端侧极速备用（设置 5 秒超时保护防卡死）
+    // ③ 仅当服务器识别失败且端侧提取出的内容非乱码时，才作为备用兜底（设置 5 秒超时保护防卡死）
     if ((!parsedData || !parsedData.items || parsedData.items.length === 0) && typeof Tesseract !== 'undefined') {
       try {
         updateOcrProgress(80, '② 端侧快速检测...');
@@ -668,12 +672,13 @@ async function handleReceiptFileSelect(files) {
           new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
         ]);
         if (clientText) {
-          const clientParsed = parseReceiptTextClientSide(clientText);
-          if (clientParsed && clientParsed.items && clientParsed.items.length > 0) {
-            recognizedText = clientText;
-            parsedData = clientParsed;
-          } else if (!recognizedText) {
-            recognizedText = clientText;
+          const gibberishRatio = (clientText.match(/[^a-zA-Z0-9\u4e00-\u9fa5\s.,:;()$¥€£/-]/g) || []).length / Math.max(1, clientText.length);
+          if (gibberishRatio < 0.15) {
+            const clientParsed = parseReceiptTextClientSide(clientText);
+            if (clientParsed && clientParsed.items && clientParsed.items.length > 0) {
+              recognizedText = clientText;
+              parsedData = clientParsed;
+            }
           }
         }
       } catch (clientErr) {
