@@ -151,10 +151,17 @@ def score_receipt_orientation(ocr_res, img_h=None, return_details=False):
         r'TOTAL', r'MYR', r'RM', r'SUBTOTAL', r'CHANGE',
         r'INVOICE', r'TABLE', r'DATE', r'ORDER', r'CASHIER',
         r'ROUNDING', r'ITEM', r'QTY', r'PRICE', r'TAX',
-        r'RECEIPT', r'CHECK', r'AMOUNT', r'PAYMENT'
+        r'RECEIPT', r'CHECK', r'AMOUNT', r'PAYMENT',
+        r'合计', r'总计', r'应收', r'实收', r'找零', r'消费'
     ]
-    HEADER_WORDS = ['invoice', 'order', 'table', 'date', 'pax', 'cashier', 'reg no', 'bill', 'receipt no']
-    FOOTER_WORDS = ['total', 'subtotal', 'change', 'rounding', 'duitnow', 'feedme', 'scan', 'pos', 'cash', 'card', 'visa', 'mastercard']
+    HEADER_WORDS = [
+        'invoice', 'order', 'table', 'date', 'pax', 'cashier', 'reg no', 'bill', 'receipt no',
+        '单号', '桌号', '台号', '时间', '日期', '收银', '账单', '流水号', '人数', '开单'
+    ]
+    FOOTER_WORDS = [
+        'total', 'subtotal', 'change', 'rounding', 'duitnow', 'feedme', 'scan', 'pos', 'cash', 'card', 'visa', 'mastercard',
+        '合计', '总计', '应收', '实收', '找零', '扫码', '微信', '支付宝', '现金', '付款', '结账'
+    ]
 
     total_score = 0
     anchor_hits = 0
