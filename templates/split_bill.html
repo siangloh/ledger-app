@@ -662,27 +662,50 @@ async function handleReceiptFileSelect(files) {
       backendNotice = '网络连接超时，请核验小票明细。';
     }
 
-    // ③ 仅当服务器识别失败且端侧提取出的内容非乱码时，才作为备用兜底（设置 5 秒超时保护防卡死）
+    // ③ 核心思维重构：若检测到字错误/无有效项目/乱码，自动旋转(Rotate)图片并保存重新读取，直到识别出正确内容！
     if ((!parsedData || !parsedData.items || parsedData.items.length === 0) && typeof Tesseract !== 'undefined') {
       try {
-        updateOcrProgress(80, '② 端侧快速检测...');
-        const targetUrl = preprocessedImgUrl || localDataUrl;
-        const clientText = await Promise.race([
-          runClientSideOCR(targetUrl),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
-        ]);
-        if (clientText) {
-          const gibberishRatio = (clientText.match(/[^a-zA-Z0-9\u4e00-\u9fa5\s.,:;()$¥€£/-]/g) || []).length / Math.max(1, clientText.length);
-          if (gibberishRatio < 0.15) {
+        const isLandscape = canvasRes && (canvasRes.width > canvasRes.height * 1.15);
+        const rotationOrder = isLandscape ? [270, 90, 0, 180] : [0, 270, 90, 180];
+
+        for (const testAngle of rotationOrder) {
+          updateOcrProgress(80, `② 智能校正朝向 (${testAngle}°)，重新识别核对...`);
+          // 将图片旋转并保存在 Canvas 中作为当前视角
+          const rotatedRes = await processReceiptOnCanvas(file, testAngle);
+          if (!rotatedRes) continue;
+
+          const clientText = await Promise.race([
+            runClientSideOCR(rotatedRes.preprocessedDataUrl || rotatedRes.originalDataUrl),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+          ]);
+
+          if (clientText) {
+            const gibberishRatio = (clientText.match(/[^a-zA-Z0-9\u4e00-\u9fa5\s.,:;()$¥€£/-]/g) || []).length / Math.max(1, clientText.length);
             const clientParsed = parseReceiptTextClientSide(clientText);
-            if (clientParsed && clientParsed.items && clientParsed.items.length > 0) {
+            const hasAnchors = /(?:TOTAL|SUBTOTAL|ORDER|CHANGE|CASH|TABLE|INVOICE|RM|MYR|\$|S\$|€|£|TAX|RECEIPT|GST|SST|炒饭|鸡|餐|总计|合计|小计)/i.test(clientText);
+
+            // 若读取出的文字包含有效菜品且命中关键字或乱码率低：判定为正确正向，采纳并退出！
+            if (clientParsed && clientParsed.items && clientParsed.items.length > 0 && (hasAnchors || gibberishRatio < 0.15)) {
+              console.log(`Rotated to ${testAngle}° and verified valid receipt content!`);
               recognizedText = clientText;
               parsedData = clientParsed;
+              parsedData.engine = 'client_tesseract';
+              parsedData.orientation_corrected = (testAngle !== 0);
+              currentReceiptRotation = testAngle;
+              localDataUrl = rotatedRes.originalDataUrl;
+              preprocessedImgUrl = rotatedRes.preprocessedDataUrl;
+              preprocessedMeta = {
+                rotation: testAngle,
+                width: rotatedRes.width,
+                height: rotatedRes.height,
+                filters: ['Canvas 自适应旋转纠偏', '灰度化', '动态对比度均衡']
+              };
+              break; // 读对之后立即停止旋转，采用当前正向图片！
             }
           }
         }
       } catch (clientErr) {
-        console.warn('Client OCR notice:', clientErr);
+        console.warn('Client OCR rotate-and-retry notice:', clientErr);
       }
     }
 

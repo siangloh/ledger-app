@@ -43,5 +43,5 @@ EXPOSE 10000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import os,urllib.request,sys; urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"PORT\",\"10000\")}/health', timeout=4)" || exit 1
 
-# 启动 Gunicorn 服务 (使用容器端口与安全 worker 配置)
-CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-10000} --workers 2 --timeout 120"]
+# 启动 Gunicorn 服务 (Render 免费层 512MB 内存优化：使用单 Worker + 4 线程，防止 OCR 推理时双 Worker 导致 OOM 502 崩溃)
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-10000} --workers 1 --threads 4 --timeout 120"]
