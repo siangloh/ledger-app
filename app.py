@@ -36,7 +36,7 @@ if hasattr(sys.stderr, 'reconfigure'):
         pass
 
 # 核心配置与基础模块导入
-from core.config import (  # noqa: F401
+from core.config import (
     BASE_DIR,
     DATA_DIR,
     DB_PATH,
@@ -50,7 +50,7 @@ from core.config import (  # noqa: F401
     get_active_llm_provider,
     get_app_password
 )
-from core.db import (  # noqa: F401
+from core.db import (
     get_db,
     close_db,
     init_db,
@@ -67,8 +67,8 @@ from core.db import (  # noqa: F401
     USER_DATA_VERSIONS,
     USER_LATEST_EVENTS
 )
-from core.auth import is_ajax_request  # noqa: F401
-from core.utils import (  # noqa: F401
+from core.auth import is_ajax_request
+from core.utils import (
     money_filter,
     date_filter,
     shift_month,
@@ -81,18 +81,18 @@ from core.utils import (  # noqa: F401
 from core.extensions import csrf
 
 # 业务服务与向后兼容导出
-from services.notification_service import (  # noqa: F401
+from services.notification_service import (
     parse_auto_track_notification,
     parse_nlp_text,
     MERCHANT_CATEGORY_MAPPING,
     EXPENSE_CATEGORY_KEYWORDS
 )
-from services.ai_service import (  # noqa: F401
+from services.ai_service import (
     call_llm_json,
     classify_notification_with_llm,
     parse_nlp_with_llm
 )
-from services.ocr_service import (  # noqa: F401
+from services.ocr_service import (
     get_rapid_ocr,
     smart_orient_receipt_ocr,
     score_receipt_orientation,
@@ -103,11 +103,28 @@ from services.ocr_service import (  # noqa: F401
 from blueprints.auth import auth_bp
 from blueprints.auto_track import auto_track_bp
 from blueprints.transactions import transactions_bp
-from blueprints.liabilities import liabilities_bp, ACCOUNT_TYPES, ACCOUNT_CURRENCIES  # noqa: F401
+from blueprints.liabilities import liabilities_bp, ACCOUNT_TYPES, ACCOUNT_CURRENCIES
 from blueprints.subscriptions import subscriptions_bp
 from blueprints.split_bill import split_bill_bp
-from blueprints.analytics import analytics_bp, get_category_insights_data  # noqa: F401
+from blueprints.analytics import analytics_bp, get_category_insights_data
 from blueprints.settings import settings_bp
+
+__all__ = [
+    'app', 'get_db', 'close_db', 'init_db', 'DB_PATH', 'BASE_DIR', 'DATA_DIR', 'UPLOAD_DIR',
+    'TURSO_URL', 'TURSO_AUTH_TOKEN', 'DEFAULT_AUTO_TRACK_KEY', 'AUTO_TRACK_KEY', 'is_valid_api_key',
+    'get_auto_track_key', 'get_active_llm_provider', 'get_app_password', 'bump_data_version',
+    'get_data_version', 'get_latest_event', 'get_categories', 'get_current_user_id',
+    'init_user_default_categories', 'seed_learning_samples', 'get_user_settings', 'DATA_VERSION',
+    'LATEST_EVENT', 'USER_DATA_VERSIONS', 'USER_LATEST_EVENTS', 'is_ajax_request', 'money_filter',
+    'date_filter', 'shift_month', 'get_savings_breakdown', 'get_category_budget_status',
+    'check_and_record_budget_alerts', 'generate_due_recurring', 'get_billing_cycle_dates',
+    'csrf', 'parse_auto_track_notification', 'parse_nlp_text', 'MERCHANT_CATEGORY_MAPPING',
+    'EXPENSE_CATEGORY_KEYWORDS', 'call_llm_json', 'classify_notification_with_llm',
+    'parse_nlp_with_llm', 'get_rapid_ocr', 'smart_orient_receipt_ocr', 'score_receipt_orientation',
+    'parse_receipt_text_to_items', 'auth_bp', 'auto_track_bp', 'transactions_bp', 'liabilities_bp',
+    'ACCOUNT_TYPES', 'ACCOUNT_CURRENCIES', 'subscriptions_bp', 'split_bill_bp', 'analytics_bp',
+    'get_category_insights_data', 'settings_bp'
+]
 
 # 创建 Flask 应用实例
 app = Flask(__name__)

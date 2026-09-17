@@ -12,5 +12,9 @@ __all__ = [
     'ParsedNotification',
     'register_parser',
     'NotificationParserComposite',
-    '_PARSER_REGISTRY'
+    '_PARSER_REGISTRY',
+    'tng_parser',
+    'maybank_parser',
+    'grab_parser',
+    'bank_card_parser'
 ]

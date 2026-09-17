@@ -96,7 +96,7 @@ def api_auto_track():
                         print(f"[AUTO_TRACK] Allowing legacy companion notification without key (Verified transaction: RM {parsed_preview.get('amount')})")
 
         if not is_legacy_companion:
-            print(f"[AUTO_TRACK] Rejected: Invalid API Key")
+            print("[AUTO_TRACK] Rejected: Invalid API Key")
             return jsonify({'ok': False, 'message': 'API Key 无效或未在服务器配置，拒绝访问'}), 401
 
     if not text or text == "None" or text == "null":
