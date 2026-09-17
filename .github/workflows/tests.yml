@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -30,6 +33,17 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
+
+      - name: Record failure log
+        if: failure()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p scratch
+          cp flake8_report.txt scratch/ci_flake8_error.log || true
+          git add scratch/ci_flake8_error.log
+          git commit -m "ci: record flake8 failure log" || true
+          git push origin main || true
 
       - name: Run tests
         run: pytest -v

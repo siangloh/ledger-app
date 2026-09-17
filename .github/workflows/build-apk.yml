@@ -52,6 +52,17 @@ jobs:
             exit 1
           fi
 
+      - name: Record failure log
+        if: failure()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p scratch
+          cp android-companion/build_output.txt scratch/ci_build_error.log || true
+          git add scratch/ci_build_error.log
+          git commit -m "ci: record build failure log" || true
+          git push origin main || true
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
