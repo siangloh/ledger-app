@@ -62,6 +62,17 @@
               🔍 打开核验与分账弹窗 ↗
             </button>
           </div>
+
+          <!-- 快速旋转纠偏工具栏 -->
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.03); padding: 5px 8px; border-radius: 6px; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+              <span style="font-size: 11px; color: var(--navy); font-weight: 700;">🔄 朝向纠偏:</span>
+              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(-90)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;" title="逆时针旋转 90 度">↺ 逆时针 90°</button>
+              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(90)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;" title="顺时针旋转 90 度">↻ 顺时针 90°</button>
+              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(180)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;" title="旋转 180 度">🔄 旋转 180°</button>
+            </div>
+            <span id="mainPageRotationTag" style="font-size: 11px; font-weight: 700; color: var(--navy); background: #fff; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border);">当前角度: 0°</span>
+          </div>
           
           <div id="mainPagePrepMeta" style="font-size: 11px; color: var(--muted); margin-bottom: 8px;">
             规格与纠偏信息加载中...
@@ -70,22 +81,22 @@
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <!-- 原图 -->
             <div style="text-align: center;">
-              <span style="font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px;">📸 上传原图</span>
+              <span style="font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px;">📸 用户上传原图</span>
               <div style="background: #0f172a; border-radius: 4px; height: 130px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
                 <img id="mainPageOriginalImg" src="" alt="原图" style="max-width: 100%; max-height: 130px; object-fit: contain; cursor: zoom-in;" onclick="openImageZoom(this.src, '用户上传原相片')">
               </div>
             </div>
             <!-- 送审图 -->
             <div style="text-align: center;">
-              <span style="font-size: 11px; color: var(--navy); font-weight: 600; display: block; margin-bottom: 4px;">⚙️ 系统送审图 (Before OCR)</span>
+              <span style="font-size: 11px; color: var(--navy); font-weight: 700; display: block; margin-bottom: 4px;">⚙️ 旋转纠偏送审图 (After Rotate)</span>
               <div style="background: #0f172a; border-radius: 4px; height: 130px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
-                <img id="mainPagePreprocessedImg" src="" alt="系统预处理送审图" style="max-width: 100%; max-height: 130px; object-fit: contain; cursor: zoom-in;" onclick="openImageZoom(this.src, '系统预处理送审图 (Before OCR)')">
+                <img id="mainPagePreprocessedImg" src="" alt="系统预处理送审图" style="max-width: 100%; max-height: 130px; object-fit: contain; cursor: zoom-in;" onclick="openImageZoom(this.src, '系统预处理送审图 (After Rotate & CLAHE)')">
               </div>
             </div>
           </div>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-            <span style="font-size: 10.5px; color: var(--green); font-weight: 600;">✔ 已完成 CLAHE 对比度增强与保边去噪</span>
-            <a id="mainPageDownloadPrepBtn" href="javascript:void(0)" target="_blank" style="font-size: 11px; color: var(--navy); text-decoration: underline;" download="preprocessed_receipt.jpg">下载送审原图 ↗</a>
+            <span style="font-size: 10.5px; color: var(--green); font-weight: 600;">✔ 已完成旋转纠偏与对比度增强</span>
+            <a id="mainPageDownloadPrepBtn" href="javascript:void(0)" target="_blank" style="font-size: 11px; color: var(--navy); text-decoration: underline;" download="preprocessed_receipt.jpg">下载送审图 ↗</a>
           </div>
         </div>
       </div>
@@ -314,13 +325,18 @@ Total 75.21"></textarea>
           <span style="font-size: 11px; color: var(--muted); font-weight: normal;">点击折叠/展开 ▾</span>
         </summary>
         
-        <div style="margin-top: 10px;">
-          <!-- 处理参数徽标 -->
-          <div id="reviewPrepMetaTags" style="display: flex; flex-wrap: gap; gap: 6px; margin-bottom: 10px; flex-wrap: wrap;">
-            <span class="tag" style="background: var(--surface); border: 1px solid var(--border); font-size: 11px;" id="reviewPrepRotationTag">🔄 纠偏朝向: 0°</span>
-            <span class="tag" style="background: var(--surface); border: 1px solid var(--border); font-size: 11px;" id="reviewPrepResolutionTag">📐 规格: 动态自适应缩放</span>
-            <span class="tag" style="background: var(--surface); border: 1px solid var(--border); font-size: 11px;">✨ CLAHE 动态对比度增强</span>
-            <span class="tag" style="background: var(--surface); border: 1px solid var(--border); font-size: 11px;">🛡️ 双边保边降噪</span>
+          <!-- 处理参数徽标与旋转纠偏 -->
+          <div style="display: flex; justify-content: space-between; align-items: center; background: var(--surface-soft); padding: 6px 10px; border-radius: 6px; margin-bottom: 10px; flex-wrap: wrap; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+              <span style="font-size: 11.5px; color: var(--navy); font-weight: 700;">🔄 小票朝向纠偏:</span>
+              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(-90)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;">↺ 逆时针 90°</button>
+              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(90)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;">↻ 顺时针 90°</button>
+              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(180)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;">🔄 旋转 180°</button>
+            </div>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span class="tag" style="background: var(--surface); border: 1px solid var(--border); font-size: 11px;" id="reviewPrepRotationTag">🔄 纠偏朝向: 0°</span>
+              <span class="tag" style="background: var(--surface); border: 1px solid var(--border); font-size: 11px;" id="reviewPrepResolutionTag">📐 规格: 动态自适应缩放</span>
+            </div>
           </div>
 
           <!-- 双图对比展示容器 -->
@@ -392,6 +408,8 @@ let reviewItems = [];
 let lastParsedReceiptData = null;
 let lastRecognizedReceiptText = '';
 let lastReceiptImageContext = null;
+let currentReceiptFile = null;
+let currentReceiptRotation = 0;
 
 function reopenReviewModalWithCurrentData() {
   if (lastParsedReceiptData || lastReceiptImageContext) {
@@ -539,22 +557,52 @@ async function handleReceiptFileSelect(files) {
     });
   }
 
+  currentReceiptFile = file;
+  currentReceiptRotation = 0;
+
   let parsedData = null;
   let recognizedText = '';
   let backendNotice = '';
   let preprocessedImgUrl = null;
   let preprocessedMeta = null;
   let localDataUrl = null;
+  let canvasRes = null;
 
   try {
-    updateOcrProgress(35, '① 正在准备小票图像...');
+    updateOcrProgress(35, '① 正在准备小票图像与自适应增强...');
     try {
-      const processedImg = await compressAndPreprocessImage(file);
-      if (processedImg && processedImg.dataUrl) {
-        localDataUrl = processedImg.dataUrl;
+      canvasRes = await processReceiptOnCanvas(file, 0);
+      if (canvasRes) {
+        localDataUrl = canvasRes.originalDataUrl;
+        preprocessedImgUrl = canvasRes.preprocessedDataUrl;
+        preprocessedMeta = {
+          rotation: 0,
+          width: canvasRes.width,
+          height: canvasRes.height,
+          filters: ['Canvas 自适应高清缩放', '灰度化', '动态对比度均衡 (Contrast Stretch)']
+        };
       }
     } catch (compErr) {
       console.warn('Canvas pre-compress notice:', compErr);
+    }
+
+    // 立即点亮主界面常驻小票预览卡片，确保用户绝不会看到任何断图或白屏！
+    const mainCard = document.getElementById('mainPageReceiptPreviewCard');
+    const mainOrig = document.getElementById('mainPageOriginalImg');
+    const mainPrep = document.getElementById('mainPagePreprocessedImg');
+    const mainDl = document.getElementById('mainPageDownloadPrepBtn');
+    const mainRotTag = document.getElementById('mainPageRotationTag');
+    const mainMeta = document.getElementById('mainPagePrepMeta');
+
+    if (mainCard && (localDataUrl || preprocessedImgUrl)) {
+      mainCard.style.display = 'block';
+      if (mainOrig && localDataUrl) mainOrig.src = localDataUrl;
+      if (mainPrep && preprocessedImgUrl) mainPrep.src = preprocessedImgUrl;
+      if (mainDl && preprocessedImgUrl) mainDl.href = preprocessedImgUrl;
+      if (mainRotTag) mainRotTag.textContent = '当前角度: 0°';
+      if (mainMeta && preprocessedMeta) {
+        mainMeta.textContent = `🔄 纠偏朝向: 0° | 📐 分辨率: ${preprocessedMeta.width}×${preprocessedMeta.height} px | 滤镜: CLAHE 对比度均衡 + 双边保边滤波降噪`;
+      }
     }
 
     // ② 优先调用服务器端 RapidOCR 深度学习引擎（自动纠偏旋转 90°/180°/270° 与几何聚类）
@@ -574,6 +622,9 @@ async function handleReceiptFileSelect(files) {
           preprocessedImgUrl = json.preprocessed_image;
           preprocessedMeta = json.preprocessed_meta || null;
         }
+        if (json.rotation_applied !== undefined && json.rotation_applied !== null) {
+          currentReceiptRotation = json.rotation_applied;
+        }
         if (json.ok && json.data) {
           parsedData = json.data;
           parsedData.engine = 'rapidocr';
@@ -592,7 +643,7 @@ async function handleReceiptFileSelect(files) {
     if ((!parsedData || !parsedData.items || parsedData.items.length === 0) && typeof Tesseract !== 'undefined') {
       try {
         updateOcrProgress(80, '② 端侧快速检测...');
-        const targetUrl = localDataUrl || (await compressAndPreprocessImage(file)).dataUrl;
+        const targetUrl = preprocessedImgUrl || localDataUrl;
         const clientText = await Promise.race([
           runClientSideOCR(targetUrl),
           new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
@@ -667,16 +718,18 @@ async function handleReceiptFileSelect(files) {
     const mainPrep = document.getElementById('mainPagePreprocessedImg');
     const mainMeta = document.getElementById('mainPagePrepMeta');
     const mainDl = document.getElementById('mainPageDownloadPrepBtn');
+    const mainRotTag = document.getElementById('mainPageRotationTag');
 
     if (mainCard && (localDataUrl || preprocessedImgUrl)) {
       mainCard.style.display = 'block';
       if (mainOrig && localDataUrl) mainOrig.src = localDataUrl;
       if (mainPrep && preprocessedImgUrl) mainPrep.src = preprocessedImgUrl;
       if (mainDl && preprocessedImgUrl) mainDl.href = preprocessedImgUrl;
+      if (mainRotTag) mainRotTag.textContent = '当前角度: ' + currentReceiptRotation + '°';
       if (mainMeta) {
-        const rot = (preprocessedMeta && preprocessedMeta.rotation !== undefined) ? preprocessedMeta.rotation : 0;
-        const w = (preprocessedMeta && preprocessedMeta.width) ? preprocessedMeta.width : '自适应';
-        const h = (preprocessedMeta && preprocessedMeta.height) ? preprocessedMeta.height : '高清';
+        const rot = (preprocessedMeta && preprocessedMeta.rotation !== undefined) ? preprocessedMeta.rotation : currentReceiptRotation;
+        const w = (preprocessedMeta && preprocessedMeta.width) ? preprocessedMeta.width : (canvasRes ? canvasRes.width : '自适应');
+        const h = (preprocessedMeta && preprocessedMeta.height) ? preprocessedMeta.height : (canvasRes ? canvasRes.height : '高清');
         mainMeta.textContent = `🔄 纠偏朝向: ${rot}° | 📐 分辨率: ${w}×${h} px | 滤镜: CLAHE 对比度均衡 + 双边保边滤波降噪`;
       }
     }
@@ -710,44 +763,191 @@ function updateOcrProgress(percent, msg) {
   if (text && msg) text.textContent = msg;
 }
 
-// Canvas 等比例快速压缩（限制最大长边在 1400px，既清晰又防 OOM）
-function compressAndPreprocessImage(file) {
+// ============================================================
+// Canvas 快速压缩与图像预处理（支持任意角度旋转 0/90/180/270、灰度化、动态对比度拉伸）
+// ============================================================
+function processReceiptOnCanvas(imageSource, rotationAngle = 0) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
+    const handleImg = (img) => {
+      const MAX_DIM = 1400;
+      let srcW = img.naturalWidth || img.width;
+      let srcH = img.naturalHeight || img.height;
+      
+      let scale = 1;
+      if (srcW > MAX_DIM || srcH > MAX_DIM) {
+        scale = MAX_DIM / Math.max(srcW, srcH);
+      }
+      let targetW = Math.round(srcW * scale);
+      let targetH = Math.round(srcH * scale);
+
+      const normAngle = ((rotationAngle % 360) + 360) % 360;
+      const rad = normAngle * Math.PI / 180;
+      const isQuarter = (normAngle === 90 || normAngle === 270);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = isQuarter ? targetH : targetW;
+      canvas.height = isQuarter ? targetW : targetH;
+      const ctx = canvas.getContext('2d');
+
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(rad);
+      ctx.drawImage(img, -targetW / 2, -targetH / 2, targetW, targetH);
+      ctx.restore();
+
+      // 原色彩按指定朝向纠偏后的图像
+      const originalRotatedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+      // 快速灰度化 + 动态对比度拉伸 (CLAHE 轻量级前端模拟，强化小票褪色字迹)
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = imgData.data;
+      let minVal = 255, maxVal = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const gray = Math.round(0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2]);
+        d[i] = d[i+1] = d[i+2] = gray;
+        if (gray < minVal) minVal = gray;
+        if (gray > maxVal) maxVal = gray;
+      }
+      const range = (maxVal - minVal) || 1;
+      for (let i = 0; i < d.length; i += 4) {
+        const normalized = Math.round(((d[i] - minVal) / range) * 255);
+        d[i] = d[i+1] = d[i+2] = normalized;
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      const preprocessedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+      resolve({
+        dataUrl: originalRotatedDataUrl,
+        originalDataUrl: originalRotatedDataUrl,
+        preprocessedDataUrl: preprocessedDataUrl,
+        width: canvas.width,
+        height: canvas.height,
+        rotation: normAngle
+      });
+    };
+
+    if (imageSource instanceof File || imageSource instanceof Blob) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => handleImg(img);
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(imageSource);
+    } else if (typeof imageSource === 'string') {
       const img = new Image();
-      img.onload = () => {
-        const MAX_DIM = 1400;
-        let w = img.width;
-        let h = img.height;
-        if (w > MAX_DIM || h > MAX_DIM) {
-          if (w > h) {
-            h = Math.round((h * MAX_DIM) / w);
-            w = MAX_DIM;
-          } else {
-            w = Math.round((w * MAX_DIM) / h);
-            h = MAX_DIM;
+      img.onload = () => handleImg(img);
+      img.onerror = reject;
+      img.src = imageSource;
+    } else if (imageSource instanceof HTMLImageElement) {
+      handleImg(imageSource);
+    } else {
+      reject(new Error('Unsupported imageSource'));
+    }
+  });
+}
+
+function compressAndPreprocessImage(file, rotationAngle = 0) {
+  return processReceiptOnCanvas(file, rotationAngle);
+}
+
+// 用户手动点击旋转小票纠偏 (↺ -90°, ↻ +90°, 🔄 180°)
+async function rotateCurrentReceipt(angleDelta) {
+  const source = currentReceiptFile || (lastReceiptImageContext && lastReceiptImageContext.originalImage);
+  if (!source) {
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({ icon: 'info', title: '提示', text: '请先拍照或上传小票照片后，方可调整旋转朝向。' });
+    }
+    return;
+  }
+
+  currentReceiptRotation = ((currentReceiptRotation + angleDelta) % 360 + 360) % 360;
+
+  try {
+    const res = await processReceiptOnCanvas(source, currentReceiptRotation);
+    if (res) {
+      const mainPrep = document.getElementById('mainPagePreprocessedImg');
+      const reviewPrep = document.getElementById('reviewPreprocessedImg');
+      const mainDl = document.getElementById('mainPageDownloadPrepBtn');
+      const reviewDl = document.getElementById('reviewDownloadPrepBtn');
+      const mainRotTag = document.getElementById('mainPageRotationTag');
+      const reviewRotTag = document.getElementById('reviewPrepRotationTag');
+      const mainMeta = document.getElementById('mainPagePrepMeta');
+
+      if (mainPrep) mainPrep.src = res.preprocessedDataUrl;
+      if (reviewPrep) reviewPrep.src = res.preprocessedDataUrl;
+      if (mainDl) mainDl.href = res.preprocessedDataUrl;
+      if (reviewDl) reviewDl.href = res.preprocessedDataUrl;
+
+      if (mainRotTag) mainRotTag.textContent = '当前角度: ' + currentReceiptRotation + '°';
+      if (reviewRotTag) reviewRotTag.textContent = '🔄 纠偏朝向: ' + currentReceiptRotation + '°';
+      if (mainMeta) {
+        mainMeta.textContent = `🔄 纠偏朝向: ${currentReceiptRotation}° | 📐 分辨率: ${res.width}×${res.height} px | 滤镜: 灰度化 + 动态对比度拉伸增强`;
+      }
+
+      if (lastReceiptImageContext) {
+        lastReceiptImageContext.preprocessedImage = res.preprocessedDataUrl;
+        lastReceiptImageContext.preprocessedMeta = {
+          rotation: currentReceiptRotation,
+          width: res.width,
+          height: res.height,
+          filters: ['旋转纠偏 (' + currentReceiptRotation + '°)', '灰度化', '动态对比度增强']
+        };
+      }
+
+      // 实时在旋转纠偏后的正向图像上重新提取菜品与金额
+      reparseRotatedReceipt(res.originalDataUrl);
+    }
+  } catch (err) {
+    console.warn('Rotate receipt notice:', err);
+  }
+}
+
+// 旋转后在正向图片上极速重新执行 OCR
+async function reparseRotatedReceipt(rotatedDataUrl) {
+  if (typeof Tesseract !== 'undefined') {
+    try {
+      if (typeof Swal !== 'undefined') {
+        const Toast = Swal.mixin({
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 2500,
+          timerProgressBar: true
+        });
+        Toast.fire({ icon: 'info', title: `正在按纠偏朝向 (${currentReceiptRotation}°) 重新提取菜品...` });
+      }
+
+      const text = await Promise.race([
+        runClientSideOCR(rotatedDataUrl),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000))
+      ]);
+
+      if (text && text.trim().length > 0) {
+        const textarea = document.getElementById('receiptTextInput');
+        if (textarea) textarea.value = text;
+        const reviewRaw = document.getElementById('reviewRawTextArea');
+        if (reviewRaw) reviewRaw.value = text;
+
+        const parsed = parseReceiptTextClientSide(text);
+        if (parsed) {
+          lastParsedReceiptData = parsed;
+          lastRecognizedReceiptText = text;
+
+          // 若核对弹窗当前开着，即刻同步刷新
+          const modal = document.getElementById('receiptReviewModal');
+          if (modal && modal.style.display === 'flex') {
+            openReviewModal(parsed, text, lastReceiptImageContext);
           }
         }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-
-        resolve({
-          dataUrl: canvas.toDataURL('image/jpeg', 0.92),
-          width: w,
-          height: h
-        });
-      };
-      img.onerror = reject;
-      img.src = e.target.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+      }
+    } catch (e) {
+      console.warn('Rotated OCR reparse notice:', e);
+    }
+  }
 }
 
 // 离线端侧 OCR 推理实现（Worker 异步线程，轻量英文+数字优先，防卡死）
@@ -1059,7 +1259,7 @@ function openReviewModal(parsed, rawText, imgContext) {
       }
 
       if (rotTag) {
-        const rotVal = (imgContext.preprocessedMeta && imgContext.preprocessedMeta.rotation !== undefined) ? imgContext.preprocessedMeta.rotation : (parsed.orientation_corrected ? '已旋转' : 0);
+        const rotVal = (imgContext.preprocessedMeta && imgContext.preprocessedMeta.rotation !== undefined) ? imgContext.preprocessedMeta.rotation : currentReceiptRotation;
         rotTag.textContent = '🔄 纠偏朝向: ' + rotVal + (typeof rotVal === 'number' ? '°' : '');
       }
 

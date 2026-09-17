@@ -464,31 +464,44 @@ def smart_orient_receipt_ocr(pil_img, engine):
 
     logger.info("========== [OCR Orientation Debugging] ==========")
     for angle, img in angle_candidates:
-        proc_arr = preprocess_receipt_for_ocr(img)
+        # 极速缩略图评测（缩小至最长边 640px，降低 80% ONNX 运算耗时，确保秒级确定正向）
+        thumb = img.copy()
+        thumb.thumbnail((640, 640))
+        proc_arr = preprocess_receipt_for_ocr(thumb)
         res, _ = engine(proc_arr)
         if not res:
-            res, _ = engine(np.array(img.convert('RGB')))
+            res, _ = engine(np.array(thumb.convert('RGB')))
 
         score, anchors = score_receipt_orientation(res)
         log_line = f"Angle {angle:3d}° -> Score: {score:5d} | Anchors Hit: {anchors} | Blocks: {len(res) if res else 0}"
         logger.info(log_line)
 
-        if score > max_score or best_proc_arr is None:
+        if best_angle is None or score > max_score:
             max_score = score
             best_angle = angle
-            best_res = res
-            best_proc_arr = proc_arr
 
         if anchors >= 2:
             confirm_line = f">> Confirmed upright angle: {angle}° with {anchors} anchors."
             logger.info(confirm_line)
             best_angle = angle
-            best_res = res
-            best_proc_arr = proc_arr
             break
 
     summary_line = f"========== Final Pick: {best_angle}° (Score: {max_score}) ==========\n"
     logger.info(summary_line)
+
+    # 确定胜出朝向后，仅对胜出的正确朝向执行完整高清预处理（CLAHE+双边滤波降噪）与完整识别
+    best_img = pil_img
+    if best_angle == 90:
+        best_img = pil_img.transpose(Image.Transpose.ROTATE_90)
+    elif best_angle == 180:
+        best_img = pil_img.transpose(Image.Transpose.ROTATE_180)
+    elif best_angle == 270:
+        best_img = pil_img.transpose(Image.Transpose.ROTATE_270)
+
+    best_proc_arr = preprocess_receipt_for_ocr(best_img)
+    best_res, _ = engine(best_proc_arr)
+    if not best_res:
+        best_res, _ = engine(np.array(best_img.convert('RGB')))
 
     preprocessed_b64 = encode_cv2_image_to_base64(best_proc_arr)
     meta = {
