@@ -650,11 +650,13 @@ async function handleReceiptFileSelect(files) {
           runClientSideOCR(targetUrl),
           new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
         ]);
-        if (clientText && clientText.trim().length > (recognizedText || '').trim().length) {
-          recognizedText = clientText;
+        if (clientText) {
           const clientParsed = parseReceiptTextClientSide(clientText);
           if (clientParsed && clientParsed.items && clientParsed.items.length > 0) {
+            recognizedText = clientText;
             parsedData = clientParsed;
+          } else if (!recognizedText) {
+            recognizedText = clientText;
           }
         }
       } catch (clientErr) {
