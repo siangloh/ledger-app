@@ -182,31 +182,31 @@ function openEditCategoryModal(catId, currentName, currentColor) {
   }
 
   Swal.fire({
-    title: window.t ? (window.t('common.edit', '编辑') + ' ' + window.t('common.category', '分类')) : '编辑收支分类',
+    title: window.t ? window.t('categories.modal_edit_title', '编辑收支分类') : '编辑收支分类',
     html: `
       <div style="text-align: left; display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
         <div>
-          <label style="font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: block;">${window.t ? window.t('common.name', '分类名称') : '分类名称'}</label>
+          <label style="font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: block;">${window.t ? window.t('categories.modal_cat_name', '分类名称') : '分类名称'}</label>
           <input type="text" id="swalEditCatName" class="swal2-input" value="${currentName}" style="margin: 0; width: 100%; box-sizing: border-box;" required>
         </div>
         <div>
-          <label style="font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: block;">${window.t ? window.t('common.category', '分类') : '代表颜色'}</label>
+          <label style="font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: block;">${window.t ? window.t('categories.modal_color', '代表颜色') : '代表颜色'}</label>
           <div style="display: flex; gap: 10px; align-items: center;">
             <input type="color" id="swalEditCatColor" value="${currentColor || '#38bdf8'}" style="width: 44px; height: 40px; border-radius: 8px; border: 1px solid var(--border); padding: 2px; cursor: pointer;">
-            <span style="font-size: 12px; color: var(--muted);">用于图表切片、图例点与统计报告代表色</span>
+            <span style="font-size: 12px; color: var(--muted);">${window.t ? window.t('categories.modal_color_hint', '用于图表切片、图例点与统计报告代表色') : '用于图表切片、图例点与统计报告代表色'}</span>
           </div>
         </div>
       </div>
     `,
     showCancelButton: true,
-    confirmButtonText: '💾 ' + (window.t ? window.t('common.save', '保存') : '保存修改'),
+    confirmButtonText: window.t ? window.t('categories.modal_save_btn', '💾 保存修改') : '💾 保存修改',
     cancelButtonText: window.t ? window.t('common.cancel', '取消') : '取消',
     focusConfirm: false,
     preConfirm: () => {
       const name = document.getElementById('swalEditCatName').value.trim();
       const color = document.getElementById('swalEditCatColor').value;
       if (!name) {
-        Swal.showValidationMessage(window.t ? window.t('common.failed', '分类名称不能为空') : '分类名称不能为空');
+        Swal.showValidationMessage(window.t ? window.t('categories.modal_cat_name_required', '分类名称不能为空') : '分类名称不能为空');
         return false;
       }
       return { name, color };
@@ -230,7 +230,7 @@ function openEditCategoryModal(catId, currentName, currentColor) {
         if (data.ok) {
           Swal.fire({
             icon: 'success',
-            title: window.t ? window.t('common.success', '分类已更新') : '分类已更新',
+            title: window.t ? window.t('categories.updated_success', '分类已更新') : '分类已更新',
             timer: 1000,
             showConfirmButton: false
           }).then(() => {
