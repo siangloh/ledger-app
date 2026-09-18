@@ -1543,7 +1543,7 @@ function renderReviewTable() {
         </div>
       </td>
       <td style="padding: 6px 10px; text-align: center;">
-        <button type="button" onclick="removeReviewItem(${idx})" style="background: none; border: none; color: var(--rose); cursor: pointer; font-size: 16px; font-weight: bold; padding: 2px 6px;" title="删除此项">&times;</button>
+        <button type="button" onclick="removeReviewItem(${idx})" style="background: none; border: none; color: var(--rose); cursor: pointer; font-size: 16px; font-weight: bold; padding: 2px 6px;" title="${window.t ? window.t('split_bill.del_item', '删除此项') : '删除此项'}">&times;</button>
       </td>
     </tr>
   `).join('');
@@ -1841,7 +1841,7 @@ function renderItemsTable() {
         <td>
           <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
             ${peopleCheckboxes}
-            <button type="button" class="btn-ghost" onclick="removeItemRow(${idx})" style="padding: 2px 6px; color: var(--rose); font-size: 13px; margin-left: auto;" title="删除这道菜">&times; 删</button>
+            <button type="button" class="btn-ghost" onclick="removeItemRow(${idx})" style="padding: 2px 6px; color: var(--rose); font-size: 13px; margin-left: auto;" title="${window.t ? window.t('split_bill.del_dish', '删除这道菜') : '删除这道菜'}">&times; ${window.t ? window.t('common.del_short', '删') : '删'}</button>
           </div>
         </td>
       </tr>

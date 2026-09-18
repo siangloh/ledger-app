@@ -116,11 +116,11 @@ def get_category_insights_data(db, time_range='all', start_date=None, end_date=N
                 trend_text = f"{pct}%"
             else:
                 trend_dir = 'flat'
-                trend_text = "持平 0%"
+                trend_text = t('insights.trend_flat', '持平 0%')
         else:
             if cur_amt > 0:
                 trend_dir = 'up'
-                trend_text = "本月新增"
+                trend_text = t('insights.trend_new', '本月新增')
             else:
                 trend_dir = 'flat'
                 trend_text = "—"

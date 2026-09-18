@@ -407,3 +407,72 @@ def test_transactions_messages_i18n(logged_in_client):
         logged_in_client.get('/api/set-language?lang=zh')
 
 
+def test_deletion_and_action_translations_all_languages(logged_in_client):
+    try:
+        keys_to_test = [
+            'swal.delete_confirm',
+            'swal.irreversible_action',
+            'swal.undo_window_5s',
+            'swal.undo_hint_5s',
+            'swal.undo_btn',
+            'swal.undo_success',
+            'swal.item_deleted',
+            'swal.deleted',
+            'swal.delete_failed',
+            'swal.network_delete_failed',
+            'records.batch_deleted_toast',
+            'records.undo_batch_toast',
+            'records.single_deleted_toast',
+            'records.undo_single_toast',
+            'liabilities.deleted_liability',
+            'accounts.account_deleted_fmt',
+            'accounts.del_warn_bound',
+            'accounts.del_confirm_title',
+            'accounts.del_confirm_msg',
+            'subscriptions.deleted_success',
+            'categories.del_confirm_title',
+            'categories.del_confirm_desc',
+            'categories.del_savings_confirm_title',
+            'auto_track.del_sample_btn',
+            'auto_track.del_sample_title',
+            'auto_track.del_sample_desc',
+            'auto_track.sample_deleted',
+            'auto_track.sample_deleted_success',
+            'auto_track.sample_reset_success',
+            'split_bill.del_item',
+            'split_bill.del_dish',
+        ]
+        for lang in ['zh', 'en', 'ms', 'zh_TW']:
+            for key in keys_to_test:
+                val = t(key, lang=lang, name='Test', count=2, sub=1, install=1, date='2026-10-01', extra='', title='Item')
+                assert val != key, f"Missing translation for {key} in {lang}"
+                assert len(val) > 0
+
+        # Verify categories delete confirmation renders in English
+        logged_in_client.get('/api/set-language?lang=en')
+        res_cat = logged_in_client.get('/categories')
+        assert res_cat.status_code == 200
+        cat_html = res_cat.get_data(as_text=True)
+        assert 'Delete category' in cat_html
+        assert 'This action cannot be undone' in cat_html
+
+        # Verify auto_track sample delete in English
+        res_del_sample = logged_in_client.post('/api/llm-samples/delete/99999')
+        assert res_del_sample.status_code == 200
+        assert res_del_sample.get_json()['message'] == 'Sample deleted successfully'
+
+        # Verify auto_track sample delete in Malay
+        logged_in_client.get('/api/set-language?lang=ms')
+        res_del_sample_ms = logged_in_client.post('/api/llm-samples/delete/99999')
+        assert res_del_sample_ms.status_code == 200
+        assert res_del_sample_ms.get_json()['message'] == 'Sampel berjaya dipadamkan'
+
+        # Verify auto_track sample delete in Traditional Chinese
+        logged_in_client.get('/api/set-language?lang=zh_TW')
+        res_del_sample_tw = logged_in_client.post('/api/llm-samples/delete/99999')
+        assert res_del_sample_tw.status_code == 200
+        assert res_del_sample_tw.get_json()['message'] == '樣本已成功刪除'
+    finally:
+        logged_in_client.get('/api/set-language?lang=zh')
+
+

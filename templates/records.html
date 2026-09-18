@@ -262,16 +262,19 @@ function confirmBatchDelete() {
         if (batchBar) batchBar.style.display = 'none';
 
         let isUndone = false;
+        const undoBatchTitle = window.t ? window.t('records.batch_deleted_toast', '已删除 {count} 条记录', {count: count}) : ('已删除 ' + count + ' 条记录');
+        const undoHint = window.t ? window.t('swal.undo_hint_5s', '如需撤销请在 5 秒内点击') : '如需撤销请在 5 秒内点击';
+        const undoBtn = window.t ? window.t('swal.undo_btn', '撤销 (Undo)') : '撤销 (Undo)';
         Swal.fire({
           toast: true,
           position: 'bottom-end',
           icon: 'info',
-          title: '已删除 ' + count + ' 条记录',
-          html: '<span style="font-size:12px;color:var(--muted)">如需撤销请在 5 秒内点击</span>',
+          title: undoBatchTitle,
+          html: '<span style="font-size:12px;color:var(--muted)">' + undoHint + '</span>',
           timer: 5000,
           timerProgressBar: true,
           showConfirmButton: true,
-          confirmButtonText: '撤销 (Undo)',
+          confirmButtonText: undoBtn,
           buttonsStyling: false,
           customClass: {
             popup: 'app-swal-toast app-swal-undo-toast',
@@ -290,7 +293,7 @@ function confirmBatchDelete() {
               toast: true,
               position: 'top-end',
               icon: 'success',
-              title: '已撤销删除，记录已保留',
+              title: window.t ? window.t('records.undo_batch_toast', '已撤销删除，记录已保留') : '已撤销删除，记录已保留',
               showConfirmButton: false,
               timer: 2000
             });
@@ -325,7 +328,7 @@ function confirmBatchDelete() {
                   r.style.pointerEvents = '';
                 });
                 updateBatchBar();
-                errorAlert(data.message || '批量删除失败');
+                errorAlert(data.message || (window.t ? window.t('records.batch_delete_failed', '批量删除失败') : '批量删除失败'));
               }
             })
             .catch(() => {
@@ -336,14 +339,15 @@ function confirmBatchDelete() {
                 r.style.pointerEvents = '';
               });
               updateBatchBar();
-              errorAlert('网络连接异常，批量删除未完成');
+              errorAlert(window.t ? window.t('records.batch_delete_network_failed', '网络连接异常，批量删除未完成') : '网络连接异常，批量删除未完成');
             });
           }
         });
       }
     });
   } else {
-    if (confirm('确认删除选中的 ' + selected.length + ' 条记录吗？')) {
+    const confirmBatchMsg = window.t ? window.t('records.batch_delete_confirm_native', '确认删除选中的 {count} 条记录吗？', {count: selected.length}) : ('确认删除选中的 ' + selected.length + ' 条记录吗？');
+    if (confirm(confirmBatchMsg)) {
       document.getElementById('batchForm').submit();
     }
   }
@@ -353,15 +357,17 @@ function confirmSingleDelete(actionUrl, detailText, btnEl) {
   const row = btnEl ? btnEl.closest('tr') : null;
 
   if (typeof Swal !== 'undefined') {
+    const defaultDelTitle = window.t ? window.t('swal.delete_confirm', '确认删除？') : '确认删除？';
+    const undoWinHint = window.t ? window.t('swal.undo_window_5s', '删除后提供 5 秒撤销恢复窗口。') : '删除后提供 5 秒撤销恢复窗口。';
     Swal.fire({
       icon: 'warning',
       iconColor: '#a8475a',
-      title: '确认删除？',
-      html: detailText + '<br><span style="color:#8a877e;font-size:13px;">删除后提供 5 秒撤销恢复窗口。</span>',
+      title: defaultDelTitle,
+      html: detailText + '<br><span style="color:#8a877e;font-size:13px;">' + undoWinHint + '</span>',
       showCancelButton: true,
       reverseButtons: true,
-      confirmButtonText: '确认删除',
-      cancelButtonText: '取消',
+      confirmButtonText: window.t ? window.t('common.confirm_delete', '确认删除') : '确认删除',
+      cancelButtonText: window.t ? window.t('common.cancel', '取消') : '取消',
       buttonsStyling: false,
       customClass: {
         popup: 'app-swal-popup',
@@ -380,16 +386,19 @@ function confirmSingleDelete(actionUrl, detailText, btnEl) {
         }
 
         let isUndone = false;
+        const undoSingleTitle = window.t ? window.t('records.single_deleted_toast', '已删除 1 条记录') : '已删除 1 条记录';
+        const undoHintSingle = window.t ? window.t('swal.undo_hint_5s', '如需撤销请在 5 秒内点击') : '如需撤回请在 5 秒内点击撤销';
+        const undoBtnSingle = window.t ? window.t('swal.undo_btn', '撤销 (Undo)') : '撤销 (Undo)';
         Swal.fire({
           toast: true,
           position: 'bottom-end',
           icon: 'info',
-          title: '已删除 1 条记录',
-          html: '<span style="font-size:12px;color:var(--muted)">如需撤回请在 5 秒内点击撤销</span>',
+          title: undoSingleTitle,
+          html: '<span style="font-size:12px;color:var(--muted)">' + undoHintSingle + '</span>',
           timer: 5000,
           timerProgressBar: true,
           showConfirmButton: true,
-          confirmButtonText: '撤销 (Undo)',
+          confirmButtonText: undoBtnSingle,
           buttonsStyling: false,
           customClass: {
             popup: 'app-swal-toast app-swal-undo-toast',
@@ -407,7 +416,7 @@ function confirmSingleDelete(actionUrl, detailText, btnEl) {
               toast: true,
               position: 'top-end',
               icon: 'success',
-              title: '已撤销删除，记录已完整保留',
+              title: window.t ? window.t('records.undo_single_toast', '已撤销删除，记录已完整保留') : '已撤销删除，记录已完整保留',
               showConfirmButton: false,
               timer: 2000
             });
@@ -429,7 +438,7 @@ function confirmSingleDelete(actionUrl, detailText, btnEl) {
                   toast: true,
                   position: 'top-end',
                   icon: 'success',
-                  title: data.message || '记录已删除',
+                  title: data.message || (window.t ? window.t('swal.deleted', '已删除') : '记录已删除'),
                   showConfirmButton: false,
                   timer: 2000,
                   customClass: { popup: 'app-swal-toast' }
@@ -440,7 +449,7 @@ function confirmSingleDelete(actionUrl, detailText, btnEl) {
                   row.style.filter = '';
                   row.style.pointerEvents = '';
                 }
-                errorAlert(data.message || '删除失败');
+                errorAlert(data.message || (window.t ? window.t('swal.delete_failed', '删除失败') : '删除失败'));
               }
             })
             .catch(() => {
@@ -450,14 +459,15 @@ function confirmSingleDelete(actionUrl, detailText, btnEl) {
                 row.style.filter = '';
                 row.style.pointerEvents = '';
               }
-              errorAlert('网络连接异常，删除未完成');
+              errorAlert(window.t ? window.t('swal.network_delete_failed', '网络连接异常，删除未完成') : '网络连接异常，删除未完成');
             });
           }
         });
       }
     });
   } else {
-    if (confirm('确认删除吗？')) {
+    const confirmSingleMsg = window.t ? window.t('swal.delete_confirm', '确认删除？') : '确认删除吗？';
+    if (confirm(confirmSingleMsg)) {
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = actionUrl;

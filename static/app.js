@@ -387,15 +387,18 @@ function attachDeleteConfirm() {
     form.dataset.swalBound = '1';
     form.addEventListener('submit', function (e) {
       e.preventDefault();
+      const defaultTitle = window.t ? window.t('swal.delete_confirm', '确认删除？') : '确认删除？';
+      const defaultDesc = window.t ? window.t('swal.irreversible_action', '此操作不可撤销。') : '此操作不可撤销。';
+      const undoWindowHint = window.t ? window.t('swal.undo_window_5s', '删除后提供 5 秒撤销恢复窗口。') : '删除后提供 5 秒撤销恢复窗口。';
       Swal.fire({
         icon: 'warning',
         iconColor: '#a8475a',
-        title: form.dataset.confirmTitle || '确认删除？',
-        html: (form.dataset.confirmText || '此操作不可撤销。') + '<br><span style="color:#8a877e;font-size:13px;">删除后提供 5 秒撤销恢复窗口。</span>',
+        title: form.dataset.confirmTitle || defaultTitle,
+        html: (form.dataset.confirmText || defaultDesc) + '<br><span style="color:#8a877e;font-size:13px;">' + undoWindowHint + '</span>',
         showCancelButton: true,
         reverseButtons: true,
-        confirmButtonText: '确认删除',
-        cancelButtonText: '取消',
+        confirmButtonText: window.t ? window.t('common.confirm_delete', '确认删除') : '确认删除',
+        cancelButtonText: window.t ? window.t('common.cancel', '取消') : '取消',
         buttonsStyling: false,
         customClass: {
           popup: 'app-swal-popup',
@@ -414,16 +417,19 @@ function attachDeleteConfirm() {
             row.style.pointerEvents = 'none';
           }
           let isUndone = false;
+          const undoTitle = window.t ? window.t('swal.item_deleted', '已删除项目') : '已删除项目';
+          const undoHint = window.t ? window.t('swal.undo_hint_5s', '如需撤销请在 5 秒内点击') : '如需撤销请在 5 秒内点击';
+          const undoBtn = window.t ? window.t('swal.undo_btn', '撤销 (Undo)') : '撤销 (Undo)';
           Swal.fire({
             toast: true,
             position: 'bottom-end',
             icon: 'info',
-            title: '已删除项目',
-            html: '<span style="font-size:12px;color:var(--muted)">如需撤销请在 5 秒内点击</span>',
+            title: undoTitle,
+            html: '<span style="font-size:12px;color:var(--muted)">' + undoHint + '</span>',
             timer: 5000,
             timerProgressBar: true,
             showConfirmButton: true,
-            confirmButtonText: '撤销 (Undo)',
+            confirmButtonText: undoBtn,
             buttonsStyling: false,
             customClass: {
               popup: 'app-swal-toast app-swal-undo-toast',
@@ -441,7 +447,7 @@ function attachDeleteConfirm() {
                 toast: true,
                 position: 'top-end',
                 icon: 'success',
-                title: '已撤销删除',
+                title: window.t ? window.t('swal.undo_success', '已撤销删除') : '已撤销删除',
                 showConfirmButton: false,
                 timer: 2000
               });
@@ -465,7 +471,7 @@ function attachDeleteConfirm() {
                     toast: true,
                     position: 'top-end',
                     icon: 'success',
-                    title: data.message || '已删除',
+                    title: data.message || (window.t ? window.t('swal.deleted', '已删除') : '已删除'),
                     showConfirmButton: false,
                     timer: 2000,
                     customClass: { popup: 'app-swal-toast' }
@@ -483,7 +489,7 @@ function attachDeleteConfirm() {
                     row.style.filter = '';
                     row.style.pointerEvents = '';
                   }
-                  errorAlert((data && data.message) || '删除失败');
+                  errorAlert((data && data.message) || (window.t ? window.t('swal.delete_failed', '删除失败') : '删除失败'));
                 }
               })
               .catch(err => {
@@ -494,7 +500,7 @@ function attachDeleteConfirm() {
                   row.style.filter = '';
                   row.style.pointerEvents = '';
                 }
-                errorAlert('网络连接异常，删除未完成');
+                errorAlert(window.t ? window.t('swal.network_delete_failed', '网络连接异常，删除未完成') : '网络连接异常，删除未完成');
               });
             }
           });

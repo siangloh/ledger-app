@@ -3,6 +3,7 @@ from datetime import datetime, date
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 
 from core.db import get_db, get_current_user_id, bump_data_version
+from core.i18n import t
 from subscription_tracker import (
     BillingCycle,
     SubscriptionStatus,
@@ -118,7 +119,7 @@ def api_add_subscription():
     note = (request.form.get('note') or '').strip()
 
     if not name:
-        flash('请输入订阅服务名称', 'error')
+        flash(t('subscriptions.enter_name', '请输入订阅服务名称'), 'error')
         return redirect(url_for('subscriptions_page'))
 
     try:
@@ -126,7 +127,7 @@ def api_add_subscription():
         if cost <= 0:
             raise ValueError()
     except ValueError:
-        flash('请输入有效的扣费金额', 'error')
+        flash(t('subscriptions.invalid_amount', '请输入有效的扣费金额'), 'error')
         return redirect(url_for('subscriptions_page'))
 
     try:
@@ -152,7 +153,7 @@ def api_add_subscription():
     ))
     db.commit()
     bump_data_version('subscription_add', user_id=user_id)
-    flash(f'成功添加订阅服务：{name}', 'success')
+    flash(t('subscriptions.added_fmt', '成功添加订阅服务：{name}', name=name), 'success')
     return redirect(url_for('subscriptions_page'))
 
 
@@ -176,13 +177,13 @@ def api_edit_subscription(sub_id):
     note = (request.form.get('note') or '').strip()
 
     if not name:
-        flash('订阅名称不能为空', 'error')
+        flash(t('subscriptions.name_required', '订阅名称不能为空'), 'error')
         return redirect(url_for('subscriptions_page'))
 
     try:
         cost = float(cost_str)
     except ValueError:
-        flash('金额格式不正确', 'error')
+        flash(t('subscriptions.invalid_amount_format', '金额格式不正确'), 'error')
         return redirect(url_for('subscriptions_page'))
 
     try:
@@ -205,7 +206,7 @@ def api_edit_subscription(sub_id):
     ))
     db.commit()
     bump_data_version('subscription_edit', user_id=user_id)
-    flash(f'已更新订阅服务：{name}', 'success')
+    flash(t('subscriptions.updated_fmt', '已更新订阅服务：{name}', name=name), 'success')
     return redirect(url_for('subscriptions_page'))
 
 
@@ -215,15 +216,15 @@ def api_toggle_subscription_status(sub_id):
     db = get_db()
     row = db.execute("SELECT status, name FROM subscriptions WHERE id = ? AND user_id = ?", (sub_id, user_id)).fetchone()
     if not row:
-        flash('找不到指定订阅记录', 'error')
+        flash(t('subscriptions.not_found', '找不到指定订阅记录'), 'error')
         return redirect(url_for('subscriptions_page'))
 
     new_status = 'PAUSED' if row['status'] == 'ACTIVE' else 'ACTIVE'
     db.execute("UPDATE subscriptions SET status = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?", (new_status, sub_id, user_id))
     db.commit()
     bump_data_version('subscription_status', user_id=user_id)
-    state_desc = '已恢复活跃计费' if new_status == 'ACTIVE' else '已暂停扣款监控'
-    flash(f"已将【{row['name']}】{state_desc}", 'success')
+    state_desc = t('subscriptions.resumed_active', '已恢复活跃计费') if new_status == 'ACTIVE' else t('subscriptions.paused_monitoring', '已暂停扣款监控')
+    flash(t('subscriptions.state_updated_fmt', '已将【{name}】{state}', name=row['name'], state=state_desc), 'success')
     return redirect(url_for('subscriptions_page'))
 
 
@@ -233,15 +234,15 @@ def api_toggle_cancel_target(sub_id):
     db = get_db()
     row = db.execute("SELECT target_to_cancel, name FROM subscriptions WHERE id = ? AND user_id = ?", (sub_id, user_id)).fetchone()
     if not row:
-        flash('找不到指定订阅记录', 'error')
+        flash(t('subscriptions.not_found', '找不到指定订阅记录'), 'error')
         return redirect(url_for('subscriptions_page'))
 
     new_flag = 0 if row['target_to_cancel'] else 1
     db.execute("UPDATE subscriptions SET target_to_cancel = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?", (new_flag, sub_id, user_id))
     db.commit()
     bump_data_version('subscription_cancel_target', user_id=user_id)
-    tip = '已标记为【打算退订】，将在扣款前高亮预警拦截！' if new_flag else '已取消退订标记'
-    flash(f"【{row['name']}】{tip}", 'success')
+    tip = t('subscriptions.marked_to_cancel', '已标记为【打算退订】，将在扣款前高亮预警拦截！') if new_flag else t('subscriptions.unmarked_to_cancel', '已取消退订标记')
+    flash(t('subscriptions.tip_fmt', '【{name}】{tip}', name=row['name'], tip=tip), 'success')
     return redirect(url_for('subscriptions_page'))
 
 
@@ -251,7 +252,7 @@ def api_roll_subscription(sub_id):
     db = get_db()
     row = db.execute("SELECT * FROM subscriptions WHERE id = ? AND user_id = ?", (sub_id, user_id)).fetchone()
     if not row:
-        flash('找不到指定订阅记录', 'error')
+        flash(t('subscriptions.not_found', '找不到指定订阅记录'), 'error')
         return redirect(url_for('subscriptions_page'))
 
     d = dict(row)
@@ -278,8 +279,8 @@ def api_roll_subscription(sub_id):
     """, (new_date.isoformat(), anchor_day, sub_id, user_id))
     db.commit()
     bump_data_version('subscription_roll', user_id=user_id)
-    extra_msg = '，并已自动生成当期记账支出' if record_expense else ''
-    flash(f"【{d['name']}】已成功续期至 {new_date.isoformat()}{extra_msg}！", 'success')
+    extra_msg = t('subscriptions.auto_expense_hint', '，并已自动生成当期记账支出') if record_expense else ''
+    flash(t('subscriptions.renewed_fmt', '【{name}】已成功续期至 {date}{extra}！', name=d['name'], date=new_date.isoformat(), extra=extra_msg), 'success')
     return redirect(url_for('subscriptions_page'))
 
 
@@ -290,5 +291,5 @@ def api_delete_subscription(sub_id):
     db.execute("DELETE FROM subscriptions WHERE id = ? AND user_id = ?", (sub_id, user_id))
     db.commit()
     bump_data_version('subscription_delete', user_id=user_id)
-    flash('已删除该订阅服务记录', 'success')
+    flash(t('subscriptions.deleted_success', '已删除该订阅服务记录'), 'success')
     return redirect(url_for('subscriptions_page'))

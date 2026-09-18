@@ -319,17 +319,21 @@ function openEditModal(id, name, type, currency, creditLimit, statementDay, dueD
 function confirmDelete(id, name, subCount, installCount) {
   let extra = '';
   if (subCount > 0 || installCount > 0) {
-    extra = '<br><br><span style="color:#f87171">⚠️ 此账户已绑定 ' + subCount + ' 个订阅、' + installCount + ' 个分期，删除后绑定将自动解除。</span>';
+    const boundFmt = window.t ? window.t('accounts.del_warn_bound', '⚠️ 此账户已绑定 {sub} 个订阅、{install} 个分期，删除后绑定将自动解除。', {sub: subCount, install: installCount}) : ('⚠️ 此账户已绑定 ' + subCount + ' 个订阅、' + installCount + ' 个分期，删除后绑定将自动解除。');
+    extra = '<br><br><span style="color:#f87171">' + boundFmt + '</span>';
   }
+  const title = window.t ? window.t('accounts.del_confirm_title', '确认删除账户？') : '确认删除账户？';
+  const strongName = '<strong style="color:var(--ink)">' + name + '</strong>';
+  const msgFmt = window.t ? window.t('accounts.del_confirm_msg', '账户「{name}」将被永久删除。', {name: strongName}) : ('账户「' + strongName + '」将被永久删除。');
   Swal.fire({
-    title: '确认删除账户？',
-    html: '<p style="color:var(--muted);font-size:14px">账户「<strong style="color:var(--ink)">' + name + '</strong>」将被永久删除。' + extra + '</p>',
+    title: title,
+    html: '<p style="color:var(--muted);font-size:14px">' + msgFmt + extra + '</p>',
     icon: 'warning',
     background: 'var(--surface,#1a2744)',
     color: 'var(--ink,#e2e8f0)',
     showCancelButton: true,
-    confirmButtonText: '删除',
-    cancelButtonText: '取消',
+    confirmButtonText: window.t ? window.t('common.delete', '删除') : '删除',
+    cancelButtonText: window.t ? window.t('common.cancel', '取消') : '取消',
     confirmButtonColor: '#ef4444',
   }).then(result => {
     if (result.isConfirmed) {

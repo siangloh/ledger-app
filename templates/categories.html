@@ -20,8 +20,8 @@
         <div style="display: flex; gap: 6px; align-items: center;">
           <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#34d399' }}')">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
-                data-confirm-title="删除分类「{{ c.name }}」？"
-                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。" style="display:inline; margin:0;">
+                data-confirm-title="{{ t('categories.del_confirm_title', '删除分类「{name}」？', name=c.name) }}"
+                data-confirm-text="{{ t('categories.del_confirm_desc', '不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。') }}" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="cat-action-btn danger">{{ t('common.delete') }}</button>
           </form>
@@ -33,7 +33,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="income">
       <input type="hidden" name="group_name" value="main">
-      <input type="color" name="color" value="#34d399" title="分类代表颜色" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
+      <input type="color" name="color" value="#34d399" title="{{ t('categories.cat_color_title', '分类代表颜色') }}" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
       <input type="text" name="name" placeholder="{{ t('categories.add_cat_placeholder') }}" required style="flex: 1;">
       <button type="submit" class="btn-primary btn-sm">{{ t('common.add') }}</button>
     </form>
@@ -52,8 +52,8 @@
         <div style="display: flex; gap: 6px; align-items: center;">
           <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#38bdf8' }}')">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
-                data-confirm-title="删除分类「{{ c.name }}」？"
-                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。" style="display:inline; margin:0;">
+                data-confirm-title="{{ t('categories.del_confirm_title', '删除分类「{name}」？', name=c.name) }}"
+                data-confirm-text="{{ t('categories.del_confirm_desc', '不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。') }}" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="cat-action-btn danger">{{ t('common.delete') }}</button>
           </form>
@@ -65,7 +65,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="income">
       <input type="hidden" name="group_name" value="side">
-      <input type="color" name="color" value="#38bdf8" title="分类代表颜色" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
+      <input type="color" name="color" value="#38bdf8" title="{{ t('categories.cat_color_title', '分类代表颜色') }}" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
       <input type="text" name="name" placeholder="{{ t('categories.add_cat_placeholder') }}" required style="flex: 1;">
       <button type="submit" class="btn-primary btn-sm">{{ t('common.add') }}</button>
     </form>
@@ -110,14 +110,14 @@
                   data-name="{{ c.name }}"
                   data-limit=""
                   onclick="openSetBudgetModal(this)"
-                  title="点击为「{{ c.name }}」设定每月支出限额">
+                  title="{{ t('categories.set_limit_tooltip', '点击为「{name}」设定每月支出限额', name=c.name) }}">
             {{ t('categories.set_limit_btn') }}
           </button>
           {% endif %}
-          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#fb923c' }}')" title="修改分类名称与代表颜色">{{ t('common.edit') }}</button>
+          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#fb923c' }}')" title="{{ t('categories.edit_cat_tooltip', '修改分类名称与代表颜色') }}">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
-                data-confirm-title="删除分类「{{ c.name }}」？"
-                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。" style="display:inline; margin:0;">
+                data-confirm-title="{{ t('categories.del_confirm_title', '删除分类「{name}」？', name=c.name) }}"
+                data-confirm-text="{{ t('categories.del_confirm_desc', '不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。') }}" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="cat-action-btn danger">{{ t('common.delete') }}</button>
           </form>
@@ -128,7 +128,7 @@
     <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="expense">
-      <input type="color" name="color" value="#fb923c" title="分类代表颜色" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
+      <input type="color" name="color" value="#fb923c" title="{{ t('categories.cat_color_title', '分类代表颜色') }}" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
       <input type="text" name="name" placeholder="{{ t('categories.add_cat_placeholder') }}" required style="flex: 1;">
       <button type="submit" class="btn-primary btn-sm">{{ t('common.add') }}</button>
     </form>
@@ -147,8 +147,8 @@
         <div style="display: flex; gap: 6px; align-items: center;">
           <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#059669' }}')">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
-                data-confirm-title="删除储蓄分类「{{ c.name }}」？"
-                data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。" style="display:inline; margin:0;">
+                data-confirm-title="{{ t('categories.del_savings_confirm_title', '删除储蓄分类「{name}」？', name=c.name) }}"
+                data-confirm-text="{{ t('categories.del_confirm_desc', '不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。') }}" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="cat-action-btn danger">{{ t('common.delete') }}</button>
           </form>
@@ -159,7 +159,7 @@
     <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="savings">
-      <input type="color" name="color" value="#059669" title="分类代表颜色" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
+      <input type="color" name="color" value="#059669" title="{{ t('categories.cat_color_title', '分类代表颜色') }}" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
       <input type="text" name="name" placeholder="{{ t('categories.savings_placeholder') }}" required style="flex: 1;">
       <button type="submit" class="btn-primary btn-sm">{{ t('common.add') }}</button>
     </form>

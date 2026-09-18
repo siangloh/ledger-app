@@ -5,6 +5,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 
 from core.db import get_db, get_current_user_id
 from core.auth import is_ajax_request
+from core.i18n import t
 from liabilities_tracker import (
     get_monthly_cashflow_events,
     sync_installments_to_monthly_statement,
@@ -116,7 +117,7 @@ def api_add_installment():
 
     title = (request.form.get('title') or '').strip()
     if not title:
-        flash('请输入分期项目名称', 'error')
+        flash(t('liabilities.enter_installment_name', '请输入分期项目名称'), 'error')
         return redirect(url_for('liabilities_page'))
 
     try:
@@ -124,7 +125,7 @@ def api_add_installment():
         tenure_months = int(request.form.get('tenure_months', 1))
         paid_periods = int(request.form.get('paid_periods', 0))
     except (ValueError, TypeError):
-        flash('分期金额或期数格式不正确', 'error')
+        flash(t('liabilities.invalid_installment_format', '分期金额或期数格式不正确'), 'error')
         return redirect(url_for('liabilities_page'))
 
     first_due_date = request.form.get('first_due_date') or date.today().isoformat()
@@ -144,7 +145,7 @@ def api_add_installment():
         monthly_amount, first_due_date, status, note, datetime.now().isoformat()
     ))
     db.commit()
-    flash(f'已成功添加免息分期项目：{title}', 'success')
+    flash(t('liabilities.added_installment_fmt', '已成功添加免息分期项目：{title}', title=title), 'success')
     return redirect(url_for('liabilities_page'))
 
 
@@ -155,7 +156,7 @@ def api_add_loan():
 
     title = (request.form.get('title') or '').strip()
     if not title:
-        flash('请输入贷款项目名称', 'error')
+        flash(t('liabilities.enter_loan_name', '请输入贷款项目名称'), 'error')
         return redirect(url_for('liabilities_page'))
 
     try:
@@ -165,7 +166,7 @@ def api_add_loan():
         interest_rate = float(request.form.get('annual_interest_rate', 0.0))
         due_day = int(request.form.get('due_day', 5))
     except (ValueError, TypeError):
-        flash('贷款金额、利率或期数格式不正确', 'error')
+        flash(t('liabilities.invalid_loan_format', '贷款金额、利率或期数格式不正确'), 'error')
         return redirect(url_for('liabilities_page'))
 
     method = request.form.get('method') or 'reducing_balance'
@@ -202,7 +203,7 @@ def api_add_loan():
         monthly_payment, due_day, start_date, status, note, datetime.now().isoformat()
     ))
     db.commit()
-    flash(f'已成功添加贷款记录：{title}', 'success')
+    flash(t('liabilities.added_loan_fmt', '已成功添加贷款记录：{title}', title=title), 'success')
     return redirect(url_for('liabilities_page'))
 
 
@@ -214,7 +215,7 @@ def api_add_account():
     name = (request.form.get('name') or '').strip()
     acc_type = request.form.get('type') or 'credit_card'
     if not name:
-        flash('请输入账户/卡片名称', 'error')
+        flash(t('liabilities.enter_account_name', '请输入账户/卡片名称'), 'error')
         return redirect(url_for('liabilities_page'))
 
     credit_limit = float(request.form.get('credit_limit') or 0.0)
@@ -227,7 +228,7 @@ def api_add_account():
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
     ''', (user_id, name, acc_type, credit_limit, statement_day, due_day, datetime.now().isoformat()))
     db.commit()
-    flash(f'已成功添加卡片/账户：{name}', 'success')
+    flash(t('liabilities.added_card_fmt', '已成功添加卡片/账户：{name}', name=name), 'success')
     return redirect(url_for('liabilities_page'))
 
 
@@ -252,7 +253,7 @@ def api_delete_liability(item_type, item_id):
     elif item_type == 'account':
         db.execute('DELETE FROM accounts WHERE id = ? AND user_id = ?', (item_id, user_id))
     db.commit()
-    flash('已删除该负债记录', 'success')
+    flash(t('liabilities.deleted_liability', '已删除该负债记录'), 'success')
     return redirect(url_for('liabilities_page'))
 
 
@@ -304,7 +305,7 @@ def manage_add_account():
     grace_period_days = request.form.get('grace_period_days', '20') or '20'
 
     if not name:
-        flash('账户名称不能为空', 'error')
+        flash(t('accounts.name_required', '账户名称不能为空'), 'error')
         return redirect(url_for('accounts_page'))
 
     try:
@@ -324,7 +325,7 @@ def manage_add_account():
          datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     )
     db.commit()
-    flash(f'账户「{name}」已成功添加', 'success')
+    flash(t('accounts.added_fmt', '账户「{name}」已成功添加', name=name), 'success')
     return redirect(url_for('accounts_page'))
 
 
@@ -341,7 +342,7 @@ def manage_edit_account(acc_id):
     grace_period_days = request.form.get('grace_period_days', '20') or '20'
 
     if not name:
-        flash('账户名称不能为空', 'error')
+        flash(t('accounts.name_required', '账户名称不能为空'), 'error')
         return redirect(url_for('accounts_page'))
 
     try:
@@ -361,7 +362,7 @@ def manage_edit_account(acc_id):
          acc_id, user_id)
     )
     db.commit()
-    flash(f'账户「{name}」已更新', 'success')
+    flash(t('accounts.updated_fmt', '账户「{name}」已更新', name=name), 'success')
     return redirect(url_for('accounts_page'))
 
 
@@ -371,12 +372,12 @@ def manage_toggle_account(acc_id):
     db = get_db()
     row = db.execute('SELECT is_active FROM accounts WHERE id=? AND user_id=?', (acc_id, user_id)).fetchone()
     if not row:
-        flash('账户不存在', 'error')
+        flash(t('accounts.not_found', '账户不存在'), 'error')
         return redirect(url_for('accounts_page'))
     new_state = 0 if row['is_active'] else 1
     db.execute('UPDATE accounts SET is_active=? WHERE id=? AND user_id=?', (new_state, acc_id, user_id))
     db.commit()
-    flash('账户状态已更新', 'success')
+    flash(t('accounts.status_updated', '账户状态已更新'), 'success')
     return redirect(url_for('accounts_page'))
 
 
@@ -386,13 +387,13 @@ def manage_delete_account(acc_id):
     db = get_db()
     row = db.execute('SELECT name FROM accounts WHERE id=? AND user_id=?', (acc_id, user_id)).fetchone()
     if not row:
-        flash('账户不存在', 'error')
+        flash(t('accounts.not_found', '账户不存在'), 'error')
         return redirect(url_for('accounts_page'))
     # Unlink subscriptions and installments before deletion
     db.execute('UPDATE subscriptions SET payment_method_id=NULL WHERE payment_method_id=? AND user_id=?', (acc_id, user_id))
     db.execute('UPDATE installments SET account_id=NULL WHERE account_id=? AND user_id=?', (acc_id, user_id))
     db.execute('DELETE FROM accounts WHERE id=? AND user_id=?', (acc_id, user_id))
     db.commit()
-    flash(f'账户「{row["name"]}」已删除', 'success')
+    flash(t('accounts.account_deleted_fmt', '账户「{name}」已删除', name=row["name"]), 'success')
     return redirect(url_for('accounts_page'))
 

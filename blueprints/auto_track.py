@@ -19,6 +19,7 @@ from services.notification_service import parse_auto_track_notification
 from services.ai_service import classify_notification_with_llm
 from core.utils import money_filter, check_and_record_budget_alerts
 from core.extensions import csrf
+from core.i18n import t
 
 auto_track_bp = Blueprint('auto_track', __name__)
 
@@ -606,25 +607,25 @@ def api_llm_samples_add():
     ''', (user_id, text, label_type, is_real, amount, merchant, category, notes, now))
     db.commit()
 
-    return jsonify({'ok': True, 'message': '成功录入学习样本库！大模型下次遇到类似通知将照此学习。'})
+    return jsonify({'ok': True, 'message': t('auto_track.sample_added_success', '成功录入学习样本库！大模型下次遇到类似通知将照此学习。')})
 
 
 @auto_track_bp.route('/api/llm-samples/delete/<int:sample_id>', methods=['POST'], endpoint='api_llm_samples_delete')
 def api_llm_samples_delete(sample_id):
     if not session.get('logged_in'):
-        return jsonify({'ok': False, 'message': '请先登录'}), 401
+        return jsonify({'ok': False, 'message': t('common.please_login', '请先登录')}), 401
     db = get_db()
     db.execute("DELETE FROM llm_learning_samples WHERE id = ?", (sample_id,))
     db.commit()
-    return jsonify({'ok': True, 'message': '样本已成功删除'})
+    return jsonify({'ok': True, 'message': t('auto_track.sample_deleted_success', '样本已成功删除')})
 
 
 @auto_track_bp.route('/api/llm-samples/reset', methods=['POST'], endpoint='api_llm_samples_reset')
 def api_llm_samples_reset():
     if not session.get('logged_in'):
-        return jsonify({'ok': False, 'message': '请先登录'}), 401
+        return jsonify({'ok': False, 'message': t('common.please_login', '请先登录')}), 401
     db = get_db()
     db.execute("DELETE FROM llm_learning_samples")
     db.commit()
     seed_learning_samples(db)
-    return jsonify({'ok': True, 'message': '已成功将学习样本库恢复为官方预设语料库！'})
+    return jsonify({'ok': True, 'message': t('auto_track.sample_reset_success', '已成功将学习样本库恢复为官方预设语料库！')})

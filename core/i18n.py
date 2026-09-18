@@ -724,6 +724,97 @@ TRANSLATIONS = {
         'transactions.import_empty_file': '文件中没有数据',
         'transactions.import_session_expired': '导入会话已过期，请重新上传文件',
         'transactions.import_completed': '导入完成：成功 {inserted} 条，跳过 {skipped} 条',
+
+        # Analytics trend
+        'insights.trend_flat': '持平 0%',
+        'insights.trend_new': '本月新增',
+
+        # Common actions & buttons
+        'common.confirm_delete': '确认删除',
+        'common.del_short': '删',
+        'common.please_login': '请先登录',
+
+        # Swal & Undo window
+        'swal.undo_window_5s': '删除后提供 5 秒撤销恢复窗口。',
+        'swal.undo_hint_5s': '如需撤销请在 5 秒内点击',
+        'swal.undo_btn': '撤销 (Undo)',
+        'swal.undo_success': '已撤销删除',
+        'swal.item_deleted': '已删除项目',
+        'swal.deleted': '已删除',
+        'swal.delete_failed': '删除失败',
+        'swal.network_delete_failed': '网络连接异常，删除未完成',
+        'swal.save_failed': '保存失败',
+        'swal.request_failed': '请求失败',
+        'swal.irreversible_action': '此操作不可撤销。',
+        'swal.network_error': '网络错误',
+
+        # Records delete & undo
+        'records.batch_deleted_toast': '已删除 {count} 条记录',
+        'records.undo_batch_toast': '已撤销删除，记录已保留',
+        'records.single_deleted_toast': '已删除 1 条记录',
+        'records.undo_single_toast': '已撤销删除，记录已完整保留',
+        'records.batch_delete_failed': '批量删除失败',
+        'records.batch_delete_network_failed': '网络连接异常，批量删除未完成',
+        'records.batch_delete_confirm_native': '确认删除选中的 {count} 条记录吗？',
+
+        # Liabilities & Accounts delete/actions
+        'liabilities.deleted_liability': '已删除该负债记录',
+        'liabilities.enter_installment_name': '请输入分期项目名称',
+        'liabilities.invalid_installment_format': '分期金额或期数格式不正确',
+        'liabilities.added_installment_fmt': '已成功添加免息分期项目：{title}',
+        'liabilities.enter_loan_name': '请输入贷款项目名称',
+        'liabilities.invalid_loan_format': '贷款金额、利率或期数格式不正确',
+        'liabilities.added_loan_fmt': '已成功添加贷款记录：{title}',
+        'liabilities.enter_account_name': '请输入账户/卡片名称',
+        'liabilities.added_card_fmt': '已成功添加卡片/账户：{name}',
+        'accounts.name_required': '账户名称不能为空',
+        'accounts.added_fmt': '账户「{name}」已成功添加',
+        'accounts.updated_fmt': '账户「{name}」已更新',
+        'accounts.not_found': '账户不存在',
+        'accounts.status_updated': '账户状态已更新',
+        'accounts.account_deleted_fmt': '账户「{name}」已删除',
+        'accounts.del_warn_bound': '⚠️ 此账户已绑定 {sub} 个订阅、{install} 个分期，删除后绑定将自动解除。',
+        'accounts.del_confirm_title': '确认删除账户？',
+        'accounts.del_confirm_msg': '账户「{name}」将被永久删除。',
+
+        # Subscriptions delete/actions
+        'subscriptions.deleted_success': '已删除该订阅服务记录',
+        'subscriptions.enter_name': '请输入订阅服务名称',
+        'subscriptions.invalid_amount': '请输入有效的扣费金额',
+        'subscriptions.added_fmt': '成功添加订阅服务：{name}',
+        'subscriptions.name_required': '订阅名称不能为空',
+        'subscriptions.invalid_amount_format': '金额格式不正确',
+        'subscriptions.updated_fmt': '已更新订阅服务：{name}',
+        'subscriptions.not_found': '找不到指定订阅记录',
+        'subscriptions.state_updated_fmt': '已将【{name}】{state}',
+        'subscriptions.tip_fmt': '【{name}】{tip}',
+        'subscriptions.renewed_fmt': '【{name}】已成功续期至 {date}{extra}！',
+        'subscriptions.resumed_active': '已恢复活跃计费',
+        'subscriptions.paused_monitoring': '已暂停扣款监控',
+        'subscriptions.marked_to_cancel': '已标记为【打算退订】，将在扣款前高亮预警拦截！',
+        'subscriptions.unmarked_to_cancel': '已取消退订标记',
+        'subscriptions.auto_expense_hint': '，并已自动生成当期记账支出',
+
+        # Categories delete confirmation
+        'categories.del_confirm_title': '删除分类「{name}」？',
+        'categories.del_confirm_desc': '不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。',
+        'categories.del_savings_confirm_title': '删除储蓄分类「{name}」？',
+        'categories.set_limit_tooltip': '点击为「{name}」设定每月支出限额',
+        'categories.edit_cat_tooltip': '修改分类名称与代表颜色',
+        'categories.cat_color_title': '分类代表颜色',
+
+        # Auto track delete/actions
+        'auto_track.del_sample_btn': '删除此条样本',
+        'auto_track.del_sample_title': '确认删除此条学习样本？',
+        'auto_track.del_sample_desc': '删除后，大模型分析时将不再参考本条样本。',
+        'auto_track.sample_deleted': '样本已删除',
+        'auto_track.sample_added_success': '成功录入学习样本库！大模型下次遇到类似通知将照此学习。',
+        'auto_track.sample_deleted_success': '样本已成功删除',
+        'auto_track.sample_reset_success': '已成功将学习样本库恢复为官方预设语料库！',
+
+        # Split bill delete tooltips
+        'split_bill.del_item': '删除此项',
+        'split_bill.del_dish': '删除这道菜',
     },
 
     'en': {
@@ -1428,6 +1519,97 @@ TRANSLATIONS = {
         'transactions.import_empty_file': 'File contains no data',
         'transactions.import_session_expired': 'Import session has expired, please upload again',
         'transactions.import_completed': 'Import completed: {inserted} succeeded, {skipped} skipped',
+
+        # Analytics trend
+        'insights.trend_flat': 'Flat 0%',
+        'insights.trend_new': 'New this month',
+
+        # Common actions & buttons
+        'common.confirm_delete': 'Confirm Delete',
+        'common.del_short': 'Del',
+        'common.please_login': 'Please sign in first',
+
+        # Swal & Undo window
+        'swal.undo_window_5s': 'A 5-second undo recovery window is provided after deletion.',
+        'swal.undo_hint_5s': 'Click within 5 seconds to undo',
+        'swal.undo_btn': 'Undo',
+        'swal.undo_success': 'Deletion undone',
+        'swal.item_deleted': 'Item deleted',
+        'swal.deleted': 'Deleted',
+        'swal.delete_failed': 'Deletion failed',
+        'swal.network_delete_failed': 'Network error, deletion incomplete',
+        'swal.save_failed': 'Save failed',
+        'swal.request_failed': 'Request failed',
+        'swal.irreversible_action': 'This action cannot be undone.',
+        'swal.network_error': 'Network error',
+
+        # Records delete & undo
+        'records.batch_deleted_toast': 'Deleted {count} records',
+        'records.undo_batch_toast': 'Deletion undone, records kept',
+        'records.single_deleted_toast': 'Deleted 1 record',
+        'records.undo_single_toast': 'Deletion undone, record fully restored',
+        'records.batch_delete_failed': 'Batch delete failed',
+        'records.batch_delete_network_failed': 'Network error, batch delete incomplete',
+        'records.batch_delete_confirm_native': 'Are you sure you want to delete {count} selected records?',
+
+        # Liabilities & Accounts delete/actions
+        'liabilities.deleted_liability': 'Liability record deleted',
+        'liabilities.enter_installment_name': 'Please enter installment item name',
+        'liabilities.invalid_installment_format': 'Invalid installment amount or tenure format',
+        'liabilities.added_installment_fmt': 'Successfully added installment: {title}',
+        'liabilities.enter_loan_name': 'Please enter loan name',
+        'liabilities.invalid_loan_format': 'Invalid loan amount, interest rate or tenure format',
+        'liabilities.added_loan_fmt': 'Successfully added loan: {title}',
+        'liabilities.enter_account_name': 'Please enter account or card name',
+        'liabilities.added_card_fmt': 'Successfully added card/account: {name}',
+        'accounts.name_required': 'Account name cannot be empty',
+        'accounts.added_fmt': 'Account "{name}" added successfully',
+        'accounts.updated_fmt': 'Account "{name}" updated',
+        'accounts.not_found': 'Account does not exist',
+        'accounts.status_updated': 'Account status updated',
+        'accounts.account_deleted_fmt': 'Account "{name}" deleted',
+        'accounts.del_warn_bound': '⚠️ This account is linked to {sub} subscription(s) and {install} installment(s). Deleting it will unlink them.',
+        'accounts.del_confirm_title': 'Confirm delete account?',
+        'accounts.del_confirm_msg': 'Account "{name}" will be permanently deleted.',
+
+        # Subscriptions delete/actions
+        'subscriptions.deleted_success': 'Subscription record deleted',
+        'subscriptions.enter_name': 'Please enter subscription name',
+        'subscriptions.invalid_amount': 'Please enter a valid billing amount',
+        'subscriptions.added_fmt': 'Successfully added subscription: {name}',
+        'subscriptions.name_required': 'Subscription name cannot be empty',
+        'subscriptions.invalid_amount_format': 'Invalid amount format',
+        'subscriptions.updated_fmt': 'Updated subscription: {name}',
+        'subscriptions.not_found': 'Subscription record not found',
+        'subscriptions.state_updated_fmt': 'Set [{name}] to {state}',
+        'subscriptions.tip_fmt': '[{name}] {tip}',
+        'subscriptions.renewed_fmt': '[{name}] successfully renewed to {date}{extra}!',
+        'subscriptions.resumed_active': 'resumed active billing',
+        'subscriptions.paused_monitoring': 'paused charge monitoring',
+        'subscriptions.marked_to_cancel': 'marked as [intending to cancel], alert will be triggered before charge!',
+        'subscriptions.unmarked_to_cancel': 'unmarked cancellation target',
+        'subscriptions.auto_expense_hint': ', and current period expense record automatically generated',
+
+        # Categories delete confirmation
+        'categories.del_confirm_title': 'Delete category "{name}"?',
+        'categories.del_confirm_desc': 'Old historical records will remain unaffected, but it will no longer be selectable in future entries. This action cannot be undone.',
+        'categories.del_savings_confirm_title': 'Delete savings category "{name}"?',
+        'categories.set_limit_tooltip': 'Click to set monthly spending limit for "{name}"',
+        'categories.edit_cat_tooltip': 'Edit category name and color',
+        'categories.cat_color_title': 'Category color',
+
+        # Auto track delete/actions
+        'auto_track.del_sample_btn': 'Delete this sample',
+        'auto_track.del_sample_title': 'Confirm delete this learning sample?',
+        'auto_track.del_sample_desc': 'After deletion, the LLM will no longer reference this sample.',
+        'auto_track.sample_deleted': 'Sample deleted',
+        'auto_track.sample_added_success': 'Successfully added to learning sample library! LLM will learn from this sample for future notifications.',
+        'auto_track.sample_deleted_success': 'Sample deleted successfully',
+        'auto_track.sample_reset_success': 'Successfully reset learning sample library to official default corpus!',
+
+        # Split bill delete tooltips
+        'split_bill.del_item': 'Delete item',
+        'split_bill.del_dish': 'Delete this dish',
     },
 
     'ms': {
@@ -2132,6 +2314,97 @@ TRANSLATIONS = {
         'transactions.import_empty_file': 'Tiada data dalam fail',
         'transactions.import_session_expired': 'Sesi import telah tamat tempoh, sila muat naik semula',
         'transactions.import_completed': 'Import selesai: {inserted} berjaya, {skipped} dilangkau',
+
+        # Analytics trend
+        'insights.trend_flat': 'Mendatar 0%',
+        'insights.trend_new': 'Baru bulan ini',
+
+        # Common actions & buttons
+        'common.confirm_delete': 'Sahkan Padam',
+        'common.del_short': 'Padam',
+        'common.please_login': 'Sila log masuk dahulu',
+
+        # Swal & Undo window
+        'swal.undo_window_5s': 'Tetingkap pemulihan buat asal 5 saat disediakan selepas pemadaman.',
+        'swal.undo_hint_5s': 'Klik dalam masa 5 saat untuk buat asal',
+        'swal.undo_btn': 'Buat Asal (Undo)',
+        'swal.undo_success': 'Pemadaman dibatalkan',
+        'swal.item_deleted': 'Item dipadamkan',
+        'swal.deleted': 'Dipadamkan',
+        'swal.delete_failed': 'Pemadaman gagal',
+        'swal.network_delete_failed': 'Ralat rangkaian, pemadaman tidak selesai',
+        'swal.save_failed': 'Gagal menyimpan',
+        'swal.request_failed': 'Permintaan gagal',
+        'swal.irreversible_action': 'Tindakan ini tidak boleh dibuat asal.',
+        'swal.network_error': 'Ralat rangkaian',
+
+        # Records delete & undo
+        'records.batch_deleted_toast': '{count} rekod telah dipadamkan',
+        'records.undo_batch_toast': 'Pemadaman dibatalkan, rekod dikekalkan',
+        'records.single_deleted_toast': '1 rekod telah dipadamkan',
+        'records.undo_single_toast': 'Pemadaman dibatalkan, rekod dipulihkan sepenuhnya',
+        'records.batch_delete_failed': 'Pemadaman pukal gagal',
+        'records.batch_delete_network_failed': 'Ralat rangkaian, pemadaman pukal tidak selesai',
+        'records.batch_delete_confirm_native': 'Adakah anda pasti mahu memadamkan {count} rekod yang dipilih?',
+
+        # Liabilities & Accounts delete/actions
+        'liabilities.deleted_liability': 'Rekod liabiliti dipadamkan',
+        'liabilities.enter_installment_name': 'Sila masukkan nama item ansuran',
+        'liabilities.invalid_installment_format': 'Format jumlah ansuran atau tempoh tidak sah',
+        'liabilities.added_installment_fmt': 'Berjaya menambah ansuran: {title}',
+        'liabilities.enter_loan_name': 'Sila masukkan nama pinjaman',
+        'liabilities.invalid_loan_format': 'Format jumlah pinjaman, kadar faedah atau tempoh tidak sah',
+        'liabilities.added_loan_fmt': 'Berjaya menambah pinjaman: {title}',
+        'liabilities.enter_account_name': 'Sila masukkan nama akaun atau kad',
+        'liabilities.added_card_fmt': 'Berjaya menambah kad/akaun: {name}',
+        'accounts.name_required': 'Nama akaun tidak boleh kosong',
+        'accounts.added_fmt': 'Akaun "{name}" berjaya ditambah',
+        'accounts.updated_fmt': 'Akaun "{name}" dikemas kini',
+        'accounts.not_found': 'Akaun tidak wujud',
+        'accounts.status_updated': 'Status akaun dikemas kini',
+        'accounts.account_deleted_fmt': 'Akaun "{name}" dipadamkan',
+        'accounts.del_warn_bound': '⚠️ Akaun ini dipautkan kepada {sub} langganan dan {install} ansuran. Memadamnya akan menyahpautkannya.',
+        'accounts.del_confirm_title': 'Sahkan padam akaun?',
+        'accounts.del_confirm_msg': 'Akaun "{name}" akan dipadamkan secara kekal.',
+
+        # Subscriptions delete/actions
+        'subscriptions.deleted_success': 'Rekod langganan dipadamkan',
+        'subscriptions.enter_name': 'Sila masukkan nama langganan',
+        'subscriptions.invalid_amount': 'Sila masukkan jumlah bil yang sah',
+        'subscriptions.added_fmt': 'Berjaya menambah langganan: {name}',
+        'subscriptions.name_required': 'Nama langganan tidak boleh kosong',
+        'subscriptions.invalid_amount_format': 'Format jumlah tidak sah',
+        'subscriptions.updated_fmt': 'Langganan dikemas kini: {name}',
+        'subscriptions.not_found': 'Rekod langganan tidak ditemui',
+        'subscriptions.state_updated_fmt': 'Telah menetapkan [{name}] kepada {state}',
+        'subscriptions.tip_fmt': '[{name}] {tip}',
+        'subscriptions.renewed_fmt': '[{name}] berjaya diperbaharui sehingga {date}{extra}!',
+        'subscriptions.resumed_active': 'diteruskan pengebilan aktif',
+        'subscriptions.paused_monitoring': 'dijeda pemantauan caj',
+        'subscriptions.marked_to_cancel': 'ditandakan sebagai [berhasrat untuk batal], amaran akan dipaparkan sebelum caj!',
+        'subscriptions.unmarked_to_cancel': 'dibatalkan tanda pembatalan',
+        'subscriptions.auto_expense_hint': ', dan rekod perbelanjaan tempoh semasa dijana secara automatik',
+
+        # Categories delete confirmation
+        'categories.del_confirm_title': 'Padam kategori "{name}"?',
+        'categories.del_confirm_desc': 'Rekod sejarah lama tidak akan terjejas, tetapi ia tidak lagi boleh dipilih dalam entri masa depan. Tindakan ini tidak boleh dibuat asal.',
+        'categories.del_savings_confirm_title': 'Padam kategori simpanan "{name}"?',
+        'categories.set_limit_tooltip': 'Klik untuk tetapkan had perbelanjaan bulanan untuk "{name}"',
+        'categories.edit_cat_tooltip': 'Ubah suai nama kategori dan warna',
+        'categories.cat_color_title': 'Warna kategori',
+
+        # Auto track delete/actions
+        'auto_track.del_sample_btn': 'Padam sampel ini',
+        'auto_track.del_sample_title': 'Padam sampel pembelajaran ini?',
+        'auto_track.del_sample_desc': 'Selepas dipadamkan, model AI tidak lagi akan merujuk kepada sampel ini semasa analisis.',
+        'auto_track.sample_deleted': 'Sampel dipadamkan',
+        'auto_track.sample_added_success': 'Berjaya ditambah ke pustaka sampel pembelajaran! LLM akan belajar dari sampel ini untuk pemberitahuan akan datang.',
+        'auto_track.sample_deleted_success': 'Sampel berjaya dipadamkan',
+        'auto_track.sample_reset_success': 'Berjaya memulihkan sampel pembelajaran kepada lalai rasmi!',
+
+        # Split bill delete tooltips
+        'split_bill.del_item': 'Padam item',
+        'split_bill.del_dish': 'Padam hidangan ini',
     },
 
     'zh_TW': {
@@ -2836,6 +3109,97 @@ TRANSLATIONS = {
         'transactions.import_empty_file': '檔案中沒有資料',
         'transactions.import_session_expired': '匯入工作階段已過期，請重新上傳檔案',
         'transactions.import_completed': '匯入完成：成功 {inserted} 條，跳過 {skipped} 條',
+
+        # Analytics trend
+        'insights.trend_flat': '持平 0%',
+        'insights.trend_new': '本月新增',
+
+        # Common actions & buttons
+        'common.confirm_delete': '確認刪除',
+        'common.del_short': '刪',
+        'common.please_login': '請先登入',
+
+        # Swal & Undo window
+        'swal.undo_window_5s': '刪除後提供 5 秒撤銷恢復窗口。',
+        'swal.undo_hint_5s': '如需撤銷請在 5 秒內點擊',
+        'swal.undo_btn': '撤銷 (Undo)',
+        'swal.undo_success': '已撤銷刪除',
+        'swal.item_deleted': '已刪除項目',
+        'swal.deleted': '已刪除',
+        'swal.delete_failed': '刪除失敗',
+        'swal.network_delete_failed': '網絡連線異常，刪除未完成',
+        'swal.save_failed': '儲存失敗',
+        'swal.request_failed': '請求失敗',
+        'swal.irreversible_action': '此操作不可撤銷。',
+        'swal.network_error': '網絡錯誤',
+
+        # Records delete & undo
+        'records.batch_deleted_toast': '已刪除 {count} 條記錄',
+        'records.undo_batch_toast': '已撤銷刪除，記錄已保留',
+        'records.single_deleted_toast': '已刪除 1 條記錄',
+        'records.undo_single_toast': '已撤銷刪除，記錄已完整保留',
+        'records.batch_delete_failed': '批量刪除失敗',
+        'records.batch_delete_network_failed': '網絡連線異常，批量刪除未完成',
+        'records.batch_delete_confirm_native': '確認刪除選中的 {count} 條記錄嗎？',
+
+        # Liabilities & Accounts delete/actions
+        'liabilities.deleted_liability': '已刪除該負債記錄',
+        'liabilities.enter_installment_name': '請輸入分期項目名稱',
+        'liabilities.invalid_installment_format': '分期金額或期數格式不正確',
+        'liabilities.added_installment_fmt': '已成功新增免息分期項目：{title}',
+        'liabilities.enter_loan_name': '請輸入貸款項目名稱',
+        'liabilities.invalid_loan_format': '貸款金額、利率或期數格式不正確',
+        'liabilities.added_loan_fmt': '已成功新增貸款記錄：{title}',
+        'liabilities.enter_account_name': '請輸入賬戶/卡片名稱',
+        'liabilities.added_card_fmt': '已成功新增卡片/賬戶：{name}',
+        'accounts.name_required': '賬戶名稱不能為空',
+        'accounts.added_fmt': '賬戶「{name}」已成功新增',
+        'accounts.updated_fmt': '賬戶「{name}」已更新',
+        'accounts.not_found': '賬戶不存在',
+        'accounts.status_updated': '賬戶狀態已更新',
+        'accounts.account_deleted_fmt': '賬戶「{name}」已刪除',
+        'accounts.del_warn_bound': '⚠️ 此賬戶已綁定 {sub} 個訂閱、{install} 個分期，刪除後綁定將自動解除。',
+        'accounts.del_confirm_title': '確認刪除賬戶？',
+        'accounts.del_confirm_msg': '賬戶「{name}」將被永久刪除。',
+
+        # Subscriptions delete/actions
+        'subscriptions.deleted_success': '已刪除該訂閱服務記錄',
+        'subscriptions.enter_name': '請輸入訂閱服務名稱',
+        'subscriptions.invalid_amount': '請輸入有效的扣費金額',
+        'subscriptions.added_fmt': '成功新增訂閱服務：{name}',
+        'subscriptions.name_required': '訂閱名稱不能為空',
+        'subscriptions.invalid_amount_format': '金額格式不正確',
+        'subscriptions.updated_fmt': '已更新訂閱服務：{name}',
+        'subscriptions.not_found': '找不到指定訂閱記錄',
+        'subscriptions.state_updated_fmt': '已將【{name}】{state}',
+        'subscriptions.tip_fmt': '【{name}】{tip}',
+        'subscriptions.renewed_fmt': '【{name}】已成功續期至 {date}{extra}！',
+        'subscriptions.resumed_active': '已恢復活躍計費',
+        'subscriptions.paused_monitoring': '已暫停扣款監控',
+        'subscriptions.marked_to_cancel': '已標記為【打算退訂】，將在扣款前高亮預警攔截！',
+        'subscriptions.unmarked_to_cancel': '已取消退訂標記',
+        'subscriptions.auto_expense_hint': '，並已自動生成當期記賬支出',
+
+        # Categories delete confirmation
+        'categories.del_confirm_title': '刪除分類「{name}」？',
+        'categories.del_confirm_desc': '不會影響歷史記錄中已使用該分類的舊資料，但今後錄入時將不再能選擇它。此操作不可撤銷。',
+        'categories.del_savings_confirm_title': '刪除儲蓄分類「{name}」？',
+        'categories.set_limit_tooltip': '點擊為「{name}」設定每月支出限額',
+        'categories.edit_cat_tooltip': '修改分類名稱與代表顏色',
+        'categories.cat_color_title': '分類代表顏色',
+
+        # Auto track delete/actions
+        'auto_track.del_sample_btn': '刪除此條樣本',
+        'auto_track.del_sample_title': '確認刪除此條學習樣本？',
+        'auto_track.del_sample_desc': '刪除後，大模型分析時將不再參考本條樣本。',
+        'auto_track.sample_deleted': '樣本已刪除',
+        'auto_track.sample_added_success': '成功錄入學習樣本庫！大模型下次遇到類似通知將照此學習。',
+        'auto_track.sample_deleted_success': '樣本已成功刪除',
+        'auto_track.sample_reset_success': '已成功將學習樣本庫恢復為官方預設語料庫！',
+
+        # Split bill delete tooltips
+        'split_bill.del_item': '刪除此項',
+        'split_bill.del_dish': '刪除這道菜',
     }
 }
 

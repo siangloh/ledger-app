@@ -230,7 +230,7 @@
             {{ s.notes or '-' }}
           </td>
           <td style="text-align: center;">
-            <button type="button" class="btn-ghost btn-sm" style="color: var(--danger); padding: 2px 6px;" onclick="deleteLlmSample({{ s.id }})" title="删除此条样本">✕</button>
+            <button type="button" class="btn-ghost btn-sm" style="color: var(--danger); padding: 2px 6px;" onclick="deleteLlmSample({{ s.id }})" title="{{ t('auto_track.del_sample_btn', '删除此条样本') }}">✕</button>
           </td>
         </tr>
         {% endfor %}
@@ -497,21 +497,21 @@ async function saveSampleToServer(payload) {
         window.location.reload();
       });
     } else {
-      Swal.fire('保存失败', data.message || '未知错误', 'error');
+      Swal.fire(window.t ? window.t('swal.save_failed', '保存失败') : '保存失败', data.message || (window.t ? window.t('swal.unknown_error', '未知错误') : '未知错误'), 'error');
     }
   } catch (err) {
-    Swal.fire('网络错误', err.message, 'error');
+    Swal.fire(window.t ? window.t('swal.network_error', '网络错误') : '网络错误', err.message, 'error');
   }
 }
 
 function deleteLlmSample(id) {
   Swal.fire({
-    title: '确认删除此条学习样本？',
-    text: '删除后，大模型分析时将不再参考本条样本。',
+    title: window.t ? window.t('auto_track.del_sample_title', '确认删除此条学习样本？') : '确认删除此条学习样本？',
+    text: window.t ? window.t('auto_track.del_sample_desc', '删除后，大模型分析时将不再参考本条样本。') : '删除后，大模型分析时将不再参考本条样本。',
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonText: '确认删除',
-    cancelButtonText: '取消',
+    confirmButtonText: window.t ? window.t('common.confirm_delete', '确认删除') : '确认删除',
+    cancelButtonText: window.t ? window.t('common.cancel', '取消') : '取消',
     customClass: {
       confirmButton: 'btn-danger',
       cancelButton: 'btn-ghost'
@@ -529,15 +529,15 @@ function deleteLlmSample(id) {
             toast: true,
             position: 'top-end',
             icon: 'success',
-            title: '样本已删除',
+            title: window.t ? window.t('auto_track.sample_deleted', '样本已删除') : '样本已删除',
             showConfirmButton: false,
             timer: 1500
           });
         } else {
-          Swal.fire('删除失败', data.message, 'error');
+          Swal.fire(window.t ? window.t('swal.delete_failed', '删除失败') : '删除失败', data.message, 'error');
         }
       } catch (err) {
-        Swal.fire('请求失败', err.message, 'error');
+        Swal.fire(window.t ? window.t('swal.request_failed', '请求失败') : '请求失败', err.message, 'error');
       }
     }
   });
