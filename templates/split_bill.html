@@ -1,5 +1,5 @@
 {% extends layout|default('base.html') %}
-{% block title %}小票拍照与智能 AA 分账 - 我的记账本{% endblock %}
+{% block title %}{{ t('split_bill.title') }} - {{ t('nav.brand') }}{% endblock %}
 {% block content %}
 
 <style>
@@ -13,8 +13,8 @@
 
 <div class="page-title-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
   <div>
-    <h2>🧾 小票拍照与智能 AA 分账 (Split Bill)</h2>
-    <p class="hint">拍摄或上传餐厅/聚餐小票，或直接粘贴小票明细。自动拆分单品、服务费与税费，点选人头分摊，秒算每个人应付多少！</p>
+    <h2>🧾 {{ t('split_bill.title') }}</h2>
+    <p class="hint">{{ t('split_bill.desc') }}</p>
   </div>
 </div>
 
@@ -22,11 +22,11 @@
   <!-- 步骤 1：录入/解析小票 -->
   <section class="panel" style="margin-bottom: 24px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-      <h3 style="margin: 0;">第 1 步：录入小票信息</h3>
+      <h3 style="margin: 0;">{{ t('split_bill.step1') }}</h3>
       <div class="tab-options" style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button type="button" class="btn-secondary btn-sm" onclick="openReviewModalWithGoodMoodSample()">🧾 演示：槟城餐厅小票 (RM 26.80)</button>
-        <button type="button" class="btn-secondary btn-sm" onclick="openReviewModalWithSample()">🧾 演示：星巴克小票 (RM 15.39)</button>
-        <button type="button" class="btn-secondary btn-sm" onclick="loadSampleReceipt()">加载通用示例</button>
+        <button type="button" class="btn-secondary btn-sm" onclick="openReviewModalWithGoodMoodSample()">{{ t('split_bill.demo_penang') }}</button>
+        <button type="button" class="btn-secondary btn-sm" onclick="openReviewModalWithSample()">{{ t('split_bill.demo_starbucks') }}</button>
+        <button type="button" class="btn-secondary btn-sm" onclick="loadSampleReceipt()">{{ t('split_bill.load_sample') }}</button>
       </div>
     </div>
 
@@ -39,27 +39,27 @@
         <input type="file" id="receiptBatchFileInput" accept="image/*" multiple style="display: none;" onchange="handleReceiptFileSelect(this.files)">
         
         <div style="font-size: 38px; margin-bottom: 8px;">📷</div>
-        <div style="font-weight: 700; font-size: 15px; margin-bottom: 4px; color: var(--navy);">拍摄 / 批量选取小票相片</div>
+        <div style="font-weight: 700; font-size: 15px; margin-bottom: 4px; color: var(--navy);">{{ t('split_bill.scan_card_title') }}</div>
         <p id="receiptScanHint" style="font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.55;">
-          支持单张即拍或相册一次性批量选取多张小票（多餐一次过核算）。智能纠偏旋转、合并单品清单并汇总税费！
+          {{ t('split_bill.scan_card_hint') }}
         </p>
         <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
           <button type="button" id="btnScanReceipt" class="btn-primary btn-sm" onclick="startReceiptScan()">
-            <span>📸 拍摄单张小票</span>
+            <span>{{ t('split_bill.scan_single_btn') }}</span>
           </button>
           <button type="button" id="btnBatchReceipt" class="btn-secondary btn-sm" onclick="startBatchReceiptScan()">
-            <span>🖼️ 批量选取多张 (多餐)</span>
+            <span>{{ t('split_bill.batch_upload_btn') }}</span>
           </button>
         </div>
         <div style="margin-top: 10px; font-size: 11px; color: var(--green); display: flex; align-items: center; justify-content: center; gap: 5px;">
           <span style="display:inline-block; width:6px; height:6px; background:var(--green); border-radius:50%;"></span>
-          <span>纯离线推理 · 预填弹窗 + 大字号金额确认</span>
+          <span>{{ t('split_bill.offline_notice') }}</span>
         </div>
       </div>
 
       <!-- 文本粘贴卡片 -->
       <div>
-        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px;">或直接粘贴小票文本 / 明细：</label>
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px;">{{ t('split_bill.paste_label') }}</label>
         <textarea id="receiptTextInput" rows="6" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); font-family: var(--font-mono); font-size: 12px;" placeholder="例如：
 Chicken Chop 22.00
 Fish & Chips 24.00
@@ -69,7 +69,7 @@ Service Charge 10% 6.45
 SST 6% 4.26
 Total 75.21"></textarea>
         <div style="display: flex; justify-content: flex-end; margin-top: 8px; gap: 8px; flex-wrap: wrap;">
-          <button type="button" class="btn-secondary btn-sm" onclick="parseTextReceipt()">智能解析并核对</button>
+          <button type="button" class="btn-secondary btn-sm" onclick="parseTextReceipt()">{{ t('split_bill.parse_btn') }}</button>
         </div>
       </div>
     </div>
@@ -77,33 +77,33 @@ Total 75.21"></textarea>
     <!-- 🌍 全球多国小票实测体验预设 -->
     <div style="margin-top: 16px; background: var(--surface-soft); padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
       <div style="font-size: 12px; font-weight: 700; color: var(--navy); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
-        <span>🌍 全球小票实测体验预设（一键载入不同国家小票版式与货币）：</span>
-        <span style="font-size: 11px; color: var(--muted); font-weight: normal;">自动识别 $, €, ¥, S$, RM, 逗号小数与税费</span>
+        <span>{{ t('split_bill.presets_title') }}</span>
+        <span style="font-size: 11px; color: var(--muted); font-weight: normal;">{{ t('split_bill.presets_sub') }}</span>
       </div>
       <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('my')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">🇲🇾 马来西亚 (SST+抹零)</button>
-        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('us')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">🇺🇸 美国 (Tax+18% Tip)</button>
-        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('jp')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">🇯🇵 日本 (円+10% 消費税)</button>
-        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('eu')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">🇪🇺 欧洲 (€ 逗号小数)</button>
-        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('sg')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">🇸🇬 新加坡 (10% SC+GST)</button>
-        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('cn')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">🇨🇳 中国餐饮 (满减优惠)</button>
+        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('my')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_my') }}</button>
+        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('us')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_us') }}</button>
+        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('jp')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_jp') }}</button>
+        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('eu')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_eu') }}</button>
+        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('sg')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_sg') }}</button>
+        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('cn')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_cn') }}</button>
       </div>
     </div>
   </section>
 
   <!-- 步骤 2：参与人管理与点选分摊 -->
   <section class="panel" id="splitSection" style="margin-bottom: 24px;">
-    <h3>第 2 步：添加参与人 & 分配消费</h3>
+    <h3>{{ t('split_bill.step2') }}</h3>
     
     <!-- 参与人标签栏 -->
     <div style="background: var(--surface-soft); padding: 14px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 18px;">
-      <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 8px;">参与分账人员 (Members)：</label>
+      <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 8px;">{{ t('split_bill.members_title') }}</label>
       <div id="peopleChips" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
         <!-- 动态生成的成员芯片 -->
       </div>
       <div style="display: flex; gap: 8px; max-width: 320px;">
-        <input type="text" id="newPersonName" placeholder="输入名字，如：小明" style="font-size: 13px; padding: 6px 12px;">
-        <button type="button" class="btn-secondary btn-sm" onclick="addPerson()">+ 添加人员</button>
+        <input type="text" id="newPersonName" placeholder="{{ t('split_bill.member_placeholder') }}" style="font-size: 13px; padding: 6px 12px;">
+        <button type="button" class="btn-secondary btn-sm" onclick="addPerson()">{{ t('split_bill.add_member_btn') }}</button>
       </div>
     </div>
 
@@ -112,9 +112,9 @@ Total 75.21"></textarea>
       <table id="itemsTable">
         <thead>
           <tr>
-            <th style="width: 45%;">消费项目 (Item)</th>
-            <th style="width: 20%;">单价 (<span class="dyn-curr">RM</span>)</th>
-            <th style="width: 35%;">分摊给谁 (Split With)</th>
+            <th style="width: 45%;">{{ t('split_bill.th_item') }}</th>
+            <th style="width: 20%;">{{ t('split_bill.th_price') }} (<span class="dyn-curr">RM</span>)</th>
+            <th style="width: 35%;">{{ t('split_bill.th_split_with') }}</th>
           </tr>
         </thead>
         <tbody id="itemsTableBody">
@@ -124,25 +124,25 @@ Total 75.21"></textarea>
     </div>
 
     <div style="display: flex; justify-content: flex-start; gap: 10px; margin-bottom: 20px;">
-      <button type="button" class="btn-ghost btn-sm" onclick="addNewItemRow()">+ 手动加一道菜/项目</button>
+      <button type="button" class="btn-ghost btn-sm" onclick="addNewItemRow()">+ {{ t('common.add') }}</button>
     </div>
 
     <!-- 税费与服务费调整区 -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; background: var(--surface-soft); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 20px;">
       <div>
-        <label style="font-size: 12px; color: var(--muted); display: block;">菜品小计 (Subtotal)</label>
+        <label style="font-size: 12px; color: var(--muted); display: block;">{{ t('common.subtotal') }}</label>
         <strong id="displaySubtotal" style="font-family: var(--font-mono); font-size: 16px; color: var(--navy);"><span class="dyn-curr">RM</span> 0.00</strong>
       </div>
       <div>
-        <label style="font-size: 12px; color: var(--muted); display: block;">服务费 / 小费 (<span class="dyn-curr">RM</span>)</label>
+        <label style="font-size: 12px; color: var(--muted); display: block;">{{ t('split_bill.service_charge') }} (<span class="dyn-curr">RM</span>)</label>
         <input type="number" step="0.01" min="0" id="inputServiceCharge" value="0.00" onchange="calculateSplit()" style="width: 100%; font-size: 14px; padding: 6px;">
       </div>
       <div>
-        <label style="font-size: 12px; color: var(--muted); display: block;">税费 SST / Tax / VAT (<span class="dyn-curr">RM</span>)</label>
+        <label style="font-size: 12px; color: var(--muted); display: block;">{{ t('split_bill.tax') }} (<span class="dyn-curr">RM</span>)</label>
         <input type="number" step="0.01" min="0" id="inputTax" value="0.00" onchange="calculateSplit()" style="width: 100%; font-size: 14px; padding: 6px;">
       </div>
       <div>
-        <label style="font-size: 12px; color: var(--muted); display: block;">账单实付总额 (Total)</label>
+        <label style="font-size: 12px; color: var(--muted); display: block;">{{ t('split_bill.grand_total') }}</label>
         <strong id="displayGrandTotal" style="font-family: var(--font-mono); font-size: 18px; color: var(--rose);"><span class="dyn-curr">RM</span> 0.00</strong>
       </div>
     </div>
@@ -150,8 +150,8 @@ Total 75.21"></textarea>
 
   <!-- 步骤 3：计算结果与一键结算 -->
   <section class="panel">
-    <h3>第 3 步：分摊结果与一键催款</h3>
-    <p class="hint">系统已按每个人的净消费比例，精准分摊了服务费与 SST，公平无误。</p>
+    <h3>{{ t('split_bill.step3') }}</h3>
+    <p class="hint">{{ t('split_bill.step3_desc') }}</p>
 
     <div class="cards" id="resultsCards" style="margin-bottom: 24px;">
       <!-- 动态渲染每个人应付的金额卡片 -->
@@ -160,8 +160,8 @@ Total 75.21"></textarea>
     <!-- 微信/WhatsApp 催款文本一键复制 -->
     <div style="background: var(--surface-soft); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border); margin-bottom: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-        <label style="font-size: 13px; font-weight: 600; color: var(--navy);">📋 WhatsApp / 微信 催款清单格式：</label>
-        <button type="button" class="btn-secondary btn-sm" onclick="copyClaimMessage()">一键复制清单发群</button>
+        <label style="font-size: 13px; font-weight: 600; color: var(--navy);">📋 Claim Bill (WhatsApp / WeChat)：</label>
+        <button type="button" class="btn-secondary btn-sm" onclick="copyClaimMessage()">{{ t('split_bill.copy_claim') }}</button>
       </div>
       <textarea id="claimMessageText" rows="6" readonly style="width: 100%; font-family: var(--font-mono); font-size: 12px; background: #fff; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);"></textarea>
     </div>
@@ -169,8 +169,8 @@ Total 75.21"></textarea>
     <!-- 将“我”的那份一键记账 -->
     <div style="background: var(--gold-soft); border: 1px solid rgba(182, 144, 47, 0.4); padding: 16px 20px; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
       <div>
-        <strong style="color: var(--navy); font-size: 15px;">💾 将我的自付金额一键记入主账本</strong>
-        <p style="font-size: 12px; color: var(--ink-soft); margin: 4px 0 0;">无需重复手动打字，直接将“我”在本次聚餐中实际消费的金额记为支出。</p>
+        <strong style="color: var(--navy); font-size: 15px;">💾 {{ t('split_bill.save_to_ledger') }}</strong>
+        <p style="font-size: 12px; color: var(--ink-soft); margin: 4px 0 0;">{{ t('split_bill.save_to_ledger_desc') }}</p>
       </div>
       <form method="post" action="{{ url_for('split_bill_save_record') }}" style="display: flex; gap: 10px; align-items: center;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -178,7 +178,7 @@ Total 75.21"></textarea>
         <input type="hidden" name="date" value="{{ today }}">
         <input type="hidden" name="category" value="餐饮">
         <input type="text" name="note" id="saveMyNote" value="聚餐 AA 分账" style="font-size: 13px; padding: 6px 10px; width: 140px;">
-        <button type="submit" class="btn-primary" id="btnSaveToLedger">一键记入主账本</button>
+        <button type="submit" class="btn-primary" id="btnSaveToLedger">{{ t('split_bill.save_to_ledger') }}</button>
       </form>
     </div>
   </section>
@@ -195,8 +195,8 @@ Total 75.21"></textarea>
       <div style="display: flex; align-items: center; gap: 10px;">
         <span style="font-size: 24px;">🧾</span>
         <div>
-          <h3 style="margin: 0; font-size: 16px; color: var(--navy);">小票识别核对与确认 (Receipt Audit)</h3>
-          <span id="modalEngineBadge" style="font-size: 11px; color: var(--green); background: var(--green-soft); padding: 2px 8px; border-radius: 10px; font-weight: 600;">✨ 深度学习智能解析 (自适应纠偏) · 请核验账目平衡</span>
+          <h3 style="margin: 0; font-size: 16px; color: var(--navy);">{{ t('split_bill.audit_title') }}</h3>
+          <span id="modalEngineBadge" style="font-size: 11px; color: var(--green); background: var(--green-soft); padding: 2px 8px; border-radius: 10px; font-weight: 600;">{{ t('split_bill.audit_engine_badge') }}</span>
         </div>
       </div>
       <button type="button" class="btn-ghost btn-sm" onclick="closeReviewModal()" style="font-size: 20px; padding: 2px 8px; line-height: 1;" title="关闭">&times;</button>
@@ -215,8 +215,8 @@ Total 75.21"></textarea>
             </div>
           </div>
           <div style="text-align: right; font-size: 12px; color: rgba(255,255,255,0.85);">
-            <div>可直接点按数字修改总额</div>
-            <div style="font-size: 11px; opacity: 0.7; margin-top: 2px;">用于防错校验与 AA 平摊</div>
+            <div>{{ t('split_bill.audit_click_to_modify') }}</div>
+            <div style="font-size: 11px; opacity: 0.7; margin-top: 2px;">{{ t('split_bill.audit_balance_note') }}</div>
           </div>
         </div>
 
@@ -247,17 +247,17 @@ Total 75.21"></textarea>
       <!-- 3. 单品明细清单（支持点选修改、删除、添加） -->
       <div style="margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <label style="font-size: 13px; font-weight: 700; color: var(--navy);">识别单品明细清单 (<span id="reviewItemCount">0</span> 项)：</label>
-          <button type="button" class="btn-ghost btn-sm" onclick="addReviewItemRow()" style="font-size: 12px; color: var(--navy);">+ 添加遗漏菜品/项目</button>
+          <label style="font-size: 13px; font-weight: 700; color: var(--navy);">{{ t('split_bill.audit_items_title') }} (<span id="reviewItemCount">0</span> 项)：</label>
+          <button type="button" class="btn-ghost btn-sm" onclick="addReviewItemRow()" style="font-size: 12px; color: var(--navy);">{{ t('split_bill.audit_add_missing_item') }}</button>
         </div>
         
         <div style="border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; max-height: 240px; overflow-y: auto; background: var(--surface);">
           <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
             <thead style="background: var(--surface-soft); position: sticky; top: 0; z-index: 1;">
               <tr style="border-bottom: 1px solid var(--border);">
-                <th style="padding: 8px 12px; text-align: left; width: 55%;">消费单品名称 (点击可修正)</th>
-                <th style="padding: 8px 12px; text-align: right; width: 30%;">单价 (<span class="review-curr-symbol">{{ current_user_currency|default('RM') }}</span>)</th>
-                <th style="padding: 8px 12px; text-align: center; width: 15%;">操作</th>
+                <th style="padding: 8px 12px; text-align: left; width: 55%;">{{ t('split_bill.audit_th_item') }}</th>
+                <th style="padding: 8px 12px; text-align: right; width: 30%;">{{ t('split_bill.audit_th_price') }} (<span class="review-curr-symbol">{{ current_user_currency|default('RM') }}</span>)</th>
+                <th style="padding: 8px 12px; text-align: center; width: 15%;">{{ t('common.actions') }}</th>
               </tr>
             </thead>
             <tbody id="reviewItemsTableBody">
@@ -269,19 +269,19 @@ Total 75.21"></textarea>
 
       <!-- 4. 查看原始小票文本（可折叠） -->
       <details style="font-size: 12px; color: var(--muted); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 8px 12px; background: var(--surface-soft);">
-        <summary style="cursor: pointer; font-weight: 600; user-select: none;">🔍 查看/微调识别出的原始文本 (可重新提取)</summary>
+        <summary style="cursor: pointer; font-weight: 600; user-select: none;">{{ t('split_bill.audit_raw_summary') }}</summary>
         <textarea id="reviewRawTextArea" rows="4" style="width: 100%; margin-top: 8px; font-family: var(--font-mono); font-size: 11px; padding: 6px; border: 1px solid var(--border); border-radius: 4px;"></textarea>
         <div style="display: flex; justify-content: flex-end; margin-top: 6px;">
-          <button type="button" class="btn-secondary btn-sm" onclick="reparseFromReviewRawText()" style="font-size: 11px;">按修正文本重新提取</button>
+          <button type="button" class="btn-secondary btn-sm" onclick="reparseFromReviewRawText()" style="font-size: 11px;">{{ t('split_bill.audit_reparse_btn') }}</button>
         </div>
       </details>
     </div>
 
     <!-- 弹窗底部操作区 -->
     <div class="receipt-modal-footer">
-      <button type="button" class="btn-secondary btn-sm" onclick="closeReviewModal()">取消 / 重新选择</button>
+      <button type="button" class="btn-secondary btn-sm" onclick="closeReviewModal()">{{ t('split_bill.audit_cancel_btn') }}</button>
       <button type="button" class="btn-primary" onclick="confirmReceiptToStep2()" style="font-size: 14px; font-weight: 600; padding: 9px 22px;">
-        ✔ 确认无误，进入分账 (Step 2) ➔
+        {{ t('split_bill.audit_confirm_btn') }}
       </button>
     </div>
   </div>

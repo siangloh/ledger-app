@@ -1,15 +1,15 @@
 {% extends layout|default('base.html') %}
-{% block title %}分类管理 - 我的记账本{% endblock %}
+{% block title %}{{ t('categories.title') }} - {{ t('nav.brand') }}{% endblock %}
 {% block content %}
 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-  <h2 style="margin:0;">分类与标签管理</h2>
-  <a href="{{ url_for('category_insights_page') }}" class="btn-primary btn-sm" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">📊 支出分类深度洞察报告</a>
+  <h2 style="margin:0;">{{ t('categories.title') }}</h2>
+  <a href="{{ url_for('category_insights_page') }}" class="btn-primary btn-sm" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">{{ t('categories.insights_btn') }}</a>
 </div>
 
 <div class="panels">
   <!-- 1. 主业收入子分类 -->
   <section class="panel">
-    <h3>主业收入子分类</h3>
+    <h3>{{ t('categories.main_income_cats') }}</h3>
     <ul class="cat-list">
       {% for c in income_main %}
       <li style="display: flex; justify-content: space-between; align-items: center;">
@@ -18,30 +18,30 @@
           <strong>{{ c.name }}</strong>
         </span>
         <div style="display: flex; gap: 6px; align-items: center;">
-          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#34d399' }}')">编辑</button>
+          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#34d399' }}')">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
                 data-confirm-title="删除分类「{{ c.name }}」？"
                 data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="cat-action-btn danger">删除</button>
+            <button type="submit" class="cat-action-btn danger">{{ t('common.delete') }}</button>
           </form>
         </div>
       </li>
-      {% else %}<li class="hint">暂无</li>{% endfor %}
+      {% else %}<li class="hint">{{ t('common.no_data') }}</li>{% endfor %}
     </ul>
     <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="income">
       <input type="hidden" name="group_name" value="main">
       <input type="color" name="color" value="#34d399" title="分类代表颜色" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
-      <input type="text" name="name" placeholder="新增子分类名称" required style="flex: 1;">
-      <button type="submit" class="btn-primary btn-sm">添加</button>
+      <input type="text" name="name" placeholder="{{ t('categories.add_cat_placeholder') }}" required style="flex: 1;">
+      <button type="submit" class="btn-primary btn-sm">{{ t('common.add') }}</button>
     </form>
   </section>
 
   <!-- 2. 副业收入子分类 -->
   <section class="panel">
-    <h3>副业收入子分类</h3>
+    <h3>{{ t('categories.side_income_cats') }}</h3>
     <ul class="cat-list">
       {% for c in income_side %}
       <li style="display: flex; justify-content: space-between; align-items: center;">
@@ -50,32 +50,32 @@
           <strong>{{ c.name }}</strong>
         </span>
         <div style="display: flex; gap: 6px; align-items: center;">
-          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#38bdf8' }}')">编辑</button>
+          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#38bdf8' }}')">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
                 data-confirm-title="删除分类「{{ c.name }}」？"
                 data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="cat-action-btn danger">删除</button>
+            <button type="submit" class="cat-action-btn danger">{{ t('common.delete') }}</button>
           </form>
         </div>
       </li>
-      {% else %}<li class="hint">暂无</li>{% endfor %}
+      {% else %}<li class="hint">{{ t('common.no_data') }}</li>{% endfor %}
     </ul>
     <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="income">
       <input type="hidden" name="group_name" value="side">
       <input type="color" name="color" value="#38bdf8" title="分类代表颜色" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
-      <input type="text" name="name" placeholder="新增子分类名称" required style="flex: 1;">
-      <button type="submit" class="btn-primary btn-sm">添加</button>
+      <input type="text" name="name" placeholder="{{ t('categories.add_cat_placeholder') }}" required style="flex: 1;">
+      <button type="submit" class="btn-primary btn-sm">{{ t('common.add') }}</button>
     </form>
   </section>
 
   <!-- 3. 支出分类 -->
   <section class="panel" style="flex: 1.6; min-width: 380px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-      <h3 style="margin:0;">支出分类</h3>
-      <span class="hint" style="font-size:12px;">可自定义代表颜色与月度限额</span>
+      <h3 style="margin:0;">{{ t('categories.expense_cats') }}</h3>
+      <span class="hint" style="font-size:12px;">{{ t('categories.budget_hint') }}</span>
     </div>
     <ul class="cat-list-compact">
       {% for c in expense %}
@@ -111,32 +111,32 @@
                   data-limit=""
                   onclick="openSetBudgetModal(this)"
                   title="点击为「{{ c.name }}」设定每月支出限额">
-            + 设限额
+            {{ t('categories.set_limit_btn') }}
           </button>
           {% endif %}
-          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#fb923c' }}')" title="修改分类名称与代表颜色">编辑</button>
+          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#fb923c' }}')" title="修改分类名称与代表颜色">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
                 data-confirm-title="删除分类「{{ c.name }}」？"
                 data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="cat-action-btn danger">删除</button>
+            <button type="submit" class="cat-action-btn danger">{{ t('common.delete') }}</button>
           </form>
         </div>
       </li>
-      {% else %}<li class="hint">暂无</li>{% endfor %}
+      {% else %}<li class="hint">{{ t('common.no_data') }}</li>{% endfor %}
     </ul>
     <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="expense">
       <input type="color" name="color" value="#fb923c" title="分类代表颜色" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
-      <input type="text" name="name" placeholder="新增分类名称" required style="flex: 1;">
-      <button type="submit" class="btn-primary btn-sm">添加</button>
+      <input type="text" name="name" placeholder="{{ t('categories.add_cat_placeholder') }}" required style="flex: 1;">
+      <button type="submit" class="btn-primary btn-sm">{{ t('common.add') }}</button>
     </form>
   </section>
 
   <!-- 4. 结余储蓄分类 -->
   <section class="panel">
-    <h3>结余储蓄分类</h3>
+    <h3>{{ t('categories.savings_cats') }}</h3>
     <ul class="cat-list">
       {% for c in savings %}
       <li style="display: flex; justify-content: space-between; align-items: center;">
@@ -145,23 +145,23 @@
           <strong>{{ c.name }}</strong>
         </span>
         <div style="display: flex; gap: 6px; align-items: center;">
-          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#059669' }}')">编辑</button>
+          <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#059669' }}')">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
                 data-confirm-title="删除储蓄分类「{{ c.name }}」？"
                 data-confirm-text="不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="cat-action-btn danger">删除</button>
+            <button type="submit" class="cat-action-btn danger">{{ t('common.delete') }}</button>
           </form>
         </div>
       </li>
-      {% else %}<li class="hint">暂无</li>{% endfor %}
+      {% else %}<li class="hint">{{ t('common.no_data') }}</li>{% endfor %}
     </ul>
     <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="savings">
       <input type="color" name="color" value="#059669" title="分类代表颜色" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
-      <input type="text" name="name" placeholder="新增储蓄分类名称" required style="flex: 1;">
-      <button type="submit" class="btn-primary btn-sm">添加</button>
+      <input type="text" name="name" placeholder="{{ t('categories.savings_placeholder') }}" required style="flex: 1;">
+      <button type="submit" class="btn-primary btn-sm">{{ t('common.add') }}</button>
     </form>
   </section>
 </div>

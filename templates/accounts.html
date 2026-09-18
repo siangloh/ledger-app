@@ -1,15 +1,15 @@
 {% extends layout|default('base.html') %}
-{% block title %}账户管理 - 我的记账本{% endblock %}
+{% block title %}{{ t('accounts.title') }} - {{ t('nav.brand') }}{% endblock %}
 
 {% block content %}
 
 
 <div class="acc-page-header">
   <div class="acc-page-title">
-    🏦 账户管理
-    <span class="badge-count">{{ accounts | length }} 个账户</span>
+    🏦 {{ t('accounts.title') }}
+    <span class="badge-count">{{ t('accounts.count_badge', count=accounts|length) }}</span>
   </div>
-  <button class="btn-add-acc" onclick="openAddModal()">＋ 添加账户</button>
+  <button class="btn-add-acc" onclick="openAddModal()">{{ t('accounts.add_btn') }}</button>
 </div>
 
 {% set active_accs = accounts | selectattr('is_active', 'equalto', 1) | list %}
@@ -24,24 +24,24 @@
 
 <div class="acc-summary-strip">
   <div class="acc-kpi">
-    <span class="acc-kpi-label">活跃账户</span>
+    <span class="acc-kpi-label">{{ t('accounts.active_kpi') }}</span>
     <span class="acc-kpi-val">{{ active_accs | length }}</span>
-    <span class="acc-kpi-sub">共 {{ accounts | length }} 个</span>
+    <span class="acc-kpi-sub">{{ t('accounts.total_count_sub', count=accounts|length) }}</span>
   </div>
   <div class="acc-kpi">
-    <span class="acc-kpi-label">信用卡</span>
+    <span class="acc-kpi-label">{{ t('accounts.credit_card_kpi') }}</span>
     <span class="acc-kpi-val">{{ cc_count }}</span>
-    <span class="acc-kpi-sub">张</span>
+    <span class="acc-kpi-sub">{{ t('accounts.cards_unit') }}</span>
   </div>
   <div class="acc-kpi">
-    <span class="acc-kpi-label">总信用额度</span>
+    <span class="acc-kpi-label">{{ t('accounts.total_cl_kpi') }}</span>
     <span class="acc-kpi-val">{{ "%.0f" | format(total_cl.val) }}</span>
     <span class="acc-kpi-sub">{{ current_user_currency_code|default('MYR') }}</span>
   </div>
   <div class="acc-kpi">
-    <span class="acc-kpi-label">绑定订阅</span>
+    <span class="acc-kpi-label">{{ t('accounts.bound_subs_kpi') }}</span>
     <span class="acc-kpi-val">{{ total_subs.val }}</span>
-    <span class="acc-kpi-sub">个有效订阅</span>
+    <span class="acc-kpi-sub">{{ t('accounts.valid_subs_unit') }}</span>
   </div>
 </div>
 
@@ -49,15 +49,15 @@
   {% if not accounts %}
   <div class="acc-empty">
     <span class="empty-icon">🏦</span>
-    <h3>还没有添加任何账户</h3>
-    <p>点击右上角"添加账户"，录入你的银行账户或信用卡<br>录入后可在订阅、负债分期等模块中选择绑定</p>
+    <h3>{{ t('accounts.empty_title') }}</h3>
+    <p>{{ t('accounts.empty_desc')|safe }}</p>
   </div>
   {% else %}
   {% set type_icons = {'savings': '🏦', 'current': '🏛️', 'credit_card': '💳', 'e_wallet': '📱', 'investment': '📈', 'cash': '💵', 'other': '📂'} %}
-  {% set type_labels = {'savings': '储蓄账户', 'current': '活期账户', 'credit_card': '信用卡', 'e_wallet': '电子钱包', 'investment': '投资账户', 'cash': '现金', 'other': '其他'} %}
+  {% set type_labels = {'savings': t('accounts.type_savings'), 'current': t('accounts.type_current'), 'credit_card': t('accounts.type_credit_card'), 'e_wallet': t('accounts.type_e_wallet'), 'investment': t('accounts.type_investment'), 'cash': t('accounts.type_cash'), 'other': t('accounts.type_other')} %}
 
   {% if active_accs %}
-  <div class="acc-section-label">✅ 活跃账户 ({{ active_accs | length }})</div>
+  <div class="acc-section-label">✅ {{ t('accounts.active_section', count=active_accs|length) }}</div>
   {% for a in active_accs %}
   <div class="acc-card">
     <div class="acc-card-top">
@@ -69,45 +69,45 @@
     </div>
     <div class="acc-details">
       <div class="acc-detail-item">
-        <span class="acc-detail-label">币种</span>
+        <span class="acc-detail-label">{{ t('accounts.label_currency') }}</span>
         <span class="acc-detail-val">{{ a.currency or current_user_currency_code|default('MYR') }}</span>
       </div>
       {% if a.type == 'credit_card' %}
       <div class="acc-detail-item">
-        <span class="acc-detail-label">信用额度</span>
+        <span class="acc-detail-label">{{ t('accounts.label_credit_limit') }}</span>
         <span class="acc-detail-val">{{ "%.0f" | format(a.credit_limit or 0) }} {{ a.currency or current_user_currency_code|default('MYR') }}</span>
       </div>
       <div class="acc-detail-item">
-        <span class="acc-detail-label">账单日</span>
-        <span class="acc-detail-val">{% if a.statement_day %}每月 {{ a.statement_day }} 日{% else %}—{% endif %}</span>
+        <span class="acc-detail-label">{{ t('accounts.label_statement_day') }}</span>
+        <span class="acc-detail-val">{% if a.statement_day %}{{ t('accounts.day_of_month', day=a.statement_day) }}{% else %}—{% endif %}</span>
       </div>
       <div class="acc-detail-item">
-        <span class="acc-detail-label">还款日</span>
-        <span class="acc-detail-val">{% if a.due_day %}每月 {{ a.due_day }} 日{% else %}—{% endif %}</span>
+        <span class="acc-detail-label">{{ t('accounts.label_due_day') }}</span>
+        <span class="acc-detail-val">{% if a.due_day %}{{ t('accounts.day_of_month', day=a.due_day) }}{% else %}—{% endif %}</span>
       </div>
       {% else %}
       <div class="acc-detail-item">
-        <span class="acc-detail-label">账户类型</span>
+        <span class="acc-detail-label">{{ t('accounts.label_type') }}</span>
         <span class="acc-detail-val">{{ type_labels.get(a.type, a.type) }}</span>
       </div>
       {% endif %}
     </div>
     <div class="acc-links-row">
-      <span class="acc-link-chip {% if a.sub_count %}has-links{% endif %}">🔄 {{ a.sub_count or 0 }} 个订阅</span>
-      <span class="acc-link-chip {% if a.install_count %}has-links{% endif %}">📦 {{ a.install_count or 0 }} 个分期</span>
+      <span class="acc-link-chip {% if a.sub_count %}has-links{% endif %}">🔄 {{ a.sub_count or 0 }} {{ t('nav.subscriptions') }}</span>
+      <span class="acc-link-chip {% if a.install_count %}has-links{% endif %}">📦 {{ a.install_count or 0 }} {{ t('nav.liabilities') }}</span>
     </div>
     <div class="acc-actions">
       <button class="btn-acc-action btn-acc-edit"
         onclick="openEditModal({{ a.id }}, '{{ a.name|e }}', '{{ a.type }}', '{{ a.currency or current_user_currency_code|default('MYR') }}', {{ a.credit_limit or 0 }}, {{ a.statement_day if a.statement_day else 'null' }}, {{ a.due_day if a.due_day else 'null' }}, {{ a.grace_period_days or 20 }})">
-        ✏️ 编辑
+        ✏️ {{ t('common.edit') }}
       </button>
       <form method="POST" action="/api/accounts/{{ a.id }}/toggle" style="display:contents;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn-acc-action btn-acc-toggle deactivate">⏸ 停用</button>
+        <button type="submit" class="btn-acc-action btn-acc-toggle deactivate">⏸ {{ t('accounts.btn_deactivate') }}</button>
       </form>
       <button class="btn-acc-action btn-acc-delete"
         onclick="confirmDelete({{ a.id }}, '{{ a.name|e }}', {{ a.sub_count or 0 }}, {{ a.install_count or 0 }})">
-        🗑️ 删除
+        🗑️ {{ t('common.delete') }}
       </button>
     </div>
   </div>
@@ -115,10 +115,10 @@
   {% endif %}
 
   {% if inactive_accs %}
-  <div class="acc-section-label">⏸ 已停用账户 ({{ inactive_accs | length }})</div>
+  <div class="acc-section-label">⏸ {{ t('accounts.inactive_section', count=inactive_accs|length) }}</div>
   {% for a in inactive_accs %}
   <div class="acc-card inactive">
-    <span class="acc-inactive-banner">停用</span>
+    <span class="acc-inactive-banner">{{ t('accounts.btn_deactivate') }}</span>
     <div class="acc-card-top">
       <div class="acc-icon {{ a.type }}">{{ type_icons.get(a.type, '📂') }}</div>
       <div class="acc-meta">
@@ -129,15 +129,15 @@
     <div class="acc-actions">
       <button class="btn-acc-action btn-acc-edit"
         onclick="openEditModal({{ a.id }}, '{{ a.name|e }}', '{{ a.type }}', '{{ a.currency or current_user_currency_code|default('MYR') }}', {{ a.credit_limit or 0 }}, {{ a.statement_day if a.statement_day else 'null' }}, {{ a.due_day if a.due_day else 'null' }}, {{ a.grace_period_days or 20 }})">
-        ✏️ 编辑
+        ✏️ {{ t('common.edit') }}
       </button>
       <form method="POST" action="/api/accounts/{{ a.id }}/toggle" style="display:contents;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn-acc-action btn-acc-toggle activate">▶️ 重新启用</button>
+        <button type="submit" class="btn-acc-action btn-acc-toggle activate">▶️ {{ t('accounts.btn_activate') }}</button>
       </form>
       <button class="btn-acc-action btn-acc-delete"
         onclick="confirmDelete({{ a.id }}, '{{ a.name|e }}', 0, 0)">
-        🗑️ 删除
+        🗑️ {{ t('common.delete') }}
       </button>
     </div>
   </div>
@@ -149,16 +149,16 @@
 <!-- ADD MODAL -->
 <div class="acc-modal-overlay" id="addModalOverlay" style="display:none;">
   <div class="acc-modal">
-    <h2>🏦 添加新账户</h2>
+    <h2>🏦 {{ t('accounts.modal_add_title') }}</h2>
     <form method="POST" action="/api/accounts">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="acc-form-grid">
         <div class="acc-form-group full-col">
-          <label>账户名称 *</label>
-          <input type="text" name="name" id="addName" required placeholder="如 Maybank Savings / Public Bank Visa" autocomplete="off">
+          <label>{{ t('accounts.label_acc_name') }} *</label>
+          <input type="text" name="name" id="addName" required placeholder="{{ t('accounts.placeholder_acc_name') }}" autocomplete="off">
         </div>
         <div class="acc-form-group">
-          <label>账户类型 *</label>
+          <label>{{ t('accounts.label_type') }} *</label>
           <select name="type" id="addType" onchange="onTypeChange('add')">
             {% for val, label in account_types %}
             <option value="{{ val }}">{{ label }}</option>
@@ -166,7 +166,7 @@
           </select>
         </div>
         <div class="acc-form-group">
-          <label>结算币种</label>
+          <label>{{ t('accounts.label_settlement_currency') }}</label>
           <select name="currency" id="addCurrency">
             {% for c in currencies %}
             <option value="{{ c }}" {% if c == (current_user_currency_code|default('MYR')) %}selected{% endif %}>{{ c }}</option>
@@ -175,28 +175,28 @@
         </div>
         <div class="cc-section hidden" id="addCcSection">
           <div class="acc-form-group">
-            <label>信用额度 (Credit Limit)</label>
+            <label>{{ t('accounts.label_credit_limit') }}</label>
             <input type="number" name="credit_limit" id="addCreditLimit" min="0" step="100" placeholder="如 10000">
           </div>
           <div class="acc-form-group">
-            <label>账单日 (Statement Day)</label>
+            <label>{{ t('accounts.label_statement_day') }}</label>
             <input type="number" name="statement_day" id="addStatementDay" min="1" max="31" placeholder="1–31">
-            <span class="acc-hint">每月账单生成日</span>
+            <span class="acc-hint">{{ t('accounts.hint_statement_day') }}</span>
           </div>
           <div class="acc-form-group">
-            <label>还款日 (Due Day)</label>
+            <label>{{ t('accounts.label_due_day') }}</label>
             <input type="number" name="due_day" id="addDueDay" min="1" max="31" placeholder="1–31">
-            <span class="acc-hint">每月最后还款日</span>
+            <span class="acc-hint">{{ t('accounts.hint_due_day') }}</span>
           </div>
           <div class="acc-form-group">
-            <label>宽限期 (天)</label>
+            <label>{{ t('accounts.label_grace_period') }}</label>
             <input type="number" name="grace_period_days" id="addGracePeriod" min="0" max="60" value="20">
           </div>
         </div>
       </div>
       <div class="acc-modal-footer">
-        <button type="button" class="btn-cancel-modal" onclick="closeAddModal()">取消</button>
-        <button type="submit" class="btn-save-acc">保存账户</button>
+        <button type="button" class="btn-cancel-modal" onclick="closeAddModal()">{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn-save-acc">{{ t('accounts.save_btn') }}</button>
       </div>
     </form>
   </div>
@@ -205,16 +205,16 @@
 <!-- EDIT MODAL -->
 <div class="acc-modal-overlay" id="editModalOverlay" style="display:none;">
   <div class="acc-modal">
-    <h2>✏️ 编辑账户</h2>
+    <h2>✏️ {{ t('accounts.modal_edit_title') }}</h2>
     <form method="POST" id="editAccountForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="acc-form-grid">
         <div class="acc-form-group full-col">
-          <label>账户名称 *</label>
+          <label>{{ t('accounts.label_acc_name') }} *</label>
           <input type="text" name="name" id="editName" required autocomplete="off">
         </div>
         <div class="acc-form-group">
-          <label>账户类型 *</label>
+          <label>{{ t('accounts.label_type') }} *</label>
           <select name="type" id="editType" onchange="onTypeChange('edit')">
             {% for val, label in account_types %}
             <option value="{{ val }}">{{ label }}</option>
@@ -222,7 +222,7 @@
           </select>
         </div>
         <div class="acc-form-group">
-          <label>结算币种</label>
+          <label>{{ t('accounts.label_settlement_currency') }}</label>
           <select name="currency" id="editCurrency">
             {% for c in currencies %}
             <option value="{{ c }}">{{ c }}</option>
@@ -231,26 +231,26 @@
         </div>
         <div class="cc-section hidden" id="editCcSection">
           <div class="acc-form-group">
-            <label>信用额度</label>
+            <label>{{ t('accounts.label_credit_limit') }}</label>
             <input type="number" name="credit_limit" id="editCreditLimit" min="0" step="100">
           </div>
           <div class="acc-form-group">
-            <label>账单日</label>
+            <label>{{ t('accounts.label_statement_day') }}</label>
             <input type="number" name="statement_day" id="editStatementDay" min="1" max="31">
           </div>
           <div class="acc-form-group">
-            <label>还款日</label>
+            <label>{{ t('accounts.label_due_day') }}</label>
             <input type="number" name="due_day" id="editDueDay" min="1" max="31">
           </div>
           <div class="acc-form-group">
-            <label>宽限期 (天)</label>
+            <label>{{ t('accounts.label_grace_period') }}</label>
             <input type="number" name="grace_period_days" id="editGracePeriod" min="0" max="60" value="20">
           </div>
         </div>
       </div>
       <div class="acc-modal-footer">
-        <button type="button" class="btn-cancel-modal" onclick="closeEditModal()">取消</button>
-        <button type="submit" class="btn-save-acc">保存更改</button>
+        <button type="button" class="btn-cancel-modal" onclick="closeEditModal()">{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn-save-acc">{{ t('common.save') }}</button>
       </div>
     </form>
   </div>

@@ -1,26 +1,26 @@
 {% extends layout|default('base.html') %}
-{% block title %}仪表盘 - 我的记账本{% endblock %}
+{% block title %}{{ t('nav.dashboard') }} - {{ t('nav.brand') }}{% endblock %}
 {% block content %}
 
 <!-- 顶部视图切换 -->
 <div class="view-header">
   <div class="view-tabs" role="tablist">
-    <button type="button" class="tab-btn active" id="tabMonthly" onclick="switchDashboardView('monthly')">当月视图 (Monthly)</button>
-    <button type="button" class="tab-btn" id="tabOverview" onclick="switchDashboardView('overview')">总体概览 (Total Overview)</button>
+    <button type="button" class="tab-btn active" id="tabMonthly" onclick="switchDashboardView('monthly')">{{ t('dashboard.view_monthly') }}</button>
+    <button type="button" class="tab-btn" id="tabOverview" onclick="switchDashboardView('overview')">{{ t('dashboard.view_overview') }}</button>
   </div>
 </div>
 
 <!-- ==================== 当月视图 ==================== -->
 <div id="monthlySection" class="dashboard-view">
   <div class="month-nav">
-    <a href="{{ url_for('index', month=prev_month) }}" class="month-nav-arrow" hx-get="{{ url_for('index', month=prev_month) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">&larr; 上月</a>
+    <a href="{{ url_for('index', month=prev_month) }}" class="month-nav-arrow" hx-get="{{ url_for('index', month=prev_month) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">&larr; {{ t('dashboard.prev_month') }}</a>
     <div style="display: inline-flex; flex-direction: column; align-items: center; gap: 2px;">
       <strong class="month-nav-current">{{ month }}</strong>
       {% if cycle_range_label and budget_start_day and budget_start_day > 1 %}
-        <span style="font-size: 11.5px; color: var(--muted); font-weight: 500;">账单周期: {{ cycle_range_label }}</span>
+        <span style="font-size: 11.5px; color: var(--muted); font-weight: 500;">{{ t('dashboard.billing_cycle') }}: {{ cycle_range_label }}</span>
       {% endif %}
     </div>
-    <a href="{{ url_for('index', month=next_month) }}" class="month-nav-arrow" hx-get="{{ url_for('index', month=next_month) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">下月 &rarr;</a>
+    <a href="{{ url_for('index', month=next_month) }}" class="month-nav-arrow" hx-get="{{ url_for('index', month=next_month) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">{{ t('dashboard.next_month') }} &rarr;</a>
   </div>
 
   <div id="dashboardSummaryCardsWrap">
@@ -33,53 +33,53 @@
 
   <div class="panels">
     <section class="panel">
-      <h3>快速录入</h3>
+      <h3>{{ t('dashboard.quick_add_header') }}</h3>
       <form method="post" action="{{ url_for('add_transaction') }}" class="quick-add" id="quickAddForm">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="source" value="manual">
         <div class="row seg-row">
-          <label class="seg"><input type="radio" name="type" value="expense" checked onchange="onTypeChange()"><span>支出</span></label>
-          <label class="seg"><input type="radio" name="type" value="income" onchange="onTypeChange()"><span>收入</span></label>
-          <label class="seg"><input type="radio" name="type" value="savings" onchange="onTypeChange()"><span>储蓄</span></label>
+          <label class="seg"><input type="radio" name="type" value="expense" checked onchange="onTypeChange()"><span>{{ t('common.expense') }}</span></label>
+          <label class="seg"><input type="radio" name="type" value="income" onchange="onTypeChange()"><span>{{ t('common.income') }}</span></label>
+          <label class="seg"><input type="radio" name="type" value="savings" onchange="onTypeChange()"><span>{{ t('common.savings') }}</span></label>
         </div>
         <div class="row seg-row" id="groupRow" style="display:none;">
-          <label class="seg"><input type="radio" name="group_name" value="main" checked onchange="populateCategories()"><span>主业收入</span></label>
-          <label class="seg"><input type="radio" name="group_name" value="side" onchange="populateCategories()"><span>副业收入</span></label>
+          <label class="seg"><input type="radio" name="group_name" value="main" checked onchange="populateCategories()"><span>{{ t('dashboard.main_income') }}</span></label>
+          <label class="seg"><input type="radio" name="group_name" value="side" onchange="populateCategories()"><span>{{ t('dashboard.side_income') }}</span></label>
         </div>
         <div class="row seg-row" id="expenseSubRow">
-          <label class="seg"><input type="radio" name="expense_mode" value="regular" checked onchange="onExpenseModeChange()"><span>普通支出</span></label>
-          <label class="seg"><input type="radio" name="expense_mode" value="savings" onchange="onExpenseModeChange()"><span>储蓄支出</span></label>
+          <label class="seg"><input type="radio" name="expense_mode" value="regular" checked onchange="onExpenseModeChange()"><span>{{ t('dashboard.regular_expense') }}</span></label>
+          <label class="seg"><input type="radio" name="expense_mode" value="savings" onchange="onExpenseModeChange()"><span>{{ t('dashboard.savings_expense') }}</span></label>
         </div>
         <input type="hidden" name="from_savings" id="fromSavingsInput" value="0">
         <div id="fromSavingsCategoryBox" class="from-savings-box" style="display:none;">
           <label class="from-savings-label">
-            从哪项储蓄资金扣除：
+            {{ t('dashboard.from_savings_label') }}
           </label>
           <select name="from_savings_category" id="fromSavingsCategorySelect" class="from-savings-select">
             {% if savings_pool_by_category %}
               {% for scat, samt in savings_pool_by_category.items() %}
-                <option value="{{ scat }}">{{ scat }} (结余: {{ samt|money }})</option>
+                <option value="{{ scat }}">{{ scat }} ({{ t('dashboard.balance_prefix') }}: {{ samt|money }})</option>
               {% endfor %}
             {% endif %}
             {% for scat in savings_categories %}
               {% if not savings_pool_by_category or scat not in savings_pool_by_category %}
-                <option value="{{ scat }}">{{ scat }} (结余: {{ 0|money }})</option>
+                <option value="{{ scat }}">{{ scat }} ({{ t('dashboard.balance_prefix') }}: {{ 0|money }})</option>
               {% endif %}
             {% endfor %}
             {% if not savings_pool_by_category and not savings_categories %}
-              <option value="默认储蓄">默认储蓄</option>
+              <option value="默认储蓄">{{ t('dashboard.default_savings') }}</option>
             {% endif %}
           </select>
         </div>
         <div class="row">
-          <label>日期 <input type="date" name="date" value="{{ today }}" required></label>
-          <label>金额 <input type="number" step="0.01" min="0.01" name="amount" id="quickAddAmount" required></label>
+          <label>{{ t('common.date') }} <input type="date" name="date" value="{{ today }}" required></label>
+          <label>{{ t('common.amount') }} <input type="number" step="0.01" min="0.01" name="amount" id="quickAddAmount" required></label>
         </div>
         <div class="row">
-          <label>分类 <select name="category" id="categorySelect"></select></label>
-          <label>账户
+          <label>{{ t('common.category') }} <select name="category" id="categorySelect"></select></label>
+          <label>{{ t('common.account') }}
             <select name="account_id" id="quickAddAccountSelect">
-              <option value="">默认账户</option>
+              <option value="">{{ t('dashboard.default_account') }}</option>
               {% if accounts %}
                 {% for acc in accounts %}
                   <option value="{{ acc.id }}">{{ acc.name }} ({{ acc.currency }})</option>
@@ -89,42 +89,42 @@
           </label>
         </div>
         <div class="row">
-          <label style="flex: 1;">备注 <input type="text" name="note" id="quickAddNote" placeholder="可选"></label>
+          <label style="flex: 1;">{{ t('common.note') }} <input type="text" name="note" id="quickAddNote" placeholder="{{ t('dashboard.optional') }}"></label>
         </div>
         <div class="row">
-          <label style="flex: 1;">自定义标签 <input type="text" name="tags" id="quickAddTags" placeholder="多个标签用逗号分隔，如：出差, 报销, 聚餐"></label>
+          <label style="flex: 1;">{{ t('dashboard.custom_tags') }} <input type="text" name="tags" id="quickAddTags" placeholder="{{ t('dashboard.tags_placeholder') }}"></label>
         </div>
         <div class="quick-chips" id="quickChipsRow">
-          <button type="button" class="chip-btn" onclick="quickFillForm(10, '餐饮', '早餐')">早餐 {{ current_user_currency }}10</button>
-          <button type="button" class="chip-btn" onclick="quickFillForm(15, '餐饮', '午餐')">午餐 {{ current_user_currency }}15</button>
-          <button type="button" class="chip-btn" onclick="quickFillForm(12, '餐饮', '咖啡')">咖啡 {{ current_user_currency }}12</button>
-          <button type="button" class="chip-btn" onclick="quickFillForm(50, '交通', 'Petronas加油')">加油 {{ current_user_currency }}50</button>
-          <button type="button" class="chip-btn" onclick="quickFillForm(30, '购物', '超市日常')">超市 {{ current_user_currency }}30</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(10, '餐饮', '早餐')">{{ t('dashboard.chips_breakfast') }} {{ current_user_currency }}10</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(15, '餐饮', '午餐')">{{ t('dashboard.chips_lunch') }} {{ current_user_currency }}15</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(12, '餐饮', '咖啡')">{{ t('dashboard.chips_coffee') }} {{ current_user_currency }}12</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(50, '交通', 'Petronas加油')">{{ t('dashboard.chips_fuel') }} {{ current_user_currency }}50</button>
+          <button type="button" class="chip-btn" onclick="quickFillForm(30, '购物', '超市日常')">{{ t('dashboard.chips_groceries') }} {{ current_user_currency }}30</button>
         </div>
         <div class="row" style="margin-top: 10px; align-items: center; justify-content: space-between;">
           <label class="checkbox-label" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; user-select: none;">
             <input type="checkbox" id="continuousEntryCheckbox">
-            <span>连续记账 (保存后保持表单并聚焦金额)</span>
+            <span>{{ t('dashboard.continuous_entry') }}</span>
           </label>
-          <button type="submit" class="btn-primary" id="quickAddSubmitBtn">保存记账</button>
+          <button type="submit" class="btn-primary" id="quickAddSubmitBtn">{{ t('dashboard.save_record') }}</button>
         </div>
       </form>
     </section>
 
     <section class="panel">
-      <h3>自然语言快速记账</h3>
-      <p class="hint">例如："午饭 15"、"副业 稿费 200"、"工资 8000"。解析后会先让你确认再保存。</p>
+      <h3>{{ t('dashboard.nlp_title') }}</h3>
+      <p class="hint">{{ t('dashboard.nlp_hint') }}</p>
       <form method="post" action="{{ url_for('nlp_parse') }}" class="nlp-form" id="nlpForm">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="text" name="text" placeholder="输入一句话，如：打车 32.5" required>
-        <button type="submit" class="btn-primary">智能解析</button>
+        <input type="text" name="text" placeholder="{{ t('dashboard.nlp_placeholder') }}" required>
+        <button type="submit" class="btn-primary">{{ t('dashboard.nlp_button') }}</button>
       </form>
     </section>
   </div>
 
   <div class="panels">
     <section class="panel">
-      <h3>收入构成（主业 vs 副业）</h3>
+      <h3>{{ t('dashboard.income_composition') }}</h3>
       <div style="position:relative; height:190px;">
         <canvas id="incomeChart"></canvas>
       </div>
@@ -132,8 +132,8 @@
     </section>
     <section class="panel">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <h3 style="margin:0;">支出分类占比</h3>
-        <a href="{{ url_for('category_insights_page') }}" class="btn-link" style="font-size:12.5px; font-weight:500;">深度洞察报告 &rarr;</a>
+        <h3 style="margin:0;">{{ t('dashboard.expense_by_category') }}</h3>
+        <a href="{{ url_for('category_insights_page') }}" class="btn-link" style="font-size:12.5px; font-weight:500;">{{ t('dashboard.insights_link') }}</a>
       </div>
       <div style="position:relative; height:190px;">
         <canvas id="expenseChart"></canvas>
@@ -148,43 +148,43 @@
   <!-- 时间范围筛选器 -->
   <div class="overview-toolbar">
     <div class="filter-pills" role="tablist">
-      <button type="button" class="pill-btn active" data-range="all" onclick="selectOverviewRange('all')">全部 (All Time)</button>
-      <button type="button" class="pill-btn" data-range="12m" onclick="selectOverviewRange('12m')">近 12 个月 (12M)</button>
-      <button type="button" class="pill-btn" data-range="ytd" onclick="selectOverviewRange('ytd')">本年度 (YTD)</button>
-      <button type="button" class="pill-btn" data-range="custom" onclick="selectOverviewRange('custom')">自定义范围</button>
+      <button type="button" class="pill-btn active" data-range="all" onclick="selectOverviewRange('all')">{{ t('dashboard.range_all') }}</button>
+      <button type="button" class="pill-btn" data-range="12m" onclick="selectOverviewRange('12m')">{{ t('dashboard.range_12m') }}</button>
+      <button type="button" class="pill-btn" data-range="ytd" onclick="selectOverviewRange('ytd')">{{ t('dashboard.range_ytd') }}</button>
+      <button type="button" class="pill-btn" data-range="custom" onclick="selectOverviewRange('custom')">{{ t('dashboard.range_custom') }}</button>
     </div>
     <div id="customDateBox" class="custom-date-box" style="display:none;">
-      <input type="date" id="overviewStartDate" aria-label="开始日期">
-      <span class="date-sep">至</span>
-      <input type="date" id="overviewEndDate" value="{{ today }}" aria-label="结束日期">
-      <button type="button" class="btn-secondary btn-sm" onclick="applyCustomOverviewFilter()">应用</button>
+      <input type="date" id="overviewStartDate" aria-label="{{ t('records.date_start') }}">
+      <span class="date-sep">{{ t('dashboard.to') }}</span>
+      <input type="date" id="overviewEndDate" value="{{ today }}" aria-label="{{ t('records.date_end') }}">
+      <button type="button" class="btn-secondary btn-sm" onclick="applyCustomOverviewFilter()">{{ t('dashboard.apply') }}</button>
     </div>
-    <div class="overview-range-badge" id="overviewRangeBadge">正在加载统计数据...</div>
+    <div class="overview-range-badge" id="overviewRangeBadge">{{ t('dashboard.loading_stats') }}</div>
   </div>
 
   <!-- 总体核心指标 4 张卡片 -->
   <div class="cards cards-four">
     <div class="card">
-      <span class="card-label">累计总收入</span>
+      <span class="card-label">{{ t('dashboard.total_cumulative_income') }}</span>
       <span class="amount income" id="ovTotalIncome">{{ current_user_currency }} 0.00</span>
     </div>
     <div class="card">
-      <span class="card-label">累计总支出</span>
+      <span class="card-label">{{ t('dashboard.total_cumulative_expense') }}</span>
       <span class="amount expense" id="ovTotalExpense">{{ current_user_currency }} 0.00</span>
     </div>
     <div class="card" id="ovNetSavingsCard">
-      <span class="card-label">累计总结余</span>
+      <span class="card-label">{{ t('dashboard.total_cumulative_balance') }}</span>
       <span class="amount income" id="ovNetSavings">{{ current_user_currency }} 0.00</span>
     </div>
     <div class="card">
-      <span class="card-label">月均收支</span>
+      <span class="card-label">{{ t('dashboard.monthly_avg') }}</span>
       <div class="card-sub-stats">
         <div class="sub-stat-row">
-          <span class="sub-stat-label">月均收入</span>
+          <span class="sub-stat-label">{{ t('dashboard.avg_income') }}</span>
           <span class="sub-stat-val income" id="ovAvgIncome">{{ current_user_currency }} 0.00</span>
         </div>
         <div class="sub-stat-row">
-          <span class="sub-stat-label">月均支出</span>
+          <span class="sub-stat-label">{{ t('dashboard.avg_expense') }}</span>
           <span class="sub-stat-val expense" id="ovAvgExpense">{{ current_user_currency }} 0.00</span>
         </div>
       </div>
@@ -194,8 +194,8 @@
   <!-- 空状态容器 -->
   <div id="overviewEmptyState" class="empty-state" style="display:none;">
     <div class="empty-icon">📊</div>
-    <div class="empty-title">选定范围内暂无交易记录</div>
-    <div class="empty-desc">尝试切换其他时间范围或在当月视图中添加记录。</div>
+    <div class="empty-title">{{ t('dashboard.overview_empty_title') }}</div>
+    <div class="empty-desc">{{ t('dashboard.overview_empty_desc') }}</div>
   </div>
 
   <!-- 总体图表区 -->
@@ -204,10 +204,10 @@
     <div class="panels">
       <section class="panel panel-full">
         <div class="panel-header-with-legend">
-          <h3>收支历史趋势对比</h3>
+          <h3>{{ t('dashboard.charts') }}</h3>
           <div class="trend-legend">
-            <span class="legend-item"><span class="legend-dot dot-income"></span> 收入</span>
-            <span class="legend-item"><span class="legend-dot dot-expense"></span> 支出</span>
+            <span class="legend-item"><span class="legend-dot dot-income"></span> {{ t('common.income') }}</span>
+            <span class="legend-item"><span class="legend-dot dot-expense"></span> {{ t('common.expense') }}</span>
           </div>
         </div>
         <div class="trend-chart-wrapper" id="trendChartWrapper" style="height:280px;">
@@ -220,7 +220,7 @@
     <!-- 长期支出分类占比 与 主副业占比 -->
     <div class="panels">
       <section class="panel">
-        <h3>长期支出分类占比</h3>
+        <h3>{{ t('dashboard.expense_by_category') }}</h3>
         <div style="position:relative; height:190px;">
           <canvas id="overviewExpenseChart"></canvas>
         </div>
@@ -228,15 +228,15 @@
       </section>
       <section class="panel">
         <div class="panel-header-with-legend">
-          <h3>主业 vs 副业累计占比</h3>
-          <div class="side-badge" id="sideIncomeBadge">副业占比: 0.0%</div>
+          <h3>{{ t('dashboard.income_composition') }}</h3>
+          <div class="side-badge" id="sideIncomeBadge">{{ t('dashboard.side_income') }}: 0.0%</div>
         </div>
         <div style="position:relative; height:190px;">
           <canvas id="overviewIncomeChart"></canvas>
         </div>
         <div id="overviewIncomeChartLegend" class="chart-legend-list-scroll"></div>
         <div class="side-ratio-card" id="sideRatioDesc">
-          副业收入在累计收入中起到了良好的现金流补充作用。
+          {{ t('dashboard.side_income') }} ({{ t('common.income') }})
         </div>
       </section>
     </div>
@@ -253,7 +253,7 @@ window.CATEGORY_DATA = {
 window.CHART_DATA = {
   month: {{ month | tojson }},
   income: {
-    labels: ['主业收入', '副业收入'],
+    labels: [{{ t('dashboard.main_income')|tojson }}, {{ t('dashboard.side_income')|tojson }}],
     values: {{ [income_group.main|default(0.0)|float, income_group.side|default(0.0)|float] | tojson }}
   },
   expense: {

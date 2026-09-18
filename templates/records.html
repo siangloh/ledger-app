@@ -1,17 +1,17 @@
 {% extends layout|default('base.html') %}
-{% block title %}历史记录 - 我的记账本{% endblock %}
+{% block title %}{{ t('records.title') }} - {{ t('nav.brand') }}{% endblock %}
 {% block content %}
 <h2>{{ t('records.title') }}</h2>
 
 <form method="get" class="filters">
-  <label>{{ t('common.date') }} (Start) <input type="date" name="start" value="{{ start }}"></label>
-  <label>{{ t('common.date') }} (End) <input type="date" name="end" value="{{ end }}"></label>
+  <label>{{ t('records.date_start') }} <input type="date" name="start" value="{{ start }}"></label>
+  <label>{{ t('records.date_end') }} <input type="date" name="end" value="{{ end }}"></label>
   <label>{{ t('common.type') }}
     <select name="type">
       <option value="">{{ t('common.all') }}</option>
       <option value="income" {{ 'selected' if type=='income' }}>{{ t('common.income') }}</option>
       <option value="expense" {{ 'selected' if type=='expense' }}>{{ t('common.expense') }}</option>
-      <option value="savings" {{ 'selected' if type=='savings' }}>储蓄</option>
+      <option value="savings" {{ 'selected' if type=='savings' }}>{{ t('common.savings') }}</option>
     </select>
   </label>
   <label>{{ t('common.category') }}
@@ -31,12 +31,12 @@
   <!-- 批量操作控制栏 -->
   <div class="batch-bar" id="batchBar" style="display: none; align-items: center; justify-content: space-between; background: var(--surface-soft); padding: 10px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
     <div style="font-size: 14px; color: var(--ink-soft);">
-      已选中 <strong id="selectedCount" style="color: var(--navy);">0</strong> 项记录
+      {{ t('records.batch_selected', count='<strong id="selectedCount" style="color: var(--navy);">0</strong>')|safe }}
     </div>
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-      <button type="button" class="btn-ghost" onclick="clearAllSelections()" style="padding: 5px 12px; font-size: 13px;">取消选择</button>
-      <button type="button" class="btn-secondary" id="batchEditBtn" onclick="openBatchEditDialog()" style="padding: 5px 14px; font-size: 13px;">批量修改分类/类型</button>
-      <button type="button" class="btn-danger-solid" id="batchDeleteBtn" onclick="confirmBatchDelete()" style="padding: 5px 14px; font-size: 13px;">批量删除</button>
+      <button type="button" class="btn-ghost" onclick="clearAllSelections()" style="padding: 5px 12px; font-size: 13px;">{{ t('common.cancel') }}</button>
+      <button type="button" class="btn-secondary" id="batchEditBtn" onclick="openBatchEditDialog()" style="padding: 5px 14px; font-size: 13px;">{{ t('common.edit') }} ({{ t('common.category') }})</button>
+      <button type="button" class="btn-danger-solid" id="batchDeleteBtn" onclick="confirmBatchDelete()" style="padding: 5px 14px; font-size: 13px;">{{ t('records.batch_delete') }}</button>
     </div>
   </div>
 

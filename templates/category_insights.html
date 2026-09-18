@@ -1,15 +1,15 @@
 {% extends layout|default('base.html') %}
-{% block title %}支出分类深度洞察 - 我的记账本{% endblock %}
+{% block title %}{{ t('insights.title') }} - {{ t('nav.brand') }}{% endblock %}
 {% block content %}
 <div class="insights-page-header"
   style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
   <div>
-    <h2>📊 支出分类深度洞察</h2>
-    <p class="hint" style="margin-top:4px;">精准对比各支出分类在当前月、上个月及历史月均的支出表现与波动趋势</p>
+    <h2>📊 {{ t('insights.title') }}</h2>
+    <p class="hint" style="margin-top:4px;">{{ t('insights.subtitle') }}</p>
   </div>
   <div style="display:flex; gap:10px;">
     <a href="{{ url_for('categories_page') }}" class="btn-ghost" hx-get="{{ url_for('categories_page') }}"
-      hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">管理分类</a>
+      hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">{{ t('insights.manage_cats') }}</a>
   </div>
 </div>
 
@@ -17,20 +17,20 @@
 <div class="overview-toolbar" style="margin-bottom:20px;">
   <div class="filter-pills" role="tablist">
     <button type="button" class="pill-btn {{ 'active' if insights.range=='all' }}" data-range="all"
-      onclick="selectInsightsRange('all')">全部 (All Time)</button>
+      onclick="selectInsightsRange('all')">{{ t('dashboard.range_all') }}</button>
     <button type="button" class="pill-btn {{ 'active' if insights.range=='12m' }}" data-range="12m"
-      onclick="selectInsightsRange('12m')">近 12 个月 (12M)</button>
+      onclick="selectInsightsRange('12m')">{{ t('dashboard.range_12m') }}</button>
     <button type="button" class="pill-btn {{ 'active' if insights.range=='ytd' }}" data-range="ytd"
-      onclick="selectInsightsRange('ytd')">本年度 (YTD)</button>
+      onclick="selectInsightsRange('ytd')">{{ t('dashboard.range_ytd') }}</button>
     <button type="button" class="pill-btn {{ 'active' if insights.range=='custom' }}" data-range="custom"
-      onclick="selectInsightsRange('custom')">自定义范围</button>
+      onclick="selectInsightsRange('custom')">{{ t('dashboard.range_custom') }}</button>
   </div>
   <div id="customDateBox" class="custom-date-box"
     style="{{ 'display:flex' if insights.range=='custom' else 'display:none' }};">
-    <input type="date" id="insightsStartDate" value="{{ insights.start_date or '' }}" aria-label="开始日期">
-    <span class="date-sep">至</span>
-    <input type="date" id="insightsEndDate" value="{{ insights.end_date or today }}" aria-label="结束日期">
-    <button type="button" class="btn-secondary btn-sm" onclick="applyCustomInsightsFilter()">应用</button>
+    <input type="date" id="insightsStartDate" value="{{ insights.start_date or '' }}" aria-label="{{ t('records.date_start') }}">
+    <span class="date-sep">{{ t('dashboard.to') }}</span>
+    <input type="date" id="insightsEndDate" value="{{ insights.end_date or today }}" aria-label="{{ t('records.date_end') }}">
+    <button type="button" class="btn-secondary btn-sm" onclick="applyCustomInsightsFilter()">{{ t('dashboard.apply') }}</button>
   </div>
   <div class="overview-range-badge" id="insightsRangeBadge">
     {% if insights.range == '12m' %}统计范围：近 12 个月 ({{ insights.start_date }} 至 {{ insights.end_date }})
@@ -44,21 +44,21 @@
 <!-- 核心汇总指标卡片 -->
 <div class="cards cards-four" style="margin-bottom:24px;">
   <div class="card">
-    <span class="card-label">区间总支出</span>
+    <span class="card-label">{{ t('insights.kpi_total_expense') }}</span>
     <span class="amount expense" id="kpiTotalExpense">{{ insights.total_expense|money }}</span>
   </div>
   <div class="card">
-    <span class="card-label">本月支出 ({{ insights.current_month }})</span>
+    <span class="card-label">{{ t('insights.kpi_this_month', month=insights.current_month) }}</span>
     <span class="amount expense" id="kpiThisMonth">{{ (insights.categories|map(attribute='this_month')|sum)|money
       }}</span>
   </div>
   <div class="card">
-    <span class="card-label">上月支出 ({{ insights.prev_month }})</span>
+    <span class="card-label">{{ t('insights.kpi_last_month', month=insights.prev_month) }}</span>
     <span class="amount" style="color:var(--ink-soft);" id="kpiLastMonth">{{
       (insights.categories|map(attribute='last_month')|sum)|money }}</span>
   </div>
   <div class="card">
-    <span class="card-label">活跃支出分类</span>
+    <span class="card-label">{{ t('insights.kpi_active_cats') }}</span>
     <span class="amount" style="color:var(--ink);" id="kpiCatCount">{{ insights.total_categories }} 个</span>
   </div>
 </div>
@@ -67,8 +67,8 @@
 <div class="panel insights-table-panel" style="padding:0; overflow:hidden;">
   <div
     style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-    <h3 style="margin:0;">分类支出明细与月度环比</h3>
-    <span class="hint" style="margin:0; font-size:12.5px;">💡 点击分类行可展开/收起该分类在选定范围内的月度消费走势柱状图</span>
+    <h3 style="margin:0;">{{ t('insights.table_title') }}</h3>
+    <span class="hint" style="margin:0; font-size:12.5px;">{{ t('insights.table_tip') }}</span>
   </div>
 
   <div class="table-wrap" style="margin:0;">
@@ -76,13 +76,13 @@
       <thead>
         <tr>
           <th style="width:40px;"></th>
-          <th>分类名称</th>
-          <th style="text-align:right;">本月支出</th>
-          <th style="text-align:right;">上月支出</th>
-          <th style="text-align:right;">月均支出</th>
-          <th style="text-align:right;">区间累计</th>
-          <th style="text-align:center;">环比上月</th>
-          <th style="text-align:center;">操作</th>
+          <th>{{ t('insights.th_category') }}</th>
+          <th style="text-align:right;">{{ t('insights.th_this_month') }}</th>
+          <th style="text-align:right;">{{ t('insights.th_last_month') }}</th>
+          <th style="text-align:right;">{{ t('insights.th_avg_monthly') }}</th>
+          <th style="text-align:right;">{{ t('insights.th_cumulative') }}</th>
+          <th style="text-align:center;">{{ t('insights.th_mom_change') }}</th>
+          <th style="text-align:center;">{{ t('common.actions') }}</th>
         </tr>
       </thead>
       <tbody id="insightsTableBody">
@@ -117,14 +117,14 @@
             {% endif %}
           </td>
           <td class="col-action" style="text-align:center;" onclick="event.stopPropagation();">
-            <button type="button" class="btn-ghost btn-sm" onclick="toggleCategoryChart({{ loop.index0 }})">走势图</button>
+            <button type="button" class="btn-ghost btn-sm" onclick="toggleCategoryChart({{ loop.index0 }})">{{ t('insights.trend_chart_btn') }}</button>
           </td>
         </tr>
         <!-- 展开的柱状图容器行 -->
         <tr id="chart-row-{{ loop.index0 }}" class="chart-expand-row" onclick="event.stopPropagation();">
           <td colspan="8" class="chart-expand-td">
             <div class="chart-expand-header">
-              <span class="chart-expand-title">「{{ cat.category }}」月度支出走势</span>
+              <span class="chart-expand-title">{{ t('insights.trend_title', category=cat.category) }}</span>
               <div class="chart-expand-stats">
                 <span class="stat-pill">月均 {{ cat.avg_monthly|money }}</span>
                 <span class="stat-pill">累计 {{ cat.total_amt|money }}</span>
@@ -137,7 +137,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="8" style="text-align:center; padding:32px; color:var(--muted);">选定统计范围内暂无支出分类数据</td>
+          <td colspan="8" style="text-align:center; padding:32px; color:var(--muted);">{{ t('insights.empty_data') }}</td>
         </tr>
         {% endfor %}
       </tbody>

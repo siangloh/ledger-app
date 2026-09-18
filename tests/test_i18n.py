@@ -118,3 +118,88 @@ def test_api_set_language_endpoint(flask_app, logged_in_client, admin_user_id):
 
     # 4. 恢复为 zh
     logged_in_client.get('/api/set-language?lang=zh')
+
+
+def test_pages_render_in_english(logged_in_client):
+    try:
+        # 切换到英文
+        logged_in_client.get('/api/set-language?lang=en')
+
+        # 1. 仪表盘
+        res = logged_in_client.get('/')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Dashboard' in html
+        assert 'Quick Entry' in html
+        assert 'Regular Expense' in html
+
+        # 2. 交易记录
+        res = logged_in_client.get('/records')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Transaction Records' in html
+        assert 'Start Date' in html
+
+        # 3. 小票分账
+        res = logged_in_client.get('/split-bill')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Split Bill' in html
+        assert 'Step 1: Input Receipts' in html
+
+        # 4. 账户管理
+        res = logged_in_client.get('/accounts')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Account Management' in html
+        assert 'Active Accounts' in html
+
+        # 5. 分类管理
+        res = logged_in_client.get('/categories')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Category &amp; Tag Management' in html or 'Category & Tag Management' in html
+    finally:
+        # 还原为中文
+        logged_in_client.get('/api/set-language?lang=zh')
+
+
+def test_new_translation_keys_across_all_languages():
+    for lang in ['zh', 'en', 'ms', 'zh_TW']:
+        assert t('dashboard.month_deposit', lang=lang) is not None
+        assert t('records.select_batch_first', lang=lang) is not None
+        assert t('split_bill.th_item', lang=lang) is not None
+        assert t('accounts.modal_add_title', lang=lang) is not None
+        assert t('categories.budget_hint', lang=lang) is not None
+        assert t('insights.title', lang=lang) is not None
+
+
+def test_pages_render_in_malay_and_traditional_chinese(logged_in_client):
+    try:
+        # 1. 测试 Malay 渲染
+        logged_in_client.get('/api/set-language?lang=ms')
+        res = logged_in_client.get('/categories/insights')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Cerapan Terperinci Kategori' in html
+
+        res = logged_in_client.get('/accounts')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Tambah Akaun Baru' in html
+
+        # 2. 测试繁体中文渲染
+        logged_in_client.get('/api/set-language?lang=zh_TW')
+        res = logged_in_client.get('/categories/insights')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert '支出分類深度洞察' in html
+
+        res = logged_in_client.get('/accounts')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert '添加新賬戶' in html
+    finally:
+        # 还原为中文
+        logged_in_client.get('/api/set-language?lang=zh')
+

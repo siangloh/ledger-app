@@ -1,4 +1,4 @@
-<p class="hint" id="recordsSummaryHint">筛选结果合计 — 收入 <span class="sensitive-val">{{ total_income|money }}</span>，支出 <span class="sensitive-val">{{ total_expense|money }}</span>，储蓄 <span class="sensitive-val">{{ total_savings|money }}</span>，共 {{ rows|length }} 条</p>
+<p class="hint" id="recordsSummaryHint">{{ t('records.summary_hint', income='<span class="sensitive-val">' ~ (total_income|money) ~ '</span>', expense='<span class="sensitive-val">' ~ (total_expense|money) ~ '</span>', savings='<span class="sensitive-val">' ~ (total_savings|money) ~ '</span>', count=rows|length)|safe }}</p>
 
 <div class="table-wrap" id="recordsTableWrap">
 <table class="records-table">
@@ -7,7 +7,7 @@
       <th style="width: 40px; text-align: center;">
         <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
       </th>
-      <th>日期</th><th>类型</th><th>分组</th><th>分类</th><th>金额</th><th>备注</th><th>来源</th><th style="text-align: right; min-width: 120px;">操作</th>
+      <th>{{ t('records.th_date') }}</th><th>{{ t('records.th_type') }}</th><th>{{ t('records.th_group') }}</th><th>{{ t('records.th_category') }}</th><th>{{ t('records.th_amount') }}</th><th>{{ t('records.th_note') }}</th><th>{{ t('records.th_source') }}</th><th style="text-align: right; min-width: 120px;">{{ t('records.th_actions') }}</th>
     </tr>
   </thead>
   <tbody id="recordsTableBody">
@@ -18,37 +18,37 @@
       </td>
       <td data-col="date">{{ r.date|user_date }}</td>
       <td data-col="type">
-        <span class="tag {{ 'tag-income' if r.type=='income' else ('tag-savings' if r.type=='savings' else 'tag-expense') }}">{{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }}</span>
-        {% if r.from_savings %}<span class="tag tag-savings" style="margin-left: 4px; font-size: 10px; padding: 2px 6px;" title="从储蓄储备扣除">扣: {{ r.from_savings_category or '储蓄' }}</span>{% endif %}
+        <span class="tag {{ 'tag-income' if r.type=='income' else ('tag-savings' if r.type=='savings' else 'tag-expense') }}">{{ t('common.income') if r.type=='income' else (t('common.savings') if r.type=='savings' else t('common.expense')) }}</span>
+        {% if r.from_savings %}<span class="tag tag-savings" style="margin-left: 4px; font-size: 10px; padding: 2px 6px;" title="{{ t('records.tag_from_savings', cat=r.from_savings_category or t('common.savings')) }}">{{ t('records.tag_from_savings', cat=r.from_savings_category or t('common.savings')) }}</span>{% endif %}
       </td>
-      <td data-col="group">{{ {'main':'主业','side':'副业'}.get(r.group_name, '') }}</td>
+      <td data-col="group">{{ {'main': t('records.tag_main'), 'side': t('records.tag_side')}.get(r.group_name, '') }}</td>
       <td data-col="category"><strong>{{ r.category }}</strong></td>
       <td data-col="amount" class="amount-cell {{ 'income' if r.type=='income' else ('savings' if r.type=='savings' else 'expense') }}">{{ r.amount|money }}</td>
       <td data-col="note">
         {{ r.note }}
         {% if r.tags %}
           <div class="record-tags-box" style="margin-top: 3px; display: flex; gap: 4px; flex-wrap: wrap;">
-            {% for t in r.tags.split(',') %}
-              {% if t.strip() %}
-                <span class="tag tag-pill-sm" style="font-size: 10px; padding: 1px 6px; background: var(--surface-soft); color: var(--muted); border-radius: 10px; border: 1px solid var(--border);">#{{ t.strip() }}</span>
+            {% for t_tag in r.tags.split(',') %}
+              {% if t_tag.strip() %}
+                <span class="tag tag-pill-sm" style="font-size: 10px; padding: 1px 6px; background: var(--surface-soft); color: var(--muted); border-radius: 10px; border: 1px solid var(--border);">#{{ t_tag.strip() }}</span>
               {% endif %}
             {% endfor %}
           </div>
         {% endif %}
       </td>
-      <td data-col="source"><span class="tag">{{ {'manual':'手动','nlp':'智能记账','import':'导入','recurring':'固定收支','auto_track':'自动记账','split_bill':'AA分账'}.get(r.source, r.source) }}</span></td>
+      <td data-col="source"><span class="tag">{{ {'manual': t('records.src_manual'), 'nlp': t('records.src_nlp'), 'import': t('records.src_import'), 'recurring': t('records.src_recurring'), 'auto_track': t('records.src_auto_track'), 'split_bill': t('records.src_split_bill')}.get(r.source, r.source) }}</span></td>
       <td data-col="actions" class="actions">
         <div class="actions-inner">
           {% if r.type == 'income' %}
-          <button type="button" class="btn-link" style="color: var(--primary); font-weight: 600;" onclick="openOffsetModal({{ r.id }}, {{ r.amount }}, '{{ r.note|e }}')" title="冲抵之前的支出（朋友还款）">冲抵</button>
+          <button type="button" class="btn-link" style="color: var(--primary); font-weight: 600;" onclick="openOffsetModal({{ r.id }}, {{ r.amount }}, '{{ r.note|e }}')" title="{{ t('records.btn_offset_title') }}">{{ t('records.btn_offset') }}</button>
           {% endif %}
-          <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link" hx-get="{{ url_for('edit_record', tx_id=r.id) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">编辑</a>
-          <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ '收入' if r.type=='income' else ('储蓄' if r.type=='savings' else '支出') }} · {{ r.category }} · {{ r.amount|money }}', this)">删除</button>
+          <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link" hx-get="{{ url_for('edit_record', tx_id=r.id) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">{{ t('common.edit') }}</a>
+          <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ t('common.income') if r.type=='income' else (t('common.savings') if r.type=='savings' else t('common.expense')) }} · {{ r.category }} · {{ r.amount|money }}', this)">{{ t('common.delete') }}</button>
         </div>
       </td>
     </tr>
     {% else %}
-    <tr><td colspan="9">暂无记录</td></tr>
+    <tr><td colspan="9">{{ t('records.empty') }}</td></tr>
     {% endfor %}
   </tbody>
 </table>
