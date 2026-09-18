@@ -29,6 +29,7 @@ from core.utils import (
 )
 from services.ai_service import parse_nlp_with_llm
 from services.notification_service import parse_nlp_text
+from core.i18n import t
 
 transactions_bp = Blueprint('transactions', __name__)
 
@@ -48,8 +49,8 @@ def add_transaction():
         amount = 0
     if amount <= 0:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '金额必须是大于 0 的数字'}), 400
-        flash('金额必须是大于 0 的数字', 'error')
+            return jsonify({'ok': False, 'message': t('transactions.amount_must_be_positive', '金额必须是大于 0 的数字')}), 400
+        flash(t('transactions.amount_must_be_positive', '金额必须是大于 0 的数字'), 'error')
         return redirect(url_for('index'))
 
     tx_type = f.get('type')
@@ -120,7 +121,7 @@ def add_transaction():
 
         return jsonify({
             'ok': True,
-            'message': '记录已添加',
+            'message': t('transactions.record_added', '记录已添加'),
             'version': DATA_VERSION,
             'transaction': {
                 'id': cur.lastrowid,
@@ -149,7 +150,7 @@ def add_transaction():
             'budget_alert': budget_alert
         })
 
-    flash('记录已添加', 'success')
+    flash(t('transactions.record_added', '记录已添加'), 'success')
     return redirect(url_for('index', month=tx_date[:7]))
 
 
@@ -256,9 +257,9 @@ def edit_record(tx_id):
                 flash(budget_alert['message'], 'warning' if budget_alert['threshold'] < 100 else 'error')
 
         if is_ajax_request():
-            return jsonify({'ok': True, 'message': '记录已更新', 'budget_alert': budget_alert})
+            return jsonify({'ok': True, 'message': t('transactions.record_updated', '记录已更新'), 'budget_alert': budget_alert})
 
-        flash('记录已更新', 'success')
+        flash(t('transactions.record_updated', '记录已更新'), 'success')
         return redirect(url_for('records'))
 
     row = db.execute('SELECT * FROM transactions WHERE id=? AND user_id=?', (tx_id, user_id)).fetchone()
@@ -287,9 +288,9 @@ def delete_record(tx_id):
     bump_data_version('delete', {'id': tx_id})
 
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': '记录已删除', 'id': tx_id})
+        return jsonify({'ok': True, 'message': t('transactions.record_deleted', '记录已删除'), 'id': tx_id})
 
-    flash('记录已删除', 'success')
+    flash(t('transactions.record_deleted', '记录已删除'), 'success')
     return redirect(url_for('records'))
 
 
@@ -300,8 +301,8 @@ def batch_delete_records():
     ids = request.form.getlist('ids')
     if not ids:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '未选中任何记录'}), 400
-        flash('未选中任何记录', 'error')
+            return jsonify({'ok': False, 'message': t('transactions.no_records_selected', '未选中任何记录')}), 400
+        flash(t('transactions.no_records_selected', '未选中任何记录'), 'error')
         return redirect(url_for('records'))
 
     # 安全地过滤数字 ID
@@ -318,14 +319,15 @@ def batch_delete_records():
         db.commit()
         bump_data_version('batch_delete', {'count': len(valid_ids)})
 
+        msg = t('transactions.batch_deleted', '成功批量删除 {count} 条记录', count=len(valid_ids))
         if is_ajax_request():
-            return jsonify({'ok': True, 'message': f'成功批量删除 {len(valid_ids)} 条记录', 'deleted_ids': valid_ids})
+            return jsonify({'ok': True, 'message': msg, 'deleted_ids': valid_ids})
 
-        flash(f'成功批量删除 {len(valid_ids)} 条记录', 'success')
+        flash(msg, 'success')
     else:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '未选中有效的记录'}), 400
-        flash('未选中有效的记录', 'error')
+            return jsonify({'ok': False, 'message': t('transactions.no_valid_records_selected', '未选中有效的记录')}), 400
+        flash(t('transactions.no_valid_records_selected', '未选中有效的记录'), 'error')
 
     return redirect(url_for('records'))
 
@@ -344,8 +346,8 @@ def batch_edit_records():
 
     if not ids:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '未选中任何记录'}), 400
-        flash('未选中任何记录', 'error')
+            return jsonify({'ok': False, 'message': t('transactions.no_records_selected', '未选中任何记录')}), 400
+        flash(t('transactions.no_records_selected', '未选中任何记录'), 'error')
         return redirect(url_for('records'))
 
     valid_ids = []
@@ -357,14 +359,14 @@ def batch_edit_records():
 
     if not valid_ids:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '未选中有效的记录'}), 400
-        flash('未选中有效的记录', 'error')
+            return jsonify({'ok': False, 'message': t('transactions.no_valid_records_selected', '未选中有效的记录')}), 400
+        flash(t('transactions.no_valid_records_selected', '未选中有效的记录'), 'error')
         return redirect(url_for('records'))
 
     if not new_type and not new_category:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '未指定需要修改的分类或类型'}), 400
-        flash('未指定需要修改的分类或类型', 'warning')
+            return jsonify({'ok': False, 'message': t('transactions.no_edit_fields_specified', '未指定需要修改的分类或类型')}), 400
+        flash(t('transactions.no_edit_fields_specified', '未指定需要修改的分类或类型'), 'warning')
         return redirect(url_for('records'))
 
     updates = []
@@ -404,10 +406,11 @@ def batch_edit_records():
                 if not is_ajax_request():
                     flash(alert['message'], 'warning' if alert['threshold'] < 100 else 'error')
 
+    msg = t('transactions.batch_edited', '成功批量修改 {count} 条记录', count=len(valid_ids))
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': f'成功批量修改 {len(valid_ids)} 条记录', 'edited_ids': valid_ids, 'budget_alerts': budget_alerts})
+        return jsonify({'ok': True, 'message': msg, 'edited_ids': valid_ids, 'budget_alerts': budget_alerts})
 
-    flash(f'成功批量修改 {len(valid_ids)} 条记录', 'success')
+    flash(msg, 'success')
     return redirect(url_for('records'))
 
 
@@ -419,7 +422,7 @@ def batch_edit_records():
 def nlp_parse():
     text = request.form.get('text', '').strip()
     if not text:
-        return {'ok': False, 'message': '请输入内容后再点智能解析'}
+        return {'ok': False, 'message': t('transactions.nlp_enter_content', '请输入内容后再点智能解析')}
 
     # 1. 优先调用 LLM 深度智能解析
     llm_parsed = parse_nlp_with_llm(text)
@@ -449,7 +452,7 @@ def api_recent_expenses():
     """获取用户近期支出列表，供还款记录手动冲抵选择"""
     user_id = get_current_user_id()
     if not user_id:
-        return jsonify({'ok': False, 'message': '未登录'}), 401
+        return jsonify({'ok': False, 'message': t('common.unauthorized', '未登录')}), 401
     db = get_db()
     rows = db.execute('''
         SELECT id, date, category, amount, note, source 
@@ -476,31 +479,31 @@ def api_offset_transaction(tx_id):
     """手动将某笔收入/朋友还款记录冲抵指定的一笔历史支出"""
     user_id = get_current_user_id()
     if not user_id:
-        return jsonify({'ok': False, 'message': '未登录'}), 401
+        return jsonify({'ok': False, 'message': t('common.unauthorized', '未登录')}), 401
 
     db = get_db()
     income_tx = db.execute('SELECT * FROM transactions WHERE id = ? AND user_id = ?', (tx_id, user_id)).fetchone()
     if not income_tx:
-        return jsonify({'ok': False, 'message': '未找到该笔还款/收入记录'}), 404
+        return jsonify({'ok': False, 'message': t('transactions.offset_income_not_found', '未找到该笔还款/收入记录')}), 404
     if income_tx['type'] != 'income':
-        return jsonify({'ok': False, 'message': '只有收入记录可以冲抵支出'}), 400
+        return jsonify({'ok': False, 'message': t('transactions.offset_only_income', '只有收入记录可以冲抵支出')}), 400
 
     data = request.get_json(silent=True) or request.form
     target_expense_id = data.get('target_expense_id')
     if not target_expense_id:
-        return jsonify({'ok': False, 'message': '请选择要冲抵的目标支出'}), 400
+        return jsonify({'ok': False, 'message': t('transactions.offset_select_target', '请选择要冲抵的目标支出')}), 400
 
     target_expense = db.execute('SELECT * FROM transactions WHERE id = ? AND user_id = ?', (target_expense_id, user_id)).fetchone()
     if not target_expense:
-        return jsonify({'ok': False, 'message': '未找到目标支出记录'}), 404
+        return jsonify({'ok': False, 'message': t('transactions.offset_target_not_found', '未找到目标支出记录')}), 404
     if target_expense['type'] != 'expense':
-        return jsonify({'ok': False, 'message': '目标记录必须是支出类型'}), 400
+        return jsonify({'ok': False, 'message': t('transactions.offset_target_must_be_expense', '目标记录必须是支出类型')}), 400
 
     offset_amt = float(income_tx['amount'])
     old_amt = float(target_expense['amount'])
     new_amt = max(0.0, round(old_amt - offset_amt, 2))
 
-    tag = f"[收到还款冲抵 {money_filter(offset_amt)}]"
+    tag = t('transactions.offset_tag', '[收到还款冲抵 {amount}]', amount=money_filter(offset_amt))
     old_note = (target_expense['note'] or '').strip()
     new_note = f"{old_note} {tag}".strip()
 
@@ -517,9 +520,16 @@ def api_offset_transaction(tx_id):
         'user_id': user_id
     })
 
+    offset_msg = t(
+        'transactions.offset_success',
+        '成功冲抵！已从【{category}】支出中扣除 {offset_amt}（现为 {new_amt}）',
+        category=target_expense['category'],
+        offset_amt=money_filter(offset_amt),
+        new_amt=money_filter(new_amt)
+    )
     return jsonify({
         'ok': True,
-        'message': f"成功冲抵！已从【{target_expense['category']}】支出中扣除 {money_filter(offset_amt)}（现为 {money_filter(new_amt)}）",
+        'message': offset_msg,
         'target_id': target_expense_id,
         'new_amount': new_amt,
         'deleted_id': tx_id
@@ -558,8 +568,8 @@ def add_category():
     name = (f.get('name') or '').strip()
     if not name:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '分类名称不能为空'}), 400
-        flash('分类名称不能为空', 'error')
+            return jsonify({'ok': False, 'message': t('transactions.category_name_required', '分类名称不能为空')}), 400
+        flash(t('transactions.category_name_required', '分类名称不能为空'), 'error')
         return redirect(url_for('categories_page'))
     color = (f.get('color') or '').strip()
     if color and not re.match(r'^#[0-9a-fA-F]{3,8}$', color):
@@ -568,12 +578,12 @@ def add_category():
         db.execute('INSERT INTO categories (user_id, type, group_name, name, color) VALUES (?,?,?,?,?)', (user_id, type_, group_name, name, color))
         db.commit()
         if is_ajax_request():
-            return jsonify({'ok': True, 'message': '分类已添加'})
-        flash('分类已添加', 'success')
+            return jsonify({'ok': True, 'message': t('transactions.category_added', '分类已添加')})
+        flash(t('transactions.category_added', '分类已添加'), 'success')
     except sqlite3.IntegrityError:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '该分类已存在'}), 400
-        flash('该分类已存在', 'error')
+            return jsonify({'ok': False, 'message': t('transactions.category_exists', '该分类已存在')}), 400
+        flash(t('transactions.category_exists', '该分类已存在'), 'error')
     return redirect(url_for('categories_page'))
 
 
@@ -588,8 +598,8 @@ def edit_category(cat_id):
     cat = db.execute('SELECT * FROM categories WHERE id = ? AND user_id = ?', (cat_id, user_id)).fetchone()
     if not cat:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '分类不存在'}), 404
-        flash('分类不存在', 'error')
+            return jsonify({'ok': False, 'message': t('transactions.category_not_found', '分类不存在')}), 404
+        flash(t('transactions.category_not_found', '分类不存在'), 'error')
         return redirect(url_for('categories_page'))
 
     old_name = cat['name']
@@ -612,17 +622,17 @@ def edit_category(cat_id):
         db.commit()
         bump_data_version('category_edit', {'category': new_name, 'user_id': user_id})
         if is_ajax_request():
-            return jsonify({'ok': True, 'message': '分类已更新', 'id': cat_id, 'name': new_name, 'color': new_color})
-        flash('分类已更新', 'success')
+            return jsonify({'ok': True, 'message': t('transactions.category_updated', '分类已更新'), 'id': cat_id, 'name': new_name, 'color': new_color})
+        flash(t('transactions.category_updated', '分类已更新'), 'success')
     except sqlite3.IntegrityError:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '已存在同名分类'}), 400
-        flash('已存在同名分类', 'error')
+            return jsonify({'ok': False, 'message': t('transactions.category_name_exists', '已存在同名分类')}), 400
+        flash(t('transactions.category_name_exists', '已存在同名分类'), 'error')
     except Exception as e:
         logger.error('Failed to edit category %s: %s', cat_id, e, exc_info=True)
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '更新分类失败'}), 500
-        flash('更新分类失败', 'error')
+            return jsonify({'ok': False, 'message': t('transactions.category_update_failed', '更新分类失败')}), 500
+        flash(t('transactions.category_update_failed', '更新分类失败'), 'error')
     return redirect(url_for('categories_page'))
 
 
@@ -636,8 +646,8 @@ def delete_category(cat_id):
         db.execute('DELETE FROM category_budgets WHERE user_id = ? AND category = ?', (user_id, cat['name']))
     db.commit()
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': '分类已删除（历史记录中的旧数据不受影响）', 'id': cat_id})
-    flash('分类已删除（历史记录中的旧数据不受影响）', 'success')
+        return jsonify({'ok': True, 'message': t('transactions.category_deleted', '分类已删除（历史记录中的旧数据不受影响）'), 'id': cat_id})
+    flash(t('transactions.category_deleted', '分类已删除（历史记录中的旧数据不受影响）'), 'success')
     return redirect(url_for('categories_page'))
 
 
@@ -649,8 +659,8 @@ def set_category_budget(cat_id):
     cat = db.execute("SELECT name FROM categories WHERE id = ? AND user_id = ? AND type = 'expense'", (cat_id, user_id)).fetchone()
     if not cat:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '分类不存在'}), 404
-        flash('分类不存在', 'error')
+            return jsonify({'ok': False, 'message': t('transactions.category_not_found', '分类不存在')}), 404
+        flash(t('transactions.category_not_found', '分类不存在'), 'error')
         return redirect(url_for('categories_page'))
 
     raw_limit = (request.form.get('monthly_limit') or '').strip()
@@ -660,7 +670,7 @@ def set_category_budget(cat_id):
         db.execute('DELETE FROM category_budgets WHERE user_id = ? AND category = ?', (user_id, cat['name']))
         db.commit()
         bump_data_version('budget', {'category': cat['name'], 'user_id': user_id})
-        msg = f'已取消「{cat["name"]}」的月度预算'
+        msg = t('transactions.budget_cancelled', '已取消「{category}」的月度预算', category=cat['name'])
     else:
         try:
             limit = float(raw_limit)
@@ -668,8 +678,8 @@ def set_category_budget(cat_id):
             limit = -1
         if limit <= 0:
             if is_ajax_request():
-                return jsonify({'ok': False, 'message': '预算金额必须是大于 0 的数字'}), 400
-            flash('预算金额必须是大于 0 的数字', 'error')
+                return jsonify({'ok': False, 'message': t('transactions.budget_amount_positive', '预算金额必须是大于 0 的数字')}), 400
+            flash(t('transactions.budget_amount_positive', '预算金额必须是大于 0 的数字'), 'error')
             return redirect(url_for('categories_page'))
 
         existing = db.execute('SELECT id FROM category_budgets WHERE user_id = ? AND category = ?', (user_id, cat['name'])).fetchone()
@@ -683,7 +693,7 @@ def set_category_budget(cat_id):
         db.commit()
         from flask import g
         sym = getattr(g, 'current_currency_symbol', 'RM') or 'RM'
-        msg = f'已设置「{cat["name"]}」的月度预算为 {sym}{limit:.2f}'
+        msg = t('transactions.budget_set', '已设置「{category}」的月度预算为 {amount}', category=cat['name'], amount=f'{sym}{limit:.2f}')
 
     if is_ajax_request():
         return jsonify({'ok': True, 'message': msg})
@@ -736,8 +746,8 @@ def add_recurring():
 
     if amount <= 0:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '金额必须是大于 0 的数字'}), 400
-        flash('金额必须是大于 0 的数字', 'error')
+            return jsonify({'ok': False, 'message': t('transactions.amount_must_be_positive', '金额必须是大于 0 的数字')}), 400
+        flash(t('transactions.amount_must_be_positive', '金额必须是大于 0 的数字'), 'error')
         return redirect(url_for('recurring_page'))
 
     db.execute(
@@ -749,8 +759,8 @@ def add_recurring():
     db.commit()
     bump_data_version('recurring_add', {'type': tx_type, 'amount': amount, 'day_of_month': day, 'category': f.get('category'), 'user_id': user_id})
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': '固定收支规则已添加'})
-    flash('固定收支规则已添加', 'success')
+        return jsonify({'ok': True, 'message': t('transactions.recurring_added', '固定收支规则已添加')})
+    flash(t('transactions.recurring_added', '固定收支规则已添加'), 'success')
     return redirect(url_for('recurring_page'))
 
 
@@ -762,8 +772,8 @@ def delete_recurring(rule_id):
     db.commit()
     bump_data_version('recurring_delete', {'id': rule_id, 'user_id': user_id})
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': '规则已删除', 'id': rule_id})
-    flash('规则已删除', 'success')
+        return jsonify({'ok': True, 'message': t('transactions.recurring_deleted', '规则已删除'), 'id': rule_id})
+    flash(t('transactions.recurring_deleted', '规则已删除'), 'success')
     return redirect(url_for('recurring_page'))
 
 
@@ -777,13 +787,13 @@ def toggle_recurring(rule_id):
         db.execute('UPDATE recurring_rules SET is_active = ? WHERE id = ? AND user_id = ?', (new_active, rule_id, user_id))
         db.commit()
         bump_data_version('recurring_toggle', {'id': rule_id, 'user_id': user_id})
-        msg = '规则已停用' if row['is_active'] else '规则已启用'
+        msg = t('transactions.recurring_disabled', '规则已停用') if row['is_active'] else t('transactions.recurring_enabled', '规则已启用')
         if is_ajax_request():
             return jsonify({'ok': True, 'message': msg, 'id': rule_id, 'is_active': new_active})
         flash(msg, 'success')
     else:
         if is_ajax_request():
-            return jsonify({'ok': False, 'message': '未找到对应规则'}), 404
+            return jsonify({'ok': False, 'message': t('transactions.recurring_rule_not_found', '未找到对应规则')}), 404
     return redirect(url_for('recurring_page'))
 
 
@@ -793,9 +803,9 @@ def manual_generate_recurring():
     count = generate_due_recurring(user_id)
     if count:
         bump_data_version('recurring_generate', {'count': count, 'user_id': user_id})
-        msg = f'已生成 {count} 条本月固定收支记录'
+        msg = t('transactions.recurring_generated', '已生成 {count} 条本月固定收支记录', count=count)
     else:
-        msg = '本月固定收支已全部生成，无需重复生成'
+        msg = t('transactions.recurring_already_generated', '本月固定收支已全部生成，无需重复生成')
     if is_ajax_request():
         return jsonify({'ok': True, 'message': msg, 'count': count})
     flash(msg, 'success')
@@ -821,12 +831,12 @@ def import_page():
 def import_upload():
     file = request.files.get('file')
     if not file or file.filename == '':
-        flash('请选择要导入的文件', 'error')
+        flash(t('transactions.import_select_file', '请选择要导入的文件'), 'error')
         return redirect(url_for('import_page'))
 
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ('.csv', '.xlsx', '.xls'):
-        flash('仅支持 .csv / .xlsx / .xls 文件', 'error')
+        flash(t('transactions.import_unsupported_format', '仅支持 .csv / .xlsx / .xls 文件'), 'error')
         return redirect(url_for('import_page'))
 
     token = uuid.uuid4().hex
@@ -837,12 +847,12 @@ def import_upload():
         df = read_import_file(saved_path)
     except Exception as e:
         os.remove(saved_path)
-        flash(f'文件读取失败：{e}', 'error')
+        flash(t('transactions.import_read_failed', '文件读取失败：{error}', error=str(e)), 'error')
         return redirect(url_for('import_page'))
 
     if df.empty:
         os.remove(saved_path)
-        flash('文件中没有数据', 'error')
+        flash(t('transactions.import_empty_file', '文件中没有数据'), 'error')
         return redirect(url_for('import_page'))
 
     columns = df.columns.tolist()
@@ -870,13 +880,13 @@ def import_confirm():
     saved_path = os.path.join(UPLOAD_DIR, token + ext) if is_valid_token and is_valid_ext else None
 
     if not saved_path or not os.path.exists(saved_path):
-        flash('导入会话已过期，请重新上传文件', 'error')
+        flash(t('transactions.import_session_expired', '导入会话已过期，请重新上传文件'), 'error')
         return redirect(url_for('import_page'))
 
     try:
         df = read_import_file(saved_path)
     except Exception as e:
-        flash(f'文件读取失败：{e}', 'error')
+        flash(t('transactions.import_read_failed', '文件读取失败：{error}', error=str(e)), 'error')
         return redirect(url_for('import_page'))
 
     date_col = f.get('date_col')
@@ -952,5 +962,5 @@ def import_confirm():
         if alert:
             flash(alert['message'], 'warning' if alert['threshold'] < 100 else 'error')
 
-    flash(f'导入完成：成功 {inserted} 条，跳过 {skipped} 条', 'success')
+    flash(t('transactions.import_completed', '导入完成：成功 {inserted} 条，跳过 {skipped} 条', inserted=inserted, skipped=skipped), 'success')
     return redirect(url_for('records'))

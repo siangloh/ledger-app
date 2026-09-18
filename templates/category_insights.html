@@ -33,10 +33,10 @@
     <button type="button" class="btn-secondary btn-sm" onclick="applyCustomInsightsFilter()">{{ t('dashboard.apply') }}</button>
   </div>
   <div class="overview-range-badge" id="insightsRangeBadge">
-    {% if insights.range == '12m' %}统计范围：近 12 个月 ({{ insights.start_date }} 至 {{ insights.end_date }})
-    {% elif insights.range == 'ytd' %}统计范围：本年度 YTD ({{ insights.start_date }} 至今)
-    {% elif insights.range == 'custom' %}统计范围：{{ insights.start_date }} 至 {{ insights.end_date }}
-    {% else %}统计范围：全部历史记录 (共计 {{ insights.num_months }} 个有效统计月)
+    {% if insights.range == '12m' %}{{ t('insights.range_12m', '统计范围：近 12 个月 ({start} 至 {end})', start=insights.start_date, end=insights.end_date) }}
+    {% elif insights.range == 'ytd' %}{{ t('insights.range_ytd', '统计范围：本年度 YTD ({start} 至今)', start=insights.start_date) }}
+    {% elif insights.range == 'custom' %}{{ t('insights.range_custom', '统计范围：{start} 至 {end}', start=insights.start_date, end=insights.end_date) }}
+    {% else %}{{ t('insights.range_all', '统计范围：全部历史记录 (共计 {count} 个有效统计月)', count=insights.num_months) }}
     {% endif %}
   </div>
 </div>
@@ -59,7 +59,7 @@
   </div>
   <div class="card">
     <span class="card-label">{{ t('insights.kpi_active_cats') }}</span>
-    <span class="amount" style="color:var(--ink);" id="kpiCatCount">{{ insights.total_categories }} 个</span>
+    <span class="amount" style="color:var(--ink);" id="kpiCatCount">{{ insights.total_categories }}{% if t('insights.cat_unit', '个') %} {{ t('insights.cat_unit', '个') }}{% endif %}</span>
   </div>
 </div>
 
@@ -126,8 +126,8 @@
             <div class="chart-expand-header">
               <span class="chart-expand-title">{{ t('insights.trend_title', category=cat.category) }}</span>
               <div class="chart-expand-stats">
-                <span class="stat-pill">月均 {{ cat.avg_monthly|money }}</span>
-                <span class="stat-pill">累计 {{ cat.total_amt|money }}</span>
+                <span class="stat-pill">{{ t('insights.th_avg_monthly', '月均') }} {{ cat.avg_monthly|money }}</span>
+                <span class="stat-pill">{{ t('insights.th_cumulative', '累计') }} {{ cat.total_amt|money }}</span>
               </div>
             </div>
             <div class="chart-canvas-box">
@@ -289,18 +289,22 @@
     const start = document.getElementById('insightsStartDate').value;
     const end = document.getElementById('insightsEndDate').value;
     if (!start || !end) {
+      const msg = window.t ? window.t('insights.alert_select_dates', '请选择完整的开始与结束日期') : '请选择完整的开始与结束日期';
+      const title = window.t ? window.t('insights.filter_prompt', '筛选提示') : '筛选提示';
       if (typeof errorAlert === 'function') {
-        errorAlert('请选择完整的开始与结束日期', '筛选提示');
+        errorAlert(msg, title);
       } else {
-        alert('请选择完整的开始与结束日期');
+        alert(msg);
       }
       return;
     }
     if (start > end) {
+      const msg = window.t ? window.t('insights.alert_invalid_dates', '开始日期不能晚于结束日期') : '开始日期不能晚于结束日期';
+      const title = window.t ? window.t('insights.filter_prompt', '筛选提示') : '筛选提示';
       if (typeof errorAlert === 'function') {
-        errorAlert('开始日期不能晚于结束日期', '筛选提示');
+        errorAlert(msg, title);
       } else {
-        alert('开始日期不能晚于结束日期');
+        alert(msg);
       }
       return;
     }

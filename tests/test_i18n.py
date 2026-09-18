@@ -323,3 +323,87 @@ def test_dashboard_charts_api_i18n(logged_in_client):
         logged_in_client.get('/api/set-language?lang=zh')
 
 
+def test_category_insights_range_badge_i18n(logged_in_client):
+    try:
+        # 1. English
+        logged_in_client.get('/api/set-language?lang=en')
+        res = logged_in_client.get('/categories/insights?range=12m')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Period: Last 12 Months' in html
+        assert 'Monthly Avg' in html
+        assert 'Total' in html
+
+        res = logged_in_client.get('/categories/insights?range=ytd')
+        assert res.status_code == 200
+        assert 'Period: Year to Date' in res.get_data(as_text=True)
+
+        res = logged_in_client.get('/categories/insights?range=all')
+        assert res.status_code == 200
+        assert 'Period: All Time' in res.get_data(as_text=True)
+
+        # 2. Malay
+        logged_in_client.get('/api/set-language?lang=ms')
+        res = logged_in_client.get('/categories/insights?range=12m')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Tempoh: 12 Bulan Lepas' in html
+
+        # 3. Traditional Chinese
+        logged_in_client.get('/api/set-language?lang=zh_TW')
+        res = logged_in_client.get('/categories/insights?range=12m')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert '統計範圍：近 12 個月' in html
+
+        # 4. Simplified Chinese
+        logged_in_client.get('/api/set-language?lang=zh')
+        res = logged_in_client.get('/categories/insights?range=12m')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert '统计范围：近 12 个月' in html
+    finally:
+        logged_in_client.get('/api/set-language?lang=zh')
+
+
+def test_transactions_messages_i18n(logged_in_client):
+    try:
+        # English
+        logged_in_client.get('/api/set-language?lang=en')
+        res = logged_in_client.post('/recurring/generate', headers={'X-Requested-With': 'XMLHttpRequest'})
+        assert res.status_code == 200
+        data = res.get_json()
+        assert 'Recurring transactions already generated' in data['message'] or 'Generated' in data['message']
+
+        res_invalid = logged_in_client.post('/transactions/add', data={'amount': '-10'}, headers={'X-Requested-With': 'XMLHttpRequest'})
+        assert res_invalid.status_code == 400
+        assert res_invalid.get_json()['message'] == 'Amount must be a number greater than 0'
+
+        # Malay
+        logged_in_client.get('/api/set-language?lang=ms')
+        res = logged_in_client.post('/recurring/generate', headers={'X-Requested-With': 'XMLHttpRequest'})
+        assert res.status_code == 200
+        data = res.get_json()
+        assert 'Transaksi berulang bulan ini telah dijana' in data['message'] or 'Berjaya menjana' in data['message']
+
+        res_invalid = logged_in_client.post('/transactions/add', data={'amount': '-10'}, headers={'X-Requested-With': 'XMLHttpRequest'})
+        assert res_invalid.status_code == 400
+        assert res_invalid.get_json()['message'] == 'Jumlah mestilah nombor lebih besar daripada 0'
+
+        # Traditional Chinese
+        logged_in_client.get('/api/set-language?lang=zh_TW')
+        res = logged_in_client.post('/recurring/generate', headers={'X-Requested-With': 'XMLHttpRequest'})
+        assert res.status_code == 200
+        data = res.get_json()
+        assert '本月固定收支已全部生成，無需重複生成' in data['message'] or '已生成' in data['message']
+
+        # Simplified Chinese
+        logged_in_client.get('/api/set-language?lang=zh')
+        res = logged_in_client.post('/recurring/generate', headers={'X-Requested-With': 'XMLHttpRequest'})
+        assert res.status_code == 200
+        data = res.get_json()
+        assert '本月固定收支已全部生成，无需重复生成' in data['message'] or '已生成' in data['message']
+    finally:
+        logged_in_client.get('/api/set-language?lang=zh')
+
+
