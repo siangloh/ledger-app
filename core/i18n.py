@@ -166,6 +166,15 @@ TRANSLATIONS = {
         'dashboard.avg_expense': '月均支出',
         'dashboard.overview_empty_title': '选定范围内暂无交易记录',
         'dashboard.overview_empty_desc': '尝试切换其他时间范围或在当月视图中添加记录。',
+        'dashboard.side_ratio': '副业占比',
+        'dashboard.side_ratio_high': '副业贡献率达 {ratio}%，副业成长显著，收入来源具备很强的防御性与弹性。',
+        'dashboard.side_ratio_mid': '副业累计贡献 {amount} ({ratio}%)，主业为基本盘，副业稳健增益。',
+        'dashboard.side_ratio_zero': '选定范围内暂无副业收入记录，当前收入 100% 来自主要工作。',
+        'dashboard.timespan_fmt': '{desc} · 跨度 {months} 个月',
+        'dashboard.earliest': '最早',
+        'dashboard.present': '至今',
+        'dashboard.network_error': '网络异常，无法获取统计数据',
+        'dashboard.load_failed_retry': '加载失败，请刷新重试',
 
         # 交易明细
         'records.title': '历史记录',
@@ -990,6 +999,15 @@ TRANSLATIONS = {
         'dashboard.avg_expense': 'Avg Expense',
         'dashboard.overview_empty_title': 'No transactions found in selected range',
         'dashboard.overview_empty_desc': 'Try switching date range or add records in Monthly view.',
+        'dashboard.side_ratio': 'Side Income Ratio',
+        'dashboard.side_ratio_high': 'Side income contributes {ratio}%, showing remarkable growth and building strong financial resilience.',
+        'dashboard.side_ratio_mid': 'Side income contributed {amount} ({ratio}%). Main income forms the foundation with healthy supplemental earnings.',
+        'dashboard.side_ratio_zero': 'No side income recorded in this period. 100% of income is from main occupation.',
+        'dashboard.timespan_fmt': '{desc} · Span {months} months',
+        'dashboard.earliest': 'Earliest',
+        'dashboard.present': 'Present',
+        'dashboard.network_error': 'Network error, unable to fetch statistics',
+        'dashboard.load_failed_retry': 'Failed to load, please refresh and retry',
 
         # Records
         'records.title': 'Transaction Records',
@@ -1814,6 +1832,15 @@ TRANSLATIONS = {
         'dashboard.avg_expense': 'Purata Perbelanjaan',
         'dashboard.overview_empty_title': 'Tiada transaksi dalam julat yang dipilih',
         'dashboard.overview_empty_desc': 'Cuba tukar julat tarikh atau tambah rekod dalam paparan bulanan.',
+        'dashboard.side_ratio': 'Nisbah Sampingan',
+        'dashboard.side_ratio_high': 'Pendapatan sampingan menyumbang {ratio}%, menunjukkan pertumbuhan ketara dan daya tahan kewangan yang kukuh.',
+        'dashboard.side_ratio_mid': 'Pendapatan sampingan menyumbang {amount} ({ratio}%). Pendapatan utama kekal sebagai asas dengan peningkatan sampingan yang stabil.',
+        'dashboard.side_ratio_zero': 'Tiada pendapatan sampingan direkodkan dalam tempoh ini. 100% pendapatan adalah daripada pekerjaan utama.',
+        'dashboard.timespan_fmt': '{desc} · Tempoh {months} bulan',
+        'dashboard.earliest': 'Paling Awal',
+        'dashboard.present': 'Kini',
+        'dashboard.network_error': 'Ralat rangkaian, gagal mendapatkan statistik',
+        'dashboard.load_failed_retry': 'Gagal memuatkan, sila muat semula dan cuba lagi',
 
         # Rekod
         'records.title': 'Rekod Transaksi',
@@ -2638,6 +2665,15 @@ TRANSLATIONS = {
         'dashboard.avg_expense': '月均支出',
         'dashboard.overview_empty_title': '選定範圍內暫無交易記錄',
         'dashboard.overview_empty_desc': '嘗試切換其他時間範圍或在當月視圖中添加記錄。',
+        'dashboard.side_ratio': '副業占比',
+        'dashboard.side_ratio_high': '副業貢獻率達 {ratio}%，副業成長顯著，收入來源具備很強的防禦性與彈性。',
+        'dashboard.side_ratio_mid': '副業累計貢獻 {amount} ({ratio}%)，主業為基本盤，副業穩健增益。',
+        'dashboard.side_ratio_zero': '選定範圍內暫無副業收入記錄，當前收入 100% 來自主要工作。',
+        'dashboard.timespan_fmt': '{desc} · 跨度 {months} 個月',
+        'dashboard.earliest': '最早',
+        'dashboard.present': '至今',
+        'dashboard.network_error': '網路異常，無法獲取統計數據',
+        'dashboard.load_failed_retry': '載入失敗，請重新整理重試',
 
         # 交易明細
         'records.title': '歷史記錄',

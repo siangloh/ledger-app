@@ -229,14 +229,14 @@
       <section class="panel">
         <div class="panel-header-with-legend">
           <h3>{{ t('dashboard.income_composition') }}</h3>
-          <div class="side-badge" id="sideIncomeBadge">{{ t('dashboard.side_income') }}: 0.0%</div>
+          <div class="side-badge" id="sideIncomeBadge">{{ t('dashboard.side_ratio', '副业占比') }}: 0.0%</div>
         </div>
         <div style="position:relative; height:190px;">
           <canvas id="overviewIncomeChart"></canvas>
         </div>
         <div id="overviewIncomeChartLegend" class="chart-legend-list-scroll"></div>
         <div class="side-ratio-card" id="sideRatioDesc">
-          {{ t('dashboard.side_income') }} ({{ t('common.income') }})
+          {{ t('dashboard.side_ratio_zero', '选定范围内暂无副业收入记录，当前收入 100% 来自主要工作。') }}
         </div>
       </section>
     </div>

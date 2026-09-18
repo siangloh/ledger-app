@@ -1225,7 +1225,7 @@ function loadOverviewData(range, start, end) {
     .then(function (r) { return r.json(); })
     .then(function (data) {
       if (!data.ok) {
-        if (badge) badge.textContent = '加载失败，请刷新重试';
+        if (badge) badge.textContent = window.t ? window.t('dashboard.load_failed_retry', '加载失败，请刷新重试') : '加载失败，请刷新重试';
         return;
       }
       currentOverviewData = data;
@@ -1234,18 +1234,24 @@ function loadOverviewData(range, start, end) {
     })
     .catch(function (err) {
       console.error(err);
-      if (badge) badge.textContent = '网络异常，无法获取统计数据';
+      if (badge) badge.textContent = window.t ? window.t('dashboard.network_error', '网络异常，无法获取统计数据') : '网络异常，无法获取统计数据';
     });
 }
 
 function renderOverview(data) {
   const badge = document.getElementById('overviewRangeBadge');
   if (badge) {
-    let rangeDesc = '全部历史';
-    if (data.range === '12m') rangeDesc = '近 12 个月';
-    else if (data.range === 'ytd') rangeDesc = '本年度 (YTD)';
-    else if (data.range === 'custom') rangeDesc = (data.start_date || '最早') + ' 至 ' + (data.end_date || '至今');
-    badge.textContent = rangeDesc + ' · 跨度 ' + data.num_months + ' 个月';
+    let rangeDesc = window.t ? window.t('dashboard.range_all', '全部历史') : '全部历史';
+    if (data.range === '12m') rangeDesc = window.t ? window.t('dashboard.range_12m', '近 12 个月') : '近 12 个月';
+    else if (data.range === 'ytd') rangeDesc = window.t ? window.t('dashboard.range_ytd', '本年度 (YTD)') : '本年度 (YTD)';
+    else if (data.range === 'custom') {
+      const earliest = window.t ? window.t('dashboard.earliest', '最早') : '最早';
+      const present = window.t ? window.t('dashboard.present', '至今') : '至今';
+      const toStr = window.t ? window.t('dashboard.to', '至') : '至';
+      rangeDesc = (data.start_date || earliest) + ' ' + toStr + ' ' + (data.end_date || present);
+    }
+    const spanMonths = window.t ? window.t('dashboard.timespan_fmt', '{desc} · 跨度 {months} 个月', { desc: rangeDesc, months: data.num_months || 0 }) : (rangeDesc + ' · 跨度 ' + (data.num_months || 0) + ' 个月');
+    badge.textContent = spanMonths;
   }
 
   const m = data.metrics || {};
@@ -1286,11 +1292,12 @@ function renderOverview(data) {
   const expCats = data.expense_categories || { labels: [], values: [] };
   drawOverviewDoughnut('overviewExpenseChart', expCats.labels, expCats.values);
 
+  const incGrp = data.income_group || { main: 0, side: 0, side_ratio: 0 };
   const incLabels = [
     window.t ? window.t('dashboard.main_income', '主业收入') : '主业收入',
     window.t ? window.t('dashboard.side_income', '副业收入') : '副业收入'
   ];
-  drawOverviewDoughnut('overviewIncomeChart', incLabels, [incGrp.main, incGrp.side]);
+  drawOverviewDoughnut('overviewIncomeChart', incLabels, [incGrp.main || 0, incGrp.side || 0]);
 
   const sideBadge = document.getElementById('sideIncomeBadge');
   if (sideBadge) {
@@ -1301,12 +1308,14 @@ function renderOverview(data) {
   const sideDesc = document.getElementById('sideRatioDesc');
   if (sideDesc) {
     const r = incGrp.side_ratio || 0;
+    const rStr = r.toFixed(1);
     if (r >= 35) {
-      sideDesc.textContent = '副业贡献率达 ' + r.toFixed(1) + '%，副业成长显著，收入来源具备很强的防御性与弹性。';
+      sideDesc.textContent = window.t ? window.t('dashboard.side_ratio_high', '副业贡献率达 {ratio}%，副业成长显著，收入来源具备很强的防御性与弹性。', { ratio: rStr }) : ('副业贡献率达 ' + rStr + '%，副业成长显著，收入来源具备很强的防御性与弹性。');
     } else if (r > 0) {
-      sideDesc.textContent = '副业累计贡献 ' + formatMoney(incGrp.side) + ' (' + r.toFixed(1) + '%)，主业为基本盘，副业稳健增益。';
+      const sideAmtStr = formatMoney(incGrp.side || 0);
+      sideDesc.textContent = window.t ? window.t('dashboard.side_ratio_mid', '副业累计贡献 {amount} ({ratio}%)，主业为基本盘，副业稳健增益。', { amount: sideAmtStr, ratio: rStr }) : ('副业累计贡献 ' + sideAmtStr + ' (' + rStr + '%)，主业为基本盘，副业稳健增益。');
     } else {
-      sideDesc.textContent = '选定范围内暂无副业收入记录，当前收入 100% 来自主要工作。';
+      sideDesc.textContent = window.t ? window.t('dashboard.side_ratio_zero', '选定范围内暂无副业收入记录，当前收入 100% 来自主要工作。') : '选定范围内暂无副业收入记录，当前收入 100% 来自主要工作。';
     }
   }
 }
