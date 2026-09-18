@@ -815,6 +815,9 @@ TRANSLATIONS = {
         # Split bill delete tooltips
         'split_bill.del_item': '删除此项',
         'split_bill.del_dish': '删除这道菜',
+        'settings.repayment_offset_window': '朋友还款自动冲抵时间窗口',
+        'settings.offset_window_disabled': '停用自动冲抵 (仅记作普通收入)',
+        'settings.repayment_offset_tip': '聚餐或日常分账垫付后，仅在该时间窗口内收到的还款转账才会自动冲减上一笔支出；超出时限或本人自转则作为正常收入入账。',
     },
 
     'en': {
@@ -1610,6 +1613,9 @@ TRANSLATIONS = {
         # Split bill delete tooltips
         'split_bill.del_item': 'Delete item',
         'split_bill.del_dish': 'Delete this dish',
+        'settings.repayment_offset_window': 'Repayment Auto-Offset Window',
+        'settings.offset_window_disabled': 'Disabled (Record as normal income)',
+        'settings.repayment_offset_tip': 'After splitting a bill, only repayment transfers received within this time window will automatically deduct from the last expense. Outside this window or self-transfers will be recorded as regular income.',
     },
 
     'ms': {
@@ -2405,6 +2411,9 @@ TRANSLATIONS = {
         # Split bill delete tooltips
         'split_bill.del_item': 'Padam item',
         'split_bill.del_dish': 'Padam hidangan ini',
+        'settings.repayment_offset_window': 'Tetingkap Auto-Tolak Bayaran Balik',
+        'settings.offset_window_disabled': 'Nyahaktif (Rekod sebagai pendapatan biasa)',
+        'settings.repayment_offset_tip': 'Selepas berkongsi bil, hanya pemindahan bayaran balik yang diterima dalam tetingkap masa ini akan ditolak secara automatik daripada perbelanjaan terakhir. Di luar tetingkap ini atau pemindahan sendiri akan direkodkan sebagai pendapatan biasa.',
     },
 
     'zh_TW': {
@@ -3200,6 +3209,9 @@ TRANSLATIONS = {
         # Split bill delete tooltips
         'split_bill.del_item': '刪除此項',
         'split_bill.del_dish': '刪除這道菜',
+        'settings.repayment_offset_window': '朋友還款自動沖抵時間窗口',
+        'settings.offset_window_disabled': '停用自動沖抵 (僅記作普通收入)',
+        'settings.repayment_offset_tip': '聚餐或日常分賬墊付後，僅在該時間窗口內收到的還款轉賬才會自動沖減上一筆支出；超出時限或本人自轉則作為正常收入入賬。',
     }
 }
 

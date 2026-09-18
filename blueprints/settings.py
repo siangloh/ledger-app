@@ -138,6 +138,15 @@ def api_update_settings():
         except (ValueError, TypeError):
             pass
 
+    # 7.1 还款自动冲抵时间窗口 (0 表示禁用，5-1440 分钟有效)
+    if 'repayment_offset_window_minutes' in data:
+        try:
+            r_win = int(data.get('repayment_offset_window_minutes', 120))
+            if 0 <= r_win <= 1440:
+                updates['repayment_offset_window_minutes'] = r_win
+        except (ValueError, TypeError):
+            pass
+
     # 8. 表格显示密度
     if 'table_density' in data:
         td = str(data.get('table_density', '')).strip().lower()

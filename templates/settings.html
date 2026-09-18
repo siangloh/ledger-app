@@ -268,6 +268,19 @@
         </div>
 
         <div class="settings-item">
+          <label class="settings-label" for="repaymentOffsetWindowSelect">{{ t('settings.repayment_offset_window', '朋友还款自动冲抵时间窗口') }}</label>
+          <select id="repaymentOffsetWindowSelect" name="repayment_offset_window_minutes">
+            <option value="0" {{ 'selected' if settings.repayment_offset_window_minutes == 0 }}>{{ t('settings.offset_window_disabled', '停用自动冲抵 (仅记作普通收入)') }}</option>
+            <option value="30" {{ 'selected' if settings.repayment_offset_window_minutes == 30 }}>30 min</option>
+            <option value="60" {{ 'selected' if settings.repayment_offset_window_minutes == 60 }}>60 min (1 h)</option>
+            <option value="120" {{ 'selected' if settings.repayment_offset_window_minutes == 120 }}>120 min (2 h - 推荐)</option>
+            <option value="240" {{ 'selected' if settings.repayment_offset_window_minutes == 240 }}>240 min (4 h)</option>
+            <option value="480" {{ 'selected' if settings.repayment_offset_window_minutes == 480 }}>480 min (8 h)</option>
+          </select>
+          <span class="settings-tip">{{ t('settings.repayment_offset_tip', '聚餐或日常分账垫付后，仅在该时间窗口内收到的还款转账才会自动冲减上一笔支出；超出时限或本人自转则作为正常收入入账。') }}</span>
+        </div>
+
+        <div class="settings-item">
           <label class="settings-label">{{ t('settings.haptic_feedback', '触感与震动反馈 (Haptic)') }}</label>
           <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
             <label class="toggle-switch">

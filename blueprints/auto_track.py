@@ -8,7 +8,7 @@ from flask import Blueprint, request, jsonify, render_template, session, send_fr
 
 logger = logging.getLogger(__name__)
 
-from core.db import get_db, bump_data_version, get_current_user_id, seed_learning_samples
+from core.db import get_db, bump_data_version, get_current_user_id, seed_learning_samples, get_user_settings
 from core.config import (
     is_valid_api_key,
     get_auto_track_key,
@@ -348,23 +348,107 @@ def api_auto_track():
                 'parsed': parsed
             }), 200
 
-    # 1. 智能朋友还款冲抵支出
+    # 1. 智能朋友还款冲抵支出 (支持时间窗口限定、自己转账自转排除与品类安全门禁)
+    user_settings = get_user_settings(target_user_id, db=db)
+    offset_window_minutes = int(user_settings.get('repayment_offset_window_minutes', 120))
+
+    # 排除自己转账给自己的关键词 (Self-Transfer / Own Account)
+    SELF_TRANSFER_KEYWORDS = [
+        'own account', 'transfer to own', 'self transfer', 'to own', 'from own',
+        'myself', 'transfer to self', '本人', '自己账户', '自己', '本人账户',
+        '自转', '互转', '内部转账', '自己名下', '自有账户', '同一人'
+    ]
+    raw_text_lower = text.lower()
+    parsed_note_lower = (parsed.get('note') or '').lower()
+    parsed_merchant_lower = (parsed.get('merchant') or '').lower()
+
+    is_self_transfer = any(
+        k in raw_text_lower or k in parsed_note_lower or k in parsed_merchant_lower
+        for k in SELF_TRANSFER_KEYWORDS
+    )
+
+    # 进一步核对用户已注册的自有银行/账户名称 (如 Maybank, CIMB, Touch 'n Go 等)
+    if not is_self_transfer and target_user_id:
+        try:
+            acc_rows = db.execute("SELECT name FROM accounts WHERE user_id = ?", (target_user_id,)).fetchall()
+            user_acc_names = [r['name'].strip().lower() for r in acc_rows if r['name'] and len(r['name'].strip()) >= 2]
+            u_row = db.execute("SELECT username FROM users WHERE id = ?", (target_user_id,)).fetchone()
+            if u_row and u_row['username'] and len(u_row['username'].strip()) >= 2:
+                user_acc_names.append(u_row['username'].strip().lower())
+
+            for aname in user_acc_names:
+                if aname in raw_text_lower or aname in parsed_note_lower or aname in parsed_merchant_lower:
+                    if any(prefix in raw_text_lower for prefix in [f"from {aname}", f"to {aname}", f"via {aname}", f"dari {aname}"]) or aname == parsed_merchant_lower:
+                        is_self_transfer = True
+                        break
+        except Exception as e:
+            logger.debug("Failed to check user accounts for self-transfer: %s", e)
+
     is_repayment = (
-        parsed['type'] == 'income'
-        and any(k in text.lower() for k in [
+        offset_window_minutes > 0
+        and not is_self_transfer
+        and parsed['type'] == 'income'
+        and not parsed.get('is_internal_transfer')
+        and not parsed.get('is_refund')
+        and any(k in raw_text_lower for k in [
             'duitnow transfer', 'transfer from', 'transferred from', 'received from', 'received',
             '转入', '收到转账', '转账给您', '付款给您', '还款', '还钱'
         ])
-        and not any(k in text.lower() for k in ['salary', 'payroll', '工资', '薪资', '薪水'])
+        and not any(k in raw_text_lower for k in ['salary', 'payroll', '工资', '薪资', '薪水'])
     )
 
     if is_repayment:
+        # 非日常分摊消费分类（如房租、房贷、车贷、分期、贷款、理财、投资、储蓄等）严格不予自动冲减
+        NON_SPLITTABLE_CATEGORIES = {
+            '房租', '房贷', '车贷', '分期', '贷款', '保险', '理财', '投资', '储蓄', '定期存款',
+            '应急基金', '心愿基金', '信用卡还款', '学费', '税务', '罚单',
+            'rent', 'mortgage', 'loan', 'installment', 'insurance', 'investment',
+            'savings', 'tax', 'credit card'
+        }
+
         last_expense = db.execute('''
-            SELECT id, date, category, amount, note 
+            SELECT id, date, category, amount, note, created_at 
             FROM transactions 
             WHERE user_id = ? AND type = 'expense' 
             ORDER BY date DESC, created_at DESC, id DESC LIMIT 1
         ''', (target_user_id,)).fetchone()
+
+        if last_expense:
+            old_amount = float(last_expense['amount'])
+            offset_amount = float(parsed['amount'])
+            exp_cat = (last_expense['category'] or '').strip().lower()
+
+            # 1. 品类校验：固定大额非分摊支出跳过冲抵
+            if any(nc in exp_cat for nc in NON_SPLITTABLE_CATEGORIES):
+                last_expense = None
+            # 2. 金额校验：还款金额不能超过原始支出整单金额 (允许 0.05 元计算误差)
+            elif offset_amount > (old_amount + 0.05):
+                last_expense = None
+            # 3. 时间窗口限制 ("within 那个时间点")
+            else:
+                is_within_window = False
+                exp_date = str(last_expense['date'] or '')
+                current_date = str(parsed.get('date') or date.today().isoformat())
+
+                created_at_val = last_expense['created_at']
+                if created_at_val:
+                    try:
+                        exp_created_str = str(created_at_val).replace('T', ' ')
+                        if '.' in exp_created_str:
+                            exp_created_str = exp_created_str.split('.')[0]
+                        exp_dt = datetime.strptime(exp_created_str, '%Y-%m-%d %H:%M:%S')
+                        now_dt = datetime.now()
+                        diff_minutes = (now_dt - exp_dt).total_seconds() / 60.0
+                        if -5 <= diff_minutes <= offset_window_minutes:
+                            is_within_window = True
+                    except Exception as e:
+                        logger.debug("Failed to parse created_at for window check: %s", e)
+
+                if not is_within_window and exp_date == current_date and offset_window_minutes >= 720:
+                    is_within_window = True
+
+                if not is_within_window:
+                    last_expense = None
 
         if last_expense:
             old_amount = float(last_expense['amount'])

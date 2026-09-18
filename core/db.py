@@ -701,6 +701,7 @@ def init_db(app_logger=None):
         budget_start_day INTEGER DEFAULT 1,
         default_dashboard_view TEXT DEFAULT 'monthly',
         dedup_window_minutes INTEGER DEFAULT 120,
+        repayment_offset_window_minutes INTEGER DEFAULT 120,
         table_density TEXT DEFAULT 'comfortable',
         haptic_feedback INTEGER DEFAULT 1,
         date_format TEXT DEFAULT 'YYYY-MM-DD',
@@ -713,9 +714,15 @@ def init_db(app_logger=None):
     ''')
     db.commit()
 
-    # 轻量迁移：确保老旧版本数据库补充 language 列
+    # 轻量迁移：确保老旧版本数据库补充 language 列与还款冲抵时间窗口列
     try:
         db.execute("ALTER TABLE user_settings ADD COLUMN language TEXT DEFAULT 'zh'")
+        db.commit()
+    except Exception:
+        pass
+
+    try:
+        db.execute("ALTER TABLE user_settings ADD COLUMN repayment_offset_window_minutes INTEGER DEFAULT 120")
         db.commit()
     except Exception:
         pass
@@ -734,6 +741,7 @@ DEFAULT_USER_SETTINGS = {
     'budget_start_day': 1,
     'default_dashboard_view': 'monthly',
     'dedup_window_minutes': 120,
+    'repayment_offset_window_minutes': 120,
     'table_density': 'comfortable',
     'haptic_feedback': 1,
     'date_format': 'YYYY-MM-DD',
@@ -790,9 +798,9 @@ def update_user_settings(user_id, new_settings, db=None):
             INSERT INTO user_settings (
                 user_id, theme_mode, currency_symbol, default_currency, default_account_id,
                 default_group, budget_start_day, default_dashboard_view,
-                dedup_window_minutes, table_density, haptic_feedback,
+                dedup_window_minutes, repayment_offset_window_minutes, table_density, haptic_feedback,
                 date_format, number_format, timezone, nlp_confirm_required, language, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 theme_mode=excluded.theme_mode,
                 currency_symbol=excluded.currency_symbol,
@@ -802,6 +810,7 @@ def update_user_settings(user_id, new_settings, db=None):
                 budget_start_day=excluded.budget_start_day,
                 default_dashboard_view=excluded.default_dashboard_view,
                 dedup_window_minutes=excluded.dedup_window_minutes,
+                repayment_offset_window_minutes=excluded.repayment_offset_window_minutes,
                 table_density=excluded.table_density,
                 haptic_feedback=excluded.haptic_feedback,
                 date_format=excluded.date_format,
@@ -820,6 +829,7 @@ def update_user_settings(user_id, new_settings, db=None):
             int(current['budget_start_day']),
             current['default_dashboard_view'],
             int(current['dedup_window_minutes']),
+            int(current.get('repayment_offset_window_minutes', 120)),
             current['table_density'],
             int(current['haptic_feedback']),
             current['date_format'],
