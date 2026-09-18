@@ -165,12 +165,11 @@ def generate_ieee_report(output_path):
     images_info = [
         ("fig1_dashboard.png",         "rIdImg1", "Overview Analytics Dashboard: monthly metric cards (income RM 5,300, expenses RM 727.91), budget progress monitor, quick-entry form, and income/expense doughnut charts."),
         ("fig2_split_bill_ocr.png",    "rIdImg2", "Smart Receipt AA Split Bill page: Step 1 camera/batch OCR upload; Step 2 item allocation matrix with service charge & tax split; Step 3 per-person payable summary and one-tap ledger sync."),
-        ("fig3_autotrack.png",         "rIdImg3", "Auto Track self-hosted webhook gateway: unified header endpoint, MacroDroid integration guide, live notification simulation panel, and AI few-shot training datasheet for transaction classification."),
-        ("fig4_records.png",           "rIdImg4", "Transaction History audit table: multi-criteria date/category filters, batch selection, delete controls, and expense-offset status indicators for friend reimbursements."),
-        ("fig5_subscriptions.png",     "rIdImg5", "Subscriptions tracker: active subscription cards with renewal dates, monthly cost aggregation, and next-charge countdown badges."),
-        ("fig6_recurring.png",         "rIdImg6", "Fixed/Recurring Income & Expense Rules manager: rule table with type badges (income/expense/saving), category, billing day, status toggle, and add-rule form."),
-        ("fig7_categories_budget.png", "rIdImg7", "Category & Tag Management with Monthly Budget: expense categories with real-time RM budget usage percentages and saving pool classifications."),
-        ("fig8_liabilities.png",       "rIdImg8", "Liabilities & 0% EPP Tracker: monthly cash-flow schedule, 0% installment plan (EPP) progress tracker, and fixed loan amortization monitor."),
+        ("fig3_records.png",           "rIdImg3", "Transaction History audit table: multi-criteria date/category filters, batch selection, delete controls, and expense-offset status indicators for friend reimbursements."),
+        ("fig4_subscriptions.png",     "rIdImg4", "Subscriptions tracker: active subscription cards with renewal dates, monthly cost aggregation, and next-charge countdown badges."),
+        ("fig5_recurring.png",         "rIdImg5", "Fixed/Recurring Income & Expense Rules manager: rule table with type badges (income/expense/saving), category, billing day, status toggle, and add-rule form."),
+        ("fig6_categories_budget.png", "rIdImg6", "Category & Tag Management with Monthly Budget: expense categories with real-time RM budget usage percentages and saving pool classifications."),
+        ("fig7_liabilities.png",       "rIdImg7", "Liabilities & 0% EPP Tracker: monthly cash-flow schedule, 0% installment plan (EPP) progress tracker, and fixed loan amortization monitor."),
     ]
 
     loaded_images = {}
@@ -250,10 +249,6 @@ def generate_ieee_report(output_path):
         "In the domain of document analysis and optical character recognition, deep learning models such as Differentiable Binarization (DBNet) [4] and Convolutional Recurrent Neural Networks (CRNN) [5] have revolutionized scene text extraction. Du et al. introduced PP-OCR [6], a lightweight, quantized ONNX-compatible architecture optimized for edge devices and resource-constrained CPU servers. Unlike cloud OCR services that introduce network latency and transmit sensitive receipt images to external servers, embedded ONNX inference enables high-throughput text extraction on-premise [6]. Furthermore, classical image processing techniques, including Contrast Limited Adaptive Histogram Equalization (CLAHE) [7] and bilateral filtering [8], remain vital for mitigating real-world receipt artifacts, such as creases, thermal paper fading, and uneven shadows."
     ))
 
-    # Figure 3 in column
-    if "fig3_autotrack.png" in loaded_images:
-        f = loaded_images["fig3_autotrack.png"]
-        body_elements.append(build_image_figure(3, f["caption"], f["rId"], f["w_emu"], f["h_emu"], "fig3_autotrack.png"))
 
     # III. PROBLEM STATEMENT
     body_elements.append(build_heading_sec("III. PROBLEM STATEMENT"))
@@ -273,10 +268,10 @@ def generate_ieee_report(output_path):
         "4) Canvas Visualization Clipping in Responsive Dashboards: In internationalized analytics dashboards, text strings inside doughnut charts (e.g., 'Total Cumulative Expenses' vs. 'Jumlah Perbelanjaan Terkumpul') possess unequal widths. Fixed font sizes cause rendered text to exceed doughnut cutouts, resulting in chart segments physically occluding numerical values."
     ))
 
-    # Figure 4 in column
-    if "fig4_records.png" in loaded_images:
-        f = loaded_images["fig4_records.png"]
-        body_elements.append(build_image_figure(4, f["caption"], f["rId"], f["w_emu"], f["h_emu"], "fig4_records.png"))
+    # Figure 3 in column
+    if "fig3_records.png" in loaded_images:
+        f = loaded_images["fig3_records.png"]
+        body_elements.append(build_image_figure(3, f["caption"], f["rId"], f["w_emu"], f["h_emu"], "fig3_records.png"))
 
     # IV. METHODOLOGY & SYSTEM ARCHITECTURE
     body_elements.append(build_heading_sec("IV. METHODOLOGY"))
@@ -301,33 +296,33 @@ def generate_ieee_report(output_path):
 
     body_elements.append(build_heading_subsec("B. Strategy-Based Bank Notification Parsing Engine"))
     body_elements.append(build_p(
-        "To achieve true Open/Closed extensibility (GoF Strategy Pattern [10]), all payment notification parsers derive from NotificationParserStrategy, defining strict can_parse(pkg, title, text) -> bool and parse(...) contracts. Concrete strategies are dynamically discovered and instantiated at runtime via the @register_parser decorator, as shown in Figure 4. Independent strategies are deployed for Touch 'n Go, GrabPay, Maybank MAE, and universal bank card SMS templates [15], [16]."
+        "To achieve true Open/Closed extensibility (GoF Strategy Pattern [10]), all payment notification parsers derive from NotificationParserStrategy, defining strict can_parse(pkg, title, text) -> bool and parse(...) contracts. Concrete strategies are dynamically discovered and instantiated at runtime via the @register_parser decorator. Independent strategies are deployed for Touch 'n Go, GrabPay, Maybank MAE, and universal bank card SMS templates [15], [16]."
     ))
 
-    # Figure 5 in column
-    if "fig5_subscriptions.png" in loaded_images:
-        f = loaded_images["fig5_subscriptions.png"]
-        body_elements.append(build_image_figure(5, f["caption"], f["rId"], f["w_emu"], f["h_emu"], "fig5_subscriptions.png"))
+    # Figure 4 in column
+    if "fig4_subscriptions.png" in loaded_images:
+        f = loaded_images["fig4_subscriptions.png"]
+        body_elements.append(build_image_figure(4, f["caption"], f["rId"], f["w_emu"], f["h_emu"], "fig4_subscriptions.png"))
 
     body_elements.append(build_heading_subsec("C. Offline RapidOCR Receipt Processing & Orientation Correction"))
     body_elements.append(build_p(
         "The bill-splitting module deploys an on-premise RapidOCR engine powered by ONNX Runtime, eliminating cloud inference latency and bandwidth costs [6]. As illustrated in Figure 2, incoming receipt images undergo bilateral filtering to preserve text edges while suppressing crease noise [8], followed by Contrast Limited Adaptive Histogram Equalization (CLAHE) to uniformize lighting [7]. To resolve arbitrary camera orientations, the engine evaluates text box aspect ratios and orientation confidence across four orthogonal rotations (0°, 90°, 180°, 270°), automatically rectifying tilted captures before lexical extraction."
     ))
 
-    # Figure 6 in column
-    if "fig6_recurring.png" in loaded_images:
-        f = loaded_images["fig6_recurring.png"]
-        body_elements.append(build_image_figure(6, f["caption"], f["rId"], f["w_emu"], f["h_emu"], "fig6_recurring.png"))
+    # Figure 5 in column
+    if "fig5_recurring.png" in loaded_images:
+        f = loaded_images["fig5_recurring.png"]
+        body_elements.append(build_image_figure(5, f["caption"], f["rId"], f["w_emu"], f["h_emu"], "fig5_recurring.png"))
 
     body_elements.append(build_heading_subsec("D. Sliding-Window Transfer Deduplication & Expense Offset"))
     body_elements.append(build_p(
         "To eliminate self-transfer misclassification, the auto-tracking gateway applies a sliding-window temporal deduplication algorithm (tau = 300 s) [10]. When a debit notification is received, the engine checks for a corresponding credit of identical magnitude in a paired account within tau. If detected, both transactions are tagged as internal transfers, bypassing consumption expenditure tallies. Furthermore, when group advance payments are reimbursed, the Expense Offset module decrements the net amount of the original debit record and atomically updates data_version in system_metadata."
     ))
 
-    # Figure 7 in column
-    if "fig7_categories_budget.png" in loaded_images:
-        f = loaded_images["fig7_categories_budget.png"]
-        body_elements.append(build_image_figure(7, f["caption"], f["rId"], f["w_emu"], f["h_emu"], "fig7_categories_budget.png"))
+    # Figure 6 in column
+    if "fig6_categories_budget.png" in loaded_images:
+        f = loaded_images["fig6_categories_budget.png"]
+        body_elements.append(build_image_figure(6, f["caption"], f["rId"], f["w_emu"], f["h_emu"], "fig6_categories_budget.png"))
 
     # V. RESULTS & DISCUSSION
     body_elements.append(build_heading_sec("V. RESULTS & EVALUATION"))
@@ -339,14 +334,14 @@ def generate_ieee_report(output_path):
         "During the afterDraw phase, the plugin retrieves the exact inner radius via chart.getDatasetMeta(0).data[0].innerRadius. A safe rendering width W_safe = innerRadius * 1.65 is established. If ctx.measureText(text).width exceeds W_safe, the font size decrements iteratively by 0.5px until the entire string fits with a guaranteed 15% safety margin. Coupled with an expanded cutout ratio of 72%, text rendering remains crisp, centered, and completely unobscured across all device viewports and languages, as shown in Figure 1."
     ))
 
-    # Figure 8 in column
-    if "fig8_liabilities.png" in loaded_images:
-        f = loaded_images["fig8_liabilities.png"]
-        body_elements.append(build_image_figure(8, f["caption"], f["rId"], f["w_emu"], f["h_emu"], "fig8_liabilities.png"))
+    # Figure 7 in column
+    if "fig7_liabilities.png" in loaded_images:
+        f = loaded_images["fig7_liabilities.png"]
+        body_elements.append(build_image_figure(7, f["caption"], f["rId"], f["w_emu"], f["h_emu"], "fig7_liabilities.png"))
 
     body_elements.append(build_heading_subsec("B. Receipt Parsing Accuracy & Inference Performance"))
     body_elements.append(build_p(
-        "Empirical benchmarks were conducted over 50 real-world dining receipts under diverse lighting, folds, and camera tilts. Running on a standard quad-core Intel i5 CPU without GPU acceleration, RapidOCR achieved an average inference latency of 342 ms. The 4-way orientation detection pipeline correctly aligned 98.0% of skewed captures. Line-item extraction achieved 94.2% precision, successfully parsing item names, unit costs, and separate tax columns into an interactive split matrix (Figure 3)."
+        "Empirical benchmarks were conducted over 50 real-world dining receipts under diverse lighting, folds, and camera tilts. Running on a standard quad-core Intel i5 CPU without GPU acceleration, RapidOCR achieved an average inference latency of 342 ms. The 4-way orientation detection pipeline correctly aligned 98.0% of skewed captures. Line-item extraction achieved 94.2% precision, successfully parsing item names, unit costs, and separate tax columns into an interactive split matrix (Figure 2)."
     ))
 
     body_elements.append(build_heading_subsec("C. Concurrency, Multi-Worker State Consistency & Security"))
