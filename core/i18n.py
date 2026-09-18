@@ -679,6 +679,8 @@ TRANSLATIONS = {
         'dashboard.balance_prefix': '结余',
         'dashboard.total_cumulative_expense': '长期总支出',
         'dashboard.total_cumulative_income': '累计总收入',
+        'dashboard.chart_center_expense': '总支出',
+        'dashboard.chart_center_income': '总收入',
         'dashboard.side_ratio': '副业占比',
 
         # Category Insights range badge & alerts
@@ -1512,6 +1514,8 @@ TRANSLATIONS = {
         'dashboard.balance_prefix': 'Net',
         'dashboard.total_cumulative_expense': 'Total Cumulative Expenses',
         'dashboard.total_cumulative_income': 'Total Cumulative Income',
+        'dashboard.chart_center_expense': 'Total Expense',
+        'dashboard.chart_center_income': 'Total Income',
         'dashboard.side_ratio': 'Side Income Ratio',
 
         # Category Insights range badge & alerts
@@ -2345,6 +2349,8 @@ TRANSLATIONS = {
         'dashboard.balance_prefix': 'Baki',
         'dashboard.total_cumulative_expense': 'Jumlah Perbelanjaan Terkumpul',
         'dashboard.total_cumulative_income': 'Jumlah Pendapatan Terkumpul',
+        'dashboard.chart_center_expense': 'Jumlah Belanja',
+        'dashboard.chart_center_income': 'Jumlah Masuk',
         'dashboard.side_ratio': 'Nisbah Pendapatan Sampingan',
 
         # Category Insights range badge & alerts
@@ -3178,6 +3184,8 @@ TRANSLATIONS = {
         'dashboard.balance_prefix': '結餘',
         'dashboard.total_cumulative_expense': '長期總支出',
         'dashboard.total_cumulative_income': '累計總收入',
+        'dashboard.chart_center_expense': '總支出',
+        'dashboard.chart_center_income': '總收入',
         'dashboard.side_ratio': '副業佔比',
 
         # Category Insights range badge & alerts

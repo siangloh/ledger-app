@@ -1508,10 +1508,10 @@ function drawOverviewDoughnut(canvasId, labels, values) {
   var tooltipBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(27, 27, 31, 0.1)';
 
   var centerTitle = (canvasId === 'overviewExpenseChart')
-    ? (window.t ? window.t('dashboard.total_cumulative_expense', '长期总支出') : '长期总支出')
-    : (window.t ? window.t('dashboard.total_cumulative_income', '累计总收入') : '累计总收入');
+    ? (window.t ? window.t('dashboard.chart_center_expense', window.t('dashboard.total_cumulative_expense', '总支出')) : '总支出')
+    : (window.t ? window.t('dashboard.chart_center_income', window.t('dashboard.total_cumulative_income', '总收入')) : '总收入');
   var centerTextPlugin = {
-    beforeDraw: function(chart) {
+    afterDraw: function(chart) {
       if (!chart.chartArea) return;
       var ctx = chart.ctx;
       ctx.save();
@@ -1522,16 +1522,35 @@ function drawOverviewDoughnut(canvasId, labels, values) {
       var centerY = (chart.chartArea.top + chart.chartArea.bottom) / 2;
       var curDark = isDarkModeActive();
 
-      // 标题
-      ctx.font = '500 12px "Segoe UI", sans-serif';
-      ctx.fillStyle = curDark ? '#94a3b8' : '#64748b';
-      ctx.fillText(centerTitle, centerX, centerY - 10);
+      // 获取环形图真实内圈半径并保留 15% 安全边距，杜绝文字触碰或被环形遮挡
+      var meta = chart.getDatasetMeta(0);
+      var innerR = 52;
+      if (meta && meta.data && meta.data[0] && typeof meta.data[0].innerRadius === 'number') {
+        innerR = meta.data[0].innerRadius;
+      }
+      var maxInnerWidth = Math.max(innerR * 1.65, 50);
 
-      // 金额数字 (浅色模式下 #0f172a, 深色模式下 #ffffff)
-      ctx.font = '700 15px ui-monospace, SFMono-Regular, Consolas, monospace';
-      ctx.fillStyle = curDark ? '#ffffff' : '#0f172a';
+      // 标题自适应字号
+      var titleSize = 12;
+      ctx.font = '500 ' + titleSize + 'px "Segoe UI", sans-serif';
+      while (titleSize > 8.5 && ctx.measureText(centerTitle).width > maxInnerWidth) {
+        titleSize -= 0.5;
+        ctx.font = '500 ' + titleSize + 'px "Segoe UI", sans-serif';
+      }
+      ctx.fillStyle = curDark ? '#94a3b8' : '#64748b';
+      ctx.fillText(centerTitle, centerX, centerY - 9);
+
+      // 金额数字自适应字号
       var isPrivacy = document.documentElement.classList.contains('privacy-mode');
-      ctx.fillText(isPrivacy ? '••••••' : formatMoney(total), centerX, centerY + 10);
+      var amtText = isPrivacy ? '••••••' : formatMoney(total);
+      var amtSize = 15;
+      ctx.font = '700 ' + amtSize + 'px ui-monospace, SFMono-Regular, Consolas, monospace';
+      while (amtSize > 10 && ctx.measureText(amtText).width > maxInnerWidth) {
+        amtSize -= 0.5;
+        ctx.font = '700 ' + amtSize + 'px ui-monospace, SFMono-Regular, Consolas, monospace';
+      }
+      ctx.fillStyle = curDark ? '#ffffff' : '#0f172a';
+      ctx.fillText(amtText, centerX, centerY + 10);
       ctx.restore();
     }
   };
@@ -1552,7 +1571,7 @@ function drawOverviewDoughnut(canvasId, labels, values) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '68%',
+      cutout: '72%',
       plugins: {
         legend: {
           display: false
@@ -1761,7 +1780,7 @@ function drawMonthlyDoughnut(canvasId, rawLabels, rawValues) {
 
   // 自定义中心文字局部插件（不设置固定全局 id，规避插件多次注册时的冲突异常）
   var centerTextPlugin = {
-    beforeDraw: function(chart) {
+    afterDraw: function(chart) {
       if (!chart.chartArea) return;
       var ctx = chart.ctx;
       ctx.save();
@@ -1774,16 +1793,35 @@ function drawMonthlyDoughnut(canvasId, rawLabels, rawValues) {
       var currentTotal = chart._customCenterTotal !== undefined ? chart._customCenterTotal : total;
       var curDark = isDarkModeActive();
 
-      // 标题 (本月总收入 / 本月总支出)
-      ctx.font = '500 12px "Segoe UI", sans-serif';
-      ctx.fillStyle = curDark ? '#94a3b8' : '#6f6c66';
-      ctx.fillText(centerTitle, centerX, centerY - 10);
+      // 获取环形图真实内圈半径并留出安全间距，防止文字溢出遮盖
+      var meta = chart.getDatasetMeta(0);
+      var innerR = 52;
+      if (meta && meta.data && meta.data[0] && typeof meta.data[0].innerRadius === 'number') {
+        innerR = meta.data[0].innerRadius;
+      }
+      var maxInnerWidth = Math.max(innerR * 1.65, 50);
 
-      // 金额
-      ctx.font = '700 15.5px ui-monospace, SFMono-Regular, Consolas, monospace';
-      ctx.fillStyle = curDark ? '#ffffff' : '#10213b';
+      // 标题 (本月总收入 / 本月总支出) 自适应缩放
+      var titleSize = 12;
+      ctx.font = '500 ' + titleSize + 'px "Segoe UI", sans-serif';
+      while (titleSize > 8.5 && ctx.measureText(centerTitle).width > maxInnerWidth) {
+        titleSize -= 0.5;
+        ctx.font = '500 ' + titleSize + 'px "Segoe UI", sans-serif';
+      }
+      ctx.fillStyle = curDark ? '#94a3b8' : '#6f6c66';
+      ctx.fillText(centerTitle, centerX, centerY - 9);
+
+      // 金额自适应缩放
       var isPrivacy = document.documentElement.classList.contains('privacy-mode');
-      ctx.fillText(isPrivacy ? '••••••' : formatMoney(currentTotal), centerX, centerY + 10);
+      var amtText = isPrivacy ? '••••••' : formatMoney(currentTotal);
+      var amtSize = 15;
+      ctx.font = '700 ' + amtSize + 'px ui-monospace, SFMono-Regular, Consolas, monospace';
+      while (amtSize > 10 && ctx.measureText(amtText).width > maxInnerWidth) {
+        amtSize -= 0.5;
+        ctx.font = '700 ' + amtSize + 'px ui-monospace, SFMono-Regular, Consolas, monospace';
+      }
+      ctx.fillStyle = curDark ? '#ffffff' : '#10213b';
+      ctx.fillText(amtText, centerX, centerY + 10);
       ctx.restore();
     }
   };
@@ -1804,13 +1842,13 @@ function drawMonthlyDoughnut(canvasId, rawLabels, rawValues) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '70%',
+        cutout: '72%',
         animation: {
           duration: 450,
           easing: 'easeOutQuart'
         },
         layout: {
-          padding: { top: 10, bottom: 10 }
+          padding: { top: 4, bottom: 4 }
         },
         plugins: {
           legend: {
