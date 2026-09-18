@@ -212,6 +212,15 @@ def generate_ieee_report(output_path):
     )
     header_elements.append(abstract_p)
 
+    keywords_p = (
+        '<w:p>'
+        '<w:pPr><w:jc w:val="both"/><w:spacing w:before="60" w:after="180" w:line="240" w:lineRule="auto"/><w:ind w:left="400" w:right="400"/></w:pPr>'
+        '<w:r><w:rPr><w:b/><w:i/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">Index Terms\u2014 </w:t></w:r>'
+        '<w:r><w:rPr><w:i/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">personal finance management, privacy-first architecture, RapidOCR, receipt OCR, notification parsing, strategy pattern, Flask, Android, expense tracking, bill splitting, local-first software.</w:t></w:r>'
+        '</w:p>'
+    )
+    header_elements.append(keywords_p)
+
     # Section 2: Two-column body
     body_elements = []
 
@@ -221,7 +230,7 @@ def generate_ieee_report(output_path):
         "Disciplined personal accounting and budgeting are fundamental to long-term financial security and debt mitigation [1]. Despite the proliferation of consumer fintech solutions, personal accounting applications suffer from high abandonment rates, with studies indicating that over 60% of users cease manual bookkeeping within six weeks of onboarding [2]. The root causes of user attrition are twofold: first, manual transaction entry imposes persistent cognitive and time burdens; second, commercial cloud-based financial tracking applications regularly collect, aggregate, and monetize granular consumer transaction histories, raising critical data sovereignty and privacy concerns [3]."
     ))
     body_elements.append(build_p(
-        "To resolve the dilemma between bookkeeping automation and data privacy, this proposal presents Ledger App, a self-hosted, full-stack personal finance platform engineered for zero-effort transaction capture and deep analytical transparency [4]. Ledger App combines an event-driven native Android Companion service with an on-premise analytical web server. By intercepting push notifications directly from Malaysian and Southeast Asian financial providers (e.g., Touch 'n Go eWallet, GrabPay, Maybank MAE) on the user's mobile device, payment records are structured and synchronized into the ledger in under 500 milliseconds without requiring open banking API credentials."
+        "To resolve the dilemma between bookkeeping automation and data privacy, this proposal presents Ledger App, a self-hosted, full-stack personal finance platform engineered for zero-effort transaction capture and deep analytical transparency [13]. Ledger App combines an event-driven native Android Companion service with an on-premise analytical web server. By intercepting push notifications directly from Malaysian and Southeast Asian financial providers (e.g., Touch 'n Go eWallet, GrabPay, Maybank MAE) on the user's mobile device, payment records are structured and synchronized into the ledger in under 500 milliseconds without requiring open banking API credentials."
     ))
     body_elements.append(build_p(
         "Moreover, group social dining represents a frequent point of failure in conventional accounting. Paying upfront on behalf of a group and subsequently collecting peer-to-peer (P2P) reimbursements typically pollutes ledger statistics with inflated expenditures and artificial income spikes. Ledger App integrates an offline RapidOCR receipt scanner that automatically rectifies camera tilts, segments line items, and calculates individual shares. To close the reconciliation loop, an Expense Offset mechanism links incoming reimbursements directly to original debit records, dynamically recalculating the true net cost."
@@ -358,26 +367,26 @@ def generate_ieee_report(output_path):
     # REFERENCES
     body_elements.append(build_heading_sec("REFERENCES"))
     references = [
-        "[1] M. Kleppmann, A. Wiggins, P. R. van Hardenberg, and M. McGranaghan, 'Local-first software: you own your data, in spite of the cloud,' in Proc. 2019 ACM SIGPLAN Int. Symp. New Ideas, New Paradigms, and Reflections on Programming and Software (Onward!), 2019, pp. 154–178.",
-        "[2] J. Kaye, M. McCuistion, R. Gulotta, and D. A. Shamma, 'Money talks: Tracking personal finances,' in Proc. SIGCHI Conf. Human Factors in Computing Systems (CHI), 2014, pp. 521–530.",
-        "[3] M. Toomim, T. Freier, and J. A. Landay, 'Managing personal finances with automated transaction tracking,' ACM Trans. Comput.-Hum. Interact. (TOCHI), vol. 18, no. 3, pp. 14:1–14:24, 2011.",
-        "[4] M. Liao, Z. Wan, C. Yao, K. Chen, and X. Bai, 'Real-time scene text detection with differentiable binarization,' in Proc. AAAI Conf. Artif. Intell., vol. 34, no. 7, pp. 11474–11481, 2020.",
-        "[5] B. Shi, X. Bai, and C. Yao, 'An end-to-end trainable neural network for image-based sequence recognition and its application to scene text recognition,' IEEE Trans. Pattern Anal. Mach. Intell. (TPAMI), vol. 39, no. 11, pp. 2298–2304, 2017.",
-        "[6] Y. Du et al., 'PP-OCR: A practical ultra lightweight OCR system,' arXiv preprint arXiv:2009.09941, 2020.",
-        "[7] S. M. Pizer et al., 'Adaptive histogram equalization and its variations,' Comput. Vis. Graph. Image Process., vol. 39, no. 3, pp. 355–368, 1987.",
-        "[8] C. Tomasi and R. Manduchi, 'Bilateral filtering for gray and color images,' in Proc. IEEE Int. Conf. Comput. Vis. (ICCV), 1998, pp. 839–846.",
-        "[9] R. T. Fielding, 'Architectural styles and the design of network-based software architectures,' Ph.D. dissertation, Univ. California, Irvine, 2000.",
-        "[10] E. Gamma, R. Helm, R. Johnson, and J. Vlissides, Design Patterns: Elements of Reusable Object-Oriented Software. Reading, MA: Addison-Wesley, 1994.",
-        "[11] D. Crockford, 'The application/json media type for JavaScript Object Notation (JSON),' RFC 4627, 2006.",
-        "[12] D. R. Hipp, 'SQLite: An embeddable SQL database engine,' Software: Practice and Experience, 2020. [Online]. Available: https://www.sqlite.org/",
-        "[13] A. Grinberg, Flask Web Development: Developing Web Applications with Python, 2nd ed. Sebastopol, CA: O'Reilly Media, 2018.",
+        "[1] M. Kleppmann, A. Wiggins, P. R. van Hardenberg, and M. McGranaghan, 'Local-first software: you own your data, in spite of the cloud,' in Proc. ACM SIGPLAN Symp. New Ideas, New Paradigms, and Reflections on Programming and Software (Onward!), 2019, pp. 154-178. [Online]. Available: https://doi.org/10.1145/3359591.3359737",
+        "[2] J. Kaye, M. McCuistion, R. Gulotta, and D. A. Shamma, 'Money talks: Tracking personal finances,' in Proc. ACM SIGCHI Conf. Human Factors in Computing Systems (CHI), 2014, pp. 521-530. [Online]. Available: https://doi.org/10.1145/2556288.2557239",
+        "[3] M. Toomim, B. Kriplean, C. Poller, and J. Landay, 'Utility of human-computer interactions: toward a science of preference in context,' in Proc. ACM SIGCHI Conf. Human Factors in Computing Systems (CHI), 2011, pp. 2705-2714. [Online]. Available: https://doi.org/10.1145/1978942.1979349",
+        "[4] M. Liao, Z. Wan, C. Yao, K. Chen, and X. Bai, 'Real-time scene text detection with differentiable binarization,' in Proc. AAAI Conf. Artif. Intell., vol. 34, no. 7, pp. 11474-11481, 2020. [Online]. Available: https://arxiv.org/abs/1911.08947",
+        "[5] B. Shi, X. Bai, and C. Yao, 'An end-to-end trainable neural network for image-based sequence recognition and its application to scene text recognition,' IEEE Trans. Pattern Anal. Mach. Intell. (TPAMI), vol. 39, no. 11, pp. 2298-2304, 2017. [Online]. Available: https://arxiv.org/abs/1507.05717",
+        "[6] Y. Du et al., 'PP-OCR: A practical ultra lightweight OCR system,' arXiv preprint arXiv:2009.09941, 2020. [Online]. Available: https://arxiv.org/abs/2009.09941",
+        "[7] S. M. Pizer et al., 'Adaptive histogram equalization and its variations,' Comput. Vis. Graph. Image Process., vol. 39, no. 3, pp. 355-368, 1987. [Online]. Available: https://doi.org/10.1016/S0734-189X(87)80186-X",
+        "[8] C. Tomasi and R. Manduchi, 'Bilateral filtering for gray and color images,' in Proc. IEEE Int. Conf. Comput. Vis. (ICCV), 1998, pp. 839-846. [Online]. Available: https://doi.org/10.1109/ICCV.1998.710815",
+        "[9] R. T. Fielding, 'Architectural styles and the design of network-based software architectures,' Ph.D. dissertation, Dept. Information and Computer Science, Univ. California, Irvine, 2000. [Online]. Available: https://ics.uci.edu/~fielding/pubs/dissertation/top.htm",
+        "[10] E. Gamma, R. Helm, R. Johnson, and J. Vlissides, Design Patterns: Elements of Reusable Object-Oriented Software. Reading, MA: Addison-Wesley, 1994, ISBN: 978-0201633610. [Online]. Available: https://www.amazon.com/dp/0201633612",
+        "[11] T. Bray, 'The JavaScript Object Notation (JSON) Data Interchange Format,' RFC 8259, Internet Engineering Task Force, Dec. 2017. [Online]. Available: https://www.rfc-editor.org/rfc/rfc8259",
+        "[12] D. R. Hipp, 'SQLite: A self-contained, serverless, zero-configuration, transactional SQL database engine,' 2000-2024. [Online]. Available: https://www.sqlite.org/",
+        "[13] A. Grinberg, Flask Web Development: Developing Web Applications with Python, 2nd ed. Sebastopol, CA: O'Reilly Media, 2018, ISBN: 978-1491991725. [Online]. Available: https://flask.palletsprojects.com/",
         "[14] Android Open Source Project, 'NotificationListenerService API Reference,' Google Developers, 2024. [Online]. Available: https://developer.android.com/reference/android/service/notification/NotificationListenerService",
-        "[15] Bank Negara Malaysia, 'Financial Stability Review: Digital Payments and E-Money Landscape in Malaysia,' Central Bank of Malaysia, Kuala Lumpur, 2023.",
-        "[16] PayNet Malaysia, 'DuitNow Interoperable Credit Transfer and QR Ecosystem Technical Specifications,' Payments Network Malaysia, 2024.",
-        "[17] D. V. Klein, 'Defending against CSRF attacks in modern Web APIs,' in Proc. USENIX Security Symp., 2019, pp. 412–428.",
-        "[18] M. Bostock, V. Ogievetsky, and J. Heer, 'D3: Data-Driven Documents,' IEEE Trans. Vis. Comput. Graph., vol. 17, no. 12, pp. 2301–2309, 2011.",
-        "[19] N. Downie, 'Chart.js: Flexible HTML5 Canvas Charting for Modern Web Applications,' 2024. [Online]. Available: https://www.chartjs.org/",
-        "[20] OWASP Foundation, 'OWASP Top 10 Web Application Security Risks,' Open Web Application Security Project, 2023. [Online]. Available: https://owasp.org/www-project-top-ten/"
+        "[15] Bank Negara Malaysia, 'Financial Stability Review: Digital Payments and E-Money Landscape in Malaysia,' Central Bank of Malaysia, Kuala Lumpur, 2023. [Online]. Available: https://www.bnm.gov.my/publications/fsr",
+        "[16] Payments Network Malaysia (PayNet), 'DuitNow - Malaysia's Interoperable QR and Credit Transfer Payment Scheme,' 2024. [Online]. Available: https://www.paynet.my/",
+        "[17] A. Barth, C. Jackson, and J. C. Mitchell, 'Robust defenses for cross-site request forgery,' in Proc. 15th ACM Conf. Computer and Communications Security (CCS), 2008, pp. 75-88. [Online]. Available: https://doi.org/10.1145/1455770.1455782",
+        "[18] M. Bostock, V. Ogievetsky, and J. Heer, 'D3: Data-Driven Documents,' IEEE Trans. Vis. Comput. Graph., vol. 17, no. 12, pp. 2301-2309, Nov. 2011. [Online]. Available: https://doi.org/10.1109/TVCG.2011.185",
+        "[19] N. Downie et al., 'Chart.js: Simple yet flexible JavaScript charting for designers & developers,' 2024. [Online]. Available: https://www.chartjs.org/",
+        "[20] OWASP Foundation, 'OWASP Top 10 Web Application Security Risks,' Open Web Application Security Project, 2021. [Online]. Available: https://owasp.org/www-project-top-ten/"
     ]
     for ref in references:
         p_ref = (
