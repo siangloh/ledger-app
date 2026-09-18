@@ -569,7 +569,11 @@ def smart_orient_receipt_ocr(pil_img, engine, forced_angle=None):
                     idx + 1, angle, score, anchors, len(items), total)
 
         # 校验：识别到的文字是否正确有效（含有菜品、金额大于0、命中核心小票词、得分达标）
-        is_valid = (len(items) >= 1 and total > 0 and anchors >= 2 and score >= 400)
+        # 优化快速收敛：只要检出 2 个以上合法单品且命中锚点或得分达标，直接提前胜出，节约 5~8 秒多余角度轮询
+        is_valid = (
+            (len(items) >= 2 and total > 0 and (anchors >= 1 or score >= 250)) or
+            (len(items) >= 1 and total > 0 and anchors >= 2 and score >= 350)
+        )
         if is_valid:
             logger.info("==> Angle %d° detected valid receipt items! Concluding immediately.", angle)
             best_angle = angle
@@ -605,3 +609,115 @@ def smart_orient_receipt_ocr(pil_img, engine, forced_angle=None):
     }
 
     return best_res or [], best_raw_text, best_parsed, best_angle, preprocessed_b64, meta
+
+
+def merge_multi_receipt_parsed_data(results):
+    """
+    将多张小票的解析结果智能合并为一个大账单：
+    1. 为每个菜品名称前加上 [小票1]、[小票2] 等前缀，并附带 receipt_index
+    2. 累加 subtotal, service_charge, tax, discount, rounding, total
+    3. 保留 currency_symbol
+    """
+    merged_items = []
+    total_subtotal = 0.0
+    total_service_charge = 0.0
+    total_tax = 0.0
+    total_discount = 0.0
+    total_rounding = 0.0
+    total_grand = 0.0
+    currency_symbol = 'RM'
+    raw_texts = []
+
+    for idx, r in enumerate(results):
+        data = r.get('data') or {}
+        prefix = f"[小票 {idx + 1}] " if len(results) > 1 else ""
+        if data.get('currency_symbol'):
+            currency_symbol = data['currency_symbol']
+
+        items = data.get('items') or []
+        for it in items:
+            name = str(it.get('name', '菜品'))
+            if not name.startswith('['):
+                name = f"{prefix}{name}"
+            try:
+                price = float(it.get('price', 0))
+            except (ValueError, TypeError):
+                price = 0.0
+            merged_items.append({
+                'name': name,
+                'price': round(price, 2),
+                'receipt_index': idx + 1
+            })
+
+        total_subtotal += float(data.get('subtotal', 0) or 0)
+        total_service_charge += float(data.get('service_charge', 0) or 0)
+        total_tax += float(data.get('tax', 0) or 0)
+        total_discount += float(data.get('discount', 0) or 0)
+        total_rounding += float(data.get('rounding', 0) or 0)
+        total_grand += float(data.get('total', 0) or 0)
+
+        raw_t = r.get('raw_text', '').strip()
+        if raw_t:
+            raw_texts.append(f"--- [小票 {idx + 1}] ---\n{raw_t}")
+
+    # 兜底金额平衡
+    if total_grand == 0 and total_subtotal > 0:
+        total_grand = round(total_subtotal - total_discount + total_service_charge + total_tax + total_rounding, 2)
+
+    return {
+        'items': merged_items,
+        'subtotal': round(total_subtotal, 2),
+        'service_charge': round(total_service_charge, 2),
+        'tax': round(total_tax, 2),
+        'discount': round(total_discount, 2),
+        'rounding': round(total_rounding, 2),
+        'total': round(total_grand, 2),
+        'currency_symbol': currency_symbol,
+        'receipt_count': len(results),
+        'raw_text': '\n\n'.join(raw_texts)
+    }
+
+
+def batch_smart_orient_receipt_ocr(pil_images, engine, max_workers=3):
+    """
+    多张小票并发自适应 OCR 识别：
+    使用 ThreadPoolExecutor 并发调度，大幅削减多张小票串行排队的等待时间。
+    返回与输入图片顺序一致的解析结果列表。
+    """
+    import os
+    from concurrent.futures import ThreadPoolExecutor
+
+    if not pil_images:
+        return []
+
+    workers = min(max_workers, len(pil_images), os.cpu_count() or 2)
+
+    def _process_one(task):
+        index, img = task
+        try:
+            res, raw_text, parsed, rot, b64, meta = smart_orient_receipt_ocr(img, engine)
+            return {
+                'index': index,
+                'ok': bool(parsed and (parsed.get('items') or parsed.get('total'))),
+                'data': parsed,
+                'raw_text': raw_text,
+                'rotation_applied': rot
+            }
+        except Exception as e:
+            logger.error("Batch OCR task %d failed: %s", index, e)
+            return {
+                'index': index,
+                'ok': False,
+                'data': {'items': [], 'total': 0.0, 'subtotal': 0.0},
+                'raw_text': '',
+                'rotation_applied': 0,
+                'error': str(e)
+            }
+
+    tasks = list(enumerate(pil_images))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        results = list(executor.map(_process_one, tasks))
+
+    results.sort(key=lambda r: r['index'])
+    return results
+

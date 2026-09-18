@@ -35,15 +35,20 @@
       <div id="receiptScanCard" class="receipt-scan-card" style="border: 2px dashed var(--border); border-radius: var(--radius-md); padding: 22px 18px; text-align: center; background: var(--surface-soft); transition: all 0.25s ease; position: relative;">
         <!-- 隐蔽的相机/文件输入框，移动端直接唤醒相机 -->
         <input type="file" id="receiptFileInput" accept="image/*" capture="environment" style="display: none;" onchange="handleReceiptFileSelect(this.files)">
+        <!-- 批量上传文件输入框，支持相册一次性选取多张小票 (多餐合并) -->
+        <input type="file" id="receiptBatchFileInput" accept="image/*" multiple style="display: none;" onchange="handleReceiptFileSelect(this.files)">
         
         <div style="font-size: 38px; margin-bottom: 8px;">📷</div>
-        <div style="font-weight: 700; font-size: 15px; margin-bottom: 4px; color: var(--navy);">拍摄 / 选取小票相片</div>
+        <div style="font-weight: 700; font-size: 15px; margin-bottom: 4px; color: var(--navy);">拍摄 / 批量选取小票相片</div>
         <p id="receiptScanHint" style="font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.55;">
-          支持手机相机即拍或相册上传。采用纯前端 <b>100% 离线端侧推理</b>（Canvas 自动压缩至 1280px 免 OOM），图片绝不上传服务器！
+          支持单张即拍或相册一次性批量选取多张小票（多餐一次过核算）。智能纠偏旋转、合并单品清单并汇总税费！
         </p>
         <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
           <button type="button" id="btnScanReceipt" class="btn-primary btn-sm" onclick="startReceiptScan()">
-            <span>📸 拍照 / 选取小票照片</span>
+            <span>📸 拍摄单张小票</span>
+          </button>
+          <button type="button" id="btnBatchReceipt" class="btn-secondary btn-sm" onclick="startBatchReceiptScan()">
+            <span>🖼️ 批量选取多张 (多餐)</span>
           </button>
         </div>
         <div style="margin-top: 10px; font-size: 11px; color: var(--green); display: flex; align-items: center; justify-content: center; gap: 5px;">
@@ -374,6 +379,15 @@ function startReceiptScan() {
   }
 }
 
+function startBatchReceiptScan() {
+  // 调起支持多选的文件选择器，支持一次选择多张小票（多餐合并）
+  const batchFileInput = document.getElementById('receiptBatchFileInput');
+  if (batchFileInput) {
+    batchFileInput.value = '';
+    batchFileInput.click();
+  }
+}
+
 // 原生 Android 回调函数（如从外部通知或原生组件送入文字）
 async function receiveScannedReceiptText(text) {
   const textarea = document.getElementById('receiptTextInput');
@@ -424,9 +438,17 @@ async function receiveScannedReceiptText(text) {
 // ============================================================
 async function handleReceiptFileSelect(files) {
   if (!files || files.length === 0) return;
+
+  // 若用户一次性选择了多张相片（多餐合并），直接进入并发批量识别管线
+  if (files.length > 1) {
+    return handleBatchReceiptFileSelect(files);
+  }
+
   const file = files[0];
   const fileInput = document.getElementById('receiptFileInput');
   if (fileInput) fileInput.value = '';
+  const batchFileInput = document.getElementById('receiptBatchFileInput');
+  if (batchFileInput) batchFileInput.value = '';
 
   // 1. 弹出加载指示器
   if (typeof Swal !== 'undefined') {
@@ -645,6 +667,119 @@ async function handleReceiptFileSelect(files) {
           title: backendNotice || '照片字迹较浅或未检出菜品，您可直接在此手动录入金额与单品'
         });
       }
+    }
+  }
+}
+
+// ============================================================
+// 批量小票多图并发识别与多餐合并管线
+// 支持聚餐多餐一次性选图，自动多线程并行推理识别并合并单品、税费与服务费！
+// ============================================================
+async function handleBatchReceiptFileSelect(files) {
+  if (!files || files.length === 0) return;
+  const count = files.length;
+
+  const fileInput = document.getElementById('receiptFileInput');
+  if (fileInput) fileInput.value = '';
+  const batchFileInput = document.getElementById('receiptBatchFileInput');
+  if (batchFileInput) batchFileInput.value = '';
+
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: `正在智能并行识别 ${count} 张小票...`,
+      html: `
+        <div style="padding: 12px 0;">
+          <div style="font-size: 38px; margin-bottom: 12px;">🧾📑</div>
+          <div id="ocrProgressMsg" style="font-size: 13.5px; color: var(--ink-soft); line-height: 1.6;">
+            ① 正在批量优化 ${count} 张小票画质与尺寸...
+          </div>
+          <div style="width: 100%; background: #e2e8f0; height: 6px; border-radius: 4px; margin-top: 14px; overflow: hidden;">
+            <div id="ocrProgressBar" style="width: 30%; height: 100%; background: var(--navy); transition: width 0.3s ease;"></div>
+          </div>
+          <div style="font-size: 11px; color: var(--muted); margin-top: 8px;">多张小票并发识别 · 自动合并多餐消费清单与汇总税费</div>
+        </div>
+      `,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false
+    });
+  }
+
+  let parsedData = null;
+  let recognizedText = '';
+  let backendNotice = '';
+
+  try {
+    updateOcrProgress(30, `① 正在前端自适应预压缩 ${count} 张照片...`);
+    const formData = new FormData();
+    for (let i = 0; i < count; i++) {
+      const f = files[i];
+      try {
+        const cRes = await processReceiptOnCanvas(f, 0);
+        if (cRes && cRes.originalDataUrl) {
+          formData.append('files', dataURLtoBlob(cRes.originalDataUrl), f.name || `receipt_${i+1}.jpg`);
+        } else {
+          formData.append('files', f);
+        }
+      } catch (e) {
+        formData.append('files', f);
+      }
+    }
+
+    updateOcrProgress(60, `② 启动服务器端 RapidOCR 并发线程识别与多餐智能汇总...`);
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const res = await fetch('/split-bill/ocr-upload-batch', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken },
+      body: formData
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json.ok && json.data) {
+        parsedData = json.data;
+        parsedData.engine = 'rapidocr_batch';
+        parsedData.batch_count = count;
+        recognizedText = json.raw_text || '';
+      } else {
+        backendNotice = json.message || '部分小票未能识别出清晰文字';
+        if (json.data) parsedData = json.data;
+        if (json.raw_text) recognizedText = json.raw_text;
+      }
+    } else {
+      console.warn('Batch OCR upload responded with non-200 status:', res.status);
+      backendNotice = '服务器深度学习识别繁忙，您可在此直接录入或调整。';
+    }
+  } catch (err) {
+    console.error('Batch OCR pipeline notice:', err);
+    backendNotice = '网络连接超时，请手动核对或重新选择。';
+  } finally {
+    if (typeof Swal !== 'undefined') Swal.close();
+
+    if (!parsedData) {
+      parsedData = parseReceiptTextClientSide(recognizedText || '');
+    }
+
+    const textarea = document.getElementById('receiptTextInput');
+    if (textarea) textarea.value = recognizedText || '';
+
+    lastParsedReceiptData = parsedData;
+    lastRecognizedReceiptText = recognizedText || '';
+
+    openReviewModal(parsedData, recognizedText || '');
+
+    if (typeof Swal !== 'undefined' && parsedData && (!parsedData.items || parsedData.items.length === 0)) {
+      const Toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3500,
+        timerProgressBar: true
+      });
+      Toast.fire({
+        icon: 'info',
+        title: backendNotice || '照片未检出菜品，您可直接在此手动录入金额与单品'
+      });
     }
   }
 }
@@ -1173,7 +1308,9 @@ function openReviewModal(parsed, rawText, imgContext) {
   // 更新引擎识别标志
   const engineBadge = document.getElementById('modalEngineBadge');
   if (engineBadge) {
-    if (parsed.orientation_corrected) {
+    if (parsed.batch_count) {
+      engineBadge.innerHTML = `📑 多餐智能聚合 (${parsed.batch_count} 张小票已合并) · 请核验总账目`;
+    } else if (parsed.orientation_corrected) {
       engineBadge.innerHTML = '✨ RapidOCR 智能解析 (已自适应旋转纠偏) · 请核验账目平衡';
     } else if (parsed.engine === 'rapidocr') {
       engineBadge.innerHTML = '✨ RapidOCR 深度学习解析 · 请核验账目平衡';

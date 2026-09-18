@@ -9,7 +9,8 @@ from core.auth import is_ajax_request
 from core.utils import money_filter, check_and_record_budget_alerts
 from services.ocr_service import (
     get_rapid_ocr, smart_orient_receipt_ocr, parse_receipt_text_to_items,
-    get_preprocessed_receipt_preview
+    get_preprocessed_receipt_preview, batch_smart_orient_receipt_ocr,
+    merge_multi_receipt_parsed_data
 )
 from core.extensions import csrf
 
@@ -151,6 +152,75 @@ def split_bill_ocr_upload():
     except Exception as e:
         logger.error("RapidOCR recognition failed: %s", e)
         return jsonify({'ok': False, 'message': f'小票识别失败: {str(e)}'}), 500
+
+
+@split_bill_bp.route('/split-bill/ocr-upload-batch', methods=['POST'], endpoint='split_bill_ocr_upload_batch')
+@csrf.exempt
+def split_bill_ocr_upload_batch():
+    """
+    批量小票并发 OCR 识别与多餐合并接口：
+    接收多个小票图片文件 (files)，并发执行自适应纠偏识别，
+    并自动将多张小票/多餐明细聚合为一个结构化账单。
+    """
+    files = request.files.getlist('files') or request.files.getlist('receipt_images')
+    if not files:
+        single = request.files.get('file') or request.files.get('receipt_image')
+        if single and single.filename:
+            files = [single]
+
+    valid_files = [f for f in files if f and f.filename]
+    if not valid_files:
+        return jsonify({'ok': False, 'message': '未检测到有效上传的小票照片'}), 400
+
+    engine = get_rapid_ocr()
+    if not engine:
+        return jsonify({'ok': False, 'message': '本地 RapidOCR 引擎未安装或初始化失败'}), 500
+
+    from flask import g
+    sym = getattr(g, 'current_currency_symbol', 'RM') or 'RM'
+
+    pil_images = []
+    file_names = []
+    for f in valid_files:
+        try:
+            img_bytes = f.read()
+            pil_img = Image.open(io.BytesIO(img_bytes))
+            try:
+                pil_img = ImageOps.exif_transpose(pil_img)
+            except Exception:
+                pass
+            if pil_img.mode != 'RGB':
+                pil_img = pil_img.convert('RGB')
+            pil_images.append(pil_img)
+            file_names.append(f.filename)
+        except Exception as err:
+            logger.warning("Failed to decode receipt image %s: %s", f.filename, err)
+
+    if not pil_images:
+        return jsonify({'ok': False, 'message': '小票相片解码失败，请确保上传有效的 JPG/PNG 图片'}), 400
+
+    try:
+        ocr_results = batch_smart_orient_receipt_ocr(pil_images, engine)
+
+        # 挂载文件名与货币符号
+        for idx, res in enumerate(ocr_results):
+            res['filename'] = file_names[idx] if idx < len(file_names) else f"receipt_{idx+1}.jpg"
+            if res.get('data'):
+                res['data']['currency_symbol'] = res['data'].get('currency_symbol') or sym
+
+        merged = merge_multi_receipt_parsed_data(ocr_results)
+        merged['currency_symbol'] = sym
+
+        return jsonify({
+            'ok': True,
+            'receipt_count': len(ocr_results),
+            'results': ocr_results,
+            'data': merged,
+            'raw_text': merged.get('raw_text', '')
+        })
+    except Exception as e:
+        logger.error("Batch receipt OCR failed: %s", e)
+        return jsonify({'ok': False, 'message': f'批量识别失败: {str(e)}'}), 500
 
 
 @split_bill_bp.route('/split-bill/save-record', methods=['POST'], endpoint='split_bill_save_record')
