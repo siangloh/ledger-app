@@ -50,56 +50,6 @@
           <span style="display:inline-block; width:6px; height:6px; background:var(--green); border-radius:50%;"></span>
           <span>纯离线推理 · 预填弹窗 + 大字号金额确认</span>
         </div>
-
-        <!-- 主页面常驻小票预览卡片（当用户上传相片后直接在主界面显示原图与 OCR 前预处理图） -->
-        <div id="mainPageReceiptPreviewCard" style="display: none; margin-top: 14px; background: var(--surface); border: 1.5px solid var(--navy); border-radius: var(--radius-sm); padding: 12px; text-align: left; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="font-size: 14px;">🖼️</span>
-              <strong style="font-size: 12.5px; color: var(--navy);">已生成 OCR 前预处理送审图</strong>
-            </div>
-            <button type="button" class="btn-secondary btn-sm" onclick="reopenReviewModalWithCurrentData()" style="font-size: 11.5px; padding: 3px 8px;">
-              🔍 打开核验与分账弹窗 ↗
-            </button>
-          </div>
-
-          <!-- 快速旋转纠偏工具栏 -->
-          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.03); padding: 5px 8px; border-radius: 6px; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
-            <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
-              <span style="font-size: 11px; color: var(--navy); font-weight: 700;">🔄 朝向纠偏:</span>
-              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(-90)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;" title="逆时针旋转 90 度">↺ 逆时针 90°</button>
-              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(90)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;" title="顺时针旋转 90 度">↻ 顺时针 90°</button>
-              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(180)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;" title="旋转 180 度">🔄 旋转 180°</button>
-              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(0, true)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;" title="重置为 0° 原图朝向">⏮ 恢复 0° 原图</button>
-            </div>
-            <span id="mainPageRotationTag" style="font-size: 11px; font-weight: 700; color: var(--navy); background: #fff; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border);">当前角度: 0°</span>
-          </div>
-          
-          <div id="mainPagePrepMeta" style="font-size: 11px; color: var(--muted); margin-bottom: 8px;">
-            规格与纠偏信息加载中...
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <!-- 原图 -->
-            <div style="text-align: center;">
-              <span style="font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px;">📸 用户上传原图</span>
-              <div style="background: #0f172a; border-radius: 4px; height: 130px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                <img id="mainPageOriginalImg" src="" alt="原图" style="max-width: 100%; max-height: 130px; object-fit: contain; cursor: zoom-in;" onclick="openImageZoom(this.src, '用户上传原相片')">
-              </div>
-            </div>
-            <!-- 送审图 -->
-            <div style="text-align: center;">
-              <span style="font-size: 11px; color: var(--navy); font-weight: 700; display: block; margin-bottom: 4px;">⚙️ 旋转纠偏送审图 (After Rotate)</span>
-              <div style="background: #0f172a; border-radius: 4px; height: 130px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
-                <img id="mainPagePreprocessedImg" src="" alt="系统预处理送审图" style="max-width: 100%; max-height: 130px; object-fit: contain; cursor: zoom-in;" onclick="openImageZoom(this.src, '系统预处理送审图 (After Rotate & CLAHE)')">
-              </div>
-            </div>
-          </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-            <span style="font-size: 10.5px; color: var(--green); font-weight: 600;">✔ 已完成旋转纠偏与对比度增强</span>
-            <a id="mainPageDownloadPrepBtn" href="javascript:void(0)" target="_blank" style="font-size: 11px; color: var(--navy); text-decoration: underline;" download="preprocessed_receipt.jpg">下载送审图 ↗</a>
-          </div>
-        </div>
       </div>
 
       <!-- 文本粘贴卡片 -->
@@ -114,9 +64,6 @@ Service Charge 10% 6.45
 SST 6% 4.26
 Total 75.21"></textarea>
         <div style="display: flex; justify-content: flex-end; margin-top: 8px; gap: 8px; flex-wrap: wrap;">
-          <button type="button" id="btnViewReceiptImages" class="btn-ghost btn-sm" onclick="reopenReviewModalWithCurrentData()" style="display: none; font-size: 12px; border: 1.5px solid var(--navy); color: var(--navy); font-weight: 600;">
-            🖼️ 查看小票送审对比图
-          </button>
           <button type="button" class="btn-secondary btn-sm" onclick="parseTextReceipt()">智能解析并核对</button>
         </div>
       </div>
@@ -315,63 +262,7 @@ Total 75.21"></textarea>
         </div>
       </div>
 
-      <!-- 4. 系统预处理图像与送审核查 (Preprocessed Image Before OCR Detection) -->
-      <details id="reviewPreprocessedSection" style="display: none; margin-bottom: 16px; font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; background: var(--surface-soft);" open>
-        <summary style="cursor: pointer; font-weight: 700; color: var(--navy); display: flex; align-items: center; justify-content: space-between; user-select: none;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 16px;">🖼️</span>
-            <span>系统预处理送审图像 (OCR 识别前处理结果)</span>
-            <span id="reviewPrepBadge" style="font-size: 10.5px; background: var(--green-soft); color: var(--green); padding: 2px 8px; border-radius: 10px; font-weight: 600;">已自适应纠偏增强</span>
-          </div>
-          <span style="font-size: 11px; color: var(--muted); font-weight: normal;">点击折叠/展开 ▾</span>
-        </summary>
-        
-          <!-- 处理参数徽标与旋转纠偏 -->
-          <div style="display: flex; justify-content: space-between; align-items: center; background: var(--surface-soft); padding: 6px 10px; border-radius: 6px; margin-bottom: 10px; flex-wrap: wrap; gap: 6px;">
-            <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
-              <span style="font-size: 11.5px; color: var(--navy); font-weight: 700;">🔄 小票朝向纠偏:</span>
-              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(-90)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;">↺ 逆时针 90°</button>
-              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(90)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;">↻ 顺时针 90°</button>
-              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(180)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;">🔄 旋转 180°</button>
-              <button type="button" class="btn-ghost btn-sm" onclick="rotateCurrentReceipt(0, true)" style="font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); background: #fff;">⏮ 恢复 0° 原图</button>
-            </div>
-            <div style="display: flex; gap: 6px; align-items: center;">
-              <span class="tag" style="background: var(--surface); border: 1px solid var(--border); font-size: 11px;" id="reviewPrepRotationTag">🔄 纠偏朝向: 0°</span>
-              <span class="tag" style="background: var(--surface); border: 1px solid var(--border); font-size: 11px;" id="reviewPrepResolutionTag">📐 规格: 动态自适应缩放</span>
-            </div>
-          </div>
-
-          <!-- 双图对比展示容器 -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 8px;">
-            <!-- 原图卡片 -->
-            <div id="reviewOriginalImgCard" style="border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); padding: 8px; text-align: center;">
-              <div style="font-size: 11.5px; font-weight: 600; color: var(--navy); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
-                <span>📸 用户上传原相片</span>
-                <span style="font-size: 10px; color: var(--muted);">原拍摄视角</span>
-              </div>
-              <div style="max-height: 220px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #0f172a; border-radius: 4px; padding: 4px;">
-                <img id="reviewOriginalImg" src="" alt="原图" style="max-width: 100%; max-height: 210px; object-fit: contain; cursor: zoom-in; border-radius: 2px;" onclick="openImageZoom(this.src, '用户上传原图')">
-              </div>
-            </div>
-
-            <!-- 系统预处理后送审图卡片 -->
-            <div id="reviewPreprocessedImgCard" style="border: 1.5px solid var(--navy); border-radius: var(--radius-sm); background: var(--surface); padding: 8px; text-align: center;">
-              <div style="font-size: 11.5px; font-weight: 700; color: var(--navy); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
-                <span>⚙️ 送入 OCR 识别前图像 (Preprocessed)</span>
-                <a id="reviewDownloadPrepBtn" href="javascript:void(0)" target="_blank" style="font-size: 11px; color: var(--navy); text-decoration: underline;" download="preprocessed_receipt.jpg">高清图 ↗</a>
-              </div>
-              <div style="max-height: 220px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #0f172a; border-radius: 4px; padding: 4px;">
-                <img id="reviewPreprocessedImg" src="" alt="预处理图像" style="max-width: 100%; max-height: 210px; object-fit: contain; cursor: zoom-in; border-radius: 2px;" onclick="openImageZoom(this.src, 'OCR 识别前送审预处理图像')">
-              </div>
-            </div>
-          </div>
-          <p style="font-size: 11px; color: var(--muted); margin: 0; line-height: 1.5;">
-            💡 <b>逻辑说明</b>：系统在将图像丢给 RapidOCR 深度学习模型检测文字前，自动执行自适应旋转纠偏、局部阴影消除与双边滤波降噪。点击图片可放大检视。
-          </p>
-        </div>
-      </details>
-
-      <!-- 5. 查看原始小票文本（可折叠） -->
+      <!-- 4. 查看原始小票文本（可折叠） -->
       <details style="font-size: 12px; color: var(--muted); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 8px 12px; background: var(--surface-soft);">
         <summary style="cursor: pointer; font-weight: 600; user-select: none;">🔍 查看/微调识别出的原始文本 (可重新提取)</summary>
         <textarea id="reviewRawTextArea" rows="4" style="width: 100%; margin-top: 8px; font-family: var(--font-mono); font-size: 11px; padding: 6px; border: 1px solid var(--border); border-radius: 4px;"></textarea>
@@ -588,25 +479,6 @@ async function handleReceiptFileSelect(files) {
       console.warn('Canvas pre-compress notice:', compErr);
     }
 
-    // 立即点亮主界面常驻小票预览卡片，确保用户绝不会看到任何断图或白屏！
-    const mainCard = document.getElementById('mainPageReceiptPreviewCard');
-    const mainOrig = document.getElementById('mainPageOriginalImg');
-    const mainPrep = document.getElementById('mainPagePreprocessedImg');
-    const mainDl = document.getElementById('mainPageDownloadPrepBtn');
-    const mainRotTag = document.getElementById('mainPageRotationTag');
-    const mainMeta = document.getElementById('mainPagePrepMeta');
-
-    if (mainCard && (localDataUrl || preprocessedImgUrl)) {
-      mainCard.style.display = 'block';
-      if (mainOrig && localDataUrl) mainOrig.src = localDataUrl;
-      if (mainPrep && preprocessedImgUrl) mainPrep.src = preprocessedImgUrl;
-      if (mainDl && preprocessedImgUrl) mainDl.href = preprocessedImgUrl;
-      if (mainRotTag) mainRotTag.textContent = '当前角度: 0°';
-      if (mainMeta && preprocessedMeta) {
-        mainMeta.textContent = `🔄 纠偏朝向: 0° | 📐 分辨率: ${preprocessedMeta.width}×${preprocessedMeta.height} px | 滤镜: CLAHE 对比度均衡 + 双边保边滤波降噪`;
-      }
-    }
-
     // ② 优先调用服务器端 RapidOCR 深度学习引擎（自动纠偏旋转 90°/180°/270° 与几何聚类）
     updateOcrProgress(65, '② 启动 RapidOCR 深度学习引擎，自动纠偏图片朝向与识别...');
     try {
@@ -754,34 +626,6 @@ async function handleReceiptFileSelect(files) {
       preprocessedImage: preprocessedImgUrl,
       preprocessedMeta: preprocessedMeta
     };
-
-    // 显示文本框下方的查看图片快捷按钮
-    const viewBtn = document.getElementById('btnViewReceiptImages');
-    if (viewBtn && (localDataUrl || preprocessedImgUrl)) {
-      viewBtn.style.display = 'inline-flex';
-    }
-
-    // 同步更新主页面第 1 步的常驻小票预览卡片
-    const mainCard = document.getElementById('mainPageReceiptPreviewCard');
-    const mainOrig = document.getElementById('mainPageOriginalImg');
-    const mainPrep = document.getElementById('mainPagePreprocessedImg');
-    const mainMeta = document.getElementById('mainPagePrepMeta');
-    const mainDl = document.getElementById('mainPageDownloadPrepBtn');
-    const mainRotTag = document.getElementById('mainPageRotationTag');
-
-    if (mainCard && (localDataUrl || preprocessedImgUrl)) {
-      mainCard.style.display = 'block';
-      if (mainOrig && localDataUrl) mainOrig.src = localDataUrl;
-      if (mainPrep && preprocessedImgUrl) mainPrep.src = preprocessedImgUrl;
-      if (mainDl && preprocessedImgUrl) mainDl.href = preprocessedImgUrl;
-      if (mainRotTag) mainRotTag.textContent = '当前角度: ' + currentReceiptRotation + '°';
-      if (mainMeta) {
-        const rot = (preprocessedMeta && preprocessedMeta.rotation !== undefined) ? preprocessedMeta.rotation : currentReceiptRotation;
-        const w = (preprocessedMeta && preprocessedMeta.width) ? preprocessedMeta.width : (canvasRes ? canvasRes.width : '自适应');
-        const h = (preprocessedMeta && preprocessedMeta.height) ? preprocessedMeta.height : (canvasRes ? canvasRes.height : '高清');
-        mainMeta.textContent = `🔄 纠偏朝向: ${rot}° | 📐 分辨率: ${w}×${h} px | 滤镜: CLAHE 对比度均衡 + 双边保边滤波降噪`;
-      }
-    }
 
     // 唤起“预填弹窗 + 大字号金额确认”，同时附带系统预处理图像
     openReviewModal(parsedData, recognizedText || '', lastReceiptImageContext);
@@ -1335,56 +1179,6 @@ function openReviewModal(parsed, rawText, imgContext) {
       engineBadge.innerHTML = '✨ RapidOCR 深度学习解析 · 请核验账目平衡';
     } else {
       engineBadge.innerHTML = '⚡ 智能录入核验 · 请核验账目平衡';
-    }
-  }
-
-  // 更新预处理图像送审查看板块
-  const prepSection = document.getElementById('reviewPreprocessedSection');
-  const origImg = document.getElementById('reviewOriginalImg');
-  const prepImg = document.getElementById('reviewPreprocessedImg');
-  const origCard = document.getElementById('reviewOriginalImgCard');
-  const prepCard = document.getElementById('reviewPreprocessedImgCard');
-  const downloadBtn = document.getElementById('reviewDownloadPrepBtn');
-  const rotTag = document.getElementById('reviewPrepRotationTag');
-  const resTag = document.getElementById('reviewPrepResolutionTag');
-  const prepBadge = document.getElementById('reviewPrepBadge');
-
-  if (prepSection) {
-    if (imgContext && (imgContext.preprocessedImage || imgContext.originalImage)) {
-      prepSection.style.display = 'block';
-      prepSection.open = true;
-
-      if (imgContext.originalImage && origImg) {
-        origImg.src = imgContext.originalImage;
-        if (origCard) origCard.style.display = 'block';
-      } else if (origCard) {
-        origCard.style.display = 'none';
-      }
-
-      if (imgContext.preprocessedImage && prepImg) {
-        prepImg.src = imgContext.preprocessedImage;
-        if (downloadBtn) downloadBtn.href = imgContext.preprocessedImage;
-        if (prepCard) prepCard.style.display = 'block';
-      } else if (prepCard) {
-        prepCard.style.display = 'none';
-      }
-
-      if (rotTag) {
-        const rotVal = (imgContext.preprocessedMeta && imgContext.preprocessedMeta.rotation !== undefined) ? imgContext.preprocessedMeta.rotation : currentReceiptRotation;
-        rotTag.textContent = '🔄 纠偏朝向: ' + rotVal + (typeof rotVal === 'number' ? '°' : '');
-      }
-
-      if (resTag) {
-        const w = imgContext.preprocessedMeta && imgContext.preprocessedMeta.width;
-        const h = imgContext.preprocessedMeta && imgContext.preprocessedMeta.height;
-        resTag.textContent = (w && h) ? `📐 规格: ${w} × ${h} px` : '📐 规格: 动态自适应高清';
-      }
-
-      if (prepBadge) {
-        prepBadge.textContent = imgContext.preprocessedImage ? '已生成送审图像' : '原图已就绪';
-      }
-    } else {
-      prepSection.style.display = 'none';
     }
   }
 
