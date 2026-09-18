@@ -160,21 +160,30 @@
     <form method="post" action="{{ url_for('login', next=next) }}" class="login-form" id="loginForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>
-        用户名 / 账号
-        <input type="text" name="username" value="{{ username or 'admin' }}" placeholder="请输入用户名（默认：admin）" required autofocus autocomplete="username">
+        {{ t('auth.username') }}
+        <input type="text" name="username" value="{{ username or 'admin' }}" placeholder="Username" required autofocus autocomplete="username">
       </label>
       <label>
-        登录密码
-        <input type="password" name="password" placeholder="请输入密码" required autocomplete="current-password">
+        {{ t('auth.password') }}
+        <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
       </label>
       {% if next %}
       <input type="hidden" name="next" value="{{ next }}">
       {% endif %}
-      <button type="submit" class="btn-login" id="btnLoginSubmit">安全登录</button>
+      <button type="submit" class="btn-login" id="btnLoginSubmit">{{ t('auth.signin_btn') }}</button>
     </form>
 
     <div style="margin-top: 20px; font-size: 13px; color: var(--muted);">
-      还没有账号？<a href="{{ url_for('register') }}" style="color: var(--gold); text-decoration: none; font-weight: 600;">立即注册新账号 &rarr;</a>
+      {{ t('auth.no_account') }} <a href="{{ url_for('register') }}" style="color: var(--gold); text-decoration: none; font-weight: 600;">{{ t('auth.signup_btn') }} &rarr;</a>
+    </div>
+
+    <!-- 语言切换选项 -->
+    <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 22px; font-size: 12px;">
+      {% for l in supported_languages %}
+      <a href="{{ url_for('settings.api_set_language', lang=l.code) }}" style="text-decoration: none; padding: 4px 8px; border-radius: 6px; border: 1px solid {% if current_lang == l.code %}var(--gold){% else %}var(--border){% endif %}; background: {% if current_lang == l.code %}var(--gold-soft){% else %}var(--surface-soft){% endif %}; color: var(--navy); font-weight: {% if current_lang == l.code %}700{% else %}normal{% endif %};">
+        {{ l.flag }} {{ l.name }}
+      </a>
+      {% endfor %}
     </div>
   </div>
 </div>

@@ -13,7 +13,8 @@ from flask import (
     redirect,
     url_for,
     Response,
-    session
+    session,
+    make_response
 )
 
 from core.db import (
@@ -24,6 +25,7 @@ from core.db import (
     DEFAULT_USER_SETTINGS
 )
 from core.auth import is_ajax_request
+from core.i18n import normalize_locale, set_current_locale
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +176,12 @@ def api_update_settings():
         val = str(data.get('nlp_confirm_required', '')).strip().lower()
         updates['nlp_confirm_required'] = 1 if val in ('1', 'true', 'on', 'yes') else 0
 
+    # 14. 系统界面语言 (Language)
+    if 'language' in data:
+        lang_code = normalize_locale(data.get('language'))
+        updates['language'] = lang_code
+        set_current_locale(lang_code)
+
     if not updates:
         return jsonify({'ok': False, 'message': '未检测到需更新的有效字段'}), 400
 
@@ -316,3 +324,29 @@ def api_export_data():
             'Content-Disposition': f'attachment; filename="{filename}"'
         }
     )
+
+
+@settings_bp.route('/api/set-language', methods=['GET', 'POST'], endpoint='api_set_language')
+def api_set_language():
+    """快捷语言切换接口，支持 GET ?lang=en 或 POST JSON/Form，切换后重定向回原页面或返回 JSON"""
+    lang = request.args.get('lang') or request.form.get('language')
+    if not lang and request.is_json:
+        lang = (request.get_json(silent=True) or {}).get('language')
+
+    norm_lang = set_current_locale(lang)
+
+    # 若用户已登录，同步持久化入库
+    if session.get('logged_in'):
+        user_id = get_current_user_id()
+        db = get_db()
+        update_user_settings(user_id, {'language': norm_lang}, db=db)
+
+    if request.is_json or is_ajax_request():
+        resp = make_response(jsonify({'ok': True, 'language': norm_lang}))
+    else:
+        referrer = request.referrer or url_for('index')
+        resp = make_response(redirect(referrer))
+
+    resp.set_cookie('lang', norm_lang, max_age=60 * 60 * 24 * 365, samesite='Lax')
+    return resp
+

@@ -707,10 +707,18 @@ def init_db(app_logger=None):
         number_format TEXT DEFAULT 'comma',
         timezone TEXT DEFAULT 'Asia/Kuala_Lumpur',
         nlp_confirm_required INTEGER DEFAULT 1,
+        language TEXT DEFAULT 'zh',
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     ''')
     db.commit()
+
+    # 轻量迁移：确保老旧版本数据库补充 language 列
+    try:
+        db.execute("ALTER TABLE user_settings ADD COLUMN language TEXT DEFAULT 'zh'")
+        db.commit()
+    except Exception:
+        pass
 
     # 确保 admin 用户具备默认分类
     init_user_default_categories(db, admin_id)
@@ -732,6 +740,7 @@ DEFAULT_USER_SETTINGS = {
     'number_format': 'comma',
     'timezone': 'Asia/Kuala_Lumpur',
     'nlp_confirm_required': 1,
+    'language': 'zh',
 }
 
 
@@ -782,8 +791,8 @@ def update_user_settings(user_id, new_settings, db=None):
                 user_id, theme_mode, currency_symbol, default_currency, default_account_id,
                 default_group, budget_start_day, default_dashboard_view,
                 dedup_window_minutes, table_density, haptic_feedback,
-                date_format, number_format, timezone, nlp_confirm_required, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                date_format, number_format, timezone, nlp_confirm_required, language, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 theme_mode=excluded.theme_mode,
                 currency_symbol=excluded.currency_symbol,
@@ -799,6 +808,7 @@ def update_user_settings(user_id, new_settings, db=None):
                 number_format=excluded.number_format,
                 timezone=excluded.timezone,
                 nlp_confirm_required=excluded.nlp_confirm_required,
+                language=excluded.language,
                 updated_at=excluded.updated_at
         ''', (
             str(user_id),
@@ -816,6 +826,7 @@ def update_user_settings(user_id, new_settings, db=None):
             current['number_format'],
             current['timezone'],
             int(current.get('nlp_confirm_required', 1)),
+            current.get('language', 'zh'),
             now_str
         ))
         db.commit()

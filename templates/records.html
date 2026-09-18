@@ -1,29 +1,29 @@
 {% extends layout|default('base.html') %}
 {% block title %}历史记录 - 我的记账本{% endblock %}
 {% block content %}
-<h2>历史记录</h2>
+<h2>{{ t('records.title') }}</h2>
 
 <form method="get" class="filters">
-  <label>开始日期 <input type="date" name="start" value="{{ start }}"></label>
-  <label>结束日期 <input type="date" name="end" value="{{ end }}"></label>
-  <label>类型
+  <label>{{ t('common.date') }} (Start) <input type="date" name="start" value="{{ start }}"></label>
+  <label>{{ t('common.date') }} (End) <input type="date" name="end" value="{{ end }}"></label>
+  <label>{{ t('common.type') }}
     <select name="type">
-      <option value="">全部</option>
-      <option value="income" {{ 'selected' if type=='income' }}>收入</option>
-      <option value="expense" {{ 'selected' if type=='expense' }}>支出</option>
+      <option value="">{{ t('common.all') }}</option>
+      <option value="income" {{ 'selected' if type=='income' }}>{{ t('common.income') }}</option>
+      <option value="expense" {{ 'selected' if type=='expense' }}>{{ t('common.expense') }}</option>
       <option value="savings" {{ 'selected' if type=='savings' }}>储蓄</option>
     </select>
   </label>
-  <label>分类
+  <label>{{ t('common.category') }}
     <select name="category">
-      <option value="">全部</option>
+      <option value="">{{ t('common.all') }}</option>
       {% for c in categories %}
       <option value="{{ c }}" {{ 'selected' if category==c }}>{{ c }}</option>
       {% endfor %}
     </select>
   </label>
-  <button type="submit" class="btn-primary">筛选</button>
-  <a href="{{ url_for('records') }}" class="btn-ghost">重置</a>
+  <button type="submit" class="btn-primary">{{ t('common.filter') }}</button>
+  <a href="{{ url_for('records') }}" class="btn-ghost">{{ t('common.cancel') }}</a>
 </form>
 
 <form method="post" action="{{ url_for('batch_delete_records') }}" id="batchForm">

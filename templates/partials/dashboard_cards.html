@@ -1,17 +1,17 @@
 <div class="cards cards-four" id="dashboardSummaryCards">
   <div class="card card-live-pulse">
-    <span class="card-label">本月收入</span>
+    <span class="card-label">{{ t('dashboard.monthly_income') }}</span>
     <span class="amount income">{{ total_income|money }}</span>
   </div>
   <div class="card card-live-pulse">
-    <span class="card-label">本月支出</span>
+    <span class="card-label">{{ t('dashboard.monthly_expense') }}</span>
     <span class="amount expense">{{ total_expense|money }}</span>
     {% if savings_expense and savings_expense > 0 %}
     <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">含储蓄支付 <span class="sensitive-val">{{ savings_expense|money }}</span></div>
     {% endif %}
   </div>
   <div class="card card-live-pulse">
-    <span class="card-label">累计总储蓄</span>
+    <span class="card-label">{{ t('dashboard.savings_pool') }}</span>
     <span class="amount savings" style="color:var(--gold);">{{ (total_savings_pool if total_savings_pool is defined else total_savings)|money }}</span>
     {% if savings_by_category and savings_by_category|length > 0 %}
     <div class="card-sub-stats custom-scrollbar" style="margin-top: 8px; max-height: 84px; overflow-y: auto; padding-right: 4px; gap: 5px;">
@@ -32,7 +32,7 @@
     {% endif %}
   </div>
   <div class="card card-live-pulse" id="monthlyBalanceCard">
-    <span class="card-label">本月净结余</span>
+    <span class="card-label">{{ t('dashboard.net_balance') }}</span>
     <span class="amount {{ 'income' if balance >= 0 else 'expense' }}">{{ balance|money }}</span>
     <div style="font-size: 10.5px; color: var(--muted); margin-top: 4px;">已扣减本月储蓄</div>
   </div>

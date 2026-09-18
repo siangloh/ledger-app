@@ -38,6 +38,8 @@
                 window.LEDGER_DATE_FORMAT = '{{ current_date_format|default("YYYY-MM-DD") }}';
                 window.LEDGER_NLP_CONFIRM_REQUIRED = {{ current_nlp_confirm_required|default(1) }};
                 window.LEDGER_BUDGET_START_DAY = {{ current_budget_start_day|default(1) }};
+                window.LEDGER_LANG = '{{ current_lang|default("zh") }}';
+                window.I18N = {{ i18n_client_json | tojson }};
             } catch (e) { }
         })();
     </script>
@@ -59,22 +61,22 @@
                 <span class="app-avatar-badge">💰</span>
                 <a href="{{ url_for('index') }}" class="brand-link" hx-get="{{ url_for('index') }}"
                     hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true"><span
-                        class="brand">我的账本</span></a>
+                        class="brand">{{ t('nav.brand') }}</span></a>
             </div>
             <!-- 桌面端导航链接 (分组下拉式) -->
             <nav class="desktop-nav-links">
                 <!-- 主要入口 -->
                 <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}" data-nav="index"
                     hx-get="{{ url_for('index') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
-                    hx-push-url="true">仪表盘</a>
+                    hx-push-url="true">{{ t('nav.dashboard') }}</a>
                 <a href="{{ url_for('records') }}"
                     class="{{ 'active' if request.endpoint.split('.')[-1] in ('records','edit_record') }}" data-nav="records"
                     hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
-                    hx-push-url="true">历史记录</a>
+                    hx-push-url="true">{{ t('nav.records') }}</a>
                 <a href="{{ url_for('split_bill_page') }}"
                     class="{{ 'active' if request.endpoint.split('.')[-1] == 'split_bill_page' }}" data-nav="split-bill"
                     hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer"
-                    hx-swap="innerHTML show:window:top" hx-push-url="true">AA 分账</a>
+                    hx-swap="innerHTML show:window:top" hx-push-url="true">{{ t('nav.split_bill') }}</a>
 
                 <div class="nav-sep"></div>
 
@@ -82,76 +84,94 @@
                 <div class="nav-group">
                     <button
                         class="nav-group-trigger {% if request.endpoint.split('.')[-1] in ('accounts_page','liabilities_page','subscriptions_page','recurring_page','settings_page') %}active{% endif %}">
-                        管理 <span class="nav-chevron">▾</span>
+                        {{ t('nav.manage') }} <span class="nav-chevron">▾</span>
                     </button>
                     <div class="nav-dropdown">
                         <a href="{{ url_for('accounts_page') }}"
                             class="{{ 'active' if request.endpoint.split('.')[-1] == 'accounts_page' }}" data-nav="accounts"
                             hx-get="{{ url_for('accounts_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
-                            <span class="nav-icon">🏦</span>账户管理
+                            <span class="nav-icon">🏦</span>{{ t('nav.accounts') }}
                         </a>
                         <a href="{{ url_for('liabilities_page') }}"
                             class="{{ 'active' if request.endpoint.split('.')[-1] == 'liabilities_page' }}" data-nav="liabilities"
                             hx-get="{{ url_for('liabilities_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
-                            <span class="nav-icon">💳</span>负债分期
+                            <span class="nav-icon">💳</span>{{ t('nav.liabilities') }}
                         </a>
                         <a href="{{ url_for('subscriptions_page') }}"
                             class="{{ 'active' if request.endpoint.split('.')[-1] == 'subscriptions_page' }}" data-nav="subscriptions"
                             hx-get="{{ url_for('subscriptions_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
-                            <span class="nav-icon">🔄</span>订阅大厅
+                            <span class="nav-icon">🔄</span>{{ t('nav.subscriptions') }}
                         </a>
                         <a href="{{ url_for('recurring_page') }}"
                             class="{{ 'active' if request.endpoint.split('.')[-1] == 'recurring_page' }}" data-nav="recurring"
                             hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
-                            <span class="nav-icon">📅</span>固定收支
+                            <span class="nav-icon">📅</span>{{ t('nav.recurring') }}
                         </a>
                         <a href="{{ url_for('settings.settings_page') }}"
                             class="{{ 'active' if request.endpoint.split('.')[-1] == 'settings_page' }}" data-nav="settings"
                             hx-get="{{ url_for('settings.settings_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
-                            <span class="nav-icon">⚙️</span>偏好设置
+                            <span class="nav-icon">⚙️</span>{{ t('nav.settings') }}
                         </a>
                     </div>
                 </div>
 
-                <!-- 分析 dropdown -->
+                <!-- 工具 dropdown -->
                 <div class="nav-group">
                     <button
                         class="nav-group-trigger {% if request.endpoint.split('.')[-1] in ('categories_page','category_insights_page','import_page','import_upload','import_confirm') %}active{% endif %}">
-                        工具 <span class="nav-chevron">▾</span>
+                        {{ t('nav.tools') }} <span class="nav-chevron">▾</span>
                     </button>
                     <div class="nav-dropdown">
                         <a href="{{ url_for('category_insights_page') }}"
                             class="{{ 'active' if request.endpoint.split('.')[-1] == 'category_insights_page' }}" data-nav="insights"
                             hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
-                            <span class="nav-icon">📊</span>分类洞察
+                            <span class="nav-icon">📊</span>{{ t('nav.insights') }}
                         </a>
                         <a href="{{ url_for('categories_page') }}"
                             class="{{ 'active' if request.endpoint.split('.')[-1] == 'categories_page' }}" data-nav="categories"
                             hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
-                            <span class="nav-icon">🏷️</span>分类管理
+                            <span class="nav-icon">🏷️</span>{{ t('nav.categories') }}
                         </a>
                         <a href="{{ url_for('import_page') }}"
                             class="{{ 'active' if request.endpoint.split('.')[-1] in ('import_page','import_upload','import_confirm') }}"
                             data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer"
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
-                            <span class="nav-icon">📤</span>批量导入
+                            <span class="nav-icon">📤</span>{{ t('nav.import') }}
                         </a>
                     </div>
                 </div>
 
                 <div class="nav-sep"></div>
 
+                <!-- 语言切换 Dropdown -->
+                <div class="nav-group">
+                    <button class="nav-group-trigger nav-lang-btn" title="{{ t('nav.language') }}" aria-label="{{ t('nav.language') }}" style="padding: 4px 10px; font-size: 13px; display: flex; align-items: center; gap: 4px;">
+                        <span>🌐</span>
+                        <span>{{ supported_languages | selectattr('code', 'equalto', current_lang) | map(attribute='label') | first | default('中文') }}</span>
+                        <span class="nav-chevron">▾</span>
+                    </button>
+                    <div class="nav-dropdown" style="min-width: 140px;">
+                        {% for lang in supported_languages %}
+                        <a href="{{ url_for('settings.api_set_language', lang=lang.code) }}" class="{{ 'active' if current_lang == lang.code }}" style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+                            <span>{{ lang.flag }}</span>
+                            <span>{{ lang.name }}</span>
+                            {% if current_lang == lang.code %}<span style="margin-left: auto; font-size: 11px;">✓</span>{% endif %}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+
                 <!-- 隐私模式切换 -->
-                <button type="button" class="nav-privacy-btn" id="privacyToggleBtn" title="隐私遮罩 (快捷键: Ctrl+Shift+P)" aria-label="切换隐私遮罩模式" onclick="togglePrivacyMode()">
+                <button type="button" class="nav-privacy-btn" id="privacyToggleBtn" title="{{ t('nav.privacy_title') }}" aria-label="切换隐私遮罩模式" onclick="togglePrivacyMode()">
                     <span id="privacyIcon">👁</span>
-                    <span class="privacy-label">隐私</span>
+                    <span class="privacy-label">{{ t('nav.privacy') }}</span>
                 </button>
 
                 <!-- 用户区 -->
@@ -161,7 +181,7 @@
                     {{ session.username }}
                 </span>
                 {% endif %}
-                <a href="{{ url_for('logout') }}" class="nav-logout-btn" title="退出登录">登出</a>
+                <a href="{{ url_for('logout') }}" class="nav-logout-btn" title="{{ t('nav.logout') }}">{{ t('nav.logout') }}</a>
             </nav>
         </div>
     </header>
@@ -172,25 +192,25 @@
             data-nav="index" hx-get="{{ url_for('index') }}" hx-target="#mainContainer"
             hx-swap="innerHTML show:window:top" hx-push-url="true">
             <span class="bnav-icon">📊</span>
-            <span class="bnav-label">概览</span>
+            <span class="bnav-label">{{ t('nav.overview') }}</span>
         </a>
         <a href="{{ url_for('records') }}"
             class="bnav-item {{ 'active' if request.endpoint.split('.')[-1] in ('records','edit_record') }}" data-nav="records"
             hx-get="{{ url_for('records') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
             hx-push-url="true">
             <span class="bnav-icon">📑</span>
-            <span class="bnav-label">明细</span>
+            <span class="bnav-label">{{ t('nav.details') }}</span>
         </a>
         <a href="{{ url_for('split_bill_page') }}"
             class="bnav-item {{ 'active' if request.endpoint.split('.')[-1] == 'split_bill_page' }}" data-nav="split-bill"
             hx-get="{{ url_for('split_bill_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top"
             hx-push-url="true">
             <span class="bnav-icon">🧾</span>
-            <span class="bnav-label">AA分账</span>
+            <span class="bnav-label">{{ t('nav.split_bill') }}</span>
         </a>
         <button type="button" class="bnav-item" id="btnMoreSheet" onclick="toggleMoreSheet()">
             <span class="bnav-icon">⚙️</span>
-            <span class="bnav-label">更多</span>
+            <span class="bnav-label">{{ t('nav.more') }}</span>
         </button>
     </nav>
 
@@ -213,7 +233,7 @@
         <div class="sheet-drag-handle" onclick="toggleMoreSheet(false)"></div>
         <div class="sheet-header">
             <div style="display: flex; align-items: center; gap: 8px;">
-                <span>更多管理功能</span>
+                <span>{{ t('nav.more_title') }}</span>
                 {% if session.get('username') %}
                 <span
                     style="font-size: 12px; color: var(--gold); background: rgba(182,144,47,0.15); padding: 2px 8px; border-radius: 12px;">👤
@@ -293,17 +313,22 @@
                 <span class="sheet-title">隐私遮罩</span>
                 <span class="sheet-desc" id="mobileSheetPrivacyDesc">一键隐藏金额与资产</span>
             </div>
+            <div class="sheet-tile" onclick="openMobileLangPicker();" style="cursor: pointer;">
+                <span class="sheet-icon">🌐</span>
+                <span class="sheet-title">{{ t('nav.language') }}</span>
+                <span class="sheet-desc">{{ supported_languages | selectattr('code', 'equalto', current_lang) | map(attribute='name') | first | default('简体中文') }}</span>
+            </div>
             <a href="{{ url_for('settings.settings_page') }}"
                 class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'settings_page' }}" data-nav="settings"
                 hx-get="{{ url_for('settings.settings_page') }}" hx-target="#mainContainer"
                 hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">⚙️</span>
-                <span class="sheet-title">偏好设置</span>
-                <span class="sheet-desc">个性化与数据备份</span>
+                <span class="sheet-title">{{ t('nav.settings') }}</span>
+                <span class="sheet-desc">个性化与偏好</span>
             </a>
             <a href="{{ url_for('logout') }}" class="sheet-tile">
                 <span class="sheet-icon">🚪</span>
-                <span class="sheet-title">退出登录</span>
+                <span class="sheet-title">{{ t('nav.logout') }}</span>
                 <span class="sheet-desc">锁定当前账本</span>
             </a>
         </div>
@@ -361,6 +386,30 @@
                 groups.forEach(function (g) { g.classList.remove('pinned'); });
             });
         })();
+
+        function openMobileLangPicker() {
+            toggleMoreSheet(false);
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: '🌐 ' + (window.I18N && window.I18N['nav.language'] || '语言 / Language'),
+                    html: `
+                        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px;">
+                            {% for l in supported_languages %}
+                            <a href="{{ url_for('settings.api_set_language', lang=l.code) }}" class="btn-secondary" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: var(--radius-sm); font-size: 14px; text-decoration: none; color: var(--navy); {% if current_lang == l.code %}border-color: var(--gold); background: rgba(182, 144, 47, 0.12); font-weight: 700;{% endif %}">
+                                <span>{{ l.flag }} {{ l.name }}</span>
+                                {% if current_lang == l.code %}<span>✓</span>{% endif %}
+                            </a>
+                            {% endfor %}
+                        </div>
+                    `,
+                    showConfirmButton: false,
+                    showCloseButton: true
+                });
+            } else {
+                const chosen = prompt("Choose language (zh / en / ms / zh_TW):", "{{ current_lang }}");
+                if (chosen) window.location.href = "{{ url_for('settings.api_set_language') }}?lang=" + chosen;
+            }
+        }
     </script>
     {% if session.get('username') %}
     <script>

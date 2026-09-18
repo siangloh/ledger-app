@@ -64,7 +64,27 @@
               <span>📑 紧凑高效模式</span>
             </label>
           </div>
-          <span class="settings-tip">紧凑模式适宜桌面端多数据核对，舒适模式适宜触屏与大字阅读。</span>
+        <div class="settings-item">
+          <label class="settings-label">{{ t('settings.language_setting') }}</label>
+          <div class="settings-pill-group">
+            <label class="pill-radio">
+              <input type="radio" name="language" value="zh" {{ 'checked' if (settings.language or 'zh') == 'zh' }}>
+              <span>🇨🇳 简体中文</span>
+            </label>
+            <label class="pill-radio">
+              <input type="radio" name="language" value="en" {{ 'checked' if settings.language == 'en' }}>
+              <span>🇺🇸 English</span>
+            </label>
+            <label class="pill-radio">
+              <input type="radio" name="language" value="ms" {{ 'checked' if settings.language == 'ms' }}>
+              <span>🇲🇾 Bahasa Melayu</span>
+            </label>
+            <label class="pill-radio">
+              <input type="radio" name="language" value="zh_TW" {{ 'checked' if settings.language == 'zh_TW' }}>
+              <span>🇭🇰 繁體中文</span>
+            </label>
+          </div>
+          <span class="settings-tip">{{ t('settings.language_tip') }}</span>
         </div>
       </div>
     </section>

@@ -68,6 +68,12 @@ from core.db import (
     USER_LATEST_EVENTS
 )
 from core.auth import is_ajax_request
+from core.i18n import (
+    t,
+    get_current_locale,
+    get_supported_languages,
+    get_client_translations
+)
 from core.utils import (
     money_filter,
     date_filter,
@@ -164,6 +170,9 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 # 初始化 CSRF 保护
 csrf.init_app(app)
 
+# 注册全局翻译函数
+app.jinja_env.globals['t'] = t
+
 # 安全 Cookie 与性能设置
 is_production = os.environ.get('RENDER') or os.environ.get('FLASK_ENV') == 'production' or os.environ.get('SESSION_COOKIE_SECURE', '0') == '1'
 app.config['SESSION_COOKIE_SECURE'] = bool(is_production)
@@ -221,6 +230,11 @@ def add_cache_control_headers(response):
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
+
+    # 同步 lang cookie，便于纯前端/离线状态保持语言
+    if hasattr(g, 'current_lang') and g.current_lang:
+        if request.cookies.get('lang') != g.current_lang:
+            response.set_cookie('lang', g.current_lang, max_age=60 * 60 * 24 * 365, samesite='Lax')
     return response
 
 
@@ -250,7 +264,9 @@ def inject_globals():
             user_timezone = settings.get('timezone', 'Asia/Kuala_Lumpur')
             budget_start_day = settings.get('budget_start_day', 1)
             nlp_confirm_required = settings.get('nlp_confirm_required', 1)
+            user_lang = settings.get('language', 'zh')
 
+            g.user_preferred_lang = user_lang
             g.current_currency_symbol = currency_symbol
             g.current_currency_code = currency_code
             g.current_date_format = date_format
@@ -260,6 +276,8 @@ def inject_globals():
             g.current_nlp_confirm_required = nlp_confirm_required
         except Exception as e:
             logger.debug("Failed to load user settings in context processor: %s", e, exc_info=True)
+
+    current_lang = get_current_locale()
     return {
         'layout': 'partial.html' if is_hx else 'base.html',
         'is_hx': is_hx,
@@ -273,6 +291,10 @@ def inject_globals():
         'current_user_timezone': user_timezone,
         'current_budget_start_day': budget_start_day,
         'current_nlp_confirm_required': nlp_confirm_required,
+        'current_lang': current_lang,
+        'supported_languages': get_supported_languages(),
+        'i18n_client_json': get_client_translations(current_lang),
+        't': t,
     }
 
 
@@ -340,6 +362,11 @@ def jinja_money_filter(value, symbol=None, number_format=None):
 @app.template_filter('user_date')
 def jinja_date_filter(value, fmt=None):
     return date_filter(value, fmt=fmt)
+
+
+@app.template_filter('t')
+def jinja_t_filter(key, default=None, **kwargs):
+    return t(key, default=default, **kwargs)
 
 
 # ---------------------------------------------------------------------------
