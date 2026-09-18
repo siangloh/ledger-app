@@ -1280,12 +1280,16 @@ function renderOverview(data) {
   const expCats = data.expense_categories || { labels: [], values: [] };
   drawOverviewDoughnut('overviewExpenseChart', expCats.labels, expCats.values);
 
-  const incGrp = data.income_group || { main: 0, side: 0, side_ratio: 0 };
-  drawOverviewDoughnut('overviewIncomeChart', ['主业收入', '副业收入'], [incGrp.main, incGrp.side]);
+  const incLabels = [
+    window.t ? window.t('dashboard.main_income', '主业收入') : '主业收入',
+    window.t ? window.t('dashboard.side_income', '副业收入') : '副业收入'
+  ];
+  drawOverviewDoughnut('overviewIncomeChart', incLabels, [incGrp.main, incGrp.side]);
 
   const sideBadge = document.getElementById('sideIncomeBadge');
   if (sideBadge) {
-    sideBadge.textContent = '副业占比: ' + (incGrp.side_ratio || 0).toFixed(1) + '%';
+    const sideRatioLbl = window.t ? window.t('dashboard.side_ratio', '副业占比') : '副业占比';
+    sideBadge.textContent = sideRatioLbl + ': ' + (incGrp.side_ratio || 0).toFixed(1) + '%';
   }
 
   const sideDesc = document.getElementById('sideRatioDesc');
@@ -1382,7 +1386,7 @@ function drawOverviewBarChart(trendData) {
       labels: labels,
       datasets: [
         {
-          label: '收入',
+          label: window.t ? window.t('common.income', '收入') : '收入',
           data: incomeVals,
           backgroundColor: incomeColor,
           hoverBackgroundColor: incomeHover,
@@ -1390,7 +1394,7 @@ function drawOverviewBarChart(trendData) {
           borderSkipped: 'bottom'
         },
         {
-          label: '支出',
+          label: window.t ? window.t('common.expense', '支出') : '支出',
           data: expenseVals,
           backgroundColor: expenseColor,
           hoverBackgroundColor: expenseHover,
@@ -1428,12 +1432,13 @@ function drawOverviewBarChart(trendData) {
               return ' ' + item.dataset.label + ': ' + formatMoney(item.raw);
             },
             afterBody: function (items) {
+              var balPrefix = (window.t ? window.t('dashboard.balance_prefix', '结余') : '结余') + ': ';
               if (document.documentElement.classList.contains('privacy-mode')) {
-                return ['结余: ••••••'];
+                return [balPrefix + '••••••'];
               }
               var idx = items[0].dataIndex;
               var bal = balanceVals[idx];
-              return ['结余: ' + formatMoney(bal)];
+              return [balPrefix + formatMoney(bal)];
             }
           }
         }
@@ -1487,7 +1492,9 @@ function drawOverviewDoughnut(canvasId, labels, values) {
   var tooltipBody = isDark ? '#cbd5e1' : '#46453f';
   var tooltipBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(27, 27, 31, 0.1)';
 
-  var centerTitle = (canvasId === 'overviewExpenseChart') ? '长期总支出' : '累计总收入';
+  var centerTitle = (canvasId === 'overviewExpenseChart')
+    ? (window.t ? window.t('dashboard.total_cumulative_expense', '长期总支出') : '长期总支出')
+    : (window.t ? window.t('dashboard.total_cumulative_income', '累计总收入') : '累计总收入');
   var centerTextPlugin = {
     beforeDraw: function(chart) {
       if (!chart.chartArea) return;
@@ -1564,7 +1571,8 @@ function drawOverviewDoughnut(canvasId, labels, values) {
   var legendContainer = document.getElementById(canvasId + 'Legend');
   if (legendContainer) {
     if (!total || values.length === 0) {
-      legendContainer.innerHTML = '<div style="text-align:center; color:var(--muted); font-size:12px; padding:8px;">暂无数据</div>';
+      var noDataText = window.t ? window.t('common.no_data', '暂无数据') : '暂无数据';
+      legendContainer.innerHTML = '<div style="text-align:center; color:var(--muted); font-size:12px; padding:8px;">' + noDataText + '</div>';
     } else {
       legendContainer.innerHTML = labels.map(function (lbl, i) {
         var val = values[i] || 0;
@@ -1612,7 +1620,7 @@ function fetchChartDataAndRender(month) {
       if (data && data.ok) {
         window.CHART_DATA = {
           month: data.month,
-          income: data.income || { labels: ['主业收入', '副业收入'], values: [0, 0] },
+          income: data.income || { labels: [window.t ? window.t('dashboard.main_income', '主业收入') : '主业收入', window.t ? window.t('dashboard.side_income', '副业收入') : '副业收入'], values: [0, 0] },
           expense: data.expense || { labels: [], values: [] }
         };
         renderDonutCharts();
@@ -1632,7 +1640,9 @@ function drawMonthlyDoughnut(canvasId, rawLabels, rawValues) {
   var labels = Array.isArray(rawLabels) ? rawLabels.slice() : [];
   var values = Array.isArray(rawValues) ? rawValues.map(function (v) { return Number(v) || 0; }) : [];
   var total = values.reduce(function (a, b) { return a + b; }, 0);
-  var centerTitle = isIncome ? '本月总收入' : '本月总支出';
+  var centerTitle = isIncome
+    ? (window.t ? window.t('dashboard.monthly_income', '本月总收入') : '本月总收入')
+    : (window.t ? window.t('dashboard.monthly_expense', '本月总支出') : '本月总支出');
   var isDark = isDarkModeActive();
   var palette = getChartPalette();
   var sliceBorder = isDark ? '#131d31' : '#ffffff';
@@ -1651,7 +1661,8 @@ function drawMonthlyDoughnut(canvasId, rawLabels, rawValues) {
   var legendContainer = document.getElementById(canvasId + 'Legend');
   if (legendContainer) {
     if (!total || values.length === 0) {
-      legendContainer.innerHTML = '<div style="text-align:center; color:var(--muted); font-size:12px; padding:8px;">暂无数据</div>';
+      var noDataText = window.t ? window.t('common.no_data', '暂无数据') : '暂无数据';
+      legendContainer.innerHTML = '<div style="text-align:center; color:var(--muted); font-size:12px; padding:8px;">' + noDataText + '</div>';
     } else {
       legendContainer.innerHTML = labels.map(function (lbl, i) {
         var val = Number(values[i]) || 0;

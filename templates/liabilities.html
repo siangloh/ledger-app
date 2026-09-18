@@ -1,17 +1,17 @@
 {% extends layout|default('base.html') %}
-{% block title %}负债与分期付款追踪 - 我的记账本{% endblock %}
+{% block title %}{{ t('liabilities.title') }} - {{ t('nav.brand') }}{% endblock %}
 
 {% block content %}
 <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 24px;">
   <div>
     <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 8px;">
-      <span>💳</span> 负债与分期付款追踪
+      <span>💳</span> {{ t('liabilities.title') }}
       <span style="font-size: 13px; font-weight: normal; color: var(--muted); background: var(--bg-soft); padding: 3px 10px; border-radius: 12px; border: 1px solid var(--border);">
-        Liabilities & 0% EPP Tracker
+        {{ t('liabilities.badge') }}
       </span>
     </h1>
     <p style="margin: 4px 0 0; font-size: 13px; color: var(--ink-soft);">
-      按月拆解贷款供款与免息分期，精准监控本金剩余、硬性月供现金流与未来释放节点。
+      {{ t('liabilities.desc') }}
     </p>
   </div>
 
@@ -23,18 +23,18 @@
     </form>
 
     <button type="button" class="btn btn-secondary btn-sm" onclick="openModal('modalAccount')">
-      <span>🏦</span> 账户/卡片
+      <span>🏦</span> {{ t('liabilities.btn_accounts') }}
     </button>
     <button type="button" class="btn btn-secondary btn-sm" onclick="openModal('modalLoan')">
-      <span>🏠</span> + 新增贷款
+      <span>🏠</span> {{ t('liabilities.btn_add_loan') }}
     </button>
     <button type="button" class="btn btn-primary btn-sm" onclick="openModal('modalInstallment')">
-      <span>📱</span> + 新增分期
+      <span>📱</span> {{ t('liabilities.btn_add_installment') }}
     </button>
-    <form method="post" action="{{ url_for('api_sync_liabilities') }}" style="margin: 0;" onsubmit="return confirm('确认立即将本月到达扣款日期的分期入账到主账本中吗？');">
+    <form method="post" action="{{ url_for('api_sync_liabilities') }}" style="margin: 0;" onsubmit="return confirm('{{ t('liabilities.sync_confirm') }}');">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="btn btn-outline-success btn-sm" title="检测今日已到期分期并写入 transactions 支出">
-        <span>⚡</span> 自动记账同步
+      <button type="submit" class="btn btn-outline-success btn-sm" title="{{ t('liabilities.sync_title') }}">
+        <span>⚡</span> {{ t('liabilities.btn_auto_sync') }}
       </button>
     </form>
   </div>
@@ -44,45 +44,45 @@
 <div class="kpi-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px;">
   <!-- 1. 全景未还总本金 -->
   <div class="card" style="padding: 18px 20px; border-left: 4px solid var(--navy); position: relative;">
-    <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">全景未还总负债本金</div>
+    <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">{{ t('liabilities.kpi_total_debt') }}</div>
     <div class="sensitive-val" style="font-size: 26px; font-weight: 700; color: var(--navy); margin-top: 6px;">
       {{ total_debt|money }}
     </div>
     <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">
-      贷款剩余: <span class="sensitive-val">{{ total_loan_debt|money }}</span> · 分期未还: <span class="sensitive-val">{{ total_inst_debt|money }}</span>
+      {{ t('liabilities.kpi_loan_left') }}: <span class="sensitive-val">{{ total_loan_debt|money }}</span> · {{ t('liabilities.kpi_inst_left') }}: <span class="sensitive-val">{{ total_inst_debt|money }}</span>
     </div>
   </div>
 
   <!-- 2. 本月刚性还款支出 -->
   <div class="card" style="padding: 18px 20px; border-left: 4px solid #e11d48; position: relative;">
     <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">
-      {{ target_month }} 刚性现金流总支出
+      {{ t('liabilities.kpi_monthly_cashflow', month=target_month) }}
     </div>
     <div class="sensitive-val" style="font-size: 26px; font-weight: 700; color: #e11d48; margin-top: 6px;">
       {{ cashflow.totalRigidPayment|money }}
     </div>
     <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">
-      固定贷款供款 + 信用卡分期必付合计
+      {{ t('liabilities.kpi_cashflow_note') }}
     </div>
   </div>
 
   <!-- 3. 未来现金流释放预测 -->
   <div class="card" style="padding: 18px 20px; border-left: 4px solid var(--green); position: relative;">
     <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">
-      即将结清与现金流释放点
+      {{ t('liabilities.kpi_upcoming_release') }}
     </div>
     {% if cashflow.upcomingReleases %}
       <div style="margin-top: 6px;">
         {% for rel in cashflow.upcomingReleases %}
         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; padding: 2px 0;">
           <span style="font-weight: 600; color: var(--ink);">{{ rel.title }}</span>
-          <span class="sensitive-val" style="color: var(--green); font-weight: 700;">+{{ rel.monthly_amount|money }}/月 ({{ rel.settle_month }})</span>
+          <span class="sensitive-val" style="color: var(--green); font-weight: 700;">+{{ rel.monthly_amount|money }}/{{ t('dashboard.current_month') }} ({{ rel.settle_month }})</span>
         </div>
         {% endfor %}
       </div>
     {% else %}
-      <div style="font-size: 20px; font-weight: 600; color: var(--green); margin-top: 8px;">无临近结清项目</div>
-      <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">各分期尚有充裕还款周期</div>
+      <div style="font-size: 20px; font-weight: 600; color: var(--green); margin-top: 8px;">{{ t('liabilities.kpi_no_release') }}</div>
+      <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px;">{{ t('liabilities.kpi_sufficient_cycle') }}</div>
     {% endif %}
   </div>
 </div>
@@ -92,26 +92,26 @@
   <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
     <div>
       <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 6px;">
-        <span>📅</span> 模块一：{{ target_month }} 现金流刚性排程流水 (按扣款日升序)
+        <span>📅</span> {{ t('liabilities.m1_title', month=target_month) }}
       </h2>
       <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
-        每月按日核对扣款，清晰追踪各账期自动扣缴进度
+        {{ t('liabilities.m1_desc') }}
       </div>
     </div>
-    <span class="tag tag-primary" style="font-weight: 600;">共 {{ cashflow.events|length }} 笔排程事件</span>
+    <span class="tag tag-primary" style="font-weight: 600;">{{ t('liabilities.m1_count', count=cashflow.events|length) }}</span>
   </div>
 
   <div class="table-responsive">
     <table class="table" style="margin: 0;">
       <thead>
         <tr>
-          <th style="width: 90px;">扣款日</th>
-          <th>项目名称</th>
-          <th>分类/类型</th>
-          <th>扣款账户/卡号</th>
-          <th style="text-align: center;">期数进度</th>
-          <th style="text-align: right;">当期金额 ({{ current_user_currency|default('RM') }})</th>
-          <th style="text-align: center;">状态 / 提醒</th>
+          <th style="width: 90px;">{{ t('liabilities.th_due_day') }}</th>
+          <th>{{ t('liabilities.th_item_name') }}</th>
+          <th>{{ t('liabilities.th_category_type') }}</th>
+          <th>{{ t('liabilities.th_account') }}</th>
+          <th style="text-align: center;">{{ t('liabilities.th_progress') }}</th>
+          <th style="text-align: right;">{{ t('liabilities.th_current_amount', curr=current_user_currency|default('RM')) }}</th>
+          <th style="text-align: center;">{{ t('liabilities.th_status_reminder') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -120,15 +120,15 @@
           <tr>
             <td>
               <span class="badge" style="background: var(--navy); color: #fff; font-size: 12px; padding: 3px 8px; border-radius: 6px; font-weight: 700;">
-                {{ "%02d"|format(ev.day) }}日
+                {{ t('liabilities.day_suffix', day="%02d"|format(ev.day)) }}
               </span>
             </td>
             <td><strong>{{ ev.title }}</strong></td>
             <td>
               {% if ev.type == '免息分期(EPP)' %}
-                <span class="tag" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;">免息分期 (0% EPP)</span>
+                <span class="tag" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;">{{ t('liabilities.type_epp') }}</span>
               {% else %}
-                <span class="tag" style="background: #fef3c7; color: #d97706; border: 1px solid #fde68a;">固定按揭贷款</span>
+                <span class="tag" style="background: #fef3c7; color: #d97706; border: 1px solid #fde68a;">{{ t('liabilities.type_loan') }}</span>
               {% endif %}
             </td>
             <td><span style="color: var(--ink-soft);">{{ ev.accountId }}</span></td>
@@ -144,9 +144,9 @@
                   {{ ev.status }}
                 </span>
               {% elif ev.type == '固定贷款' %}
-                <span class="tag tag-muted">自动扣款预留</span>
+                <span class="tag tag-muted">{{ t('liabilities.status_auto_reserve') }}</span>
               {% else %}
-                <span class="tag tag-muted">随卡账单还款</span>
+                <span class="tag tag-muted">{{ t('liabilities.status_card_bill') }}</span>
               {% endif %}
             </td>
           </tr>
@@ -154,7 +154,7 @@
         {% else %}
           <tr class="empty-row">
             <td colspan="7" style="text-align: center; padding: 32px; color: var(--muted);">
-              {{ target_month }} 暂无任何负债扣款事件或还款计划。请在右上角新增免息分期或贷款。
+              {{ t('liabilities.empty_events', month=target_month) }}
             </td>
           </tr>
         {% endif %}
@@ -170,24 +170,24 @@
   <div class="card">
     <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
       <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 6px;">
-        <span>📱</span> 模块二：大件免息分期 (0% Interest EPP)
+        <span>📱</span> {{ t('liabilities.m2_epp_title') }}
       </h2>
-      <button class="btn btn-outline-primary btn-sm" onclick="openModal('modalInstallment')">+ 录入分期</button>
+      <button class="btn btn-outline-primary btn-sm" onclick="openModal('modalInstallment')">{{ t('liabilities.btn_input_epp') }}</button>
     </div>
 
     <div class="table-responsive">
       <table class="table" style="margin: 0;">
         <thead>
           <tr>
-            <th>分期项目</th>
-            <th>绑定卡片</th>
-            <th style="text-align: right;">原始总额</th>
-            <th style="text-align: right;">每月摊销</th>
-            <th style="width: 140px; text-align: center;">已还期数 / 进度</th>
-            <th style="text-align: right;">剩余本金</th>
-            <th style="text-align: center;">预计结清</th>
-            <th style="text-align: center;">释放现金流</th>
-            <th style="text-align: center;">操作</th>
+            <th>{{ t('liabilities.th_epp_item') }}</th>
+            <th>{{ t('liabilities.th_epp_card') }}</th>
+            <th style="text-align: right;">{{ t('liabilities.th_total_amount') }}</th>
+            <th style="text-align: right;">{{ t('liabilities.th_monthly_amort') }}</th>
+            <th style="width: 140px; text-align: center;">{{ t('liabilities.th_paid_progress') }}</th>
+            <th style="text-align: right;">{{ t('liabilities.th_remaining_principal') }}</th>
+            <th style="text-align: center;">{{ t('liabilities.th_est_settle') }}</th>
+            <th style="text-align: center;">{{ t('liabilities.th_cashflow_release') }}</th>
+            <th style="text-align: center;">{{ t('common.actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -197,7 +197,7 @@
               <td>
                 <strong>{{ inst.title }}</strong>
                 {% if inst.status == 'completed' %}
-                  <span class="tag tag-success" style="margin-left: 4px;">已结清</span>
+                  <span class="tag tag-success" style="margin-left: 4px;">{{ t('liabilities.tag_completed') }}</span>
                 {% endif %}
               </td>
               <td><span style="color: var(--ink-soft); font-size: 13px;">{{ inst.card_name or '—' }}</span></td>
@@ -218,10 +218,10 @@
                 {{ inst.settle_month }}
               </td>
               <td class="sensitive-val" style="text-align: center; font-weight: 600; color: var(--green);">
-                +{{ inst.monthly_amount|money }}/月
+                +{{ inst.monthly_amount|money }}/{{ t('dashboard.current_month') }}
               </td>
               <td style="text-align: center;">
-                <form method="post" action="{{ url_for('api_delete_liability', item_type='installment', item_id=inst.id) }}" style="display:inline;" onsubmit="return confirm('确定删除该分期记录吗？');">
+                <form method="post" action="{{ url_for('api_delete_liability', item_type='installment', item_id=inst.id) }}" style="display:inline;" onsubmit="return confirm('{{ t('liabilities.del_epp_confirm') }}');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="btn-ghost btn-sm" style="color: var(--danger); padding: 2px 6px;">&times;</button>
                 </form>
@@ -230,7 +230,7 @@
             {% endfor %}
           {% else %}
             <tr class="empty-row">
-              <td colspan="9" style="text-align: center; padding: 24px; color: var(--muted);">暂无免息分期记录</td>
+              <td colspan="9" style="text-align: center; padding: 24px; color: var(--muted);">{{ t('liabilities.empty_epp') }}</td>
             </tr>
           {% endif %}
         </tbody>
@@ -242,24 +242,24 @@
   <div class="card">
     <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
       <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 6px;">
-        <span>🏠</span> 模块二：固定摊销按揭贷款 (Fixed Loans)
+        <span>🏠</span> {{ t('liabilities.m2_loan_title') }}
       </h2>
-      <button class="btn btn-outline-primary btn-sm" onclick="openModal('modalLoan')">+ 录入贷款</button>
+      <button class="btn btn-outline-primary btn-sm" onclick="openModal('modalLoan')">{{ t('liabilities.btn_input_loan') }}</button>
     </div>
 
     <div class="table-responsive">
       <table class="table" style="margin: 0;">
         <thead>
           <tr>
-            <th>贷款项目</th>
-            <th>扣款银行账户</th>
-            <th style="text-align: right;">贷款总本金</th>
-            <th style="text-align: center;">年化利率</th>
-            <th style="text-align: center;">还款方式</th>
-            <th style="text-align: right;">每月月供</th>
-            <th style="text-align: center;">固定扣款日</th>
-            <th style="text-align: right;">当前剩余本金</th>
-            <th style="text-align: center;">操作</th>
+            <th>{{ t('liabilities.th_loan_item') }}</th>
+            <th>{{ t('liabilities.th_debit_bank') }}</th>
+            <th style="text-align: right;">{{ t('liabilities.th_loan_principal') }}</th>
+            <th style="text-align: center;">{{ t('liabilities.th_interest_rate') }}</th>
+            <th style="text-align: center;">{{ t('liabilities.th_repay_method') }}</th>
+            <th style="text-align: right;">{{ t('liabilities.th_monthly_payment') }}</th>
+            <th style="text-align: center;">{{ t('liabilities.th_fixed_day') }}</th>
+            <th style="text-align: right;">{{ t('liabilities.th_remaining_principal') }}</th>
+            <th style="text-align: center;">{{ t('common.actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -267,25 +267,25 @@
             {% for loan in loans %}
             <tr>
               <td><strong>{{ loan.title }}</strong></td>
-              <td><span style="color: var(--ink-soft); font-size: 13px;">{{ loan.account_name or '主账户' }}</span></td>
+              <td><span style="color: var(--ink-soft); font-size: 13px;">{{ loan.account_name or t('common.account') }}</span></td>
               <td class="sensitive-val" style="text-align: right;">{{ loan.loan_amount|money }}</td>
               <td style="text-align: center; font-weight: 600;">{{ loan.annual_interest_rate }}%</td>
               <td style="text-align: center;">
                 {% if loan.method == 'flat_rate' %}
-                  <span class="tag" style="background: #f1f5f9; color: #475569;">车贷平息法</span>
+                  <span class="tag" style="background: #f1f5f9; color: #475569;">{{ t('liabilities.method_flat') }}</span>
                 {% else %}
-                  <span class="tag" style="background: #eef2ff; color: #4338ca;">等额本息</span>
+                  <span class="tag" style="background: #eef2ff; color: #4338ca;">{{ t('liabilities.method_reducing') }}</span>
                 {% endif %}
               </td>
               <td class="sensitive-val" style="text-align: right; font-weight: 700; color: #e11d48;">
                 {{ loan.monthly_payment|money }}
               </td>
-              <td style="text-align: center;">每月 {{ "%02d"|format(loan.due_day) }} 日</td>
+              <td style="text-align: center;">{{ t('liabilities.monthly_day_fmt', day="%02d"|format(loan.due_day)) }}</td>
               <td class="sensitive-val" style="text-align: right; font-weight: 700; color: var(--navy);">
                 {{ loan.remaining_balance|money }}
               </td>
               <td style="text-align: center;">
-                <form method="post" action="{{ url_for('api_delete_liability', item_type='loan', item_id=loan.id) }}" style="display:inline;" onsubmit="return confirm('确定删除该贷款项目吗？');">
+                <form method="post" action="{{ url_for('api_delete_liability', item_type='loan', item_id=loan.id) }}" style="display:inline;" onsubmit="return confirm('{{ t('liabilities.del_loan_confirm') }}');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="btn-ghost btn-sm" style="color: var(--danger); padding: 2px 6px;">&times;</button>
                 </form>
@@ -294,7 +294,7 @@
             {% endfor %}
           {% else %}
             <tr class="empty-row">
-              <td colspan="9" style="text-align: center; padding: 24px; color: var(--muted);">暂无固定按揭贷款记录</td>
+              <td colspan="9" style="text-align: center; padding: 24px; color: var(--muted);">{{ t('liabilities.empty_loans') }}</td>
             </tr>
           {% endif %}
         </tbody>
@@ -310,56 +310,56 @@
 <div id="modalInstallment" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 999; justify-content: center; align-items: center; padding: 16px;">
   <div class="card" style="width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--navy);">+ 新增大件免息分期 (0% EPP)</h3>
+      <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--navy);">{{ t('liabilities.modal_epp_title') }}</h3>
       <button type="button" class="btn-ghost" onclick="closeModal('modalInstallment')">&times;</button>
     </div>
     <form method="post" action="{{ url_for('api_add_installment') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div style="margin-bottom: 12px;">
-        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">分期商品名称 *</label>
-        <input type="text" name="title" required placeholder="如：iPhone 16 / 大件家电" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_title') }}</label>
+        <input type="text" name="title" required placeholder="{{ t('liabilities.form_title_ph') }}" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">商品总额 ({{ current_user_currency|default('RM') }}) *</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_total_amount', curr=current_user_currency|default('RM')) }}</label>
           <input type="number" step="0.01" name="total_amount" id="inst_total" required placeholder="3600.00" oninput="calcInstMonthly()" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">总分期期数 *</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_tenure') }}</label>
           <select name="tenure_months" id="inst_tenure" onchange="calcInstMonthly()" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
-            <option value="3">3 期</option>
-            <option value="6">6 期</option>
-            <option value="12" selected>12 期</option>
-            <option value="24">24 期</option>
-            <option value="36">36 期</option>
+            <option value="3">3</option>
+            <option value="6">6</option>
+            <option value="12" selected>12</option>
+            <option value="24">24</option>
+            <option value="36">36</option>
           </select>
         </div>
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">已还期数</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_paid_periods') }}</label>
           <input type="number" name="paid_periods" value="0" min="0" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">首期扣款日</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_first_due') }}</label>
           <input type="date" name="first_due_date" value="{{ target_month }}-05" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
       </div>
       <div style="margin-bottom: 14px;">
-        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">绑定信用卡</label>
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_bind_card') }}</label>
         <select name="account_id" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
-          <option value="">未指定 (通用卡)</option>
+          <option value="">{{ t('liabilities.unspecified_card') }}</option>
           {% for acc in accounts if acc.type == 'credit_card' %}
-            <option value="{{ acc.id }}">{{ acc.name }} (还款日: {{ acc.due_day or 5 }}日)</option>
+            <option value="{{ acc.id }}">{{ acc.name }} ({{ t('liabilities.form_due_day_label') }}: {{ acc.due_day or 5 }})</option>
           {% endfor %}
         </select>
       </div>
       <div style="padding: 10px; background: var(--bg-soft); border-radius: 6px; margin-bottom: 16px; font-size: 13px; color: var(--ink-soft);">
-        预估每月摊销：<strong id="inst_preview" style="color: #e11d48;">{{ current_user_currency|default('RM') }} 0.00</strong> (尾差自动在首期平摊)
+        {{ t('liabilities.preview_monthly') }}<strong id="inst_preview" style="color: #e11d48;">{{ current_user_currency|default('RM') }} 0.00</strong> {{ t('liabilities.preview_tail') }}
       </div>
       <div style="display: flex; justify-content: flex-end; gap: 10px;">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('modalInstallment')">取消</button>
-        <button type="submit" class="btn btn-primary">保存分期</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalInstallment')">{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn-primary">{{ t('liabilities.save_epp') }}</button>
       </div>
     </form>
   </div>
@@ -369,60 +369,60 @@
 <div id="modalLoan" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 999; justify-content: center; align-items: center; padding: 16px;">
   <div class="card" style="width: 100%; max-width: 500px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--navy);">+ 新增固定贷款 (房贷/车贷/个人贷)</h3>
+      <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--navy);">{{ t('liabilities.modal_loan_title') }}</h3>
       <button type="button" class="btn-ghost" onclick="closeModal('modalLoan')">&times;</button>
     </div>
     <form method="post" action="{{ url_for('api_add_loan') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div style="margin-bottom: 12px;">
-        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">贷款名称 *</label>
-        <input type="text" name="title" required placeholder="如：Maybank 房贷 / Toyota 车贷" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_loan_title') }}</label>
+        <input type="text" name="title" required placeholder="{{ t('liabilities.form_loan_title_ph') }}" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">贷款总本金 ({{ current_user_currency|default('RM') }}) *</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_loan_amount', curr=current_user_currency|default('RM')) }}</label>
           <input type="number" step="0.01" name="loan_amount" required placeholder="500000.00" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">总期数 (月) *</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_loan_tenure') }}</label>
           <input type="number" name="tenure_months" value="360" required placeholder="360" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">年化利率 (%)</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_interest_rate') }}</label>
           <input type="number" step="0.01" name="annual_interest_rate" value="4.25" placeholder="4.25" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">每月固定月供 ({{ current_user_currency|default('RM') }})</label>
-          <input type="number" step="0.01" name="monthly_payment" placeholder="留空则按公式自动算" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_monthly_payment', curr=current_user_currency|default('RM')) }}</label>
+          <input type="number" step="0.01" name="monthly_payment" placeholder="{{ t('liabilities.form_monthly_payment_ph') }}" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">还款计算方式</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_payment_calc') }}</label>
           <select name="method" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
-            <option value="reducing_balance">等额本息 / 减少余额法 (房贷)</option>
-            <option value="flat_rate">车贷平息法 (Flat Rate)</option>
+            <option value="reducing_balance">{{ t('liabilities.method_reducing_opt') }}</option>
+            <option value="flat_rate">{{ t('liabilities.method_flat_opt') }}</option>
           </select>
         </div>
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">每月扣款日 *</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_due_day') }}</label>
           <input type="number" name="due_day" value="5" min="1" max="31" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
       </div>
       <div style="margin-bottom: 16px;">
-        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">扣款银行账户</label>
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_debit_account') }}</label>
         <select name="debit_account_id" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
-          <option value="">默认银行账户</option>
+          <option value="">{{ t('liabilities.default_bank_account') }}</option>
           {% for acc in accounts if acc.type == 'savings' %}
             <option value="{{ acc.id }}">{{ acc.name }}</option>
           {% endfor %}
         </select>
       </div>
       <div style="display: flex; justify-content: flex-end; gap: 10px;">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('modalLoan')">取消</button>
-        <button type="submit" class="btn btn-primary">保存贷款</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalLoan')">{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn-primary">{{ t('liabilities.save_loan') }}</button>
       </div>
     </form>
   </div>
@@ -432,35 +432,35 @@
 <div id="modalAccount" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 999; justify-content: center; align-items: center; padding: 16px;">
   <div class="card" style="width: 100%; max-width: 440px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--navy);">+ 绑定卡片 / 银行账户</h3>
+      <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--navy);">{{ t('liabilities.modal_account_title') }}</h3>
       <button type="button" class="btn-ghost" onclick="closeModal('modalAccount')">&times;</button>
     </div>
     <form method="post" action="{{ url_for('api_add_account') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div style="margin-bottom: 12px;">
-        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">账户 / 卡片名称 *</label>
-        <input type="text" name="name" required placeholder="如：Maybank 储蓄卡 / Public Bank Visa" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_account_name') }}</label>
+        <input type="text" name="name" required placeholder="{{ t('liabilities.form_account_name_ph') }}" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
       </div>
       <div style="margin-bottom: 12px;">
-        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">账户类型</label>
+        <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_account_type') }}</label>
         <select name="type" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
-          <option value="credit_card">信用卡 (用于挂载分期)</option>
-          <option value="savings">银行储蓄户口 (用于扣除房车贷)</option>
+          <option value="credit_card">{{ t('liabilities.type_cc') }}</option>
+          <option value="savings">{{ t('liabilities.type_savings') }}</option>
         </select>
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">账单日 (Statement)</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_statement_day') }}</label>
           <input type="number" name="statement_day" value="15" min="1" max="31" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
         <div>
-          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">还款日 (Due Day)</label>
+          <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">{{ t('liabilities.form_due_day_label') }}</label>
           <input type="number" name="due_day" value="5" min="1" max="31" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
         </div>
       </div>
       <div style="display: flex; justify-content: flex-end; gap: 10px;">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('modalAccount')">取消</button>
-        <button type="submit" class="btn btn-primary">保存账户</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalAccount')">{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn-primary">{{ t('liabilities.save_account') }}</button>
       </div>
     </form>
   </div>

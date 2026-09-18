@@ -900,7 +900,11 @@ async function rotateCurrentReceipt(angleDelta, isAbsolute = false) {
   const source = currentReceiptFile || (lastReceiptImageContext && lastReceiptImageContext.originalImage);
   if (!source) {
     if (typeof Swal !== 'undefined') {
-      Swal.fire({ icon: 'info', title: '提示', text: '请先拍照或上传小票照片后，方可调整旋转朝向。' });
+      Swal.fire({
+        icon: 'info',
+        title: window.t ? window.t('swal.title_notice', '提示') : '提示',
+        text: window.t ? window.t('swal.rotate_need_photo', '请先拍照或上传小票照片后，方可调整旋转朝向。') : '请先拍照或上传小票照片后，方可调整旋转朝向。'
+      });
     }
     return;
   }
@@ -1658,10 +1662,11 @@ function reparseFromReviewRawText() {
 // 确认并同步到第 2 步 (Step 2)
 function confirmReceiptToStep2() {
   if (reviewItems.length === 0) {
+    const minItemMsg = window.t ? window.t('swal.split_min_item', '清单中暂无有效单品，请至少添加一项') : '清单中暂无有效单品，请至少添加一项';
     if (typeof Swal !== 'undefined') {
-      Swal.fire({ icon: 'warning', title: '提示', text: '清单中暂无有效单品，请至少添加一项' });
+      Swal.fire({ icon: 'warning', title: window.t ? window.t('swal.title_notice', '提示') : '提示', text: minItemMsg });
     } else {
-      alert('清单中暂无有效单品，请至少添加一项');
+      alert(minItemMsg);
     }
     return;
   }
@@ -1712,10 +1717,11 @@ function confirmReceiptToStep2() {
 function parseTextReceipt() {
   const text = document.getElementById('receiptTextInput').value.trim();
   if (!text) {
+    const enterTextMsg = window.t ? window.t('swal.split_enter_text', '请先输入或粘贴小票文本内容') : '请先输入或粘贴小票文本内容';
     if (typeof Swal !== 'undefined') {
-      Swal.fire({ icon: 'warning', title: '提示', text: '请先输入或粘贴小票文本内容' });
+      Swal.fire({ icon: 'warning', title: window.t ? window.t('swal.title_notice', '提示') : '提示', text: enterTextMsg });
     } else {
-      alert('请先输入或粘贴小票文本内容');
+      alert(enterTextMsg);
     }
     return;
   }
@@ -1768,10 +1774,11 @@ function addPerson() {
   const name = input.value.trim();
   if (!name) return;
   if (people.includes(name)) {
+    const personExistMsg = window.t ? window.t('swal.split_person_exists', '该人员已存在') : '该人员已存在';
     if (typeof Swal !== 'undefined') {
-      Swal.fire({ icon: 'warning', title: '提示', text: '该人员已存在', timer: 1500, showConfirmButton: false });
+      Swal.fire({ icon: 'warning', title: window.t ? window.t('swal.title_notice', '提示') : '提示', text: personExistMsg, timer: 1500, showConfirmButton: false });
     } else {
-      alert('该人员已存在');
+      alert(personExistMsg);
     }
     return;
   }
@@ -1861,10 +1868,11 @@ function togglePersonForItem(itemIdx, personName) {
     if (item.assignedTo.length > 1) {
       item.assignedTo.splice(pIdx, 1);
     } else {
+      const assignedMsg = window.t ? window.t('swal.split_item_assigned', '每个项目至少需要分配给一个人') : '每个项目至少需要分配给一个人';
       if (typeof Swal !== 'undefined') {
-        Swal.fire({ icon: 'warning', title: '提示', text: '每个项目至少需要分配给一个人', timer: 1500, showConfirmButton: false });
+        Swal.fire({ icon: 'warning', title: window.t ? window.t('swal.title_notice', '提示') : '提示', text: assignedMsg, timer: 1500, showConfirmButton: false });
       } else {
-        alert('每个项目至少需要分配给一个人');
+        alert(assignedMsg);
       }
       renderItemsTable();
       return;

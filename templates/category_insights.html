@@ -189,7 +189,7 @@
       data: {
         labels: cat.months,
         datasets: [{
-          label: cat.category + ' 支出 (' + currencySym + ')',
+          label: cat.category + ' ' + (window.t ? window.t('common.expense', '支出') : '支出') + ' (' + currencySym + ')',
           data: cat.monthly_values,
           backgroundColor: barColor + (barColor.length === 7 ? 'bf' : ''),
           borderColor: barColor,
@@ -214,10 +214,11 @@
           tooltip: {
             callbacks: {
               label: function (c) {
+                var expLbl = (window.t ? window.t('common.expense', '支出') : '支出') + ': ';
                 if (document.documentElement.classList.contains('privacy-mode')) {
-                  return ' 支出: ••••••';
+                  return ' ' + expLbl + '••••••';
                 }
-                return ' 支出: ' + formatMoney(c.parsed.y, currencySym);
+                return ' ' + expLbl + formatMoney(c.parsed.y, currencySym);
               }
             }
           }

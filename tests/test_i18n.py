@@ -203,3 +203,123 @@ def test_pages_render_in_malay_and_traditional_chinese(logged_in_client):
         # 还原为中文
         logged_in_client.get('/api/set-language?lang=zh')
 
+
+def test_liabilities_subscriptions_recurring_settings_i18n(logged_in_client):
+    try:
+        # 1. 英语环境 (English)
+        logged_in_client.get('/api/set-language?lang=en')
+
+        res = logged_in_client.get('/liabilities')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Liabilities &amp; Installment Tracker' in html or 'Liabilities & Installment Tracker' in html
+        assert 'Total Remaining Debt Principal' in html
+        assert '+ Add Loan' in html
+
+        res = logged_in_client.get('/subscriptions')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Subscriptions &amp; Renewal Radar' in html or 'Subscriptions & Renewal Radar' in html
+        assert 'Monthly Average Burn' in html
+        assert 'Add Subscription' in html
+
+        res = logged_in_client.get('/recurring')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Recurring Transactions' in html
+        assert 'Generate Recurring for This Month' in html
+
+        res = logged_in_client.get('/settings')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Personalization &amp; Preferences' in html or 'Personalization & Preferences' in html
+        assert 'Appearance &amp; Display' in html or 'Appearance & Display' in html
+        assert 'Save Preferences' in html
+
+        # 2. 马来语环境 (Malay)
+        logged_in_client.get('/api/set-language?lang=ms')
+
+        res = logged_in_client.get('/liabilities')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Liabiliti &amp; Penjejak Ansuran' in html or 'Liabiliti & Penjejak Ansuran' in html
+
+        res = logged_in_client.get('/subscriptions')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Hab Langganan &amp; Peringatan Pembaharuan' in html or 'Hab Langganan & Peringatan Pembaharuan' in html
+
+        res = logged_in_client.get('/recurring')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Transaksi Berulang' in html
+
+        res = logged_in_client.get('/settings')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert 'Keutamaan &amp; Tetapan' in html or 'Keutamaan & Tetapan' in html
+
+        # 3. 繁体中文环境 (Traditional Chinese)
+        logged_in_client.get('/api/set-language?lang=zh_TW')
+
+        res = logged_in_client.get('/liabilities')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert '負債與分期付款追蹤' in html
+
+        res = logged_in_client.get('/subscriptions')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert '訂閱服務大廳與續費提醒' in html
+
+        res = logged_in_client.get('/recurring')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert '固定 / 重複收支' in html
+
+        res = logged_in_client.get('/settings')
+        assert res.status_code == 200
+        html = res.get_data(as_text=True)
+        assert '個性化與偏好設定' in html
+    finally:
+        # 还原为中文
+        logged_in_client.get('/api/set-language?lang=zh')
+
+
+def test_dashboard_charts_api_i18n(logged_in_client):
+    try:
+        # 1. English
+        logged_in_client.get('/api/set-language?lang=en')
+        res = logged_in_client.get('/api/dashboard-charts?month=2026-09')
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data['ok'] is True
+        assert data['income']['labels'] == ['Main Income', 'Side Income']
+
+        # 2. Malay
+        logged_in_client.get('/api/set-language?lang=ms')
+        res = logged_in_client.get('/api/dashboard-charts?month=2026-09')
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data['ok'] is True
+        assert data['income']['labels'] == ['Pendapatan Utama', 'Pendapatan Sampingan']
+
+        # 3. Traditional Chinese
+        logged_in_client.get('/api/set-language?lang=zh_TW')
+        res = logged_in_client.get('/api/dashboard-charts?month=2026-09')
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data['ok'] is True
+        assert data['income']['labels'] == ['主業收入', '副業收入']
+
+        # 4. Simplified Chinese
+        logged_in_client.get('/api/set-language?lang=zh')
+        res = logged_in_client.get('/api/dashboard-charts?month=2026-09')
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data['ok'] is True
+        assert data['income']['labels'] == ['主业收入', '副业收入']
+    finally:
+        logged_in_client.get('/api/set-language?lang=zh')
+
+

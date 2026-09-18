@@ -38,8 +38,18 @@
                 window.LEDGER_DATE_FORMAT = '{{ current_date_format|default("YYYY-MM-DD") }}';
                 window.LEDGER_NLP_CONFIRM_REQUIRED = {{ current_nlp_confirm_required|default(1) }};
                 window.LEDGER_BUDGET_START_DAY = {{ current_budget_start_day|default(1) }};
-                window.LEDGER_LANG = '{{ current_lang|default("zh") }}';
                 window.I18N = {{ i18n_client_json | tojson }};
+                window.t = function(key, defaultVal, params) {
+                    var str = (window.I18N && window.I18N[key] !== undefined) ? window.I18N[key] : (defaultVal !== undefined ? defaultVal : key);
+                    if (params && typeof str === 'string') {
+                        for (var k in params) {
+                            if (Object.prototype.hasOwnProperty.call(params, k)) {
+                                str = str.replace(new RegExp('\\{' + k + '\\}', 'g'), params[k]);
+                            }
+                        }
+                    }
+                    return str;
+                };
             } catch (e) { }
         })();
     </script>

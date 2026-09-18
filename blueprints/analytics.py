@@ -4,6 +4,7 @@ from flask import Blueprint, request, jsonify, render_template
 
 from core.db import get_db, get_current_user_id
 from core.utils import shift_month
+from core.i18n import t
 
 analytics_bp = Blueprint('analytics', __name__)
 
@@ -222,7 +223,7 @@ def api_dashboard_charts():
         'ok': True,
         'month': month,
         'income': {
-            'labels': ['主业收入', '副业收入'],
+            'labels': [t('dashboard.main_income', '主业收入'), t('dashboard.side_income', '副业收入')],
             'values': [round(income_group.get('main', 0.0), 2), round(income_group.get('side', 0.0), 2)]
         },
         'expense': {

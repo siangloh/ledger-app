@@ -1,20 +1,20 @@
 {% extends layout|default('base.html') %}
-{% block title %}个性化与系统设置 - 我的记账本{% endblock %}
+{% block title %}{{ t('settings.title', '个性化与系统设置') }} - {{ t('nav.brand', '我的记账本') }}{% endblock %}
 
 {% block content %}
 <div class="settings-container">
   <div class="settings-header">
     <div class="settings-header-left">
       <h2 style="margin: 0; display: flex; align-items: center; gap: 10px;">
-        <span>⚙️</span> 个性化与偏好设置
+        <span>⚙️</span> {{ t('settings.title', '个性化与偏好设置') }}
       </h2>
       <p class="hint" style="margin: 6px 0 0 0;">
-        定制专属于你的视觉主题、默认记账偏好、自动化入账规则与数据备份。
+        {{ t('settings.desc', '定制专属于你的视觉主题、默认记账偏好、自动化入账规则与数据备份。') }}
       </p>
     </div>
     <div class="settings-header-right">
       <span class="settings-user-pill">
-        👤 {{ session.get('username', '用户') }} · 已录入 <strong>{{ stats.tx_count }}</strong> 条交易
+        {{ t('settings.user_pill', '👤 {username} · 已录入 {count} 条交易', username=session.get('username', '用户'), count=stats.tx_count)|safe }}
       </span>
     </div>
   </div>
@@ -27,43 +27,45 @@
       <div class="settings-panel-title">
         <span class="settings-icon">🎨</span>
         <div>
-          <h3>视觉外观与排版</h3>
-          <span class="settings-desc">自定义日间/夜间模式及数据表格显示紧凑度</span>
+          <h3>{{ t('settings.sec_visual', '视觉外观与排版') }}</h3>
+          <span class="settings-desc">{{ t('settings.sec_visual_desc', '自定义日间/夜间模式及数据表格显示紧凑度') }}</span>
         </div>
       </div>
 
       <div class="settings-grid">
         <div class="settings-item">
-          <label class="settings-label">主题模式</label>
+          <label class="settings-label">{{ t('settings.theme_mode', '主题模式') }}</label>
           <div class="settings-pill-group">
             <label class="pill-radio">
               <input type="radio" name="theme_mode" value="system" {{ 'checked' if settings.theme_mode == 'system' }} onchange="previewTheme('system')">
-              <span>🖥️ 跟随系统</span>
+              <span>{{ t('settings.theme_system', '🖥️ 跟随系统') }}</span>
             </label>
             <label class="pill-radio">
               <input type="radio" name="theme_mode" value="dark" {{ 'checked' if settings.theme_mode == 'dark' }} onchange="previewTheme('dark')">
-              <span>🌙 暗黑沉浸</span>
+              <span>{{ t('settings.theme_dark', '🌙 暗黑沉浸') }}</span>
             </label>
             <label class="pill-radio">
               <input type="radio" name="theme_mode" value="light" {{ 'checked' if settings.theme_mode == 'light' }} onchange="previewTheme('light')">
-              <span>☀️ 明亮浅色</span>
+              <span>{{ t('settings.theme_light', '☀️ 明亮浅色') }}</span>
             </label>
           </div>
-          <span class="settings-tip">默认随系统时间自动变换，亦可锁定暗色模式以获得舒适夜间护眼体验。</span>
+          <span class="settings-tip">{{ t('settings.theme_tip', '默认随系统时间自动变换，亦可锁定暗色模式以获得舒适夜间护眼体验。') }}</span>
         </div>
 
         <div class="settings-item">
-          <label class="settings-label">明细表格密度</label>
+          <label class="settings-label">{{ t('settings.table_density', '明细表格密度') }}</label>
           <div class="settings-pill-group">
             <label class="pill-radio">
               <input type="radio" name="table_density" value="comfortable" {{ 'checked' if settings.table_density == 'comfortable' }} onchange="previewDensity('comfortable')">
-              <span>🛋️ 舒适模式 (推荐)</span>
+              <span>{{ t('settings.density_comfortable', '🛋️ 舒适模式 (推荐)') }}</span>
             </label>
             <label class="pill-radio">
               <input type="radio" name="table_density" value="compact" {{ 'checked' if settings.table_density == 'compact' }} onchange="previewDensity('compact')">
-              <span>📑 紧凑高效模式</span>
+              <span>{{ t('settings.density_compact', '📑 紧凑高效模式') }}</span>
             </label>
           </div>
+        </div>
+
         <div class="settings-item">
           <label class="settings-label">{{ t('settings.language_setting') }}</label>
           <div class="settings-pill-group">
@@ -94,14 +96,14 @@
       <div class="settings-panel-title">
         <span class="settings-icon">💰</span>
         <div>
-          <h3>记账偏好与周期规范</h3>
-          <span class="settings-desc">减少重复手动选择，契合你的日常薪资发放与结算周期</span>
+          <h3>{{ t('settings.sec_preferences', '记账偏好与周期规范') }}</h3>
+          <span class="settings-desc">{{ t('settings.sec_preferences_desc', '减少重复手动选择，契合你的日常薪资发放与结算周期') }}</span>
         </div>
       </div>
 
       <div class="settings-grid">
         <div class="settings-item">
-          <label class="settings-label" for="defaultCurrencySelect">默认结算货币与符号</label>
+          <label class="settings-label" for="defaultCurrencySelect">{{ t('settings.default_currency', '默认结算货币与符号') }}</label>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <select id="defaultCurrencySelect" name="default_currency" style="width: 140px; font-weight: 600;" onchange="onCurrencySelectChange(this)">
               {% for code, label in [
@@ -131,37 +133,37 @@
               <button type="button" class="chip-btn" onclick="setCurrencySymbol('€')">€</button>
             </div>
           </div>
-          <span class="settings-tip">账本核心币种代号及前端金额、报表与自动记账的前置货币符号。</span>
+          <span class="settings-tip">{{ t('settings.default_currency_tip', '账本核心币种代号及前端金额、报表与自动记账的前置货币符号。') }}</span>
         </div>
 
         <div class="settings-item">
-          <label class="settings-label" for="dateFormatSelect">日期显示格式</label>
+          <label class="settings-label" for="dateFormatSelect">{{ t('settings.date_format', '日期显示格式') }}</label>
           <select id="dateFormatSelect" name="date_format">
-            <option value="YYYY-MM-DD" {{ 'selected' if settings.date_format == 'YYYY-MM-DD' }}>YYYY-MM-DD (例如 2026-09-16 · ISO 标准)</option>
-            <option value="DD/MM/YYYY" {{ 'selected' if settings.date_format == 'DD/MM/YYYY' }}>DD/MM/YYYY (例如 16/09/2026 · 英式/大马)</option>
-            <option value="MM/DD/YYYY" {{ 'selected' if settings.date_format == 'MM/DD/YYYY' }}>MM/DD/YYYY (例如 09/16/2026 · 美式规范)</option>
-            <option value="YYYY/MM/DD" {{ 'selected' if settings.date_format == 'YYYY/MM/DD' }}>YYYY/MM/DD (例如 2026/09/16)</option>
+            <option value="YYYY-MM-DD" {{ 'selected' if settings.date_format == 'YYYY-MM-DD' }}>YYYY-MM-DD (2026-09-16 · ISO)</option>
+            <option value="DD/MM/YYYY" {{ 'selected' if settings.date_format == 'DD/MM/YYYY' }}>DD/MM/YYYY (16/09/2026)</option>
+            <option value="MM/DD/YYYY" {{ 'selected' if settings.date_format == 'MM/DD/YYYY' }}>MM/DD/YYYY (09/16/2026)</option>
+            <option value="YYYY/MM/DD" {{ 'selected' if settings.date_format == 'YYYY/MM/DD' }}>YYYY/MM/DD (2026/09/16)</option>
           </select>
-          <span class="settings-tip">控制账目列表、报表卡片中交易日期的格式化展示。</span>
+          <span class="settings-tip">{{ t('settings.date_format_tip', '控制账目列表、报表卡片中交易日期的格式化展示。') }}</span>
         </div>
 
         <div class="settings-item">
-          <label class="settings-label">数字千分位规范</label>
+          <label class="settings-label">{{ t('settings.number_format', '数字千分位规范') }}</label>
           <div class="settings-pill-group">
             <label class="pill-radio">
               <input type="radio" name="number_format" value="comma" {{ 'checked' if settings.number_format != 'space' }}>
-              <span>1,234.56 (逗号分隔 · 推荐)</span>
+              <span>{{ t('settings.number_comma', '1,234.56 (逗号分隔 · 推荐)') }}</span>
             </label>
             <label class="pill-radio">
               <input type="radio" name="number_format" value="space" {{ 'checked' if settings.number_format == 'space' }}>
-              <span>1 234.56 (空格分隔)</span>
+              <span>{{ t('settings.number_space', '1 234.56 (空格分隔)') }}</span>
             </label>
           </div>
-          <span class="settings-tip">全局数值千分位间隔规范。</span>
+          <span class="settings-tip">{{ t('settings.number_format_tip', '全局数值千分位间隔规范。') }}</span>
         </div>
 
         <div class="settings-item">
-          <label class="settings-label" for="timezoneSelect">时区管理</label>
+          <label class="settings-label" for="timezoneSelect">{{ t('settings.timezone', '时区管理') }}</label>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <select id="timezoneSelect" name="timezone" style="flex: 1; min-width: 220px;">
               {% for tz_val, tz_lbl in [
@@ -182,63 +184,63 @@
               {% endfor %}
             </select>
             <button type="button" class="btn-secondary btn-sm" onclick="detectUserTimezone()" title="读取当前浏览器时区">
-              🌐 自动探测
+              {{ t('settings.btn_detect_tz', '🌐 自动探测') }}
             </button>
           </div>
-          <span class="settings-tip">用于锁定记账日期基准，防止月末或跨国时因时区错位造成跨月数据漂移。</span>
+          <span class="settings-tip">{{ t('settings.timezone_tip', '用于锁定记账日期基准，防止月末或跨国时因时区错位造成跨月数据漂移。') }}</span>
         </div>
 
         <div class="settings-item">
-          <label class="settings-label" for="defaultAccountSelect">快捷录入默认账户</label>
+          <label class="settings-label" for="defaultAccountSelect">{{ t('settings.default_account', '快捷录入默认账户') }}</label>
           <select id="defaultAccountSelect" name="default_account_id">
-            <option value="none">-- 每次手动选择 --</option>
+            <option value="none">{{ t('settings.account_manual', '-- 每次手动选择 --') }}</option>
             {% for acc in accounts %}
             <option value="{{ acc.id }}" {{ 'selected' if settings.default_account_id == acc.id }}>
               🏦 {{ acc.name }} ({{ acc.currency }})
             </option>
             {% endfor %}
           </select>
-          <span class="settings-tip">在首页快速记账与自动扣款时，优先预选此账户。<a href="{{ url_for('liabilities.accounts_page') }}" class="btn-link" style="font-size:12px; margin-left:6px;">管理账户 &rarr;</a></span>
+          <span class="settings-tip">{{ t('settings.default_account_tip', '在首页快速记账与自动扣款时，优先预选此账户。') }}<a href="{{ url_for('liabilities.accounts_page') }}" class="btn-link" style="font-size:12px; margin-left:6px;">{{ t('settings.manage_accounts', '管理账户 →') }}</a></span>
         </div>
 
         <div class="settings-item">
-          <label class="settings-label">默认收入分组</label>
+          <label class="settings-label">{{ t('settings.default_income_group', '默认收入分组') }}</label>
           <div class="settings-pill-group">
             <label class="pill-radio">
               <input type="radio" name="default_group" value="main" {{ 'checked' if settings.default_group == 'main' }}>
-              <span>💼 主业收入</span>
+              <span>{{ t('settings.group_main', '💼 主业收入') }}</span>
             </label>
             <label class="pill-radio">
               <input type="radio" name="default_group" value="side" {{ 'checked' if settings.default_group == 'side' }}>
-              <span>🌱 副业/投资收入</span>
+              <span>{{ t('settings.group_side', '🌱 副业/投资收入') }}</span>
             </label>
           </div>
-          <span class="settings-tip">录入收入时默认选中的分组归类。</span>
+          <span class="settings-tip">{{ t('settings.default_group_tip', '录入收入时默认选中的分组归类。') }}</span>
         </div>
 
         <div class="settings-item">
-          <label class="settings-label" for="budgetStartDayInput">月度预算与账单起始日</label>
+          <label class="settings-label" for="budgetStartDayInput">{{ t('settings.budget_start_day', '月度预算与账单起始日') }}</label>
           <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="color: var(--muted); font-size: 13.5px;">每月</span>
+            <span style="color: var(--muted); font-size: 13.5px;">{{ t('settings.budget_prefix', '每月') }}</span>
             <input type="number" id="budgetStartDayInput" name="budget_start_day" min="1" max="31" value="{{ settings.budget_start_day }}" style="width: 80px; text-align: center;" required>
-            <span style="color: var(--muted); font-size: 13.5px;">号开始统计</span>
+            <span style="color: var(--muted); font-size: 13.5px;">{{ t('settings.budget_suffix', '号开始统计') }}</span>
           </div>
-          <span class="settings-tip">如设为 25，则月度预算将按每月 25 日至次月 24 日发薪周期自动聚合。</span>
+          <span class="settings-tip">{{ t('settings.budget_start_day_tip', '如设为 25，则月度预算将按每月 25 日至次月 24 日发薪周期自动聚合。') }}</span>
         </div>
 
         <div class="settings-item">
-          <label class="settings-label">首页初始视图</label>
+          <label class="settings-label">{{ t('settings.default_view', '首页初始视图') }}</label>
           <div class="settings-pill-group">
             <label class="pill-radio">
               <input type="radio" name="default_dashboard_view" value="monthly" {{ 'checked' if settings.default_dashboard_view == 'monthly' }}>
-              <span>📅 当月收支与录入卡片</span>
+              <span>{{ t('settings.view_monthly', '📅 当月收支与录入卡片') }}</span>
             </label>
             <label class="pill-radio">
               <input type="radio" name="default_dashboard_view" value="overview" {{ 'checked' if settings.default_dashboard_view == 'overview' }}>
-              <span>📊 总体宏观走势大盘</span>
+              <span>{{ t('settings.view_overview', '📊 总体宏观走势大盘') }}</span>
             </label>
           </div>
-          <span class="settings-tip">打开账本首页时默认聚焦的控制面板。</span>
+          <span class="settings-tip">{{ t('settings.default_view_tip', '打开账本首页时默认聚焦的控制面板。') }}</span>
         </div>
       </div>
     </section>
@@ -248,47 +250,47 @@
       <div class="settings-panel-title">
         <span class="settings-icon">⚡</span>
         <div>
-          <h3>自动化记账与交互反馈</h3>
-          <span class="settings-desc">通知防重滑窗时长及原生端物理震动反馈</span>
+          <h3>{{ t('settings.sec_automation', '自动化记账与交互反馈') }}</h3>
+          <span class="settings-desc">{{ t('settings.sec_automation_desc', '通知防重滑窗时长及原生端物理震动反馈') }}</span>
         </div>
       </div>
 
       <div class="settings-grid">
         <div class="settings-item">
-          <label class="settings-label" for="dedupWindowSelect">通知幂等去重滑窗</label>
+          <label class="settings-label" for="dedupWindowSelect">{{ t('settings.dedup_window', '通知幂等去重滑窗') }}</label>
           <select id="dedupWindowSelect" name="dedup_window_minutes">
-            <option value="30" {{ 'selected' if settings.dedup_window_minutes == 30 }}>30 分钟 (适合高频频繁刷卡)</option>
-            <option value="60" {{ 'selected' if settings.dedup_window_minutes == 60 }}>60 分钟 (1 小时)</option>
-            <option value="120" {{ 'selected' if settings.dedup_window_minutes == 120 }}>120 分钟 (2 小时 · 官方推荐)</option>
-            <option value="240" {{ 'selected' if settings.dedup_window_minutes == 240 }}>240 分钟 (4 小时 · 严谨防重)</option>
+            <option value="30" {{ 'selected' if settings.dedup_window_minutes == 30 }}>30 min</option>
+            <option value="60" {{ 'selected' if settings.dedup_window_minutes == 60 }}>60 min (1 h)</option>
+            <option value="120" {{ 'selected' if settings.dedup_window_minutes == 120 }}>120 min (2 h)</option>
+            <option value="240" {{ 'selected' if settings.dedup_window_minutes == 240 }}>240 min (4 h)</option>
           </select>
-          <span class="settings-tip">银行或钱包在离线恢复时若补发同一条扣款通知，在此时间窗口内将自动拦截丢弃。<a href="{{ url_for('auto_track.auto_track_page') }}" class="btn-link" style="font-size:12px; margin-left:6px;">配置自动记账 &rarr;</a></span>
+          <span class="settings-tip">{{ t('settings.dedup_window_tip', '银行或钱包在离线恢复时若补发同一条扣款通知，在此时间窗口内将自动拦截丢弃。') }}<a href="{{ url_for('auto_track.auto_track_page') }}" class="btn-link" style="font-size:12px; margin-left:6px;">{{ t('settings.configure_auto', '配置自动记账 →') }}</a></span>
         </div>
 
         <div class="settings-item">
-          <label class="settings-label">触感与震动反馈 (Haptic)</label>
+          <label class="settings-label">{{ t('settings.haptic_feedback', '触感与震动反馈 (Haptic)') }}</label>
           <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
             <label class="toggle-switch">
               <input type="checkbox" name="haptic_feedback" value="1" {{ 'checked' if settings.haptic_feedback == 1 }}>
               <span class="toggle-slider"></span>
             </label>
-            <span style="font-size: 13.5px; color: var(--ink);">在记账成功、快捷操作及撤销时触发手机微震</span>
+            <span style="font-size: 13.5px; color: var(--ink);">{{ t('settings.haptic_desc', '在记账成功、快捷操作及撤销时触发手机微震') }}</span>
           </div>
-          <span class="settings-tip">需要设备支持 Vibration API 或运行在 Android 原生伴侣端。</span>
+          <span class="settings-tip">{{ t('settings.haptic_tip', '需要设备支持 Vibration API 或运行在 Android 原生伴侣端。') }}</span>
         </div>
 
         <div class="settings-item">
-          <label class="settings-label">自然语言智能记账确认</label>
+          <label class="settings-label">{{ t('settings.nlp_confirm', '自然语言智能记账确认') }}</label>
           <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
             <label class="toggle-switch">
-              <input type="checkbox" name="nlp_confirm_required" value="1" id="nlpConfirmToggle" {{ 'checked' if settings.nlp_confirm_required == 1 }} onchange="document.getElementById('nlpConfirmLabel').textContent = this.checked ? '自然语言解析后弹出二次确认弹窗 (推荐)' : '自然语言解析后直接自动入账 (免确认)';">
+              <input type="checkbox" name="nlp_confirm_required" value="1" id="nlpConfirmToggle" {{ 'checked' if settings.nlp_confirm_required == 1 }} onchange="document.getElementById('nlpConfirmLabel').textContent = this.checked ? (window.t ? window.t('settings.nlp_confirm_on', '自然语言解析后弹出二次确认弹窗 (推荐)') : '自然语言解析后弹出二次确认弹窗 (推荐)') : (window.t ? window.t('settings.nlp_confirm_off', '自然语言解析后直接自动入账 (免确认)') : '自然语言解析后直接自动入账 (免确认)');">
               <span class="toggle-slider"></span>
             </label>
             <span style="font-size: 13.5px; color: var(--ink);" id="nlpConfirmLabel">
-              {{ '自然语言解析后弹出二次确认弹窗 (推荐)' if settings.nlp_confirm_required == 1 else '自然语言解析后直接自动入账 (免确认)' }}
+              {{ t('settings.nlp_confirm_on', '自然语言解析后弹出二次确认弹窗 (推荐)') if settings.nlp_confirm_required == 1 else t('settings.nlp_confirm_off', '自然语言解析后直接自动入账 (免确认)') }}
             </span>
           </div>
-          <span class="settings-tip">关闭后，智能记账将在解析完成后直接保存入账；若遇到解析警告或金额不明确，系统仍会自动弹出确认以策安全。</span>
+          <span class="settings-tip">{{ t('settings.nlp_confirm_tip', '关闭后，智能记账将在解析完成后直接保存入账；若遇到解析警告或金额不明确，系统仍会自动弹出确认以策安全。') }}</span>
         </div>
       </div>
     </section>
@@ -296,10 +298,10 @@
     <!-- 底部保存浮动控制条 -->
     <div class="settings-actions-bar">
       <button type="submit" class="btn-primary" id="btnSaveSettings" style="min-width: 140px;">
-        💾 保存偏好设置
+        {{ t('settings.btn_save', '💾 保存偏好设置') }}
       </button>
       <button type="button" class="btn-ghost" onclick="resetToDefaults()">
-        🔄 恢复默认配置
+        {{ t('settings.btn_reset', '🔄 恢复默认配置') }}
       </button>
     </div>
   </form>
@@ -309,27 +311,27 @@
     <div class="settings-panel-title">
       <span class="settings-icon">🛡️</span>
       <div>
-        <h3>数据备份与隐私主权</h3>
-        <span class="settings-desc">随时导出当前账户名下全部财务数据，拥有完整离线数据控制权</span>
+        <h3>{{ t('settings.sec_backup', '数据备份与隐私主权') }}</h3>
+        <span class="settings-desc">{{ t('settings.sec_backup_desc', '随时导出当前账户名下全部财务数据，拥有完整离线数据控制权') }}</span>
       </div>
     </div>
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 12px 0 16px 0; border-bottom: 1px solid var(--border);">
       <div>
-        <div style="font-size: 14px; font-weight: 600; color: var(--ink);">导出全量个人记账档案 (JSON 格式)</div>
-        <div style="font-size: 12.5px; color: var(--muted); margin-top: 4px;">包含全部历史交易明细、多币种账户、分类预算、固定收支、分期与周期订阅。</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--ink);">{{ t('settings.export_json_title', '导出全量个人记账档案 (JSON 格式)') }}</div>
+        <div style="font-size: 12.5px; color: var(--muted); margin-top: 4px;">{{ t('settings.export_json_desc', '包含全部历史交易明细、多币种账户、分类预算、固定收支、分期与周期订阅。') }}</div>
       </div>
       <a href="{{ url_for('settings.api_export_data') }}" class="btn-secondary" download style="display: inline-flex; align-items: center; gap: 6px;">
-        <span>📥</span> 导出 JSON 备份
+        {{ t('settings.btn_export_json', '📥 导出 JSON 备份') }}
       </a>
     </div>
 
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 16px 0 6px 0;">
       <div>
-        <div style="font-size: 14px; font-weight: 600; color: var(--ink);">导出交易流水明细 (UTF-8 CSV 格式)</div>
-        <div style="font-size: 12.5px; color: var(--muted); margin-top: 4px;">标准 UTF-8 with BOM 编码格式，完美兼容 Microsoft Excel、WPS Office、Numbers 直接双击打开，中文及多币种符号绝不乱码。</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--ink);">{{ t('settings.export_csv_title', '导出交易流水明细 (UTF-8 CSV 格式)') }}</div>
+        <div style="font-size: 12.5px; color: var(--muted); margin-top: 4px;">{{ t('settings.export_csv_desc', '标准 UTF-8 with BOM 编码格式，完美兼容 Microsoft Excel、WPS Office、Numbers 直接双击打开，中文及多币种符号绝不乱码。') }}</div>
       </div>
       <a href="{{ url_for('settings.api_export_data', format='csv') }}" class="btn-secondary" download style="display: inline-flex; align-items: center; gap: 6px; border-color: rgba(16, 185, 129, 0.4); color: var(--income);">
-        <span>📊</span> 导出 Excel/CSV
+        {{ t('settings.btn_export_csv', '📊 导出 Excel/CSV') }}
       </a>
     </div>
   </section>
@@ -546,7 +548,7 @@ function detectUserTimezone() {
           toast: true,
           position: 'top-end',
           icon: 'success',
-          title: '已侦测到本地时区: ' + tz,
+          title: window.t ? window.t('swal.timezone_detected', '已侦测到本地时区: {tz}', {tz: tz}) : ('已侦测到本地时区: ' + tz),
           showConfirmButton: false,
           timer: 2000
         });
@@ -606,26 +608,27 @@ async function handleSettingsSave(e) {
           toast: true,
           position: 'top-end',
           icon: 'success',
-          title: data.message || '个性化偏好已保存',
+          title: data.message || (window.t ? window.t('swal.saved_success', '个性化偏好已保存') : '个性化偏好已保存'),
           showConfirmButton: false,
           timer: 2000,
           customClass: { popup: 'app-swal-toast' }
         });
       } else {
-        alert(data.message || '保存成功');
+        alert(data.message || (window.t ? window.t('common.success', '保存成功') : '保存成功'));
       }
     } else {
-      alert(data.message || '保存失败');
+      alert(data.message || (window.t ? window.t('common.failed', '保存失败') : '保存失败'));
     }
   } catch (err) {
-    alert('网络连接异常，未能完成保存');
+    alert(window.t ? window.t('swal.network_error', '网络请求超时或服务错误') : '网络连接异常，未能完成保存');
   } finally {
     if (btn) btn.disabled = false;
   }
 }
 
 async function resetToDefaults() {
-  if (!confirm('确定要将所有偏好设置恢复为系统出厂默认值吗？')) return;
+  const confirmMsg = window.t ? window.t('swal.reset_confirm', '确定要将所有偏好设置恢复为系统出厂默认值吗？') : '确定要将所有偏好设置恢复为系统出厂默认值吗？';
+  if (!confirm(confirmMsg)) return;
   try {
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     const res = await fetch('/api/settings/reset', {
@@ -644,10 +647,10 @@ async function resetToDefaults() {
       } catch (err) {}
       window.location.reload();
     } else {
-      alert(data.message || '恢复默认失败');
+      alert(data.message || (window.t ? window.t('common.failed', '恢复默认失败') : '恢复默认失败'));
     }
   } catch (e) {
-    alert('网络异常');
+    alert(window.t ? window.t('swal.network_error', '网络请求超时或服务错误') : '网络异常');
   }
 }
 </script>
