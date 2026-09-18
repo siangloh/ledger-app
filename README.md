@@ -1,8 +1,7 @@
 <div align="center">
 
 # 💎 Ledger App
-### 现代隐私优先 · 智能自动化个人记账与财务分析系统
-**Privacy-First, Self-Hosted Personal Bookkeeping & Analytics Platform**
+### Privacy-First, Intelligent & Automated Personal Finance Management System
 
 [![Tests](https://img.shields.io/badge/Tests-104%20passed-success?style=flat-square&logo=pytest)](file:///c:/Users/USER/Downloads/ledger-app/tests)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue?style=flat-square&logo=python)](https://www.python.org/)
@@ -11,65 +10,68 @@
 [![Database](https://img.shields.io/badge/Database-SQLite%20%7C%20Turso%20Cloud-informational?style=flat-square&logo=sqlite)](https://turso.tech/)
 [![Code Style](https://img.shields.io/badge/Code%20Style-Flake8%20Pass-success?style=flat-square)](https://flake8.pycqa.org/)
 
-[English](README.md) · [简体中文](README.md) · [架构工程报告 (Word & MD)](file:///c:/Users/USER/Downloads/ledger-app/docs/Ledger_App_Architecture_Report.md)
+**Languages / 语言选择 / Pilihan Bahasa:**  
+**[English](README.md)** · **[简体中文](README_zh.md)** · **[Bahasa Melayu](README_ms.md)** · **[繁體中文](README_zh_TW.md)**  
+[Architecture Engineering Report (Word .docx)](file:///c:/Users/USER/Downloads/ledger-app/LEDGER_APP_ARCHITECTURE_REPORT.docx) · [Architecture Report (Markdown)](file:///c:/Users/USER/Downloads/ledger-app/docs/Ledger_App_Architecture_Report.md)
 
 </div>
 
 ---
 
-## 📖 项目简介 (Overview)
+## 📖 Overview
 
-**Ledger App** 是一套专为注重个人财务隐私、追求极简高效与深度分析的用户打造的全功能智能记账系统。  
-区别于传统商业记账软件充斥广告、强制联网云端、存在数据倒卖隐患的问题，本系统提供 **100% 数据自主掌控（Self-Hosted）**，并结合 **Android 原生后台监听** 与 **本地离线 RapidOCR 图像引擎**，实现了从出账捕获、智能分账、预算监控到长周期宏观分析的完整闭环。
+**Ledger App** is an all-in-one personal finance, bookkeeping, and analytics suite designed for individuals and households who prioritize **financial privacy**, **seamless automation**, and **in-depth financial insights**.
+
+Unlike commercial bookkeeping applications that harvest personal transaction data, serve targeted advertisements, or lock data behind proprietary cloud subscriptions, Ledger App is **100% self-hosted, open, and private**. It bridges the gap between real-world transactions and digital accounting through an **Android native background listener** and an **on-device offline RapidOCR receipt scanner**, providing a frictionless workflow from expense capture to long-term analytics.
 
 ---
 
-## ✨ 核心特性矩阵 (Key Features)
+## ✨ Key Features Matrix
 
-| 模块 | 功能亮点 | 架构与实现方案 |
+| Module | Highlights | Technical Implementation |
 | :--- | :--- | :--- |
-| 📱 **无感自动记账** | 监听各大银行、电子钱包支付通知并秒级自动录入 | 基于 Android 原生 `NotificationListenerService`，配置应用白名单与防重放 API Token |
-| 🛡️ **开闭策略解析器** | 针对 Touch 'n Go, Grab, Maybank 等渠道推行策略模式 | 采用策略模式 (`NotificationParserStrategy`) 与 `@register_parser` 自动注册，杜绝巨型 `if/elif` |
-| 🧾 **小票 AA 智能分账** | 拍小票自动提取品名单价、税率并一键多人分摊 | 基于轻量 RapidOCR ONNX 推理，独创 0°/90°/180°/270° 自适应朝向纠偏与 SST/服务费拆分 |
-| 🔄 **朋友还款支出冲抵** | 垫资聚餐后朋友还钱？一键冲抵原消费记录 | 自动关联原支出扣减实付金额，联动重算结余，具备滑动时间窗口防内部自转误判机制 |
-| 📊 **交互式仪表盘** | 月度即时概览 + 总体历史宏观趋势图 + 分类占比 | 基于 Chart.js 4.x 构建，独创基于物理内径的环形图中心文本自适应防遮挡算法 |
-| 👁️ **隐私脱敏模式** | 在公共场合随时打开，无需担忧周围视线 | 一键开启隐私模式，所有账户余额、图表数字即时替换为高保真 `••••••` |
-| 🌐 **四语无缝国际化** | 全站覆盖中、英、马、繁四种主流语言 | 由 `core/i18n.py` 驱动，前端与后端渲染无死角动态国际化 (`window.t`) |
-| ⏰ **固定收支与债务** | 订阅账单提前预警、分期还款进度可视化 | 支持按周/月/季/年自动计算扣款日与年化利息负债总览 |
+| 📱 **Zero-Effort Auto-Tracking** | Captures payment push notifications from banks & e-wallets in real-time | Native Android `NotificationListenerService` with package whitelist filtering and HMAC Sync Token |
+| 🛡️ **Extensible Parser Strategy** | Open/Closed parsing engine for Touch 'n Go, Grab, Maybank, and bank cards | Strategy Pattern (`NotificationParserStrategy`) with dynamic `@register_parser` decorator |
+| 🧾 **Smart Receipt Split Bill** | Snaps or uploads dining receipts to automatically extract items, tax, and split per person | Offline RapidOCR ONNX runtime, 4-way (0°/90°/180°/270°) orientation auto-correction, and SST/service charge splitting |
+| 🔄 **Repayment Expense Offset** | Paid for a group dinner and received repayments? Offset against the original expense | Automatically links incoming repayment to reduce the net expense amount, featuring sliding-window transfer deduplication |
+| 📊 **Interactive Analytics** | Monthly real-time dashboard + multi-year macro trends + category breakdown | Chart.js 4.x with adaptive doughnut physical inner radius (`innerRadius`) dynamic scaling to prevent text clipping |
+| 👁️ **Public Privacy Mode** | Safe to open in public places, cafes, or public transit | One-click toggle obfuscates all account balances, income, and chart amounts with high-fidelity `••••••` |
+| 🌐 **4-Language Internationalization** | Complete localization across Chinese, English, Malay, and Traditional Chinese | Driven by `core/i18n.py`, unifying backend Jinja2 templates, frontend JS `window.t`, and SweetAlert2 alerts |
+| ⏰ **Subscriptions & Liabilities** | Recurring bill alerts, installment amortization schedules, and net worth tracking | Flexible scheduling (weekly, monthly, quarterly, yearly), interest rate computation, and debt payoff tracking |
 
 ---
 
-## 🏗️ 整体分层架构 (Architecture)
+## 🏗️ System Architecture
 
-系统严格遵循现代化分层架构原则，杜绝跨层耦合与胖控制器：
+Ledger App enforces a clean **Layered Architecture** adhering to **Thin Controller** and **Explicit Dependency Injection** principles:
 
 ```mermaid
 graph TD
-    subgraph Client["终端交互层 (Clients)"]
-        WebUI["Web 响应式终端 (Vanilla CSS + Chart.js)"]
-        AndroidClient["Android 移动伴侣 (Kotlin + Jetpack)"]
+    subgraph Client["Client Tier"]
+        WebUI["Responsive Web UI (Vanilla CSS + Chart.js)"]
+        AndroidClient["Android Companion (Kotlin + Jetpack)"]
     end
 
-    subgraph Controller["控制装配层 (Blueprints)"]
-        FlaskEntry["app.py (应用装配 / 中间件注册)"]
-        BP_Trans["transactions (交易核心流水)"]
-        BP_Analytics["analytics (总体宏观概览)"]
-        BP_Auto["auto_track (自动记账网关)"]
-        BP_Split["split_bill (小票 OCR 分账)"]
-        BP_Subs["subscriptions (固定账单订阅)"]
-        BP_Liab["liabilities (负债贷款追踪)"]
+    subgraph Controller["Controller Tier (Blueprints)"]
+        FlaskEntry["app.py (App Assembly & Middlewares)"]
+        BP_Trans["transactions (Core Records & Offsets)"]
+        BP_Analytics["analytics (Macro Overview & Trends)"]
+        BP_Auto["auto_track (Auto-Tracking Ingestion Gateway)"]
+        BP_Split["split_bill (Receipt OCR & Bill Splitter)"]
+        BP_Subs["subscriptions (Recurring Subscriptions)"]
+        BP_Liab["liabilities (Loans & Debt Amortization)"]
     end
 
-    subgraph Domain["领域服务层 (Services)"]
-        StrategyEngine["NotificationParserStrategy 策略解析引擎"]
-        OCRService["RapidOCR 图像校正与要素提取"]
+    subgraph Domain["Domain Services Tier"]
+        StrategyEngine["NotificationParserStrategy Registry"]
+        OCRService["RapidOCR Vision & Text Extraction"]
     end
 
-    subgraph Persistence["数据持久层 (Persistence)"]
-        DBBridge["core/db.py 统一数据桥接"]
-        SQLite["本地 SQLite (WAL 模式)"]
-        Turso["Turso Cloud (libsql-client 分布式云库)"]
-        Metadata["system_metadata (多 Worker 版本一致性)"]
+    subgraph Persistence["Persistence & State Tier"]
+        DBBridge["core/db.py (Unified DB Bridge)"]
+        SQLite["Local SQLite (WAL Mode)"]
+        Turso["Turso Cloud (libsql-client Distributed DB)"]
+        Metadata["system_metadata (Multi-Worker Version Consistency)"]
     end
 
     WebUI --> FlaskEntry
@@ -86,93 +88,108 @@ graph TD
 
 ---
 
-## 🚀 快速开始 (Quick Start)
+## 🚀 Quick Start Guide
 
-### 1. 本地环境运行 (Python 3.12+)
+### Prerequisites
+- **Python 3.12+**
+- Git
+
+### 1. Local Development Setup
 
 ```bash
-# 1. 克隆代码仓库
+# 1. Clone the repository
 git clone https://github.com/siangloh/ledger-app.git
 cd ledger-app
 
-# 2. 创建并激活虚拟环境
+# 2. Create and activate a Python virtual environment
 python -m venv .venv
+
 # Windows:
 .venv\Scripts\activate
 # Linux / macOS:
 # source .venv/bin/activate
 
-# 3. 安装项目依赖
+# 3. Install required dependencies
 pip install -r requirements.txt
 
-# 4. 启动服务 (默认监听 http://127.0.0.1:5000)
+# 4. Start the development server (Defaults to http://127.0.0.1:5000)
 python app.py
 ```
 
-### 2. Docker 容器化运行
+### 2. Docker Container Deployment
 
 ```bash
-# 构建 Docker 镜像
+# Build the Docker container image
 docker build -t ledger-app .
 
-# 启动容器并挂载数据持久化卷
+# Run the container with a persistent data volume
 docker run -d \
   -p 5000:5000 \
   -v $(pwd)/data:/app/instance \
-  --name my-ledger \
+  --name ledger-app-container \
   ledger-app
 ```
 
-### 3. 云端一键部署 (Render.com)
+### 3. One-Click Cloud Deployment (Render.com)
 
-仓库内已内置 `render.yaml` 基础设施配置，直接在 Render.com 导入 GitHub 仓库即可完成开箱即用部署。
-
----
-
-## 📱 Android 伴侣端配置 (Android Companion)
-
-1. 在 Android 手机上安装 `android-companion` 编译生成的 APK（可在 [static/download/ledger-app.apk](file:///c:/Users/USER/Downloads/ledger-app/static/download/ledger-app.apk) 下载最新版）。
-2. 在手机系统设置中授予 **通知使用权 (Notification Access)**。
-3. 打开 Web 端系统设置页面，生成专属 **API Sync Token**。
-4. 在 Android 伴侣端输入服务地址（如 `https://your-ledger-domain.com`）与该 Token 即可全天候静默同步！
+The repository includes a ready-to-use `render.yaml` infrastructure-as-code specification. Simply import your GitHub fork into [Render.com](https://render.com) to deploy a live instance with managed disks.
 
 ---
 
-## 🛠️ 配置环境变量 (Environment Variables)
+## 📱 Android Companion App Setup
 
-| 变量名 | 默认值 | 说明 |
+1. Build or download the latest Android Companion APK (located at [static/download/ledger-app.apk](file:///c:/Users/USER/Downloads/ledger-app/static/download/ledger-app.apk)).
+2. Install the APK on your Android device and grant **Notification Access** permissions in system settings.
+3. Open Ledger App Web UI, navigate to **Settings**, and generate a unique **API Sync Token**.
+4. Enter your deployed server URL (e.g., `https://your-ledger-domain.com`) and the token into the Android app.
+5. All supported bank payment notifications will automatically sync to your ledger in real-time!
+
+---
+
+## ⚙️ Environment Variables
+
+| Variable | Default | Description |
 | :--- | :--- | :--- |
-| `FLASK_ENV` | `production` | 运行环境模式 (`development` / `production`) |
-| `SECRET_KEY` | 自动生成 | 用于会话加密的密钥（生产环境建议自定义固定值） |
-| `TURSO_DATABASE_URL` | 空 (默认本地 SQLite) | Turso 数据库连接 URL（如需使用分布式云库填写） |
-| `TURSO_AUTH_TOKEN` | 空 | Turso 鉴权 Token |
-| `PORT` | `5000` | 服务监听端口 |
+| `FLASK_ENV` | `production` | Environment mode (`development` or `production`) |
+| `SECRET_KEY` | Auto-generated | Session signing key (specify a fixed key in production) |
+| `TURSO_DATABASE_URL` | Empty (Local SQLite) | Turso database URL for cloud replication (`libsql://...`) |
+| `TURSO_AUTH_TOKEN` | Empty | Authentication token for Turso Cloud |
+| `PORT` | `5000` | Application HTTP listening port |
 
 ---
 
-## 🧪 自动化测试与质量门禁 (CI/CD Quality Gates)
+## 🧪 Testing & CI/CD Quality Gates
 
-本项目严格执行 [AGENTS.md](file:///c:/Users/USER/Downloads/ledger-app/AGENTS.md) 规定的代码质量与测试门禁：
+This repository strictly complies with the local verification gates specified in [AGENTS.md](file:///c:/Users/USER/Downloads/ledger-app/AGENTS.md):
 
 ```bash
-# 1. 静态代码质量审查 (严禁引入未定义变量、未用包与语法错误)
+# 1. Code quality and syntax gate (Zero errors permitted)
 flake8 . --count --select=E9,F63,F7,F82,F401,F841 --show-source --statistics
 
-# 2. 运行端到端自动化测试套件 (覆盖 104 项单元测试与集成测试)
+# 2. Automated test suite (104 unit and integration tests)
 pytest
 ```
 
 ---
 
-## 📄 架构工程报告 (Word & Markdown Format)
+## 📄 In-Depth Architecture Report
 
-系统提供详细的架构白皮书与工程设计报告供深度审阅与汇报：
-- **Word 格式报告**：[LEDGER_APP_ARCHITECTURE_REPORT.docx](file:///c:/Users/USER/Downloads/ledger-app/LEDGER_APP_ARCHITECTURE_REPORT.docx) (或位于 [docs/](file:///c:/Users/USER/Downloads/ledger-app/docs))
-- **Markdown 在线阅读**：[docs/Ledger_App_Architecture_Report.md](file:///c:/Users/USER/Downloads/ledger-app/docs/Ledger_App_Architecture_Report.md)
-- **报告生成脚本**：[scripts/generate_docx_report.py](file:///c:/Users/USER/Downloads/ledger-app/scripts/generate_docx_report.py)
+A comprehensive engineering report covering system topology, the strategy engine, RapidOCR preprocessing, multi-worker concurrency, and security is available in both Word and Markdown formats:
+
+- **Microsoft Word Document (.docx)**: [LEDGER_APP_ARCHITECTURE_REPORT.docx](file:///c:/Users/USER/Downloads/ledger-app/LEDGER_APP_ARCHITECTURE_REPORT.docx)
+- **Markdown Document (.md)**: [docs/Ledger_App_Architecture_Report.md](file:///c:/Users/USER/Downloads/ledger-app/docs/Ledger_App_Architecture_Report.md)
 
 ---
 
-## 🛡️ 开源协议 (License)
+## 🌐 Language Options
 
-本项目遵循 **MIT License** 开源授权。
+- **English**: [README.md](README.md) (Current)
+- **简体中文 (Simplified Chinese)**: [README_zh.md](README_zh.md)
+- **Bahasa Melayu (Malay)**: [README_ms.md](README_ms.md)
+- **繁體中文 (Traditional Chinese)**: [README_zh_TW.md](README_zh_TW.md)
+
+---
+
+## 📄 License
+
+This project is open-sourced under the **MIT License**.
