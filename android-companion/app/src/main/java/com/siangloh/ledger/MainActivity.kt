@@ -125,7 +125,7 @@ class MainActivity : AppCompatActivity() {
         if (NetworkHelper.isOnline(this)) {
             offlineContainer.visibility = View.GONE
             webView.visibility = View.VISIBLE
-            fabQuickAdd.visibility = View.VISIBLE
+            fabQuickAdd.visibility = View.GONE
             webView.loadUrl(NetworkHelper.getServerUrl(this))
             SyncWorker.enqueueSync(this)
         } else {
@@ -163,6 +163,19 @@ class MainActivity : AppCompatActivity() {
                     NetworkHelper.setUsername(this@MainActivity, username)
                     android.util.Log.i("LedgerNativeBridge", "Bound native user to: $username")
                 }
+            }
+            // 供 Web 端在需要时呼起原生设置与通知记录（无需常驻悬浮 + 按钮遮挡屏幕）
+            @JavascriptInterface
+            fun openQuickMenu() {
+                runOnUiThread { showQuickMenu() }
+            }
+            @JavascriptInterface
+            fun openNotificationLogs() {
+                runOnUiThread { startActivity(Intent(this@MainActivity, NotificationLogActivity::class.java)) }
+            }
+            @JavascriptInterface
+            fun openSettings() {
+                runOnUiThread { startActivity(Intent(this@MainActivity, AppSelectionActivity::class.java)) }
             }
             // 小票拍照识别入口：由 split_bill.html 侦测到自己跑在原生 App 内时调用。
             // 识别完全在手机本地用 ML Kit 完成，不会把照片传去任何服务器。

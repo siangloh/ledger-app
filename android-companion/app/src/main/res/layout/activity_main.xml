@@ -155,7 +155,7 @@
 
     </LinearLayout>
 
-    <!-- 悬浮快捷入口：在线时也可快速唤起离线记账 / 监听设置 / 日志 -->
+    <!-- 悬浮快捷入口：默认隐藏，避免遮挡手机端网页底栏或内容 -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabQuickAdd"
         android:layout_width="wrap_content"
@@ -163,6 +163,7 @@
         android:layout_margin="20dp"
         android:backgroundTint="@color/navy_primary"
         android:contentDescription="快速记账"
+        android:visibility="gone"
         app:tint="@color/white"
         app:srcCompat="@android:drawable/ic_input_add"
         app:layout_constraintBottom_toBottomOf="parent"

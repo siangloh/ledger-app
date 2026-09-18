@@ -88,10 +88,32 @@
           </a>
           <span style="font-size: 12px; color: var(--muted);">✓ 支持 Android 7.0 ~ 14+</span>
         </div>
+
+        <div id="nativeCompanionToolbar" style="display: none; margin-top: 12px; padding: 10px 14px; background: rgba(37, 99, 235, 0.08); border-radius: var(--radius-sm); border: 1px dashed rgba(37, 99, 235, 0.3); gap: 10px; align-items: center; flex-wrap: wrap;">
+          <span style="font-size: 12.5px; font-weight: 600; color: var(--navy);">📱 当前正运行在伴侣 App 内：</span>
+          <button type="button" class="btn-secondary btn-sm" onclick="if(window.LedgerNativeBridge?.openNotificationLogs) window.LedgerNativeBridge.openNotificationLogs();">📋 查看通知记录与绑定</button>
+          <button type="button" class="btn-secondary btn-sm" onclick="if(window.LedgerNativeBridge?.openSettings) window.LedgerNativeBridge.openSettings();">⚙️ 监测应用设置</button>
+          <button type="button" class="btn-secondary btn-sm" onclick="if(window.LedgerNativeBridge?.openQuickMenu) window.LedgerNativeBridge.openQuickMenu();">⚡ 快捷菜单</button>
+        </div>
+        <script>
+          (function() {
+            function checkNative() {
+              if (window.LedgerNativeBridge && typeof window.LedgerNativeBridge.isNativeApp === 'function' && window.LedgerNativeBridge.isNativeApp()) {
+                var el = document.getElementById('nativeCompanionToolbar');
+                if (el) el.style.display = 'flex';
+              }
+            }
+            checkNative();
+            setTimeout(checkNative, 500);
+            document.addEventListener('DOMContentLoaded', checkNative);
+            document.addEventListener('htmx:afterSettle', checkNative);
+          })();
+        </script>
+
         <ol style="padding-left: 20px; margin: 10px 0 0 0; font-size: 12.5px; color: var(--ink-soft); line-height: 1.6;">
           <li>点击上方按钮在手机下载并安装 APK。</li>
           <li>首次打开时，按照提示允许<strong>「通知使用权」</strong>和<strong>「忽略电池优化」</strong>。</li>
-          <li>点击右上角菜单可自定义选择要监听的银行应用（默认已包含 TnG、Maybank MAE、CIMB 等全部主流银行）。</li>
+          <li>在 App 中登录你的账号后，系统会自动将通知绑定到该账号。</li>
           <li>之后每当银行扣款通知弹出，App 就会在后台自动识别入账，完全零打扰！</li>
         </ol>
       </div>
