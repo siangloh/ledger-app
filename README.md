@@ -12,7 +12,7 @@
 
 **Languages / 语言选择 / Pilihan Bahasa:**  
 **[English](README.md)** · **[简体中文](README_zh.md)** · **[Bahasa Melayu](README_ms.md)** · **[繁體中文](README_zh_TW.md)**  
-[Architecture Engineering Report (Word .docx)](file:///c:/Users/USER/Downloads/ledger-app/LEDGER_APP_ARCHITECTURE_REPORT.docx) · [Architecture Report (Markdown)](file:///c:/Users/USER/Downloads/ledger-app/docs/Ledger_App_Architecture_Report.md)
+[Architecture Report (.docx)](LEDGER_APP_ARCHITECTURE_REPORT.docx) · [Architecture Report (.pdf)](LEDGER_APP_ARCHITECTURE_REPORT.pdf) · [Architecture Report (Markdown)](docs/Ledger_App_Architecture_Report.md)
 
 </div>
 
