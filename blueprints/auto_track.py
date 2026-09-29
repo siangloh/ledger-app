@@ -373,7 +373,7 @@ def api_auto_track():
                 db.execute('''
                     INSERT INTO processed_notifications (user_id, content_hash, raw_text, amount, transaction_id, created_at)
                     VALUES (?, ?, ?, ?, ?, ?)
-                ''', (target_user_id, content_hash, text, refund_amount, matched_expense['id'], now))
+                ''', (str(target_user_id), content_hash, text, refund_amount, matched_expense['id'], now))
                 db.commit()
             except Exception as e:
                 logger.debug("Failed to record processed_notification on refund: %s", e)
@@ -521,7 +521,7 @@ def api_auto_track():
                 db.execute('''
                     INSERT INTO processed_notifications (user_id, content_hash, raw_text, amount, transaction_id, created_at)
                     VALUES (?, ?, ?, ?, ?, ?)
-                ''', (target_user_id, content_hash, text, offset_amount, last_expense['id'], now))
+                ''', (str(target_user_id), content_hash, text, offset_amount, last_expense['id'], now))
                 db.commit()
             except Exception as e:
                 logger.debug("Failed to record processed_notification on repayment: %s", e)
@@ -560,7 +560,7 @@ def api_auto_track():
         db.execute('''
             INSERT INTO processed_notifications (user_id, content_hash, raw_text, amount, transaction_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', (target_user_id, content_hash, text, parsed['amount'], cur.lastrowid, now))
+        ''', (str(target_user_id), content_hash, text, parsed['amount'], cur.lastrowid, now))
     except Exception as e:
         logger.debug("Failed to record processed_notification on insert: %s", e)
 

@@ -209,6 +209,7 @@ object NetworkHelper {
 
                 val username = getUsername(context)
                 val body = JSONObject().apply {
+                    put("key", key)
                     put("transactions", jsonArray)
                     if (username.isNotEmpty()) {
                         put("username", username)
