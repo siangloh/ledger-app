@@ -43,7 +43,11 @@ PROMO_AND_AD_KEYWORDS = [
 INTERNAL_TRANSFER_KEYWORDS = [
     'into your go+ account', 'into your go+', 'cashed in', 'cash in successful',
     'reload successful', 'top up successful', 'top up into', 'reload into',
-    '转存进入', '转入余额宝', '钱包充值成功'
+    '转存进入', '转入余额宝', '钱包充值成功',
+    'transfer to tng digital', 'transferred to tng digital', 'transfer to tng', 'transferred to tng',
+    'duitnow to tng digital', 'reload touch n go', "reload touch 'n go", 'top up touch n go', "top up touch 'n go",
+    'reload tng', 'topup tng', 'top up tng', 'grab top up', 'grabpay reload', 'reload grab',
+    'top up ewallet', 'ewallet reload', 'top up to ewallet'
 ]
 
 

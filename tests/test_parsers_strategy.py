@@ -193,3 +193,60 @@ def test_auto_track_multi_user_isolation(client, admin_user_id, flask_app):
     html = page_resp.get_data(as_text=True)
     assert "username=alice" in html
     assert "专属绑定用户：alice" in html
+
+
+def test_auto_track_dual_channel_deduplication(client, admin_user_id):
+    """验证电子钱包消费 + 银行卡扣款短信双通道到达时，自动智能识别重复并忽略，同时保留具体商户名"""
+    headers = {"X-API-KEY": "test-auto-track-key", "Content-Type": "application/json"}
+
+    # 1. 钱包端扣款通知（商户为 Shell）
+    t_wallet = "Touch 'n Go eWallet: You have paid RM 35.00 to Shell Bangsar."
+    r1 = client.post("/api/auto-track", json={"text": t_wallet, "user_id": admin_user_id}, headers=headers)
+    assert r1.status_code == 201
+    d1 = r1.get_json()
+    assert d1["verdict"] == "accepted"
+    tx_id = d1["transaction_id"]
+
+    # 2. 银行卡扣款短信（商户为通用渠道名 TNG DIGITAL）在短时间内紧随而至
+    t_bank = "RM 35.00 spent at TNG DIGITAL on your card."
+    r2 = client.post("/api/auto-track", json={"text": t_bank, "user_id": admin_user_id}, headers=headers)
+    assert r2.status_code == 200
+    d2 = r2.get_json()
+    assert d2["ok"] is True
+    assert d2["verdict"] == "duplicate_ignored"
+    assert d2["transaction_id"] == tx_id
+
+
+def test_bank_to_wallet_reload_is_internal_transfer(client, admin_user_id):
+    """验证商业银行转账/充值至 Touch'n Go 或 Grab 识别为内部资金划转，不计入日常消费支出"""
+    headers = {"X-API-KEY": "test-auto-track-key", "Content-Type": "application/json"}
+    t_reload = "Maybank: RM 100.00 transferred to TNG DIGITAL SDN BHD."
+
+    r = client.post("/api/auto-track", json={"text": t_reload, "user_id": admin_user_id}, headers=headers)
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["verdict"] == "ignored_internal_transfer"
+
+
+def test_api_sync_transactions_deduplication(client, admin_user_id):
+    """验证离线记账批量同步接口幂等性，重复上报时不生成多重重复记录"""
+    headers = {"X-API-KEY": "test-auto-track-key", "Content-Type": "application/json"}
+    tx_item = {
+        "local_id": 999,
+        "date": "2026-09-29",
+        "type": "expense",
+        "amount": 28.50,
+        "note": "Kopitiam Test Sync",
+        "category": "餐饮"
+    }
+
+    # 第 1 次同步
+    r1 = client.post("/api/transactions/sync", json={"username": "admin", "transactions": [tx_item]}, headers=headers)
+    assert r1.status_code == 200
+    assert r1.get_json()["synced_count"] == 1
+
+    # 第 2 次重复同步（模拟网络重试）
+    r2 = client.post("/api/transactions/sync", json={"username": "admin", "transactions": [tx_item]}, headers=headers)
+    assert r2.status_code == 200
+    # 仍返回 1 确认已同步以供客户端清理，但数据库不重复新增
+    assert r2.get_json()["synced_count"] == 1

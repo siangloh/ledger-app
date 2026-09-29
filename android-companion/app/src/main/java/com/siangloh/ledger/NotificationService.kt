@@ -92,6 +92,19 @@ class NotificationService : NotificationListenerService() {
             return
         }
         recentNotifications[cacheKey] = now
+
+        // 0.1 同一应用短时间内连续多阶段通知（例如 支付中 -> 支付成功 / 后续追加参考号），15秒内相同金额视为同一笔交易拦截
+        val amountMatch = AMOUNT_REGEX.find(fullContent)?.value?.replace(" ", "")?.uppercase()
+        if (amountMatch != null) {
+            val amountKey = "$pkgName:amt:$amountMatch"
+            val lastAmountSeen = recentNotifications[amountKey]
+            if (lastAmountSeen != null && (now - lastAmountSeen) < 15_000L) {
+                Log.d(TAG, "Suppressed duplicate notification with identical amount within 15s from [$pkgName]: $amountMatch")
+                return
+            }
+            recentNotifications[amountKey] = now
+        }
+
         if (recentNotifications.size > 200) {
             val cutoff = now - 300_000L
             recentNotifications.entries.removeIf { it.value < cutoff }

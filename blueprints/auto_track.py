@@ -202,9 +202,10 @@ def api_auto_track():
             target_user_id = first_row['id'] if first_row else None
 
     # ---------------------------------------------------------
-    # 幂等防重门禁 (Idempotency & Deduplication Guard)
+    # 幂等防重门禁 (Idempotency & Multi-Channel Deduplication Guard)
     # ---------------------------------------------------------
-    content_hash = hashlib.sha256(text.strip().encode('utf-8')).hexdigest()
+    clean_text = re.sub(r'\s+', ' ', text.strip().lower())
+    content_hash = hashlib.sha256(clean_text.encode('utf-8')).hexdigest()
 
     try:
         db.execute('''
@@ -226,7 +227,7 @@ def api_auto_track():
         SELECT id, transaction_id, created_at FROM processed_notifications
         WHERE user_id = ? AND content_hash = ?
         ORDER BY id DESC LIMIT 1
-    ''', (target_user_id, content_hash)).fetchone()
+    ''', (str(target_user_id), content_hash)).fetchone()
 
     if existing_notif:
         if AUTO_TRACK_DEBUG_LOG:
@@ -242,41 +243,85 @@ def api_auto_track():
             'parsed': parsed
         }), 200
 
-    # 2. 检查同用户在 2 小时内由 auto_track 创建的相同金额、分类与备注的交易
-    recent_dup_tx = db.execute('''
-        SELECT id, created_at FROM transactions
-        WHERE user_id = ? AND type = ? AND amount = ? AND note = ? AND date = ? AND source = 'auto_track'
-        ORDER BY id DESC LIMIT 1
-    ''', (target_user_id, parsed['type'], parsed['amount'], parsed['note'], parsed['date'])).fetchone()
+    # 2. 智能多渠道与语义防重 (Multi-Channel & Semantic Fuzzy Deduplication)
+    candidate_txs = db.execute('''
+        SELECT id, note, category, amount, created_at, source FROM transactions
+        WHERE user_id = ? AND type = ? AND date = ? AND abs(amount - ?) < 0.005
+        ORDER BY id DESC LIMIT 10
+    ''', (str(target_user_id), parsed['type'], parsed['date'], parsed['amount'])).fetchall()
 
-    if recent_dup_tx:
-        is_recent_dup = False
+    GENERIC_CHANNEL_NAMES = {
+        'tng', 'tng digital', 'touchngo', 'touch n go', "touch 'n go", 'tng消费', 'tng ewallet',
+        'grab', 'grabpay', 'grab消费', 'grabcar', 'grabfood',
+        'maybank', 'mae', 'm2u', 'maybank支出', 'cimb', 'public bank', 'bank card', '银行卡消费',
+        '自动追踪消费', '自动追踪入账', 'duitnow', 'duitnow qr', 'qr pay'
+    }
+
+    new_note = (parsed.get('note') or '').strip()
+    new_note_lower = new_note.lower()
+
+    for cand in candidate_txs:
+        cand_id = cand['id']
+        cand_note = (cand['note'] or '').strip()
+        cand_note_lower = cand_note.lower()
+
+        time_diff_sec = 999999.0
         try:
-            created_dt = datetime.fromisoformat(recent_dup_tx['created_at'])
-            if abs((datetime.now() - created_dt).total_seconds()) < 7200:
-                is_recent_dup = True
+            cand_dt = datetime.fromisoformat(cand['created_at'])
+            time_diff_sec = abs((datetime.now() - cand_dt).total_seconds())
         except Exception:
-            is_recent_dup = True
+            time_diff_sec = 0.0
 
-        if is_recent_dup:
+        is_dup = False
+        reason = ""
+
+        # 场景 A: 10 分钟 (600秒) 以内的紧邻交易
+        if time_diff_sec <= 600:
+            if cand_note_lower == new_note_lower or (cand_note_lower and cand_note_lower in new_note_lower) or (new_note_lower and new_note_lower in cand_note_lower):
+                is_dup = True
+                reason = "10分钟内相同/相似商户交易"
+            elif cand_note_lower in GENERIC_CHANNEL_NAMES or new_note_lower in GENERIC_CHANNEL_NAMES:
+                is_dup = True
+                reason = "10分钟内电子钱包与银行卡双通道重复通知"
+            elif time_diff_sec <= 300:
+                is_dup = True
+                reason = "5分钟内同金额重复扣款"
+
+            if is_dup:
+                if cand_note_lower in GENERIC_CHANNEL_NAMES and new_note_lower not in GENERIC_CHANNEL_NAMES and new_note:
+                    try:
+                        db.execute('UPDATE transactions SET note = ?, category = ? WHERE id = ?',
+                                   (new_note, parsed.get('category') or cand['category'], cand_id))
+                        db.commit()
+                        logger.info("[AUTO_TRACK] Enriched generic transaction note from '%s' to '%s' (id: %s)", cand_note, new_note, cand_id)
+                    except Exception as e:
+                        logger.debug("Failed to enrich transaction note: %s", e)
+
+        # 场景 B: 2 小时 (7200秒) 以内的相同商户交易
+        elif time_diff_sec <= 7200:
+            if cand_note_lower == new_note_lower and cand_note_lower:
+                is_dup = True
+                reason = "2小时内相同商户相同金额重复"
+
+        if is_dup:
             if AUTO_TRACK_DEBUG_LOG:
-                print(f"[AUTO_TRACK DEBUG] Duplicate transaction rejected within 2h: {recent_dup_tx['id']}")
+                print(f"[AUTO_TRACK DEBUG] Duplicate transaction rejected ({reason}): cand_id={cand_id}, amount={parsed['amount']}")
             try:
                 db.execute('''
                     INSERT INTO processed_notifications (user_id, content_hash, raw_text, amount, transaction_id, created_at)
                     VALUES (?, ?, ?, ?, ?, ?)
-                ''', (target_user_id, content_hash, text, parsed['amount'], recent_dup_tx['id'], now))
+                ''', (str(target_user_id), content_hash, text, parsed['amount'], cand_id, now))
                 db.commit()
             except Exception as e:
-                logger.debug("Failed to record processed_notification on recent dup: %s", e)
+                logger.debug("Failed to record processed_notification on dup: %s", e)
 
             return jsonify({
                 'ok': True,
                 'verdict': 'duplicate_ignored',
-                'message': '短时间内检测到相同交易已入账，已自动忽略重复记账',
-                'transaction_id': recent_dup_tx['id'],
+                'message': f'检测到短时间内相同交易已入账（{reason}），已自动忽略重复记账',
+                'transaction_id': cand_id,
                 'notification_title': '重复通知已忽略 ℹ️',
-                'notification_body': f"短时间内检测到相同的【{parsed['note']} {money_filter(parsed['amount'])}】已入账，已自动忽略",
+                'notification_body': f"短时间内检测到相同的【{parsed['note']} {money_filter(parsed['amount'])}】已入账，系统已自动拦截防重",
                 'raw_text': text,
                 'parsed': parsed
             }), 200
@@ -596,22 +641,39 @@ def api_sync_transactions():
     synced_ids = []
     for item in txs:
         try:
+            amt = float(item.get('amount') or 0.0)
+            t_date = item.get('date') or date.today().isoformat()
+            t_type = item.get('type') or 'expense'
+            t_note = (item.get('note') or '离线录入').strip()
+
+            # 离线同步防重检查：如果同用户、同日期、同类型、同金额、同备注的交易已存在，跳过插入
+            existing = db.execute('''
+                SELECT id FROM transactions
+                WHERE user_id = ? AND date = ? AND type = ? AND abs(amount - ?) < 0.005 AND note = ?
+                LIMIT 1
+            ''', (str(user_id), t_date, t_type, amt, t_note)).fetchone()
+
+            local_id = item.get('local_id') or item.get('id')
+            if existing:
+                if local_id is not None:
+                    synced_ids.append(local_id)
+                continue
+
             db.execute(
                 'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
                 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 (
                     user_id,
-                    item.get('date') or date.today().isoformat(),
-                    item.get('type') or 'expense',
+                    t_date,
+                    t_type,
                     item.get('group_name') or 'personal',
                     item.get('category') or '其他',
-                    float(item.get('amount') or 0.0),
-                    item.get('note') or '离线录入',
+                    amt,
+                    t_note,
                     item.get('source') or 'offline_sync',
                     now
                 )
             )
-            local_id = item.get('local_id') or item.get('id')
             if local_id is not None:
                 synced_ids.append(local_id)
         except Exception as e:
