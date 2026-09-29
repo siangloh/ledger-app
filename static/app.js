@@ -3108,18 +3108,25 @@ window.handleAppDownloadClick = function (e) {
   if (isNativeApp && typeof Swal !== 'undefined') {
     e.preventDefault();
     Swal.fire({
-      title: '📱 当前已在应用内',
-      text: '您当前已在原生 App 中运行，如需重新下载最新版本安装包，请点击确认。',
+      title: '📱 当前已在原生 App 内',
+      text: '您可以呼起原生伴侣快捷调试菜单，或重新下载最新版本安装包：',
       icon: 'info',
+      showDenyButton: true,
       showCancelButton: true,
-      confirmButtonText: '重新下载',
-      cancelButtonText: '取消'
+      confirmButtonText: '⚡ 原生调试与快捷菜单',
+      denyButtonText: '⬇️ 重新下载 APK',
+      cancelButtonText: '关闭'
     }).then((res) => {
       if (res.isConfirmed) {
+        if (window.LedgerNativeBridge && typeof window.LedgerNativeBridge.openQuickMenu === 'function') {
+          window.LedgerNativeBridge.openQuickMenu();
+        }
+        if (typeof toggleMoreSheet === 'function') toggleMoreSheet(false);
+      } else if (res.isDenied) {
         localStorage.setItem('ledger_app_downloaded', 'true');
         localStorage.setItem('ledger_app_download_time', new Date().toISOString());
         updateAppDownloadStatus();
-        window.location.href = '/download/apk';
+        window.location.href = '/download/apk?t=' + Date.now();
       }
     });
     return;

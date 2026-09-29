@@ -125,15 +125,14 @@ class MainActivity : AppCompatActivity() {
         if (NetworkHelper.isOnline(this)) {
             offlineContainer.visibility = View.GONE
             webView.visibility = View.VISIBLE
-            fabQuickAdd.visibility = View.VISIBLE
             webView.loadUrl(NetworkHelper.getServerUrl(this))
             SyncWorker.enqueueSync(this)
         } else {
             offlineContainer.visibility = View.VISIBLE
             webView.visibility = View.GONE
-            fabQuickAdd.visibility = View.GONE
             Toast.makeText(this, "当前处于离线模式，可使用快速记账", Toast.LENGTH_SHORT).show()
         }
+        fabQuickAdd.visibility = View.VISIBLE
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -225,7 +224,6 @@ class MainActivity : AppCompatActivity() {
                 if (!NetworkHelper.isOnline(this@MainActivity)) {
                     offlineContainer.visibility = View.VISIBLE
                     webView.visibility = View.GONE
-                    fabQuickAdd.visibility = View.GONE
                 }
             }
         }

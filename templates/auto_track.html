@@ -83,8 +83,8 @@
           如果你<strong>不想安装任何第三方工具（如 MacroDroid / Tasker）</strong>，可以直接在手机上下载并安装我们的专属官方 Android 伴侣应用。应用内置了银行通知监听服务，安装后授予通知权限即可自动入账！
         </p>
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-          <a href="{{ url_for('download_apk') }}" class="btn-primary" style="text-decoration: none; padding: 9px 18px; font-size: 13.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;" download="我的账本-伴侣版.apk">
-            📥 一键下载原生伴侣 App (.apk 6.3MB)
+          <a href="{{ url_for('download_apk') }}" onclick="this.href='/download/apk?t='+Date.now();" class="btn-primary" style="text-decoration: none; padding: 9px 18px; font-size: 13.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;" download="我的账本-伴侣版.apk">
+            📥 一键下载原生伴侣 App (.apk)
           </a>
           <span style="font-size: 12px; color: var(--muted);">✓ 支持 Android 7.0 ~ 14+</span>
         </div>

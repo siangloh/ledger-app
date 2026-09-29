@@ -163,6 +163,8 @@
         android:layout_margin="20dp"
         android:backgroundTint="@color/navy_primary"
         android:contentDescription="快速记账"
+        app:elevation="12dp"
+        app:pressedTranslationZ="16dp"
         app:tint="@color/white"
         app:srcCompat="@android:drawable/ic_input_add"
         app:layout_constraintBottom_toBottomOf="parent"

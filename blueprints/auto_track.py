@@ -625,7 +625,11 @@ def api_sync_transactions():
 def download_apk():
     root = current_app.root_path
     download_dir = os.path.join(root, 'static', 'download')
-    return send_from_directory(download_dir, 'ledger-app.apk', as_attachment=True, download_name='我的账本.apk')
+    response = send_from_directory(download_dir, 'ledger-app.apk', as_attachment=True, download_name='我的账本.apk')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @auto_track_bp.route('/auto-track', endpoint='auto_track_page')
