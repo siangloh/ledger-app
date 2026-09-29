@@ -211,8 +211,9 @@ def classify_notification_with_llm(text):
         "(e.g. 'Paid RM 15.00 to FamilyMart. Claim your RM2 voucher!'). If money was ACTUALLY spent, transferred, or received, "
         "is_real_transaction MUST BE TRUE.\n"
         "2. If the message is a promotional campaign inviting the user to apply for cards/loans, join a contest, win prizes, "
-        "earn cash back on future spends, or an advertisement (e.g. 'Apply online for PB Credit Card to get RM300 Cash Back'), "
-        "is_real_transaction MUST BE FALSE.\n"
+        "earn cash back on future spends, e-commerce cashback vouchers, or an advertisement (e.g. 'Apply online for PB Credit Card to get RM300 Cash Back', "
+        "'RM6 Just for You! RM6 Cashback, no min. spend! Pay with DuitNow QR this Oct. Limited redemptions.'), "
+        "is_real_transaction MUST BE FALSE and label_type MUST BE 'promo'.\n"
         "3. If it is an OTP, verification code, login alert, or system downtime notice, is_real_transaction MUST BE FALSE.\n"
         "4. Standard expense categories: 餐饮, 交通, 购物, 娱乐, 居住, 医疗, 教育, 通讯, 旅行, 人情, 其他.\n"
         "5. Standard income categories: 工资, 奖金, 投资, 自由职业, 其他.\n"
@@ -231,10 +232,16 @@ def classify_notification_with_llm(text):
         f"{samples_block}"
         f"Notification text to evaluate:\n\"\"\"{text}\"\"\""
     )
-    res = call_llm_json(prompt, system_instruction=system_instruction, timeout=4.5)
+    res = call_llm_json(prompt, system_instruction=system_instruction, timeout=6.0)
     if isinstance(res, dict) and 'is_real_transaction' in res:
         is_real = bool(res['is_real_transaction'])
         return is_real, res
+
+    # 兜底降级防御：若 LLM 离线/超时，针对明显的营销广告推广词做安全降级，拦截广告，避免误入账
+    lower_t = text.lower()
+    if any(k in lower_t for k in ['just for you', 'cashback', 'no min. spend', 'no min spend', 'limited redemption', 'pay with duitnow', 'pay with shopeepay']):
+        if not any(k in lower_t for k in ['you have paid', 'you\'ve paid', 'has been paid', 'paid rm', 'successful payment', 'successfully paid', 'has been deducted']):
+            return False, {'is_real_transaction': False, 'label_type': 'promo', 'reason': 'Offline promo heuristic fallback'}
 
     return True, None
 

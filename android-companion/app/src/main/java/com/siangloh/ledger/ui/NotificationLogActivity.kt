@@ -147,9 +147,14 @@ class NotificationLogActivity : AppCompatActivity() {
                     holder.badge.setBackgroundColor(Color.parseColor("#E8F5E9"))
                 }
                 "synced_rejected_promo" -> {
-                    holder.badge.text = "🚫 营销广告已过滤 (LLM)"
+                    holder.badge.text = "🚫 营销广告已过滤"
                     holder.badge.setTextColor(Color.parseColor("#B71C1C"))
                     holder.badge.setBackgroundColor(Color.parseColor("#FFEBEE"))
+                }
+                "synced_duplicate_ignored" -> {
+                    holder.badge.text = "ℹ️ 重复通知已忽略"
+                    holder.badge.setTextColor(Color.parseColor("#0277BD"))
+                    holder.badge.setBackgroundColor(Color.parseColor("#E1F5FE"))
                 }
                 "ignored_promo_keyword" -> {
                     holder.badge.text = "🚫 营销词过滤 (本地 Phase-1)"

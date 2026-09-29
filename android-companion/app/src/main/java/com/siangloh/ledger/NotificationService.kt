@@ -22,12 +22,17 @@ class NotificationService : NotificationListenerService() {
     companion object {
         private const val TAG = "LedgerNotifService"
 
-        // Phase-1 纯粹营销推广词汇（仅当完全不包含交易扣款动作或金额时才拦截）
+        // Phase-1 纯粹营销推广词汇
         val PURE_PROMO_KEYWORDS = listOf(
             "top up now", "reload now", "limited time offer", "apply for loan", "cash loan",
             "充值返", "立即充值", "申请贷款", "邀请好友", "分享领",
             "tebus", "baucar", "rebut", "voucher", "super brand day", "brand day",
-            "% off", "off!", "diskaun", "add to cart", "free shipping", "flash sale", "shocking sale"
+            "% off", "off!", "diskaun", "add to cart", "free shipping", "flash sale", "shocking sale",
+            "just for you", "cashback", "no min. spend", "no min spend", "min. spend", "min spend",
+            "limited redemption", "limited redemptions", "penebusan terhad", "tiada perbelanjaan minimum",
+            "pay with duitnow", "pay with shopeepay", "pay with", "bayar guna", "bayar dengan",
+            "points from your transaction", "redeem great rewards", "earn points",
+            "live stream", "livestream", "spin & win", "shake & win"
         )
 
         // 交易动作/动词与标识 (避免使用孤立的 "to " 或 "from "，防止普通英语句子误判)
@@ -35,10 +40,18 @@ class NotificationService : NotificationListenerService() {
             "paid", "spent", "transferred", "transfer", "debited", "debit", "payment",
             "received", "credited", "credit", "purchase", "purchased", "bought", "charge",
             "charged", "transaction", "txn", "付款", "扣款", "转账", "收款", "支付", "已支付",
-            "消费", "支出", "duitnow", "qr pay", "paid to", "transfer to", "transferred to",
-            "sent to", "payment to", "received from", "transfer from", "transferred from",
-            "refund from", "payment from", "successful", "completed", "you have paid",
-            "you've paid", "sent", "reload", "top up"
+            "消费", "支出", "duitnow payment", "duitnow transfer", "paid via duitnow",
+            "duitnow to", "duitnow from", "duitnow qr payment", "qr pay", "paid to",
+            "transfer to", "transferred to", "sent to", "payment to", "received from",
+            "transfer from", "transferred from", "refund from", "payment from", "successful",
+            "completed", "you have paid", "you've paid", "sent", "reload", "top up"
+        )
+
+        // 明确的已完成交易动词特征
+        val COMPLETED_TXN_VERBS = listOf(
+            "paid", "you have paid", "you've paid", "spent", "deducted", "debited", "charged",
+            "transferred", "successful", "completed", "has been deducted", "payment to", "payment of",
+            "已支付", "成功支付", "成功转账", "成功扣款", "扣款", "支出"
         )
 
         // 宽松金额格式正则：支持带 RM/MYR/$ 货币符号，或纯数字小数金额 (例如 RM15, RM 15.5, RM 15.50, 15.50, RM 1,250.00, MYR 20, $15.00)
@@ -118,10 +131,11 @@ class NotificationService : NotificationListenerService() {
         val hasVerb = TRANSACTION_VERBS.any { lower.contains(it) }
         val hasAmount = AMOUNT_REGEX.containsMatchIn(fullContent)
 
-        // 3. Phase-1 纯营销/广告拦截：只有在消息是纯广告且完全缺少扣款动词或金额时才丢弃
+        // 3. Phase-1 纯营销/广告拦截：若命中强营销关键词且缺少已完成动账凭证，直接本地拦截
         val hasPurePromoWord = PURE_PROMO_KEYWORDS.any { lower.contains(it) }
-        if (hasPurePromoWord && (!hasVerb || !hasAmount)) {
-            Log.d(TAG, "Phase-1 Filtered: contains pure promo keywords without transaction -> $fullContent")
+        val hasCompletedTxn = COMPLETED_TXN_VERBS.any { lower.contains(it) }
+        if (hasPurePromoWord && !hasCompletedTxn) {
+            Log.d(TAG, "Phase-1 Filtered: contains pure promo keywords without completed transaction -> $fullContent")
             serviceScope.launch {
                 db.notificationLogDao().insert(
                     NotificationLog(

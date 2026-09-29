@@ -6,6 +6,7 @@ from . import tng_parser  # noqa: F401
 from . import maybank_parser  # noqa: F401
 from . import grab_parser  # noqa: F401
 from . import bank_card_parser  # noqa: F401
+from . import shopee_parser  # noqa: F401
 
 __all__ = [
     'NotificationParserStrategy',
@@ -16,5 +17,6 @@ __all__ = [
     'tng_parser',
     'maybank_parser',
     'grab_parser',
-    'bank_card_parser'
+    'bank_card_parser',
+    'shopee_parser'
 ]

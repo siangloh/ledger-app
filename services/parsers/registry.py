@@ -36,7 +36,16 @@ PROMO_AND_AD_KEYWORDS = [
     'super brand day', 'brand day', 'big sale', 'megasale', 'mega sale', 'flash sale', 'shocking sale',
     '% off', 'off!', 'off on ', 'save up to', 'up to %',
     'add to cart', 'tawaran padu', 'baucar gempak', 'claim ', 'diskaun', 'discount',
-    'coins cashback', 'shopee coins', 'lazada bonus', 'new arrival'
+    'coins cashback', 'shopee coins', 'lazada bonus', 'new arrival',
+    'just for you', 'just for you!', 'cashback', 'cash back',
+    'no min. spend', 'no min spend', 'min. spend', 'min spend', 'tiada perbelanjaan minimum',
+    'limited redemption', 'limited redemptions', 'penebusan terhad',
+    'pay with duitnow', 'pay with shopeepay', 'bayar guna duitnow', 'bayar guna', 'pay with',
+    'earn points', 'earned points', 'redeem great rewards', 'redeem rewards', 'use them now to redeem',
+    'points from your transaction', 'points! you\'ve received', 'points! you have received',
+    'live stream', 'livestream', 'watch live', 'watch live stream',
+    'spin & win', 'spin and win', 'spend and win', 'shake and win', 'tap and win',
+    'cashback voucher', 'rebate voucher', 'payday sale', 'promosi hebat', 'promosi'
 ]
 
 # 内部划转与充值（不计入日常外部收支）
@@ -106,10 +115,16 @@ class NotificationParserComposite:
         """通用兜底规则解析"""
         lower_text = text.lower()
 
+        # 排除以推广/祈使引导而非已完成支付的通用文本 (例如 "Pay with DuitNow QR this Oct.")
+        if any(p in lower_text for p in ['pay with', 'bayar guna', 'scan to pay', 'scan & pay to win', 'just for you', 'cashback']):
+            if not any(k in lower_text for k in ['you have paid', 'you\'ve paid', 'has been paid', 'paid rm', 'successful payment', 'successfully paid', 'has been deducted']):
+                return None
+
         is_expense = any(k in lower_text for k in [
             'paid', 'spent', 'payment to', 'payment of', 'payment successful', 'payment has been made',
             'deducted', 'debited', 'charged', 'transfer to', 'transferred to', 'transfer of',
-            'purchase at', 'purchase of', 'withdrawal', 'withdrawn', 'duitnow qr', 'duitnow transfer to',
+            'purchase at', 'purchase of', 'withdrawal', 'withdrawn',
+            'duitnow qr payment', 'paid via duitnow', 'duitnow payment', 'duitnow transfer to',
             '付款', '支出', '扣款', '转账给', '已支付', '买单', '消费', '成功支付', '成功转账', '成功扣款'
         ])
         is_refund = any(k in lower_text for k in ['payment refunded', 'refunded', 'refund of', 'refund', '退款', '撤销', '退回'])

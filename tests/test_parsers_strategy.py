@@ -2,6 +2,7 @@ from services.parsers.tng_parser import TouchNGoParser
 from services.parsers.maybank_parser import MaybankParser
 from services.parsers.grab_parser import GrabParser
 from services.parsers.bank_card_parser import BankCardParser
+from services.parsers.shopee_parser import ShopeeParser
 from services.parsers.registry import NotificationParserComposite, _PARSER_REGISTRY
 from services.notification_service import parse_auto_track_notification
 
@@ -291,4 +292,53 @@ def test_auto_track_concurrent_idempotency(client, admin_user_id):
     verdicts = sorted([r[1] for r in results])
     assert statuses == [200, 201]
     assert verdicts == ["accepted", "duplicate_ignored"]
+
+
+def test_shopee_cashback_promo_is_rejected(client, admin_user_id):
+    """验证包含 DuitNow QR 和金额的 Shopee 返现广告会被可靠拦截为营销推广，绝不入账"""
+    raw_ad_text = "RM6 Just for You! 💰 RM6 Cashback, no min. spend! 💰 Pay with DuitNow QR this Oct. Limited redemptions."
+    shopee_ad_text = f"Shopee: {raw_ad_text}"
+
+    # 1. 策略层验证（显式 Shopee 渠道通知）
+    shopee_parser = ShopeeParser()
+    assert shopee_parser.can_handle(shopee_ad_text) is True
+    res = shopee_parser.parse(shopee_ad_text)
+    assert res is not None
+    assert res.is_promo is True
+
+    # 2. 复合引擎验证（即使通知仅为纯广告文本未带前缀，也必须被拦截）
+    composite = NotificationParserComposite()
+    c_res = composite.parse(raw_ad_text)
+    assert c_res is not None
+    assert c_res.is_promo is True
+
+    # 3. auto_track 接口级端到端验证
+    headers = {"X-API-KEY": "test-auto-track-key", "Content-Type": "application/json"}
+    resp = client.post("/api/auto-track", json={"text": raw_ad_text, "user_id": admin_user_id}, headers=headers)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is False
+    assert data["verdict"] == "rejected_promo"
+
+
+def test_shopee_genuine_payment():
+    """验证 Shopee / ShopeePay 真实扣款通知正常解析入账"""
+    text = "ShopeePay: You have successfully paid RM 18.50 to FamilyMart."
+    shopee_parser = ShopeeParser()
+    assert shopee_parser.can_handle(text) is True
+    res = shopee_parser.parse(text)
+    assert res is not None
+    assert res.is_promo is False
+    assert res.amount == 18.50
+    assert "FamilyMart" in res.merchant
+    assert res.channel == "shopeepay"
+
+
+def test_tng_reward_points_is_rejected():
+    """验证 TNG/电子钱包积分奖励通知被识别为非动账营销通知"""
+    text = "You've just earned 8 points! You've received 8 points from your transaction! Use them now to redeem great rewards."
+    composite = NotificationParserComposite()
+    res = composite.parse(text)
+    assert res is not None
+    assert res.is_promo is True
 
