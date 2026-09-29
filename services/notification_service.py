@@ -17,7 +17,8 @@ EXPENSE_CATEGORY_KEYWORDS = {
         '吃', '饭', '餐', '外卖', '奶茶', '咖啡', '早饭', '午饭', '晚饭', '夜宵', '零食',
         'kfc', 'mcd', 'mcdonald', 'starbucks', 'zus', 'chagee', 'tealive', 'subway',
         'familymart', 'family mart', 'rotiboy', 'baker', 'kopitiam', 'restaurant',
-        'nasi', 'cafe', 'food', 'din', 'bbq', 'sushi', 'pizza'
+        'nasi', 'cafe', 'food', 'din', 'bbq', 'sushi', 'pizza',
+        'bee hoon', 'beehoon', 'bihun', 'noodle', 'mee', 'kuey teow', 'bakery', 'tea', 'dim sum', 'hawker'
     ],
     '交通': [
         '打车', '地铁', '公交', '高铁', '火车', '机票', '油费', '停车', '交通', '出行',

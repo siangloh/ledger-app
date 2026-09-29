@@ -13,6 +13,10 @@ class TouchNGoParser(NotificationParserStrategy):
         r'(?:paid|payment of|spent)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:to|at)\s+([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{2,40})',
         re.IGNORECASE
     )
+    DEDUCTED_PAYMENT_PATTERN = re.compile(
+        r'Payment\s+To:\s*(.*?)(?::\s*|\s+)(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+has\s+been\s+deducted',
+        re.IGNORECASE
+    )
     REFUND_PATTERN = re.compile(
         r'(?:refund of|refunded|payment refunded)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:from|for)?\s*([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{0,40})',
         re.IGNORECASE
@@ -21,6 +25,20 @@ class TouchNGoParser(NotificationParserStrategy):
         r'(?:received|transfer from|duitnow transfer from)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:from)?\s*([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{2,40})?',
         re.IGNORECASE
     )
+
+    @staticmethod
+    def _clean_merchant(raw_merchant: str) -> str:
+        cleaned = re.split(
+            r'[\.\n\r]|\s+(?:on|via|ref|using|with|at|date|txid|merchant reference)\b',
+            raw_merchant,
+            flags=re.IGNORECASE
+        )[0].strip(' .,-:')
+        words = cleaned.split()
+        if len(words) >= 2 and len(words) % 2 == 0:
+            half = len(words) // 2
+            if [w.lower() for w in words[:half]] == [w.lower() for w in words[half:]]:
+                cleaned = " ".join(words[:half])
+        return cleaned
 
     def can_handle(self, text: str) -> bool:
         t = text.lower()
@@ -89,17 +107,33 @@ class TouchNGoParser(NotificationParserStrategy):
                     raw_text=text
                 )
 
-        # 3. 正常消费扣款
+        # 3. 正常消费扣款 (支持 "paid RM10 to..." 与 "Payment To: ... RM10 has been deducted...")
+        m_deducted = self.DEDUCTED_PAYMENT_PATTERN.search(text)
+        if m_deducted:
+            try:
+                raw_merchant = m_deducted.group(1).strip()
+                amt = float(m_deducted.group(2).replace(',', ''))
+                cleaned_merchant = self._clean_merchant(raw_merchant)
+                return ParsedNotification(
+                    amount=amt,
+                    type='expense',
+                    category='其他',
+                    merchant=cleaned_merchant or 'TnG消费',
+                    note=cleaned_merchant or 'TnG消费',
+                    date=today_str,
+                    channel='TnG',
+                    confidence=0.96,
+                    raw_text=text
+                )
+            except ValueError:
+                pass
+
         m_pay = self.PAYMENT_PATTERN.search(text)
         if m_pay:
             try:
                 amt = float(m_pay.group(1).replace(',', ''))
                 raw_merchant = m_pay.group(2).strip()
-                cleaned_merchant = re.split(
-                    r'[\.\n\r]|\s+(?:on|via|ref|using|with|at|date|txid)\b',
-                    raw_merchant,
-                    flags=re.IGNORECASE
-                )[0].strip(' .,-')
+                cleaned_merchant = self._clean_merchant(raw_merchant)
                 return ParsedNotification(
                     amount=amt,
                     type='expense',

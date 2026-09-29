@@ -250,3 +250,45 @@ def test_api_sync_transactions_deduplication(client, admin_user_id):
     assert r2.status_code == 200
     # 仍返回 1 确认已同步以供客户端清理，但数据库不重复新增
     assert r2.get_json()["synced_count"] == 1
+
+
+def test_tng_deducted_notification_format():
+    """验证 Touch'n Go eWallet 常见扣款通知格式（含双倍商户名清洗与餐饮自动归类）"""
+    text = "Payment To: KING ECONOMY BEE HOON KING ECONOMY BEE HOON: RM10.00 has been deducted from your TNG e-wallet. Merchant Reference No. MGTWFIFI"
+    parsed = parse_auto_track_notification(text)
+    assert parsed is not None
+    assert parsed["amount"] == 10.0
+    assert parsed["type"] == "expense"
+    assert parsed["note"] == "KING ECONOMY BEE HOON"
+    assert parsed["category"] == "餐饮"
+    assert parsed["channel"] == "TnG"
+
+
+def test_auto_track_concurrent_idempotency(client, admin_user_id):
+    """验证多线程并发重试或离线队列突发重试时，严格幂等拦截并发穿透，保证只记一笔账"""
+    import threading
+    import uuid
+
+    uid = uuid.uuid4().hex[:6]
+    text = f"Payment To: WARUNG {uid}: RM 15.00 has been deducted from your TNG e-wallet. Merchant Reference No. {uid}"
+    headers = {"X-API-KEY": "test-auto-track-key", "Content-Type": "application/json"}
+
+    results = []
+
+    def send_request():
+        res = client.post("/api/auto-track", json={"text": text, "user_id": admin_user_id}, headers=headers)
+        results.append((res.status_code, res.get_json()["verdict"]))
+
+    t1 = threading.Thread(target=send_request)
+    t2 = threading.Thread(target=send_request)
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    # 两个并发请求必须恰好一个 accepted (201)，一个 duplicate_ignored (200)
+    statuses = sorted([r[0] for r in results])
+    verdicts = sorted([r[1] for r in results])
+    assert statuses == [200, 201]
+    assert verdicts == ["accepted", "duplicate_ignored"]
+

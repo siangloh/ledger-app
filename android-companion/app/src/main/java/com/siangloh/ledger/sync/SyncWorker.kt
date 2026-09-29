@@ -65,6 +65,7 @@ class SyncWorker(
             if (pendingNotifs.isNotEmpty()) {
                 Log.i(TAG, "Retrying ${pendingNotifs.size} pending notifications...")
                 for (notif in pendingNotifs) {
+                    db.pendingNotificationDao().markAsSyncing(notif.id)
                     val latch = CountDownLatch(1)
                     NetworkHelper.postNotificationAsync(notif.rawText, applicationContext) { success, msg, verdict ->
                         kotlinx.coroutines.runBlocking {
@@ -75,21 +76,33 @@ class SyncWorker(
                                     "duplicate_ignored" -> "synced_duplicate_ignored"
                                     else -> "synced_success"
                                 }
-                                db.notificationLogDao().insert(
-                                    NotificationLog(
-                                        sourcePackage = notif.packageName,
-                                        rawText = notif.rawText,
-                                        matchedPhase1 = true,
-                                        sentToBackend = true,
-                                        backendVerdict = verdict,
-                                        outcome = finalOutcome
-                                    )
+                                val updatedRows = db.notificationLogDao().updateQueuedLog(
+                                    rawText = notif.rawText,
+                                    verdict = verdict,
+                                    outcome = finalOutcome
                                 )
+                                if (updatedRows <= 0) {
+                                    db.notificationLogDao().insert(
+                                        NotificationLog(
+                                            sourcePackage = notif.packageName,
+                                            rawText = notif.rawText,
+                                            matchedPhase1 = true,
+                                            sentToBackend = true,
+                                            backendVerdict = verdict,
+                                            outcome = finalOutcome
+                                        )
+                                    )
+                                }
+                            } else {
+                                db.pendingNotificationDao().markAsPending(notif.id)
                             }
                         }
                         latch.countDown()
                     }
-                    latch.await(15, TimeUnit.SECONDS)
+                    val completed = latch.await(35, TimeUnit.SECONDS)
+                    if (!completed) {
+                        Log.w(TAG, "Syncing pending notification ${notif.id} timed out after 35s.")
+                    }
                 }
             }
 
