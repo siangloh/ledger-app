@@ -125,7 +125,7 @@ class MainActivity : AppCompatActivity() {
         if (NetworkHelper.isOnline(this)) {
             offlineContainer.visibility = View.GONE
             webView.visibility = View.VISIBLE
-            fabQuickAdd.visibility = View.GONE
+            fabQuickAdd.visibility = View.VISIBLE
             webView.loadUrl(NetworkHelper.getServerUrl(this))
             SyncWorker.enqueueSync(this)
         } else {
