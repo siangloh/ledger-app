@@ -58,12 +58,12 @@
           <select name="from_savings_category" id="fromSavingsCategorySelect" class="from-savings-select">
             {% if savings_pool_by_category %}
               {% for scat, samt in savings_pool_by_category.items() %}
-                <option value="{{ scat }}">{{ scat }} ({{ t('dashboard.balance_prefix') }}: {{ samt|money }})</option>
+                <option value="{{ scat }}">{{ scat|t_cat }} ({{ t('dashboard.balance_prefix') }}: {{ samt|money }})</option>
               {% endfor %}
             {% endif %}
             {% for scat in savings_categories %}
               {% if not savings_pool_by_category or scat not in savings_pool_by_category %}
-                <option value="{{ scat }}">{{ scat }} ({{ t('dashboard.balance_prefix') }}: {{ 0|money }})</option>
+                <option value="{{ scat }}">{{ scat|t_cat }} ({{ t('dashboard.balance_prefix') }}: {{ 0|money }})</option>
               {% endif %}
             {% endfor %}
             {% if not savings_pool_by_category and not savings_categories %}

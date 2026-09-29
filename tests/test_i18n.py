@@ -1,5 +1,6 @@
 from core.i18n import (
     t,
+    t_cat,
     get_current_locale,
     set_current_locale,
     get_supported_languages,
@@ -7,6 +8,31 @@ from core.i18n import (
     SUPPORTED_LANGUAGES,
 )
 from core.db import get_user_settings, update_user_settings, get_db
+
+
+def test_t_cat_translations():
+    # 餐饮
+    assert t_cat('餐饮', lang='zh') == '餐饮'
+    assert t_cat('餐饮', lang='en') == 'Food & Dining'
+    assert t_cat('餐饮', lang='ms') == 'Makanan & Minuman'
+    assert t_cat('餐饮', lang='zh_TW') == '餐飲'
+
+    # 工资
+    assert t_cat('工资', lang='zh') == '工资'
+    assert t_cat('工资', lang='en') == 'Salary'
+    assert t_cat('工资', lang='ms') == 'Gaji'
+    assert t_cat('工资', lang='zh_TW') == '工資'
+
+    # 定期存款
+    assert t_cat('定期存款', lang='zh') == '定期存款'
+    assert t_cat('定期存款', lang='en') == 'Fixed Deposit'
+    assert t_cat('定期存款', lang='ms') == 'Simpanan Tetap'
+    assert t_cat('定期存款', lang='zh_TW') == '定期存款'
+
+    # 未定义自定义分类保持原样
+    assert t_cat('MySpecialCustomCat', lang='en') == 'MySpecialCustomCat'
+    assert t_cat(None) == ''
+    assert t_cat('') == ''
 
 
 def test_locale_helpers(flask_app):

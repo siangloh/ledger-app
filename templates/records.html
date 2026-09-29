@@ -18,7 +18,7 @@
     <select name="category">
       <option value="">{{ t('common.all') }}</option>
       {% for c in categories %}
-      <option value="{{ c }}" {{ 'selected' if category==c }}>{{ c }}</option>
+      <option value="{{ c }}" {{ 'selected' if category==c }}>{{ c|t_cat }}</option>
       {% endfor %}
     </select>
   </label>
@@ -61,36 +61,51 @@ function openBatchEditDialog() {
   }
 
   const categories = window.ALL_CATEGORIES || [];
-  let catOptions = '<option value="">保持原分类不变</option>';
+  const keepCatText = window.t ? window.t('records.batch_keep_category', '保持原分类不变') : '保持原分类不变';
+  let catOptions = '<option value="">' + keepCatText + '</option>';
   categories.forEach(c => {
-    catOptions += '<option value="' + c + '">' + c + '</option>';
+    const label = window.t_cat ? window.t_cat(c) : c;
+    catOptions += '<option value="' + c + '">' + label + '</option>';
   });
+
+  const titleText = window.t ? window.t('records.batch_edit_title', '批量修改选中的 {count} 项记录', {count: selected.length}) : ('批量修改选中的 ' + selected.length + ' 项记录');
+  const typeLabel = window.t ? window.t('records.batch_edit_type_label', '修改交易类型 (Type)：') : '修改交易类型 (Type)：';
+  const keepType = window.t ? window.t('records.batch_keep_type', '保持原类型不变') : '保持原类型不变';
+  const optExpense = window.t ? window.t('common.expense', '支出') : '支出';
+  const optIncome = window.t ? window.t('common.income', '收入') : '收入';
+  const optSavings = window.t ? window.t('common.savings', '结余储蓄') : '结余储蓄';
+  const groupLabel = window.t ? window.t('records.batch_edit_group_label', '收入分组 (Group)：') : '收入分组 (Group)：';
+  const mainIncome = window.t ? window.t('dashboard.main_income', '主业收入') : '主业收入';
+  const sideIncome = window.t ? window.t('dashboard.side_income', '副业收入') : '副业收入';
+  const catLabel = window.t ? window.t('records.batch_edit_category_label', '修改分类 (Category)：') : '修改分类 (Category)：';
+  const btnConfirm = window.t ? window.t('records.batch_confirm_edit', '确认批量修改') : '确认批量修改';
+  const btnCancel = window.t ? window.t('common.cancel', '取消') : '取消';
 
   if (typeof Swal !== 'undefined') {
     Swal.fire({
-      title: '批量修改选中的 ' + selected.length + ' 项记录',
+      title: titleText,
       html: `
         <div style="text-align: left; display:flex; flex-direction:column; gap:12px; margin-top:8px;">
           <label style="font-size:13px; color:var(--ink); font-weight:600;">
-            修改交易类型 (Type)：
+            ${typeLabel}
             <select id="swalBatchType" class="swal2-input" style="margin:4px 0 0 0; width:100%; height:38px; font-size:13.5px; box-sizing:border-box;">
-              <option value="">保持原类型不变</option>
-              <option value="expense">支出 (Expense)</option>
-              <option value="income">收入 (Income)</option>
-              <option value="savings">结余储蓄 (Savings)</option>
+              <option value="">${keepType}</option>
+              <option value="expense">${optExpense} (Expense)</option>
+              <option value="income">${optIncome} (Income)</option>
+              <option value="savings">${optSavings} (Savings)</option>
             </select>
           </label>
           <div id="swalBatchGroupWrap" style="display:none;">
             <label style="font-size:13px; color:var(--ink); font-weight:600;">
-              收入分组 (Group)：
+              ${groupLabel}
               <select id="swalBatchGroup" class="swal2-input" style="margin:4px 0 0 0; width:100%; height:38px; font-size:13.5px; box-sizing:border-box;">
-                <option value="main">主业收入</option>
-                <option value="side">副业收入</option>
+                <option value="main">${mainIncome}</option>
+                <option value="side">${sideIncome}</option>
               </select>
             </label>
           </div>
           <label style="font-size:13px; color:var(--ink); font-weight:600;">
-            修改分类 (Category)：
+            ${catLabel}
             <select id="swalBatchCategory" class="swal2-input" style="margin:4px 0 0 0; width:100%; height:38px; font-size:13.5px; box-sizing:border-box;">
               ${catOptions}
             </select>
@@ -107,8 +122,8 @@ function openBatchEditDialog() {
         }
       },
       showCancelButton: true,
-      confirmButtonText: '确认批量修改',
-      cancelButtonText: '取消',
+      confirmButtonText: btnConfirm,
+      cancelButtonText: btnCancel,
       buttonsStyling: false,
       customClass: {
         popup: 'app-swal-popup',
@@ -122,7 +137,7 @@ function openBatchEditDialog() {
         const groupName = document.getElementById('swalBatchGroup') ? document.getElementById('swalBatchGroup').value : '';
         const newCategory = document.getElementById('swalBatchCategory').value;
         if (!newType && !newCategory) {
-          Swal.showValidationMessage('请至少选择一项要修改的类型或分类');
+          Swal.showValidationMessage(window.t ? window.t('records.batch_edit_need_selection', '请至少选择一项要修改的类型或分类') : '请至少选择一项要修改的类型或分类');
           return false;
         }
         return { type: newType, group_name: groupName, category: newCategory };
@@ -168,12 +183,12 @@ function openBatchEditDialog() {
               window.location.reload();
             }
           } else {
-            errorAlert(data.message || '批量修改失败');
+            errorAlert(data.message || (window.t ? window.t('records.batch_edit_failed', '批量修改失败') : '批量修改失败'));
           }
         })
         .catch(() => {
           if (typeof finishProgressBar === 'function') finishProgressBar();
-          errorAlert('网络连接异常，批量修改未完成');
+          errorAlert(window.t ? window.t('records.batch_edit_network_error', '网络连接异常，批量修改未完成') : '网络连接异常，批量修改未完成');
         });
       }
     });
@@ -501,12 +516,12 @@ document.addEventListener('click', function(e) {
 
 async function openOffsetModal(incomeId, incomeAmount, incomeNote) {
   if (typeof Swal === 'undefined') {
-    alert('当前环境暂不支持弹窗操作');
+    alert(window.t ? window.t('records.offset_env_unsupported', '当前环境暂不支持弹窗操作') : '当前环境暂不支持弹窗操作');
     return;
   }
 
   Swal.fire({
-    title: '正在加载近期支出...',
+    title: window.t ? window.t('records.offset_loading', '正在加载近期支出...') : '正在加载近期支出...',
     didOpen: () => { Swal.showLoading(); },
     allowOutsideClick: false
   });
@@ -518,46 +533,56 @@ async function openOffsetModal(incomeId, incomeAmount, incomeNote) {
     if (!data.ok || !data.expenses || data.expenses.length === 0) {
       Swal.fire({
         icon: 'info',
-        title: '未找到近期支出',
-        text: '暂无可供冲抵的支出记录。'
+        title: window.t ? window.t('records.offset_none_title', '未找到近期支出') : '未找到近期支出',
+        text: window.t ? window.t('records.offset_none_text', '暂无可供冲抵的支出记录。') : '暂无可供冲抵的支出记录。'
       });
       return;
     }
 
     const expenses = data.expenses;
     let optionsHtml = '';
+    const sym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
     expenses.forEach((exp, idx) => {
       const isChecked = idx === 0 ? 'checked' : '';
       const expAmt = parseFloat(exp.amount) || 0;
       const remaining = Math.max(0, expAmt - incomeAmount);
-      const sym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
+      const catLabel = window.t_cat ? window.t_cat(exp.category) : exp.category;
+      const origAmtLabel = window.t ? window.t('records.offset_orig_amount', '原额 {amt}', {amt: `${sym} ${expAmt.toFixed(2)}`}) : `原额 ${sym} ${expAmt.toFixed(2)}`;
+      const noNoteLabel = window.t ? window.t('records.offset_no_note', '无备注') : '无备注';
+      const remLabel = window.t ? window.t('records.offset_remaining', '冲抵后剩余：{amt}', {amt: `${sym} ${remaining.toFixed(2)}`}) : `冲抵后剩余：${sym} ${remaining.toFixed(2)}`;
+
       optionsHtml += `
         <label style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; margin-bottom: 8px; cursor: pointer; text-align: left; background: var(--surface);">
           <input type="radio" name="offset_target" value="${exp.id}" ${isChecked} style="margin-top: 3px;">
           <div style="flex: 1; font-size: 13px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
-              <strong style="color: var(--navy); font-size: 13.5px;">${exp.category} · ${exp.date}</strong>
-              <span style="color: #b91c1c; font-weight: 700;">原额 ${sym} ${expAmt.toFixed(2)}</span>
+              <strong style="color: var(--navy); font-size: 13.5px;">${catLabel} · ${exp.date}</strong>
+              <span style="color: #b91c1c; font-weight: 700;">${origAmtLabel}</span>
             </div>
             <div style="color: var(--ink-soft); font-size: 12px; margin-bottom: 4px;">
-              ${exp.note ? exp.note : '<span style="color:var(--muted)">无备注</span>'}
+              ${exp.note ? exp.note : `<span style="color:var(--muted)">${noNoteLabel}</span>`}
             </div>
             <div style="font-size: 11.5px; color: var(--green); font-weight: 600; background: var(--green-soft); padding: 2px 6px; border-radius: 4px; display: inline-block;">
-              冲抵后剩余：${sym} ${remaining.toFixed(2)}
+              ${remLabel}
             </div>
           </div>
         </label>
       `;
     });
 
-    const sym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
     const noteDisplay = incomeNote ? ` (${incomeNote})` : '';
+    const modalTitle = window.t ? window.t('records.offset_modal_title', '💸 冲抵之前的支出') : '💸 冲抵之前的支出';
+    const modalDesc = window.t ? window.t('records.offset_modal_desc', '将此笔还款直接扣减某一笔已垫付的支出，避免总收入虚增：') : '将此笔还款直接扣减某一笔已垫付的支出，避免总收入虚增：';
+    const btnConfirm = window.t ? window.t('records.offset_confirm_btn', '确认扣减冲抵') : '确认扣减冲抵';
+    const btnCancel = window.t ? window.t('common.cancel', '取消') : '取消';
+
     const result = await Swal.fire({
-      title: '💸 冲抵之前的支出',
+      title: modalTitle,
       html: `
         <div style="text-align: left; margin-bottom: 12px;">
           <p style="font-size: 13px; color: var(--ink-soft); margin: 0 0 10px;">
-            将此笔还款 <strong style="color: var(--green);">${sym} ${incomeAmount.toFixed(2)}${noteDisplay}</strong> 直接扣减某一笔已垫付的支出，避免总收入虚增：
+            ${modalDesc}
+            <div style="margin-top: 4px;"><strong style="color: var(--green);">${sym} ${incomeAmount.toFixed(2)}${noteDisplay}</strong></div>
           </p>
           <div style="max-height: 280px; overflow-y: auto; padding-right: 4px;">
             ${optionsHtml}
@@ -565,8 +590,8 @@ async function openOffsetModal(incomeId, incomeAmount, incomeNote) {
         </div>
       `,
       showCancelButton: true,
-      confirmButtonText: '确认扣减冲抵',
-      cancelButtonText: '取消',
+      confirmButtonText: btnConfirm,
+      cancelButtonText: btnCancel,
       buttonsStyling: false,
       customClass: {
         popup: 'app-swal-popup',
@@ -577,7 +602,7 @@ async function openOffsetModal(incomeId, incomeAmount, incomeNote) {
       preConfirm: () => {
         const selected = document.querySelector('input[name="offset_target"]:checked');
         if (!selected) {
-          Swal.showValidationMessage('请选择要冲抵的目标支出');
+          Swal.showValidationMessage(window.t ? window.t('records.offset_select_target', '请选择要冲抵的目标支出') : '请选择要冲抵的目标支出');
           return false;
         }
         return selected.value;
@@ -623,7 +648,7 @@ async function openOffsetModal(incomeId, incomeAmount, incomeNote) {
           toast: true,
           position: 'top-end',
           icon: 'success',
-          title: postData.message || '已成功冲抵！',
+          title: postData.message || (window.t ? window.t('records.offset_success', '已成功冲抵！') : '已成功冲抵！'),
           showConfirmButton: false,
           timer: 3000
         });
@@ -635,8 +660,8 @@ async function openOffsetModal(incomeId, incomeAmount, incomeNote) {
       } else {
         Swal.fire({
           icon: 'error',
-          title: '冲抵失败',
-          text: postData.message || '服务器处理异常'
+          title: window.t ? window.t('records.offset_failed', '冲抵失败') : '冲抵失败',
+          text: postData.message || (window.t ? window.t('records.offset_server_err', '服务器处理异常') : '服务器处理异常')
         });
       }
     }
@@ -644,8 +669,8 @@ async function openOffsetModal(incomeId, incomeAmount, incomeNote) {
     if (typeof finishProgressBar === 'function') finishProgressBar();
     Swal.fire({
       icon: 'error',
-      title: '操作异常',
-      text: err.message || '网络连接超时'
+      title: window.t ? window.t('records.offset_op_error', '操作异常') : '操作异常',
+      text: err.message || (window.t ? window.t('records.offset_timeout', '网络连接超时') : '网络连接超时')
     });
   }
 }

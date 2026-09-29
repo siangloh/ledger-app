@@ -70,6 +70,7 @@ from core.db import (
 from core.auth import is_ajax_request
 from core.i18n import (
     t,
+    t_cat,
     get_current_locale,
     get_supported_languages,
     get_client_translations
@@ -295,6 +296,7 @@ def inject_globals():
         'supported_languages': get_supported_languages(),
         'i18n_client_json': get_client_translations(current_lang),
         't': t,
+        't_cat': t_cat,
     }
 
 
@@ -367,6 +369,11 @@ def jinja_date_filter(value, fmt=None):
 @app.template_filter('t')
 def jinja_t_filter(key, default=None, **kwargs):
     return t(key, default=default, **kwargs)
+
+
+@app.template_filter('t_cat')
+def jinja_t_cat_filter(name, default=None, lang=None):
+    return t_cat(name, default=default, lang=lang)
 
 
 # ---------------------------------------------------------------------------

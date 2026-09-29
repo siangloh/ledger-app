@@ -107,24 +107,24 @@
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <select id="defaultCurrencySelect" name="default_currency" style="width: 140px; font-weight: 600;" onchange="onCurrencySelectChange(this)">
               {% for code, label in [
-                ('MYR', 'MYR - 马币 (RM)'),
-                ('SGD', 'SGD - 新元 (S$)'),
-                ('USD', 'USD - 美元 ($)'),
-                ('CNY', 'CNY - 人民币 (¥)'),
-                ('EUR', 'EUR - 欧元 (€)'),
-                ('GBP', 'GBP - 英镑 (£)'),
-                ('JPY', 'JPY - 日元 (¥)'),
-                ('HKD', 'HKD - 港币 (HK$)'),
-                ('AUD', 'AUD - 澳元 (A$)'),
-                ('CAD', 'CAD - 加元 (C$)'),
-                ('THB', 'THB - 泰铢 (฿)'),
-                ('KRW', 'KRW - 韩元 (₩)'),
-                ('TWD', 'TWD - 新台币 (NT$)')
+                ('MYR', 'MYR - RM (Ringgit Malaysia)'),
+                ('SGD', 'SGD - S$ (Singapore Dollar)'),
+                ('USD', 'USD - $ (US Dollar)'),
+                ('CNY', 'CNY - ¥ (Chinese Yuan / 人民币)'),
+                ('EUR', 'EUR - € (Euro)'),
+                ('GBP', 'GBP - £ (British Pound)'),
+                ('JPY', 'JPY - ¥ (Japanese Yen)'),
+                ('HKD', 'HKD - HK$ (Hong Kong Dollar)'),
+                ('AUD', 'AUD - A$ (Australian Dollar)'),
+                ('CAD', 'CAD - C$ (Canadian Dollar)'),
+                ('THB', 'THB - ฿ (Thai Baht)'),
+                ('KRW', 'KRW - ₩ (Korean Won)'),
+                ('TWD', 'TWD - NT$ (New Taiwan Dollar)')
               ] %}
               <option value="{{ code }}" {{ 'selected' if settings.default_currency == code }}>{{ label }}</option>
               {% endfor %}
             </select>
-            <input type="text" id="currencySymbolInput" name="currency_symbol" value="{{ settings.currency_symbol }}" maxlength="8" style="width: 90px; font-weight: 700; text-align: center;" title="前置货币符号" required>
+            <input type="text" id="currencySymbolInput" name="currency_symbol" value="{{ settings.currency_symbol }}" maxlength="8" style="width: 90px; font-weight: 700; text-align: center;" title="{{ t('settings.currency_symbol_title', '前置货币符号') }}" required>
             <div class="quick-currency-chips">
               <button type="button" class="chip-btn" onclick="setCurrencySymbol('RM')">RM</button>
               <button type="button" class="chip-btn" onclick="setCurrencySymbol('S$')">S$</button>
@@ -167,23 +167,23 @@
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <select id="timezoneSelect" name="timezone" style="flex: 1; min-width: 220px;">
               {% for tz_val, tz_lbl in [
-                ('Asia/Kuala_Lumpur', 'Asia/Kuala_Lumpur (UTC+8 · 吉隆坡)'),
-                ('Asia/Singapore', 'Asia/Singapore (UTC+8 · 新加坡)'),
-                ('Asia/Shanghai', 'Asia/Shanghai (UTC+8 · 北京/上海)'),
-                ('Asia/Hong_Kong', 'Asia/Hong_Kong (UTC+8 · 香港)'),
-                ('Asia/Taipei', 'Asia/Taipei (UTC+8 · 台北)'),
-                ('Asia/Tokyo', 'Asia/Tokyo (UTC+9 · 东京)'),
-                ('Asia/Bangkok', 'Asia/Bangkok (UTC+7 · 曼谷)'),
-                ('UTC', 'UTC (世界协调时间)'),
-                ('Europe/London', 'Europe/London (UTC+0/+1 · 伦敦)'),
-                ('America/New_York', 'America/New_York (UTC-5/-4 · 纽约)'),
-                ('America/Los_Angeles', 'America/Los_Angeles (UTC-8/-7 · 洛杉矶)'),
-                ('Australia/Sydney', 'Australia/Sydney (UTC+10/+11 · 悉尼)')
+                ('Asia/Kuala_Lumpur', 'Asia/Kuala_Lumpur (UTC+8 · Kuala Lumpur / 吉隆坡)'),
+                ('Asia/Singapore', 'Asia/Singapore (UTC+8 · Singapore / 新加坡)'),
+                ('Asia/Shanghai', 'Asia/Shanghai (UTC+8 · Beijing / 上海/北京)'),
+                ('Asia/Hong_Kong', 'Asia/Hong_Kong (UTC+8 · Hong Kong / 香港)'),
+                ('Asia/Taipei', 'Asia/Taipei (UTC+8 · Taipei / 台北)'),
+                ('Asia/Tokyo', 'Asia/Tokyo (UTC+9 · Tokyo / 东京)'),
+                ('Asia/Bangkok', 'Asia/Bangkok (UTC+7 · Bangkok / 曼谷)'),
+                ('UTC', 'UTC (UTC+0 · Universal Time)'),
+                ('Europe/London', 'Europe/London (UTC+0/+1 · London / 伦敦)'),
+                ('America/New_York', 'America/New_York (UTC-5/-4 · New York / 纽约)'),
+                ('America/Los_Angeles', 'America/Los_Angeles (UTC-8/-7 · Los Angeles / 洛杉矶)'),
+                ('Australia/Sydney', 'Australia/Sydney (UTC+10/+11 · Sydney / 悉尼)')
               ] %}
               <option value="{{ tz_val }}" {{ 'selected' if settings.timezone == tz_val }}>{{ tz_lbl }}</option>
               {% endfor %}
             </select>
-            <button type="button" class="btn-secondary btn-sm" onclick="detectUserTimezone()" title="读取当前浏览器时区">
+            <button type="button" class="btn-secondary btn-sm" onclick="detectUserTimezone()" title="{{ t('settings.btn_detect_tz_title', '读取当前浏览器时区') }}">
               {{ t('settings.btn_detect_tz', '🌐 自动探测') }}
             </button>
           </div>

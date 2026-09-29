@@ -30,7 +30,7 @@
       {% for b in budget_status %}
       <div class="budget-dash-card level-{{ b.level }} {{ 'hidden-extra' if loop.index > 4 else '' }}">
         <div class="b-card-top">
-          <span class="b-card-name" title="{{ b.category }}">{{ b.category }}</span>
+          <span class="b-card-name" title="{{ b.category|t_cat }}">{{ b.category|t_cat }}</span>
           <span class="b-card-pct level-{{ b.level }}">
             {{ b.pct }}%
             {% if b.level == 'over' %}{{ t('dashboard.budget_over') }}{% elif b.level == 'reached' %}{{ t('dashboard.budget_reached') }}{% elif b.level == 'warn' %}{{ t('dashboard.budget_warn') }}{% endif %}

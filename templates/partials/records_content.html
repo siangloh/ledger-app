@@ -19,10 +19,10 @@
       <td data-col="date">{{ r.date|user_date }}</td>
       <td data-col="type">
         <span class="tag {{ 'tag-income' if r.type=='income' else ('tag-savings' if r.type=='savings' else 'tag-expense') }}">{{ t('common.income') if r.type=='income' else (t('common.savings') if r.type=='savings' else t('common.expense')) }}</span>
-        {% if r.from_savings %}<span class="tag tag-savings" style="margin-left: 4px; font-size: 10px; padding: 2px 6px;" title="{{ t('records.tag_from_savings', cat=r.from_savings_category or t('common.savings')) }}">{{ t('records.tag_from_savings', cat=r.from_savings_category or t('common.savings')) }}</span>{% endif %}
+        {% if r.from_savings %}<span class="tag tag-savings" style="margin-left: 4px; font-size: 10px; padding: 2px 6px;" title="{{ t('records.tag_from_savings', cat=(r.from_savings_category|t_cat) or t('common.savings')) }}">{{ t('records.tag_from_savings', cat=(r.from_savings_category|t_cat) or t('common.savings')) }}</span>{% endif %}
       </td>
       <td data-col="group">{{ {'main': t('records.tag_main'), 'side': t('records.tag_side')}.get(r.group_name, '') }}</td>
-      <td data-col="category" title="{{ r.category }}"><strong>{{ r.category }}</strong></td>
+      <td data-col="category" title="{{ r.category|t_cat }}"><strong>{{ r.category|t_cat }}</strong></td>
       <td data-col="amount" class="amount-cell {{ 'income' if r.type=='income' else ('savings' if r.type=='savings' else 'expense') }}">{{ r.amount|money }}</td>
       <td data-col="note" class="{{ 'has-note' if (r.note or r.tags) else 'no-note' }}">
         {{ r.note }}
@@ -43,7 +43,7 @@
           <button type="button" class="btn-link" style="color: var(--primary); font-weight: 600;" onclick="openOffsetModal({{ r.id }}, {{ r.amount }}, '{{ r.note|e }}')" title="{{ t('records.btn_offset_title') }}">{{ t('records.btn_offset') }}</button>
           {% endif %}
           <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link" hx-get="{{ url_for('edit_record', tx_id=r.id) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">{{ t('common.edit') }}</a>
-          <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ t('common.income') if r.type=='income' else (t('common.savings') if r.type=='savings' else t('common.expense')) }} · {{ r.category }} · {{ r.amount|money }}', this)">{{ t('common.delete') }}</button>
+          <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ t('common.income') if r.type=='income' else (t('common.savings') if r.type=='savings' else t('common.expense')) }} · {{ r.category|t_cat }} · {{ r.amount|money }}', this)">{{ t('common.delete') }}</button>
         </div>
       </td>
     </tr>

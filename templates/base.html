@@ -50,6 +50,10 @@
                     }
                     return str;
                 };
+                window.t_cat = function(name) {
+                    if (!name) return name || '';
+                    return window.t ? window.t('category.' + name, name) : name;
+                };
             } catch (e) { }
         })();
     </script>
@@ -179,7 +183,7 @@
                 </div>
 
                 <!-- 隐私模式切换 -->
-                <button type="button" class="nav-privacy-btn" id="privacyToggleBtn" title="{{ t('nav.privacy_title') }}" aria-label="切换隐私遮罩模式" onclick="togglePrivacyMode()">
+                <button type="button" class="nav-privacy-btn" id="privacyToggleBtn" title="{{ t('nav.privacy_title') }}" aria-label="{{ t('nav.privacy_toggle_aria') }}" onclick="togglePrivacyMode()">
                     <span id="privacyIcon">👁</span>
                     <span class="privacy-label">{{ t('nav.privacy') }}</span>
                 </button>
@@ -228,12 +232,12 @@
     <div class="pwa-install-banner" id="pwaInstallBanner">
         <span class="pwa-banner-icon">📲</span>
         <div class="pwa-banner-text">
-            <div class="pwa-banner-title">安装为手机应用</div>
-            <div class="pwa-banner-desc">免开浏览器，享受全屏原生 App 体验</div>
+            <div class="pwa-banner-title">{{ t('pwa.banner_title') }}</div>
+            <div class="pwa-banner-desc">{{ t('pwa.banner_desc') }}</div>
         </div>
         <div class="pwa-banner-actions">
-            <button type="button" class="pwa-btn-install" onclick="installPwaApp()">安装</button>
-            <button type="button" class="pwa-btn-close" onclick="dismissPwaBanner()" title="暂不安装">✕</button>
+            <button type="button" class="pwa-btn-install" onclick="installPwaApp()">{{ t('pwa.btn_install') }}</button>
+            <button type="button" class="pwa-btn-close" onclick="dismissPwaBanner()" title="{{ t('pwa.btn_dismiss') }}">✕</button>
         </div>
     </div>
 
@@ -254,74 +258,74 @@
         </div>
         <div class="sheet-grid">
             <a href="{{ url_for('download_apk') }}" id="appDownloadTile" class="sheet-tile"
-                onclick="handleAppDownloadClick(event)" download="我的账本.apk"
+                onclick="handleAppDownloadClick(event)" download="ledger-app.apk"
                 style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08); position: relative;">
                 <span id="appDownloadBadge"
                     style="display: none; position: absolute; top: 6px; right: 6px; font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 600; line-height: 1.2;"></span>
                 <span class="sheet-icon" id="appDownloadIcon">📱</span>
-                <span class="sheet-title" id="appDownloadTitle" style="font-weight: 600;">下载应用</span>
-                <span class="sheet-desc" id="appDownloadDesc">点击下载 Android 原生应用包</span>
+                <span class="sheet-title" id="appDownloadTitle" style="font-weight: 600;">{{ t('nav.sheet_download_app') }}</span>
+                <span class="sheet-desc" id="appDownloadDesc">{{ t('nav.sheet_download_desc') }}</span>
             </a>
             <a href="{{ url_for('category_insights_page') }}"
                 class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'category_insights_page' }}" data-nav="insights"
                 hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer"
                 hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">📊</span>
-                <span class="sheet-title">分类洞察</span>
-                <span class="sheet-desc">支出环比与走势图</span>
+                <span class="sheet-title">{{ t('nav.insights') }}</span>
+                <span class="sheet-desc">{{ t('nav.sheet_insights_desc') }}</span>
             </a>
             <a href="{{ url_for('recurring_page') }}"
                 class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'recurring_page' }}" data-nav="recurring"
                 hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer"
                 hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">🔄</span>
-                <span class="sheet-title">固定收支</span>
-                <span class="sheet-desc">房租工资每月自动</span>
+                <span class="sheet-title">{{ t('nav.recurring') }}</span>
+                <span class="sheet-desc">{{ t('nav.sheet_recurring_desc') }}</span>
             </a>
             <a href="{{ url_for('liabilities_page') }}"
                 class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'liabilities_page' }}" data-nav="liabilities"
                 hx-get="{{ url_for('liabilities_page') }}" hx-target="#mainContainer"
                 hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">💳</span>
-                <span class="sheet-title">负债分期</span>
-                <span class="sheet-desc">房贷车贷与免息分期</span>
+                <span class="sheet-title">{{ t('nav.liabilities') }}</span>
+                <span class="sheet-desc">{{ t('nav.sheet_liabilities_desc') }}</span>
             </a>
             <a href="{{ url_for('accounts_page') }}"
                 class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'accounts_page' }}" data-nav="accounts"
                 hx-get="{{ url_for('accounts_page') }}" hx-target="#mainContainer"
                 hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">🏦</span>
-                <span class="sheet-title">账户管理</span>
-                <span class="sheet-desc">银行账户与信用卡</span>
+                <span class="sheet-title">{{ t('nav.accounts') }}</span>
+                <span class="sheet-desc">{{ t('nav.sheet_accounts_desc') }}</span>
             </a>
             <a href="{{ url_for('subscriptions_page') }}"
                 class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'subscriptions_page' }}" data-nav="subscriptions"
                 hx-get="{{ url_for('subscriptions_page') }}" hx-target="#mainContainer"
                 hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">🔄</span>
-                <span class="sheet-title">订阅大厅</span>
-                <span class="sheet-desc">周期订阅与续费预警</span>
+                <span class="sheet-title">{{ t('nav.subscriptions') }}</span>
+                <span class="sheet-desc">{{ t('nav.sheet_subscriptions_desc') }}</span>
             </a>
             <a href="{{ url_for('categories_page') }}"
                 class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'categories_page' }}" data-nav="categories"
                 hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer"
                 hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">🏷️</span>
-                <span class="sheet-title">分类管理</span>
-                <span class="sheet-desc">自定义收支类别</span>
+                <span class="sheet-title">{{ t('nav.categories') }}</span>
+                <span class="sheet-desc">{{ t('nav.sheet_categories_desc') }}</span>
             </a>
             <a href="{{ url_for('import_page') }}"
                 class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] in ('import_page','import_upload','import_confirm') }}"
                 data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer"
                 hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">📤</span>
-                <span class="sheet-title">批量导入</span>
-                <span class="sheet-desc">Excel/CSV 账单</span>
+                <span class="sheet-title">{{ t('nav.import') }}</span>
+                <span class="sheet-desc">{{ t('nav.sheet_import_desc') }}</span>
             </a>
             <div class="sheet-tile" onclick="togglePrivacyMode(); toggleMoreSheet(false);" style="cursor: pointer;">
                 <span class="sheet-icon" id="mobileSheetPrivacyIcon">👁</span>
-                <span class="sheet-title">隐私遮罩</span>
-                <span class="sheet-desc" id="mobileSheetPrivacyDesc">一键隐藏金额与资产</span>
+                <span class="sheet-title">{{ t('nav.privacy') }}</span>
+                <span class="sheet-desc" id="mobileSheetPrivacyDesc">{{ t('nav.sheet_privacy_desc') }}</span>
             </div>
             <div class="sheet-tile" onclick="openMobileLangPicker();" style="cursor: pointer;">
                 <span class="sheet-icon">🌐</span>
@@ -334,12 +338,12 @@
                 hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                 <span class="sheet-icon">⚙️</span>
                 <span class="sheet-title">{{ t('nav.settings') }}</span>
-                <span class="sheet-desc">个性化与偏好</span>
+                <span class="sheet-desc">{{ t('nav.sheet_settings_desc') }}</span>
             </a>
             <a href="{{ url_for('logout') }}" class="sheet-tile">
                 <span class="sheet-icon">🚪</span>
                 <span class="sheet-title">{{ t('nav.logout') }}</span>
-                <span class="sheet-desc">锁定当前账本</span>
+                <span class="sheet-desc">{{ t('nav.sheet_logout_desc') }}</span>
             </a>
         </div>
     </div>

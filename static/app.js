@@ -220,7 +220,8 @@ function populateCategories() {
 
   const preselect = sel.dataset.preselect || '';
   sel.innerHTML = options.map(function (o) {
-    return '<option value="' + o + '"' + (o === preselect ? ' selected' : '') + '>' + o + '</option>';
+    const label = window.t_cat ? window.t_cat(o) : o;
+    return '<option value="' + o + '"' + (o === preselect ? ' selected' : '') + '>' + label + '</option>';
   }).join('');
 
   syncSegStyles();
@@ -860,43 +861,58 @@ function populateSwalCategorySelect(sel, type, group) {
     : (window.CATEGORY_DATA.expense || []);
   const preselect = sel.dataset.preselect || '';
   sel.innerHTML = options.map(function (o) {
-    return '<option value="' + o + '"' + (o === preselect ? ' selected' : '') + '>' + o + '</option>';
+    const label = window.t_cat ? window.t_cat(o) : o;
+    return '<option value="' + o + '"' + (o === preselect ? ' selected' : '') + '>' + label + '</option>';
   }).join('');
 }
 
 function buildNlpConfirmHtml(parsed, warnings) {
+  const verifyHint = window.t ? window.t('swal.nlp_verify_hint', '请核对下方字段，确认无误后再保存。') : '请核对下方字段，确认无误后再保存。';
   const warningHtml = warnings && warnings.length
-    ? '<div class="warning-box">' + warnings.map(function (w) { return '⚠ ' + w; }).join('<br>') + '<br>请核对下方字段，确认无误后再保存。</div>'
+    ? '<div class="warning-box">' + warnings.map(function (w) { return '⚠ ' + w; }).join('<br>') + '<br>' + verifyHint + '</div>'
     : '';
+  const optExpense = window.t ? window.t('common.expense', '支出') : '支出';
+  const optIncome = window.t ? window.t('common.income', '收入') : '收入';
+  const optMain = window.t ? window.t('dashboard.main_income', '主业收入') : '主业收入';
+  const optSide = window.t ? window.t('dashboard.side_income', '副业收入') : '副业收入';
+  const lblDate = window.t ? window.t('common.date', '日期') : '日期';
+  const lblAmount = window.t ? window.t('common.amount', '金额') : '金额';
+  const lblCategory = window.t ? window.t('common.category', '分类') : '分类';
+  const lblNote = window.t ? window.t('common.note', '备注') : '备注';
+
   return (
     warningHtml +
     '<div class="row seg-row">' +
-    '  <label class="seg"><input type="radio" name="swalType" value="expense"><span>支出</span></label>' +
-    '  <label class="seg"><input type="radio" name="swalType" value="income"><span>收入</span></label>' +
+    '  <label class="seg"><input type="radio" name="swalType" value="expense"><span>' + optExpense + '</span></label>' +
+    '  <label class="seg"><input type="radio" name="swalType" value="income"><span>' + optIncome + '</span></label>' +
     '</div>' +
     '<div class="row seg-row" id="swalGroupRow">' +
-    '  <label class="seg"><input type="radio" name="swalGroup" value="main"><span>主业收入</span></label>' +
-    '  <label class="seg"><input type="radio" name="swalGroup" value="side"><span>副业收入</span></label>' +
+    '  <label class="seg"><input type="radio" name="swalGroup" value="main"><span>' + optMain + '</span></label>' +
+    '  <label class="seg"><input type="radio" name="swalGroup" value="side"><span>' + optSide + '</span></label>' +
     '</div>' +
     '<div class="row">' +
-    '  <label>日期 <input type="date" id="swalDate"></label>' +
-    '  <label>金额 <input type="number" id="swalAmount" step="0.01" min="0.01"></label>' +
+    '  <label>' + lblDate + ' <input type="date" id="swalDate"></label>' +
+    '  <label>' + lblAmount + ' <input type="number" id="swalAmount" step="0.01" min="0.01"></label>' +
     '</div>' +
     '<div class="row">' +
-    '  <label>分类 <select id="swalCategory" data-preselect="' + (parsed.category || '') + '"></select></label>' +
-    '  <label>备注 <input type="text" id="swalNote"></label>' +
+    '  <label>' + lblCategory + ' <select id="swalCategory" data-preselect="' + (parsed.category || '') + '"></select></label>' +
+    '  <label>' + lblNote + ' <input type="text" id="swalNote"></label>' +
     '</div>'
   );
 }
 
 function openNlpConfirmDialog(parsed, warnings) {
+  const dlgTitle = window.t ? window.t('swal.nlp_confirm_title', '确认解析结果') : '确认解析结果';
+  const btnSave = window.t ? window.t('swal.nlp_confirm_save', '确认保存') : '确认保存';
+  const btnCancel = window.t ? window.t('common.cancel', '取消') : '取消';
+
   Swal.fire({
-    title: '确认解析结果',
+    title: dlgTitle,
     html: buildNlpConfirmHtml(parsed, warnings),
     showCancelButton: true,
     reverseButtons: true,
-    confirmButtonText: '确认保存',
-    cancelButtonText: '取消',
+    confirmButtonText: btnSave,
+    cancelButtonText: btnCancel,
     buttonsStyling: false,
     focusConfirm: false,
     customClass: {
@@ -950,15 +966,15 @@ function openNlpConfirmDialog(parsed, warnings) {
       const note = popup.querySelector('#swalNote').value;
 
       if (!date) {
-        Swal.showValidationMessage('请选择日期');
+        Swal.showValidationMessage(window.t ? window.t('swal.nlp_select_date', '请选择日期') : '请选择日期');
         return false;
       }
       if (amountValue.trim() === '' || isNaN(amount) || amount <= 0) {
-        Swal.showValidationMessage('金额必须是大于 0 的数字');
+        Swal.showValidationMessage(window.t ? window.t('swal.nlp_amount_positive', '金额必须是大于 0 的数字') : '金额必须是大于 0 的数字');
         return false;
       }
       if (!category) {
-        Swal.showValidationMessage('请先在「分类管理」里添加对应分类');
+        Swal.showValidationMessage(window.t ? window.t('swal.nlp_need_category', '请先在「分类管理」里添加对应分类') : '请先在「分类管理」里添加对应分类');
         return false;
       }
       return {
@@ -2199,7 +2215,7 @@ function updateSyncBadge(state) {
   if (state === 'online') {
     badges.forEach(b => {
       b.classList.remove('badge-offline', 'badge-unreachable');
-      b.title = '网络良好，服务正常';
+      b.title = window.t ? window.t('swal.online_service_ok', '网络良好，服务正常') : '网络良好，服务正常';
     });
     dots.forEach(d => {
       d.classList.remove('dot-offline', 'dot-unreachable');
@@ -2211,27 +2227,27 @@ function updateSyncBadge(state) {
     badges.forEach(b => {
       b.classList.remove('badge-unreachable');
       b.classList.add('badge-offline');
-      b.title = '当前设备处于离线状态，无法连接互联网';
+      b.title = window.t ? window.t('swal.device_offline', '当前设备处于离线状态，无法连接互联网') : '当前设备处于离线状态，无法连接互联网';
     });
     dots.forEach(d => {
       d.classList.remove('dot-unreachable');
       d.classList.add('dot-offline');
     });
     texts.forEach(t => {
-      t.textContent = '离线';
+      t.textContent = window.t ? window.t('swal.status_offline', '离线') : '离线';
     });
   } else if (state === 'unreachable') {
     badges.forEach(b => {
       b.classList.remove('badge-offline');
       b.classList.add('badge-unreachable');
-      b.title = '无法连接到云端记账服务器';
+      b.title = window.t ? window.t('swal.server_disconnected', '无法连接到云端记账服务器') : '无法连接到云端记账服务器';
     });
     dots.forEach(d => {
       d.classList.remove('dot-offline');
       d.classList.add('dot-unreachable');
     });
     texts.forEach(t => {
-      t.textContent = '断开';
+      t.textContent = window.t ? window.t('swal.status_disconnected', '断开') : '断开';
     });
   }
 }
@@ -2247,7 +2263,7 @@ function flashSyncBadgeUpdated() {
     b.classList.add('live-active', 'live-pulse');
   });
   texts.forEach(t => {
-    t.textContent = '已更新';
+    t.textContent = window.t ? window.t('swal.status_updated', '已更新') : '已更新';
   });
 
   setTimeout(() => {
@@ -3157,6 +3173,7 @@ window.openSetBudgetModal = function (triggerBtn) {
   if (!triggerBtn) return;
   const catId = triggerBtn.dataset.id;
   const catName = triggerBtn.dataset.name || '此分类';
+  const catDisplay = window.t_cat ? window.t_cat(catName) : catName;
   const currentLimit = triggerBtn.dataset.limit || '';
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ||
                     document.querySelector('input[name="csrf_token"]')?.value || '';
@@ -3164,36 +3181,43 @@ window.openSetBudgetModal = function (triggerBtn) {
   const currentNum = currentLimit ? parseFloat(currentLimit) : '';
 
   if (typeof Swal === 'undefined') {
-    const val = window.prompt(`设置「${catName}」每月预算上限（RM，留空或0为不限额）：`, currentNum !== '' ? currentNum : '');
+    const val = window.prompt(`设置「${catDisplay}」每月预算上限（RM，留空或0为不限额）：`, currentNum !== '' ? currentNum : '');
     if (val !== null) {
       submitCategoryBudgetAjax(catId, val, csrfToken);
     }
     return;
   }
 
+  const modalTitle = window.t ? window.t('swal.set_monthly_budget', '🎯 设置「{cat}」月度预算', {cat: catDisplay}) : ('🎯 设置「' + catDisplay + '」月度预算');
+  const modalDesc = window.t ? window.t('swal.set_budget_desc', '设定该分类每月支出上限。支出累计达到 <b>70%</b> 和 <b>100%</b> 时系统会自动预警提醒。') : '设定该分类每月支出上限。支出累计达到 <b>70%</b> 和 <b>100%</b> 时系统会自动预警提醒。';
+  const phLimit = window.t ? window.t('swal.budget_no_limit_ph', '不设限额（留空或填 0）') : '不设限额（留空或填 0）';
+  const btnClear = window.t ? window.t('swal.budget_clear_limit', '清除限额') : '清除限额';
+  const btnSave = window.t ? window.t('swal.budget_save_limit', '保存限额') : '保存限额';
+  const btnCancel = window.t ? window.t('common.cancel', '取消') : '取消';
+
   Swal.fire({
-    title: `🎯 设置「${catName}」月度预算`,
+    title: modalTitle,
     html: `
       <div style="text-align: left; font-size: 13px; color: var(--muted); margin-bottom: 14px; line-height: 1.6;">
-        设定该分类每月支出上限。支出累计达到 <b>70%</b> 和 <b>100%</b> 时系统会自动预警提醒。
+        ${modalDesc}
       </div>
       <div style="position: relative; margin-bottom: 12px;">
         <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-weight: 700; color: var(--ink); font-size: 15px;">RM</span>
         <input id="swalBudgetInput" type="number" step="0.01" min="0" class="swal2-input"
                style="margin: 0; width: 100%; box-sizing: border-box; padding-left: 48px; font-size: 16px; font-weight: 600;"
-               placeholder="不设限额（留空或填 0）" value="${currentNum !== '' ? currentNum : ''}">
+               placeholder="${phLimit}" value="${currentNum !== '' ? currentNum : ''}">
       </div>
       <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 4px;">
         <button type="button" class="btn-ghost-sm" style="border: 1px solid var(--border-soft); padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="document.getElementById('swalBudgetInput').value='200'">200</button>
         <button type="button" class="btn-ghost-sm" style="border: 1px solid var(--border-soft); padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="document.getElementById('swalBudgetInput').value='500'">500</button>
         <button type="button" class="btn-ghost-sm" style="border: 1px solid var(--border-soft); padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="document.getElementById('swalBudgetInput').value='1000'">1000</button>
         <button type="button" class="btn-ghost-sm" style="border: 1px solid var(--border-soft); padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="document.getElementById('swalBudgetInput').value='2000'">2000</button>
-        ${currentLimit ? '<button type="button" class="btn-ghost-sm" style="color: #dc2626; border: 1px solid rgba(220,38,38,0.3); padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="document.getElementById(\'swalBudgetInput\').value=\'\'">清除限额</button>' : ''}
+        ${currentLimit ? '<button type="button" class="btn-ghost-sm" style="color: #dc2626; border: 1px solid rgba(220,38,38,0.3); padding: 4px 10px; font-size: 12px; border-radius: 6px;" onclick="document.getElementById(\'swalBudgetInput\').value=\'\'">' + btnClear + '</button>' : ''}
       </div>
     `,
     showCancelButton: true,
-    confirmButtonText: '保存限额',
-    cancelButtonText: '取消',
+    confirmButtonText: btnSave,
+    cancelButtonText: btnCancel,
     buttonsStyling: false,
     customClass: {
       popup: 'app-swal-popup',
@@ -3241,7 +3265,7 @@ function submitCategoryBudgetAjax(catId, limitValue, csrfToken) {
           toast: true,
           position: 'top',
           icon: 'success',
-          title: data.message || '预算设置已更新',
+          title: data.message || (window.t ? window.t('swal.budget_updated', '预算设置已更新') : '预算设置已更新'),
           showConfirmButton: false,
           timer: 1500,
           customClass: { popup: 'app-swal-toast' }
@@ -3281,11 +3305,11 @@ window.toggleBudgetDashExpand = function () {
   const isCollapsed = grid.classList.contains('collapsed');
   if (isCollapsed) {
     grid.classList.remove('collapsed');
-    btn.innerHTML = '<span>收起 ▴</span>';
+    btn.innerHTML = '<span>' + (window.t ? window.t('swal.budget_collapse', '收起 ▴') : '收起 ▴') + '</span>';
   } else {
     grid.classList.add('collapsed');
     const total = grid.querySelectorAll('.budget-dash-card').length;
-    btn.innerHTML = `<span>展开全部 ${total} 项预算 ▾</span>`;
+    btn.innerHTML = '<span>' + (window.t ? window.t('swal.budget_expand_all', '展开全部 {total} 项预算 ▾', {total: total}) : ('展开全部 ' + total + ' 项预算 ▾')) + '</span>';
   }
 };
 

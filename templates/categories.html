@@ -15,12 +15,12 @@
       <li style="display: flex; justify-content: space-between; align-items: center;">
         <span style="display: inline-flex; align-items: center; gap: 8px;">
           <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#34d399' }}; flex-shrink: 0;"></span>
-          <strong>{{ c.name }}</strong>
+          <strong>{{ c.name|t_cat }}</strong>
         </span>
         <div style="display: flex; gap: 6px; align-items: center;">
           <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#34d399' }}')">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
-                data-confirm-title="{{ t('categories.del_confirm_title', '删除分类「{name}」？', name=c.name) }}"
+                data-confirm-title="{{ t('categories.del_confirm_title', '删除分类「{name}」？', name=c.name|t_cat) }}"
                 data-confirm-text="{{ t('categories.del_confirm_desc', '不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。') }}" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="cat-action-btn danger">{{ t('common.delete') }}</button>
@@ -47,12 +47,12 @@
       <li style="display: flex; justify-content: space-between; align-items: center;">
         <span style="display: inline-flex; align-items: center; gap: 8px;">
           <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#38bdf8' }}; flex-shrink: 0;"></span>
-          <strong>{{ c.name }}</strong>
+          <strong>{{ c.name|t_cat }}</strong>
         </span>
         <div style="display: flex; gap: 6px; align-items: center;">
           <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#38bdf8' }}')">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
-                data-confirm-title="{{ t('categories.del_confirm_title', '删除分类「{name}」？', name=c.name) }}"
+                data-confirm-title="{{ t('categories.del_confirm_title', '删除分类「{name}」？', name=c.name|t_cat) }}"
                 data-confirm-text="{{ t('categories.del_confirm_desc', '不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。') }}" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="cat-action-btn danger">{{ t('common.delete') }}</button>
@@ -83,7 +83,7 @@
       <li class="cat-item-clean">
         <div class="cat-name-box">
           <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#fb923c' }}; flex-shrink: 0;"></span>
-          <span class="cat-name-text" title="{{ c.name }}">{{ c.name }}</span>
+          <span class="cat-name-text" title="{{ c.name|t_cat }}">{{ c.name|t_cat }}</span>
         </div>
         <div class="cat-actions-box">
           {% if b %}
@@ -92,7 +92,7 @@
                   data-name="{{ c.name }}"
                   data-limit="{{ b.limit }}"
                   onclick="openSetBudgetModal(this)"
-                  title="点击修改「{{ c.name }}」月度限额">
+                  title="{{ t('categories.click_edit_limit', '点击修改「{name}」月度限额', name=c.name|t_cat) }}">
             <span class="pill-dot"></span>
             <span class="pill-text">{{ current_user_currency }}{{ '%.0f' | format(b.spent) }}/{{ '%.0f' | format(b.limit) }}</span>
             <span class="pill-pct">({{ b.pct }}%)</span>
@@ -110,13 +110,13 @@
                   data-name="{{ c.name }}"
                   data-limit=""
                   onclick="openSetBudgetModal(this)"
-                  title="{{ t('categories.set_limit_tooltip', '点击为「{name}」设定每月支出限额', name=c.name) }}">
+                  title="{{ t('categories.set_limit_tooltip', '点击为「{name}」设定每月支出限额', name=c.name|t_cat) }}">
             {{ t('categories.set_limit_btn') }}
           </button>
           {% endif %}
           <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#fb923c' }}')" title="{{ t('categories.edit_cat_tooltip', '修改分类名称与代表颜色') }}">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
-                data-confirm-title="{{ t('categories.del_confirm_title', '删除分类「{name}」？', name=c.name) }}"
+                data-confirm-title="{{ t('categories.del_confirm_title', '删除分类「{name}」？', name=c.name|t_cat) }}"
                 data-confirm-text="{{ t('categories.del_confirm_desc', '不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。') }}" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="cat-action-btn danger">{{ t('common.delete') }}</button>
@@ -142,12 +142,12 @@
       <li style="display: flex; justify-content: space-between; align-items: center;">
         <span style="display: inline-flex; align-items: center; gap: 8px;">
           <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#059669' }}; flex-shrink: 0;"></span>
-          <strong>{{ c.name }}</strong>
+          <strong>{{ c.name|t_cat }}</strong>
         </span>
         <div style="display: flex; gap: 6px; align-items: center;">
           <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#059669' }}')">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
-                data-confirm-title="{{ t('categories.del_savings_confirm_title', '删除储蓄分类「{name}」？', name=c.name) }}"
+                data-confirm-title="{{ t('categories.del_savings_confirm_title', '删除储蓄分类「{name}」？', name=c.name|t_cat) }}"
                 data-confirm-text="{{ t('categories.del_confirm_desc', '不会影响历史记录中已使用该分类的旧数据，但今后录入时将不再能选择它。此操作不可撤销。') }}" style="display:inline; margin:0;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="cat-action-btn danger">{{ t('common.delete') }}</button>
