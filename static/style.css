@@ -721,17 +721,24 @@ h3 {
   margin-bottom: 26px;
   flex-wrap: wrap;
 }
+.cards > * {
+  min-width: 0;
+}
 .card {
-  flex: 1;
-  min-width: 200px;
+  flex: 1 1 200px;
+  min-width: 0;
+  max-width: 100%;
   background: var(--surface);
   border-radius: var(--radius-lg);
-  padding: 22px 24px;
+  padding: 20px 22px;
   box-shadow: var(--shadow-card);
   border: 1px solid var(--border-soft);
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   gap: 8px;
+  overflow: hidden;
+  box-sizing: border-box;
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 .card:hover {
@@ -742,14 +749,25 @@ h3 {
   font-size: 13px;
   color: var(--muted);
   letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .card .amount {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 28px;
+  font-size: clamp(20px, 2.1vw, 27px);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
   color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  display: block;
+  max-width: 100%;
 }
 .card .amount.income { color: var(--green); }
 .card .amount.expense { color: var(--rose); }
@@ -1084,11 +1102,17 @@ tbody tr .actions { cursor: default; }
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  white-space: nowrap;
 }
 .amount-cell.income { color: var(--green); }
 .amount-cell.expense { color: var(--rose); }
 .amount-cell.savings { color: var(--gold); }
 .amount.savings { color: var(--gold); }
+
+.sensitive-val {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 .tag {
   display: inline-block;
@@ -1097,6 +1121,7 @@ tbody tr .actions { cursor: default; }
   font-size: 11.5px;
   background: var(--navy-soft);
   color: var(--navy);
+  white-space: nowrap;
 }
 .tag-income { background: var(--green-soft); color: var(--green); }
 .tag-expense { background: var(--rose-soft); color: var(--rose); }
@@ -1128,10 +1153,21 @@ table.records-table td[data-col="note"] {
   word-break: break-word;
   line-height: 1.4;
 }
+table.records-table td[data-col="category"] {
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 table.records-table td[data-col="date"],
-table.records-table td[data-col="type"],
+table.records-table td[data-col="type"] {
+  white-space: nowrap;
+}
 table.records-table td[data-col="amount"] {
   white-space: nowrap;
+  text-align: right;
+  padding-right: 18px;
+  font-variant-numeric: tabular-nums;
 }
 table.records-table th:last-child,
 table.records-table td[data-col="actions"] {
@@ -1440,6 +1476,8 @@ table.records-table td[data-col="actions"] .btn-danger-ghost {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  min-width: 0;
+  overflow: hidden;
 }
 .budget-dash-card:hover {
   background: rgba(0, 0, 0, 0.035);
@@ -1462,6 +1500,8 @@ table.records-table td[data-col="actions"] .btn-danger-ghost {
   justify-content: space-between;
   align-items: center;
   font-size: 12.5px;
+  min-width: 0;
+  gap: 6px;
 }
 .b-card-name {
   font-weight: 600;
@@ -1469,12 +1509,16 @@ table.records-table td[data-col="actions"] .btn-danger-ghost {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .b-card-pct {
   font-size: 11px;
   font-weight: 700;
   color: #059669;
   white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 .b-card-pct.level-warn { color: #d97706; }
 .b-card-pct.level-reached { color: #7c3aed; }
@@ -1499,13 +1543,23 @@ table.records-table td[data-col="actions"] .btn-danger-ghost {
 .b-card-bottom {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 6px;
   font-size: 11px;
   color: var(--muted);
+  min-width: 0;
+}
+.b-card-bottom > span {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .b-card-rem {
   font-weight: 500;
   color: var(--ink-soft);
+  flex-shrink: 0;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
 }
 .b-card-rem.text-reached {
   color: #7c3aed;
@@ -1748,19 +1802,23 @@ canvas {
   }
   table.records-table tr.record-row {
     display: grid !important;
-    grid-template-columns: 24px auto 1fr auto !important;
+    grid-template-columns: 24px minmax(0, 1fr) auto !important;
     grid-template-areas:
-      "chk date cat  amt"
-      "chk note note note"
-      "chk type src  act" !important;
-    row-gap: 8px !important;
-    column-gap: 8px !important;
+      "chk cat  amt"
+      "chk date src"
+      "chk note note"
+      "chk type act" !important;
+    row-gap: 6px !important;
+    column-gap: 10px !important;
     align-items: center !important;
     background: var(--surface) !important;
     border: 1px solid var(--border) !important;
     border-radius: 14px !important;
-    padding: 14px 16px !important;
+    padding: 13px 15px !important;
     box-shadow: var(--shadow-card) !important;
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
     transition: background-color 0.15s ease, opacity 0.3s ease !important;
   }
   table.records-table tr.record-row.selected-row {
@@ -1770,16 +1828,39 @@ canvas {
   table.records-table tr.record-row td {
     border: none !important;
     padding: 0 !important;
+    min-width: 0 !important;
   }
   table.records-table tr.record-row td[data-col="checkbox"] {
     grid-area: chk !important;
     display: flex !important;
     align-items: center !important;
+    justify-content: center !important;
   }
   table.records-table tr.record-row td[data-col="checkbox"] input {
     width: 18px !important;
     height: 18px !important;
     cursor: pointer !important;
+  }
+  table.records-table tr.record-row td[data-col="category"] {
+    grid-area: cat !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: var(--navy) !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  table.records-table tr.record-row td[data-col="amount"] {
+    grid-area: amt !important;
+    text-align: right !important;
+    font-size: clamp(14px, 4vw, 17px) !important;
+    font-weight: 700 !important;
+    font-family: var(--font-mono) !important;
+    font-variant-numeric: tabular-nums !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    justify-self: end !important;
   }
   table.records-table tr.record-row td[data-col="date"] {
     grid-area: date !important;
@@ -1787,57 +1868,61 @@ canvas {
     color: var(--muted) !important;
     white-space: nowrap !important;
   }
-  table.records-table tr.record-row td[data-col="category"] {
-    grid-area: cat !important;
-    font-size: 13.5px !important;
-    font-weight: 600 !important;
-    color: var(--navy) !important;
-  }
-  table.records-table tr.record-row td[data-col="amount"] {
-    grid-area: amt !important;
+  table.records-table tr.record-row td[data-col="source"] {
+    grid-area: src !important;
     text-align: right !important;
-    font-size: 16.5px !important;
-    font-weight: 700 !important;
-    font-family: var(--font-mono) !important;
-    white-space: nowrap !important;
+    justify-self: end !important;
+  }
+  table.records-table tr.record-row td[data-col="source"] .tag {
+    font-size: 10.5px !important;
+    padding: 2px 7px !important;
   }
   table.records-table tr.record-row td[data-col="note"] {
     grid-area: note !important;
-    font-size: 14px !important;
+    font-size: 13.5px !important;
     color: var(--ink) !important;
     padding: 2px 0 !important;
     word-break: break-word !important;
+    min-width: 0 !important;
+  }
+  table.records-table tr.record-row td[data-col="note"].no-note {
+    display: none !important;
   }
   table.records-table tr.record-row td[data-col="type"] {
     grid-area: type !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    flex-wrap: wrap !important;
+    min-width: 0 !important;
   }
   table.records-table tr.record-row td[data-col="group"] {
     display: none !important;
-  }
-  table.records-table tr.record-row td[data-col="source"] {
-    grid-area: src !important;
   }
   table.records-table tr.record-row td[data-col="actions"] {
     grid-area: act !important;
     display: flex !important;
     justify-content: flex-end !important;
-    gap: 8px !important;
+    justify-self: end !important;
+    gap: 6px !important;
     position: static !important;
     box-shadow: none !important;
     background: transparent !important;
     min-width: unset !important;
+    flex-shrink: 0 !important;
   }
   table.records-table tr.record-row td[data-col="actions"] .actions-inner {
     display: flex !important;
     justify-content: flex-end !important;
-    gap: 8px !important;
-    width: 100% !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
   }
   table.records-table tr.record-row td[data-col="actions"] .btn-link,
   table.records-table tr.record-row td[data-col="actions"] .btn-danger-ghost {
-    padding: 5px 12px !important;
-    font-size: 12.5px !important;
-    border-radius: 8px !important;
+    padding: 4px 10px !important;
+    font-size: 12px !important;
+    border-radius: 6px !important;
+    white-space: nowrap !important;
   }
 
   /* 移动端固定收支卡片化布局，彻底消除横向滚动与字段截断 */
@@ -1875,7 +1960,7 @@ canvas {
   }
   table.recurring-table tr.recurring-row {
     display: grid !important;
-    grid-template-columns: auto 1fr auto !important;
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
     grid-template-areas:
       "type  cat   amt"
       "day   day   stat"
@@ -1889,16 +1974,21 @@ canvas {
     border-radius: 14px !important;
     padding: 14px 16px !important;
     box-shadow: var(--shadow-card) !important;
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
   }
   table.recurring-table tr.recurring-row td {
     border: none !important;
     padding: 0 !important;
+    min-width: 0 !important;
   }
   table.recurring-table tr.recurring-row td[data-col="type"] {
     grid-area: type !important;
     display: flex !important;
     align-items: center !important;
     gap: 5px !important;
+    min-width: 0 !important;
   }
   table.recurring-table tr.recurring-row td[data-col="type"] .mobile-only-tag {
     display: inline-block !important;
@@ -1911,6 +2001,10 @@ canvas {
     font-size: 14.5px !important;
     font-weight: 600 !important;
     color: var(--navy) !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
   table.recurring-table tr.recurring-row td[data-col="amount"] {
     grid-area: amt !important;
@@ -1918,7 +2012,10 @@ canvas {
     font-size: 16.5px !important;
     font-weight: 700 !important;
     font-family: var(--font-mono) !important;
+    font-variant-numeric: tabular-nums !important;
     white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    justify-self: end !important;
   }
   table.recurring-table tr.recurring-row td[data-col="day"] {
     grid-area: day !important;
@@ -1936,6 +2033,7 @@ canvas {
     font-size: 13px !important;
     color: var(--ink-soft) !important;
     word-break: break-word !important;
+    min-width: 0 !important;
   }
   table.recurring-table tr.recurring-row td[data-col="note"].no-note {
     display: none !important;
@@ -1956,6 +2054,7 @@ canvas {
     padding: 5px 12px !important;
     font-size: 12px !important;
     border-radius: 8px !important;
+    white-space: nowrap !important;
   }
 
   /* 分类支出明细与月度环比表格移动端卡片化自适应 (彻底杜绝横向滚动) */
@@ -1974,7 +2073,7 @@ canvas {
   }
   table.insights-table tr.insights-row {
     display: grid !important;
-    grid-template-columns: 24px 1fr auto !important;
+    grid-template-columns: 24px minmax(0, 1fr) auto !important;
     grid-template-areas:
       "arrow name amt"
       "arrow trend sub" !important;
@@ -1986,11 +2085,15 @@ canvas {
     border: 1px solid var(--border) !important;
     border-radius: 12px !important;
     box-shadow: var(--shadow-card) !important;
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
   }
   table.insights-table tr.insights-row td {
     border: none !important;
     padding: 0 !important;
     white-space: normal !important;
+    min-width: 0 !important;
   }
   table.insights-table tr.insights-row td.col-toggle {
     grid-area: arrow !important;
@@ -2000,14 +2103,30 @@ canvas {
   }
   table.insights-table tr.insights-row td.col-name {
     grid-area: name !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+  table.insights-table tr.insights-row td.col-name > div {
+    min-width: 0 !important;
+  }
+  table.insights-table tr.insights-row td.col-name strong {
+    display: block !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    min-width: 0 !important;
   }
   table.insights-table tr.insights-row td.col-this-month {
     grid-area: amt !important;
     text-align: right !important;
-    font-size: 15px !important;
+    font-size: clamp(13px, 3.8vw, 15px) !important;
     font-weight: 700 !important;
     color: var(--rose) !important;
     font-family: var(--font-mono) !important;
+    font-variant-numeric: tabular-nums !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    justify-self: end !important;
   }
   table.insights-table tr.insights-row td.col-trend {
     grid-area: trend !important;
@@ -2024,6 +2143,10 @@ canvas {
     font-size: 11.5px !important;
     color: var(--muted) !important;
     font-family: var(--font-mono) !important;
+    font-variant-numeric: tabular-nums !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    justify-self: end !important;
   }
   /* 移动端展开图表行：默认隐藏，仅在 is-open 时展示为块级卡片，彻底杜绝关不回去的问题 */
   table.insights-table tr.chart-expand-row {
@@ -2198,8 +2321,11 @@ canvas {
 
 .cards-four {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
   gap: 16px;
+}
+.cards-four > .card {
+  min-width: 0;
 }
 
 .card-sub-stats {
@@ -2207,6 +2333,8 @@ canvas {
   flex-direction: column;
   gap: 6px;
   margin-top: 4px;
+  min-width: 0;
+  width: 100%;
 }
 
 .sub-stat-row {
@@ -2214,15 +2342,28 @@ canvas {
   justify-content: space-between;
   align-items: center;
   font-size: 13px;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
 }
 
 .sub-stat-label {
   color: var(--muted);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sub-stat-val {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-align: right;
+  margin-left: auto;
 }
 
 .sub-stat-val.income { color: var(--green); }
@@ -2458,6 +2599,7 @@ canvas {
   align-items: center;
   gap: 8px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 .chart-legend-dot {
   width: 8px;
@@ -2474,10 +2616,12 @@ canvas {
 }
 .chart-legend-right {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
-  margin-left: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* ---------- 撤销删除 Toast 样式 ---------- */
@@ -3418,11 +3562,11 @@ html[data-theme="dark"] {
 .acc-page-title .badge-count { font-size: 12px; background: rgba(99, 102, 241, 0.2); color: #818cf8; border-radius: 20px; padding: 2px 10px; font-weight: 600; }
 .btn-add-acc { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #818cf8); color: #fff; font-size: 14px; font-weight: 600; border: none; cursor: pointer; transition: opacity 0.2s, transform 0.15s; text-decoration: none; }
 .btn-add-acc:hover { opacity: 0.88; transform: translateY(-1px); }
-.acc-summary-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
-.acc-kpi { background: var(--acc-card-bg); border: 1px solid var(--acc-border); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; }
-.acc-kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-.acc-kpi-val { font-size: 22px; font-weight: 700; color: var(--ink); }
-.acc-kpi-sub { font-size: 11px; color: var(--muted); }
+.acc-summary-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 12px; margin-bottom: 28px; }
+.acc-kpi { background: var(--acc-card-bg); border: 1px solid var(--acc-border); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow: hidden; }
+.acc-kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acc-kpi-val { font-size: 22px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acc-kpi-sub { font-size: 11px; color: var(--muted); white-space: nowrap; }
 .acc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 .acc-card { background: var(--acc-card-bg); border: 1px solid var(--acc-border); border-radius: var(--acc-radius); padding: 20px; display: flex; flex-direction: column; gap: 12px; position: relative; transition: border-color 0.2s, transform 0.15s; }
 .acc-card:hover { border-color: rgba(99, 102, 241, 0.35); transform: translateY(-2px); }
