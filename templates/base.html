@@ -172,9 +172,10 @@
                         <span class="nav-chevron">▾</span>
                     </button>
                     <div class="nav-dropdown" style="min-width: 140px;">
+                        {% set nav_lang_badges = {'zh': 'ZH', 'en': 'EN', 'ms': 'MS', 'zh_TW': 'TW'} %}
                         {% for lang in supported_languages %}
                         <a href="{{ url_for('settings.api_set_language', lang=lang.code) }}" class="{{ 'active' if current_lang == lang.code }}" style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
-                            <span>{{ lang.flag }}</span>
+                            <span class="lang-tag">{{ nav_lang_badges.get(lang.code, 'ZH') }}</span>
                             <span>{{ lang.name }}</span>
                             {% if current_lang == lang.code %}<span style="margin-left: auto; font-size: 11px;">✓</span>{% endif %}
                         </a>
@@ -247,103 +248,122 @@
         <div class="sheet-drag-handle" onclick="toggleMoreSheet(false)"></div>
         <div class="sheet-header">
             <div style="display: flex; align-items: center; gap: 8px;">
-                <span>{{ t('nav.more_title') }}</span>
+                <span style="font-weight: 700; font-size: 16px;">{{ t('nav.more_title') }}</span>
                 {% if session.get('username') %}
                 <span
-                    style="font-size: 12px; color: var(--gold); background: rgba(182,144,47,0.15); padding: 2px 8px; border-radius: 12px;">👤
+                    style="font-size: 11px; color: var(--gold); background: rgba(182,144,47,0.15); padding: 2px 8px; border-radius: 12px; font-weight: 600;">👤
                     {{ session.username }}</span>
                 {% endif %}
             </div>
             <button type="button" class="sheet-close-btn" onclick="toggleMoreSheet(false)">✕</button>
         </div>
-        <div class="sheet-grid">
-            <a href="{{ url_for('download_apk') }}" id="appDownloadTile" class="sheet-tile"
-                onclick="handleAppDownloadClick(event)" download="ledger-app.apk"
-                style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08); position: relative;">
-                <span id="appDownloadBadge"
-                    style="display: none; position: absolute; top: 6px; right: 6px; font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 600; line-height: 1.2;"></span>
-                <span class="sheet-icon" id="appDownloadIcon">📱</span>
-                <span class="sheet-title" id="appDownloadTitle" style="font-weight: 600;">{{ t('nav.sheet_download_app') }}</span>
-                <span class="sheet-desc" id="appDownloadDesc">{{ t('nav.sheet_download_desc') }}</span>
-            </a>
-            <a href="{{ url_for('category_insights_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'category_insights_page' }}" data-nav="insights"
-                hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer"
-                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-                <span class="sheet-icon">📊</span>
-                <span class="sheet-title">{{ t('nav.insights') }}</span>
-                <span class="sheet-desc">{{ t('nav.sheet_insights_desc') }}</span>
-            </a>
-            <a href="{{ url_for('recurring_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'recurring_page' }}" data-nav="recurring"
-                hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer"
-                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-                <span class="sheet-icon">🔄</span>
-                <span class="sheet-title">{{ t('nav.recurring') }}</span>
-                <span class="sheet-desc">{{ t('nav.sheet_recurring_desc') }}</span>
-            </a>
-            <a href="{{ url_for('liabilities_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'liabilities_page' }}" data-nav="liabilities"
-                hx-get="{{ url_for('liabilities_page') }}" hx-target="#mainContainer"
-                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-                <span class="sheet-icon">💳</span>
-                <span class="sheet-title">{{ t('nav.liabilities') }}</span>
-                <span class="sheet-desc">{{ t('nav.sheet_liabilities_desc') }}</span>
-            </a>
-            <a href="{{ url_for('accounts_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'accounts_page' }}" data-nav="accounts"
-                hx-get="{{ url_for('accounts_page') }}" hx-target="#mainContainer"
-                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-                <span class="sheet-icon">🏦</span>
-                <span class="sheet-title">{{ t('nav.accounts') }}</span>
-                <span class="sheet-desc">{{ t('nav.sheet_accounts_desc') }}</span>
-            </a>
-            <a href="{{ url_for('subscriptions_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'subscriptions_page' }}" data-nav="subscriptions"
-                hx-get="{{ url_for('subscriptions_page') }}" hx-target="#mainContainer"
-                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-                <span class="sheet-icon">🔄</span>
-                <span class="sheet-title">{{ t('nav.subscriptions') }}</span>
-                <span class="sheet-desc">{{ t('nav.sheet_subscriptions_desc') }}</span>
-            </a>
-            <a href="{{ url_for('categories_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'categories_page' }}" data-nav="categories"
-                hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer"
-                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-                <span class="sheet-icon">🏷️</span>
-                <span class="sheet-title">{{ t('nav.categories') }}</span>
-                <span class="sheet-desc">{{ t('nav.sheet_categories_desc') }}</span>
-            </a>
-            <a href="{{ url_for('import_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] in ('import_page','import_upload','import_confirm') }}"
-                data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer"
-                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-                <span class="sheet-icon">📤</span>
-                <span class="sheet-title">{{ t('nav.import') }}</span>
-                <span class="sheet-desc">{{ t('nav.sheet_import_desc') }}</span>
-            </a>
-            <div class="sheet-tile" onclick="togglePrivacyMode(); toggleMoreSheet(false);" style="cursor: pointer;">
-                <span class="sheet-icon" id="mobileSheetPrivacyIcon">👁</span>
-                <span class="sheet-title">{{ t('nav.privacy') }}</span>
-                <span class="sheet-desc" id="mobileSheetPrivacyDesc">{{ t('nav.sheet_privacy_desc') }}</span>
+
+        <div class="sheet-scroll-body">
+            <!-- 模块 1: 财务核心工具 (4列清晰网格，原生应用体验) -->
+            <div class="sheet-section-title">{{ t('nav.sheet_sec_finance', '财务工具') }}</div>
+            <div class="sheet-action-grid">
+                <a href="{{ url_for('category_insights_page') }}"
+                    class="sheet-action-btn {{ 'active' if request.endpoint.split('.')[-1] == 'category_insights_page' }}" data-nav="insights"
+                    hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer"
+                    hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                    <div class="sheet-action-icon-wrap">📊</div>
+                    <span class="sheet-action-label">{{ t('nav.insights') }}</span>
+                </a>
+                <a href="{{ url_for('recurring_page') }}"
+                    class="sheet-action-btn {{ 'active' if request.endpoint.split('.')[-1] == 'recurring_page' }}" data-nav="recurring"
+                    hx-get="{{ url_for('recurring_page') }}" hx-target="#mainContainer"
+                    hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                    <div class="sheet-action-icon-wrap">🔄</div>
+                    <span class="sheet-action-label">{{ t('nav.recurring') }}</span>
+                </a>
+                <a href="{{ url_for('liabilities_page') }}"
+                    class="sheet-action-btn {{ 'active' if request.endpoint.split('.')[-1] == 'liabilities_page' }}" data-nav="liabilities"
+                    hx-get="{{ url_for('liabilities_page') }}" hx-target="#mainContainer"
+                    hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                    <div class="sheet-action-icon-wrap">💳</div>
+                    <span class="sheet-action-label">{{ t('nav.liabilities') }}</span>
+                </a>
+                <a href="{{ url_for('accounts_page') }}"
+                    class="sheet-action-btn {{ 'active' if request.endpoint.split('.')[-1] == 'accounts_page' }}" data-nav="accounts"
+                    hx-get="{{ url_for('accounts_page') }}" hx-target="#mainContainer"
+                    hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                    <div class="sheet-action-icon-wrap">🏦</div>
+                    <span class="sheet-action-label">{{ t('nav.accounts') }}</span>
+                </a>
+                <a href="{{ url_for('subscriptions_page') }}"
+                    class="sheet-action-btn {{ 'active' if request.endpoint.split('.')[-1] == 'subscriptions_page' }}" data-nav="subscriptions"
+                    hx-get="{{ url_for('subscriptions_page') }}" hx-target="#mainContainer"
+                    hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                    <div class="sheet-action-icon-wrap">🔁</div>
+                    <span class="sheet-action-label">{{ t('nav.subscriptions') }}</span>
+                </a>
+                <a href="{{ url_for('categories_page') }}"
+                    class="sheet-action-btn {{ 'active' if request.endpoint.split('.')[-1] == 'categories_page' }}" data-nav="categories"
+                    hx-get="{{ url_for('categories_page') }}" hx-target="#mainContainer"
+                    hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                    <div class="sheet-action-icon-wrap">🏷️</div>
+                    <span class="sheet-action-label">{{ t('nav.categories') }}</span>
+                </a>
+                <a href="{{ url_for('import_page') }}"
+                    class="sheet-action-btn {{ 'active' if request.endpoint.split('.')[-1] in ('import_page','import_upload','import_confirm') }}"
+                    data-nav="import" hx-get="{{ url_for('import_page') }}" hx-target="#mainContainer"
+                    hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                    <div class="sheet-action-icon-wrap">📤</div>
+                    <span class="sheet-action-label">{{ t('nav.import') }}</span>
+                </a>
+                <a href="{{ url_for('download_apk') }}" id="appDownloadTile" class="sheet-action-btn"
+                    onclick="handleAppDownloadClick(event)" download="ledger-app.apk">
+                    <div class="sheet-action-icon-wrap app-download-icon-wrap" style="position: relative;">
+                        <span id="appDownloadBadge" class="sheet-action-badge" style="display: none;"></span>
+                        <span id="appDownloadIcon">📱</span>
+                    </div>
+                    <span class="sheet-action-label" id="appDownloadTitle">{{ t('nav.sheet_download_app') }}</span>
+                </a>
             </div>
-            <div class="sheet-tile" onclick="openMobileLangPicker();" style="cursor: pointer;">
-                <span class="sheet-icon">🌐</span>
-                <span class="sheet-title">{{ t('nav.language') }}</span>
-                <span class="sheet-desc">{{ supported_languages | selectattr('code', 'equalto', current_lang) | map(attribute='name') | first | default('简体中文') }}</span>
+
+            <!-- 模块 2: 偏好设置与系统控制 (卡片式分组列表，带开关与状态标记) -->
+            <div class="sheet-section-title">{{ t('nav.sheet_sec_system', '偏好与系统控制') }}</div>
+            <div class="sheet-list-group">
+                <div class="sheet-list-item" onclick="togglePrivacyMode();" style="cursor: pointer;">
+                    <div class="sheet-list-icon" id="mobileSheetPrivacyIcon">👁</div>
+                    <div class="sheet-list-content">
+                        <div class="sheet-list-title">{{ t('nav.privacy') }}</div>
+                        <div class="sheet-list-desc" id="mobileSheetPrivacyDesc">{{ t('nav.sheet_privacy_desc') }}</div>
+                    </div>
+                    <span id="mobileSheetPrivacyBadge" class="sheet-pill-badge badge-off">{{ t('common.off', '关闭') }}</span>
+                </div>
+
+                <div class="sheet-list-item" onclick="openMobileLangPicker();" style="cursor: pointer;">
+                    <div class="sheet-list-icon">🌐</div>
+                    <div class="sheet-list-content">
+                        <div class="sheet-list-title">{{ t('nav.language') }}</div>
+                        <div class="sheet-list-desc">{{ t('settings.language_tip', '选择系统显示语言') }}</div>
+                    </div>
+                    {% set sheet_lang_badges = {'zh': 'ZH', 'en': 'EN', 'ms': 'MS', 'zh_TW': 'TW'} %}
+                    <span class="sheet-lang-badge">
+                        <span class="lang-tag">{{ sheet_lang_badges.get(current_lang, 'ZH') }}</span>
+                        <span>{{ supported_languages | selectattr('code', 'equalto', current_lang) | map(attribute='name') | first | default('简体中文') }}</span>
+                        <span style="font-size: 10px; opacity: 0.6;">▾</span>
+                    </span>
+                </div>
+
+                <a href="{{ url_for('settings.settings_page') }}"
+                    class="sheet-list-item {{ 'active' if request.endpoint.split('.')[-1] == 'settings_page' }}" data-nav="settings"
+                    hx-get="{{ url_for('settings.settings_page') }}" hx-target="#mainContainer"
+                    hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                    <div class="sheet-list-icon">⚙️</div>
+                    <div class="sheet-list-content">
+                        <div class="sheet-list-title">{{ t('nav.settings') }}</div>
+                        <div class="sheet-list-desc">{{ t('nav.sheet_settings_desc') }}</div>
+                    </div>
+                    <span class="sheet-chevron">›</span>
+                </a>
             </div>
-            <a href="{{ url_for('settings.settings_page') }}"
-                class="sheet-tile {{ 'active' if request.endpoint.split('.')[-1] == 'settings_page' }}" data-nav="settings"
-                hx-get="{{ url_for('settings.settings_page') }}" hx-target="#mainContainer"
-                hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
-                <span class="sheet-icon">⚙️</span>
-                <span class="sheet-title">{{ t('nav.settings') }}</span>
-                <span class="sheet-desc">{{ t('nav.sheet_settings_desc') }}</span>
-            </a>
-            <a href="{{ url_for('logout') }}" class="sheet-tile">
-                <span class="sheet-icon">🚪</span>
-                <span class="sheet-title">{{ t('nav.logout') }}</span>
-                <span class="sheet-desc">{{ t('nav.sheet_logout_desc') }}</span>
+
+            <!-- 模块 3: 安全登出账户 -->
+            <a href="{{ url_for('logout') }}" class="sheet-logout-btn">
+                <span>🚪</span>
+                <span>{{ t('nav.logout') }}</span>
             </a>
         </div>
     </div>
@@ -405,13 +425,17 @@
             toggleMoreSheet(false);
             if (typeof Swal !== 'undefined') {
                 Swal.fire({
-                    title: '🌐 ' + (window.I18N && window.I18N['nav.language'] || '语言 / Language'),
+                    title: '🌐 ' + (window.t ? window.t('nav.language', '语言 / Language') : '语言 / Language'),
                     html: `
                         <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px;">
+                            {% set lang_badges = {'zh': 'ZH', 'en': 'EN', 'ms': 'MS', 'zh_TW': 'TW'} %}
                             {% for l in supported_languages %}
                             <a href="{{ url_for('settings.api_set_language', lang=l.code) }}" class="btn-secondary" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: var(--radius-sm); font-size: 14px; text-decoration: none; color: var(--navy); {% if current_lang == l.code %}border-color: var(--gold); background: rgba(182, 144, 47, 0.12); font-weight: 700;{% endif %}">
-                                <span>{{ l.flag }} {{ l.name }}</span>
-                                {% if current_lang == l.code %}<span>✓</span>{% endif %}
+                                <span style="display: inline-flex; align-items: center; gap: 10px;">
+                                    <span class="lang-tag">{{ lang_badges.get(l.code, 'ZH') }}</span>
+                                    <span>{{ l.name }}</span>
+                                </span>
+                                {% if current_lang == l.code %}<span style="color: var(--gold); font-weight: 700;">✓</span>{% endif %}
                             </a>
                             {% endfor %}
                         </div>

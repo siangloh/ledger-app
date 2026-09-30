@@ -11,12 +11,25 @@ function updatePrivacyModeUI(isPrivacy) {
   const icon = document.getElementById('privacyIcon');
   const mIcon = document.getElementById('mobileSheetPrivacyIcon');
   const mDesc = document.getElementById('mobileSheetPrivacyDesc');
+  const mBadge = document.getElementById('mobileSheetPrivacyBadge');
   const btn = document.getElementById('privacyToggleBtn');
   if (icon) icon.textContent = isPrivacy ? '🙈' : '👁';
   if (mIcon) mIcon.textContent = isPrivacy ? '🙈' : '👁';
-  if (mDesc) mDesc.textContent = isPrivacy ? '已开启隐私遮罩' : '一键隐藏金额与资产';
+  if (mDesc) {
+    mDesc.textContent = isPrivacy
+      ? (window.t ? window.t('nav.privacy_on_title', '已开启隐私遮罩') : '已开启隐私遮罩')
+      : (window.t ? window.t('nav.sheet_privacy_desc', '一键隐藏金额与资产') : '一键隐藏金额与资产');
+  }
+  if (mBadge) {
+    mBadge.textContent = isPrivacy
+      ? (window.t ? window.t('common.on', '开启') : '开启')
+      : (window.t ? window.t('common.off', '关闭') : '关闭');
+    mBadge.className = 'sheet-pill-badge ' + (isPrivacy ? 'badge-on' : 'badge-off');
+  }
   if (btn) {
-    btn.title = isPrivacy ? '隐私遮罩已开启 (点击或 Ctrl+Shift+P 恢复)' : '隐私遮罩 (快捷键: Ctrl+Shift+P)';
+    btn.title = isPrivacy
+      ? (window.t ? window.t('nav.privacy_on_title', '隐私遮罩已开启 (点击或 Ctrl+Shift+P 恢复)') : '隐私遮罩已开启 (点击或 Ctrl+Shift+P 恢复)')
+      : (window.t ? window.t('nav.privacy_off_title', '隐私遮罩 (快捷键: Ctrl+Shift+P)') : '隐私遮罩 (快捷键: Ctrl+Shift+P)');
     btn.classList.toggle('active', isPrivacy);
   }
 }
@@ -359,9 +372,9 @@ function errorAlert(message, title) {
   if (typeof Swal === 'undefined') { return; }
   Swal.fire({
     icon: 'error',
-    title: title || '操作未完成',
+    title: title || (window.t ? window.t('swal.op_incomplete', '操作未完成') : '操作未完成'),
     html: message,
-    confirmButtonText: '知道了',
+    confirmButtonText: window.t ? window.t('swal.got_it', '知道了') : '知道了',
     buttonsStyling: false,
     customClass: {
       popup: 'app-swal-popup',
@@ -554,17 +567,17 @@ function attachQuickAddFormAjax() {
 
     if (!amountInput || amountInput.value.trim() === '' || isNaN(amount)) {
       e.preventDefault();
-      errorAlert('金额必须是大于 0 的数字，不能留空。', '请检查表单');
+      errorAlert(window.t ? window.t('swal.form_amount_req', '金额必须是大于 0 的数字，不能留空。') : '金额必须是大于 0 的数字，不能留空。', window.t ? window.t('swal.check_form', '请检查表单') : '请检查表单');
       return;
     }
     if (amount <= 0) {
       e.preventDefault();
-      errorAlert('金额必须是大于 0 的数字，当前填写的是 ' + amountInput.value + '。', '请检查表单');
+      errorAlert((window.t ? window.t('swal.form_amount_req', '金额必须是大于 0 的数字') : '金额必须是大于 0 的数字') + ': ' + amountInput.value, window.t ? window.t('swal.check_form', '请检查表单') : '请检查表单');
       return;
     }
     if (categorySelect && !categorySelect.value) {
       e.preventDefault();
-      errorAlert('请先在「分类管理」里添加至少一个对应分类，再回来录入。', '缺少可选分类');
+      errorAlert(window.t ? window.t('swal.need_category_first', '请先在「分类管理」里添加至少一个对应分类，再回来录入。') : '请先在「分类管理」里添加至少一个对应分类，再回来录入。', window.t ? window.t('swal.check_form', '缺少可选分类') : '缺少可选分类');
       return;
     }
 
@@ -669,8 +682,8 @@ function attachQuickAddFormAjax() {
               Array.from(savingsSelect.options).forEach(opt => {
                 const catName = opt.value;
                 if (catName) {
-                  const bal = data.savings_pool[catName] !== undefined ? data.savings_pool[catName] : 0;
-                  opt.textContent = `${catName} (结余: ${curSym} ${Number(bal).toFixed(2)})`;
+                  const balLabel = window.t ? window.t('accounts.balance', '结余') : '结余';
+                  opt.textContent = `${catName} (${balLabel}: ${curSym} ${Number(bal).toFixed(2)})`;
                 }
               });
             }
@@ -1049,14 +1062,14 @@ function attachNlpForm() {
     const textInput = form.querySelector('input[name="text"]');
     const text = textInput ? textInput.value.trim() : '';
     if (!text) {
-      errorAlert('请输入一句话，如「打车 32.5」。', '请先输入内容');
+      errorAlert(window.t ? window.t('nav.nlp_input_empty_msg', '请输入一句话，如「打车 32.5」。') : '请输入一句话，如「打车 32.5」。', window.t ? window.t('nav.nlp_input_empty_title', '请先输入内容') : '请先输入内容');
       return;
     }
     const submitBtn = form.querySelector('button[type="submit"]');
     const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="btn-spinner"></span> 智能解析中...';
+      submitBtn.innerHTML = '<span class="btn-spinner"></span> ' + (window.t ? window.t('swal.nlp_analyzing', '智能解析中...') : '智能解析中...');
     }
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || form.querySelector('input[name="csrf_token"]')?.value || '';
     fetch('/nlp/parse', {
@@ -3089,28 +3102,28 @@ function updateAppDownloadStatus() {
 
   if (isNativeApp) {
     if (icon) icon.textContent = '🚀';
-    if (title) title.textContent = '下载应用';
-    if (desc) desc.textContent = '当前正在原生应用内运行';
+    if (title) title.textContent = window.t ? window.t('nav.sheet_download_app', '原生应用') : '原生应用';
+    if (desc) desc.textContent = window.t ? window.t('nav.sheet_download_native', '当前正在原生应用内运行') : '当前正在原生应用内运行';
     if (badge) {
-      badge.textContent = '运行中';
+      badge.textContent = window.t ? window.t('nav.sheet_download_running', '运行中') : '运行中';
       badge.style.display = 'inline-block';
       badge.style.background = 'rgba(16, 185, 129, 0.2)';
       badge.style.color = '#10b981';
     }
   } else if (isDownloaded) {
     if (icon) icon.textContent = '✅';
-    if (title) title.textContent = '下载应用';
-    if (desc) desc.textContent = '本机已下载 (点击重新下载更新)';
+    if (title) title.textContent = window.t ? window.t('nav.sheet_download_app', '下载应用') : '下载应用';
+    if (desc) desc.textContent = window.t ? window.t('nav.sheet_download_installed', '本机已下载 (点击重新下载更新)') : '本机已下载 (点击重新下载更新)';
     if (badge) {
-      badge.textContent = '已下载';
+      badge.textContent = window.t ? window.t('nav.sheet_download_ready', '已下载') : '已下载';
       badge.style.display = 'inline-block';
       badge.style.background = 'rgba(16, 185, 129, 0.2)';
       badge.style.color = '#10b981';
     }
   } else {
     if (icon) icon.textContent = '📱';
-    if (title) title.textContent = '下载应用';
-    if (desc) desc.textContent = '点击下载 Android 原生应用包';
+    if (title) title.textContent = window.t ? window.t('nav.sheet_download_app', '下载应用') : '下载应用';
+    if (desc) desc.textContent = window.t ? window.t('nav.sheet_download_desc', '点击下载 Android 原生应用包') : '点击下载 Android 原生应用包';
     if (badge) {
       badge.style.display = 'none';
     }
@@ -3124,14 +3137,14 @@ window.handleAppDownloadClick = function (e) {
   if (isNativeApp && typeof Swal !== 'undefined') {
     e.preventDefault();
     Swal.fire({
-      title: '📱 当前已在原生 App 内',
-      text: '您可以呼起原生伴侣快捷调试菜单，或重新下载最新版本安装包：',
+      title: window.t ? window.t('nav.sheet_app_in_native_title', '📱 当前已在原生 App 内') : '📱 当前已在原生 App 内',
+      text: window.t ? window.t('nav.sheet_app_in_native_desc', '您可以呼起原生伴侣快捷调试菜单，或重新下载最新版本安装包：') : '您可以呼起原生伴侣快捷调试菜单，或重新下载最新版本安装包：',
       icon: 'info',
       showDenyButton: true,
       showCancelButton: true,
-      confirmButtonText: '⚡ 原生调试与快捷菜单',
-      denyButtonText: '⬇️ 重新下载 APK',
-      cancelButtonText: '关闭'
+      confirmButtonText: window.t ? window.t('nav.sheet_app_debug_menu', '⚡ 原生调试与快捷菜单') : '⚡ 原生调试与快捷菜单',
+      denyButtonText: window.t ? window.t('nav.sheet_app_redownload', '⬇️ 重新下载 APK') : '⬇️ 重新下载 APK',
+      cancelButtonText: window.t ? window.t('common.cancel', '关闭') : '关闭'
     }).then((res) => {
       if (res.isConfirmed) {
         if (window.LedgerNativeBridge && typeof window.LedgerNativeBridge.openQuickMenu === 'function') {
@@ -3158,8 +3171,8 @@ window.handleAppDownloadClick = function (e) {
       toast: true,
       position: 'top',
       icon: 'success',
-      title: '正在下载「我的账本」安装包...',
-      text: '下载后请点击通知栏或文件管理进行安装',
+      title: window.t ? window.t('nav.sheet_downloading_apk', '正在下载「我的账本」安装包...') : '正在下载「我的账本」安装包...',
+      text: window.t ? window.t('nav.sheet_downloading_hint', '下载后请点击通知栏或文件管理进行安装') : '下载后请点击通知栏或文件管理进行安装',
       showConfirmButton: false,
       timer: 3500
     });

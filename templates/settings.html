@@ -71,19 +71,19 @@
           <div class="settings-pill-group">
             <label class="pill-radio">
               <input type="radio" name="language" value="zh" {{ 'checked' if (settings.language or 'zh') == 'zh' }}>
-              <span>🇨🇳 简体中文</span>
+              <span><span class="lang-tag">ZH</span> 简体中文</span>
             </label>
             <label class="pill-radio">
               <input type="radio" name="language" value="en" {{ 'checked' if settings.language == 'en' }}>
-              <span>🇺🇸 English</span>
+              <span><span class="lang-tag">EN</span> English</span>
             </label>
             <label class="pill-radio">
               <input type="radio" name="language" value="ms" {{ 'checked' if settings.language == 'ms' }}>
-              <span>🇲🇾 Bahasa Melayu</span>
+              <span><span class="lang-tag">MS</span> Bahasa Melayu</span>
             </label>
             <label class="pill-radio">
               <input type="radio" name="language" value="zh_TW" {{ 'checked' if settings.language == 'zh_TW' }}>
-              <span>🇭🇰 繁體中文</span>
+              <span><span class="lang-tag">TW</span> 繁體中文</span>
             </label>
           </div>
           <span class="settings-tip">{{ t('settings.language_tip') }}</span>
@@ -104,33 +104,40 @@
       <div class="settings-grid">
         <div class="settings-item">
           <label class="settings-label" for="defaultCurrencySelect">{{ t('settings.default_currency', '默认结算货币与符号') }}</label>
-          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <select id="defaultCurrencySelect" name="default_currency" style="width: 140px; font-weight: 600;" onchange="onCurrencySelectChange(this)">
-              {% for code, label in [
-                ('MYR', 'MYR - RM (Ringgit Malaysia)'),
-                ('SGD', 'SGD - S$ (Singapore Dollar)'),
-                ('USD', 'USD - $ (US Dollar)'),
-                ('CNY', 'CNY - ¥ (Chinese Yuan / 人民币)'),
-                ('EUR', 'EUR - € (Euro)'),
-                ('GBP', 'GBP - £ (British Pound)'),
-                ('JPY', 'JPY - ¥ (Japanese Yen)'),
-                ('HKD', 'HKD - HK$ (Hong Kong Dollar)'),
-                ('AUD', 'AUD - A$ (Australian Dollar)'),
-                ('CAD', 'CAD - C$ (Canadian Dollar)'),
-                ('THB', 'THB - ฿ (Thai Baht)'),
-                ('KRW', 'KRW - ₩ (Korean Won)'),
-                ('TWD', 'TWD - NT$ (New Taiwan Dollar)')
-              ] %}
-              <option value="{{ code }}" {{ 'selected' if settings.default_currency == code }}>{{ label }}</option>
-              {% endfor %}
-            </select>
-            <input type="text" id="currencySymbolInput" name="currency_symbol" value="{{ settings.currency_symbol }}" maxlength="8" style="width: 90px; font-weight: 700; text-align: center;" title="{{ t('settings.currency_symbol_title', '前置货币符号') }}" required>
-            <div class="quick-currency-chips">
-              <button type="button" class="chip-btn" onclick="setCurrencySymbol('RM')">RM</button>
-              <button type="button" class="chip-btn" onclick="setCurrencySymbol('S$')">S$</button>
-              <button type="button" class="chip-btn" onclick="setCurrencySymbol('$')">$</button>
-              <button type="button" class="chip-btn" onclick="setCurrencySymbol('¥')">¥</button>
-              <button type="button" class="chip-btn" onclick="setCurrencySymbol('€')">€</button>
+          <div class="settings-currency-wrapper">
+            <div class="settings-currency-main">
+              <select id="defaultCurrencySelect" name="default_currency" class="settings-currency-select" onchange="onCurrencySelectChange(this)">
+                {% for code, label in [
+                  ('MYR', 'MYR - RM (Ringgit Malaysia)'),
+                  ('SGD', 'SGD - S$ (Singapore Dollar)'),
+                  ('USD', 'USD - $ (US Dollar)'),
+                  ('CNY', 'CNY - ¥ (Chinese Yuan / 人民币)'),
+                  ('EUR', 'EUR - € (Euro)'),
+                  ('GBP', 'GBP - £ (British Pound)'),
+                  ('JPY', 'JPY - ¥ (Japanese Yen)'),
+                  ('HKD', 'HKD - HK$ (Hong Kong Dollar)'),
+                  ('AUD', 'AUD - A$ (Australian Dollar)'),
+                  ('CAD', 'CAD - C$ (Canadian Dollar)'),
+                  ('THB', 'THB - ฿ (Thai Baht)'),
+                  ('KRW', 'KRW - ₩ (Korean Won)'),
+                  ('TWD', 'TWD - NT$ (New Taiwan Dollar)')
+                ] %}
+                <option value="{{ code }}" {{ 'selected' if settings.default_currency == code }}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="settings-symbol-row">
+              <div class="settings-symbol-input-wrap">
+                <span class="settings-symbol-prefix">{{ t('settings.symbol_label', '前置符号') }}:</span>
+                <input type="text" id="currencySymbolInput" name="currency_symbol" value="{{ settings.currency_symbol }}" maxlength="8" class="settings-symbol-input" title="{{ t('settings.currency_symbol_title', '前置货币符号') }}" required>
+              </div>
+              <div class="quick-currency-chips">
+                <button type="button" class="chip-btn" onclick="setCurrencySymbol('RM')">RM</button>
+                <button type="button" class="chip-btn" onclick="setCurrencySymbol('S$')">S$</button>
+                <button type="button" class="chip-btn" onclick="setCurrencySymbol('$')">$</button>
+                <button type="button" class="chip-btn" onclick="setCurrencySymbol('¥')">¥</button>
+                <button type="button" class="chip-btn" onclick="setCurrencySymbol('€')">€</button>
+              </div>
             </div>
           </div>
           <span class="settings-tip">{{ t('settings.default_currency_tip', '账本核心币种代号及前端金额、报表与自动记账的前置货币符号。') }}</span>
