@@ -714,6 +714,13 @@ def init_db(app_logger=None):
         bank_holder_names TEXT DEFAULT '',
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    -- 12. 核心性能复合索引（大幅加速总览月度聚合、明细分页与分类查询，消除全表扫描）
+    CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_transactions_user_type ON transactions(user_id, type);
+    CREATE INDEX IF NOT EXISTS idx_categories_user_type ON categories(user_id, type, group_name);
+    CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id, is_active);
+    CREATE INDEX IF NOT EXISTS idx_user_settings_uid ON user_settings(user_id);
+    CREATE INDEX IF NOT EXISTS idx_recurring_user ON recurring_rules(user_id);
     ''')
     db.commit()
 
@@ -721,20 +728,36 @@ def init_db(app_logger=None):
     try:
         db.execute("ALTER TABLE user_settings ADD COLUMN language TEXT DEFAULT 'zh'")
         db.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Column migration language notice: %s", e)
 
     try:
         db.execute("ALTER TABLE user_settings ADD COLUMN repayment_offset_window_minutes INTEGER DEFAULT 120")
         db.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Column migration repayment_offset notice: %s", e)
 
     try:
         db.execute("ALTER TABLE user_settings ADD COLUMN bank_holder_names TEXT DEFAULT ''")
         db.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Column migration bank_holder_names notice: %s", e)
+
+    # 核心性能索引轻量幂等迁移（支持已有库热升级）
+    core_indices = [
+        "CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC, id DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_transactions_user_type ON transactions(user_id, type)",
+        "CREATE INDEX IF NOT EXISTS idx_categories_user_type ON categories(user_id, type, group_name)",
+        "CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id, is_active)",
+        "CREATE INDEX IF NOT EXISTS idx_user_settings_uid ON user_settings(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_recurring_user ON recurring_rules(user_id)",
+    ]
+    for idx_sql in core_indices:
+        try:
+            db.execute(idx_sql)
+        except Exception as e:
+            logger.debug("Core index migration notice: %s", e)
+    db.commit()
 
     # 确保 admin 用户具备默认分类
     init_user_default_categories(db, admin_id)

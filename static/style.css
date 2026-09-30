@@ -85,6 +85,13 @@ body {
   }
 }
 
+/* 原生跨页面丝滑 View Transition 动效 */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.16s;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* ---------- 智能骨架屏动效 (Skeleton Screen Shimmer) ---------- */
 
 .skeleton-screen {

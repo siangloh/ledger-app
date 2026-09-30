@@ -2497,6 +2497,10 @@ function checkRealtimeUpdates() {
 
       if (data.has_update && data.version > _currentDataVersion) {
         _currentDataVersion = data.version;
+        window.INITIAL_DATA_VERSION = data.version;
+        if (typeof InstantNav !== 'undefined' && typeof InstantNav.clearCache === 'function') {
+          InstantNav.clearCache();
+        }
         handleRealtimeUpdate(data.event);
       }
     })
@@ -2833,57 +2837,261 @@ function renderSkeletonScreen(urlStr) {
 
 // ---------- HTMX 页面平滑切换集成 (Smooth Navigation with HTMX) ----------
 
+// ===========================================================================
+// 极速智能导航引擎 (InstantNav Engine): 预测性预取 + 会话级页面缓存 + 防抖骨架屏 + View Transitions
+// ===========================================================================
+
 const InstantNav = {
+  cache: new Map(), // url -> { html, timestamp, dataVersion }
+  prefetchInflight: new Map(), // url -> Promise<string|null>
+  skeletonTimer: null,
+  maxCacheAgeMs: 45000, // 45 秒内平滑秒开 (0ms)
   showProgress: showProgressBar,
   finishProgress: finishProgressBar,
   updateActiveNav: updateActiveNav,
-  navigate(url) {
-    updateActiveNav(url); // 立即高亮目标导航按钮
-    const container = document.getElementById('mainContainer');
-    if (container) {
-      container.innerHTML = renderSkeletonScreen(url);
+
+  cleanUrl(urlStr) {
+    if (!urlStr) return '';
+    try {
+      const u = new URL(urlStr, window.location.origin);
+      return u.pathname + u.search;
+    } catch (e) {
+      return urlStr;
     }
-    if (typeof htmx !== 'undefined') {
-      htmx.ajax('GET', url, { target: '#mainContainer', swap: 'innerHTML show:window:top' });
-      history.pushState({}, '', url);
+  },
+
+  isNavigable(urlStr) {
+    if (!urlStr || urlStr.startsWith('#') || urlStr.startsWith('javascript:')) return false;
+    const clean = this.cleanUrl(urlStr);
+    // 排除登出、下载、静态资源文件与独立 API
+    if (clean.startsWith('/logout') || clean.startsWith('/download') || clean.startsWith('/api/') || clean.startsWith('/static/')) {
+      return false;
+    }
+    return true;
+  },
+
+  clearCache() {
+    this.cache.clear();
+    this.prefetchInflight.clear();
+  },
+
+  prefetch(urlStr) {
+    if (!this.isNavigable(urlStr)) return;
+    const url = this.cleanUrl(urlStr);
+    const cached = this.cache.get(url);
+    const curVersion = window.INITIAL_DATA_VERSION || 0;
+    const now = Date.now();
+
+    // 命中新鲜缓存则无需重新预取
+    if (cached && (now - cached.timestamp < this.maxCacheAgeMs) && (cached.dataVersion === curVersion)) {
+      return;
+    }
+    if (this.prefetchInflight.has(url)) return;
+
+    const p = fetch(url, {
+      headers: { 'HX-Request': 'true' },
+      credentials: 'same-origin'
+    }).then(res => {
+      if (res.ok) return res.text();
+      return null;
+    }).then(html => {
+      if (html && html.trim().length > 0) {
+        this.cache.set(url, {
+          html: html,
+          timestamp: Date.now(),
+          dataVersion: window.INITIAL_DATA_VERSION || 0
+        });
+      }
+      this.prefetchInflight.delete(url);
+      return html;
+    }).catch(err => {
+      console.debug('Prefetch error:', err);
+      this.prefetchInflight.delete(url);
+      return null;
+    });
+
+    this.prefetchInflight.set(url, p);
+  },
+
+  applyHtmlWithTransition(container, newHtml, callback) {
+    if (document.startViewTransition) {
+      document.startViewTransition(() => {
+        container.innerHTML = newHtml;
+        if (callback) callback();
+      });
     } else {
-      window.location.href = url;
+      container.classList.add('page-fade-out');
+      setTimeout(() => {
+        container.innerHTML = newHtml;
+        container.classList.remove('page-fade-out');
+        container.classList.add('page-fade-in');
+        setTimeout(() => container.classList.remove('page-fade-in'), 220);
+        if (callback) callback();
+      }, 35);
     }
+  },
+
+  renderContent(url, html, pushState = true) {
+    const container = document.getElementById('mainContainer');
+    if (!container) return;
+
+    if (this.skeletonTimer) {
+      clearTimeout(this.skeletonTimer);
+      this.skeletonTimer = null;
+    }
+
+    this.applyHtmlWithTransition(container, html, () => {
+      // 执行内联数据脚本，确保各页面的 window 局部变量生效
+      container.querySelectorAll('script').forEach(s => {
+        try {
+          const fn = new Function(s.textContent);
+          fn();
+        } catch (e) {
+          console.debug('Error executing partial script:', e);
+        }
+      });
+
+      if (pushState) {
+        history.pushState({ instantNav: true, url: url }, '', url);
+      }
+      updateActiveNav(url);
+      initPageLifecycle();
+      finishProgressBar();
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    });
+  },
+
+  navigate(urlStr) {
+    if (!this.isNavigable(urlStr)) {
+      window.location.href = urlStr;
+      return;
+    }
+    const url = this.cleanUrl(urlStr);
+    updateActiveNav(url);
+    showProgressBar();
+
+    const cached = this.cache.get(url);
+    const curVersion = window.INITIAL_DATA_VERSION || 0;
+    const now = Date.now();
+
+    // 1. 命中有效缓存：0ms 瞬间挂载并呈现！
+    if (cached && (now - cached.timestamp < this.maxCacheAgeMs) && (cached.dataVersion === curVersion)) {
+      this.renderContent(url, cached.html);
+      return;
+    }
+
+    // 2. 检查是否有正在飞行的预加载请求
+    const inFlight = this.prefetchInflight.get(url);
+    if (inFlight) {
+      inFlight.then(html => {
+        if (html) {
+          this.renderContent(url, html);
+        } else {
+          this._fallbackFetch(url);
+        }
+      });
+      return;
+    }
+
+    this._fallbackFetch(url);
+  },
+
+  _fallbackFetch(url) {
+    const container = document.getElementById('mainContainer');
+    if (this.skeletonTimer) clearTimeout(this.skeletonTimer);
+    // 延迟 120ms 防抖展示骨架屏：若网络在 120ms 内极速响应，坚决杜绝骨架屏闪烁！
+    this.skeletonTimer = setTimeout(() => {
+      if (container) {
+        container.innerHTML = renderSkeletonScreen(url);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+    }, 120);
+
+    fetch(url, {
+      headers: { 'HX-Request': 'true' },
+      credentials: 'same-origin'
+    }).then(res => {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.text();
+    }).then(html => {
+      if (this.skeletonTimer) {
+        clearTimeout(this.skeletonTimer);
+        this.skeletonTimer = null;
+      }
+      this.cache.set(url, {
+        html: html,
+        timestamp: Date.now(),
+        dataVersion: window.INITIAL_DATA_VERSION || 0
+      });
+      this.renderContent(url, html);
+    }).catch(err => {
+      if (this.skeletonTimer) {
+        clearTimeout(this.skeletonTimer);
+        this.skeletonTimer = null;
+      }
+      if (typeof htmx !== 'undefined') {
+        htmx.ajax('GET', url, { target: '#mainContainer', swap: 'innerHTML show:window:top' });
+        history.pushState({}, '', url);
+      } else {
+        window.location.href = url;
+      }
+    });
   }
 };
 
 document.addEventListener('DOMContentLoaded', function () {
   initPageLifecycle();
 
-  // 核心优化：导航按钮点击瞬间（0ms 零延迟）立即点亮目标导航 Active 状态！
+  // 1. 预测性预取：当手指触碰或鼠标指针移入导航元素时，提前 100~300ms 在后台静默预取目标页 HTML
+  document.addEventListener('pointerenter', function (e) {
+    const navLink = e.target.closest('.mobile-bottom-nav .bnav-item, .desktop-nav-links a, .mobile-bottom-sheet a, a[data-nav]');
+    if (!navLink) return;
+    const url = navLink.getAttribute('hx-get') || navLink.getAttribute('href');
+    if (url) InstantNav.prefetch(url);
+  }, true);
+
+  document.addEventListener('touchstart', function (e) {
+    const navLink = e.target.closest('.mobile-bottom-nav .bnav-item, .desktop-nav-links a, .mobile-bottom-sheet a, a[data-nav]');
+    if (!navLink) return;
+    const url = navLink.getAttribute('hx-get') || navLink.getAttribute('href');
+    if (url) InstantNav.prefetch(url);
+  }, { passive: true, capture: true });
+
+  // 2. 导航按钮点击：0ms 立即高亮状态 + 优先从缓存瞬间挂载 (0ms 无闪烁)
   document.addEventListener('click', function (e) {
-    const navItem = e.target.closest('.mobile-bottom-nav .bnav-item, .desktop-nav-links a, .sheet-tile');
+    const navItem = e.target.closest('.mobile-bottom-nav .bnav-item, .desktop-nav-links a, .sheet-action-btn, .sheet-list-item');
     if (!navItem) return;
     if (navItem.id === 'btnMoreSheet') return;
 
+    const url = navItem.getAttribute('hx-get') || navItem.getAttribute('href');
+    if (!url || !InstantNav.isNavigable(url)) return;
+
     const navKey = navItem.dataset.nav;
     if (navKey) {
-      // 1. 立即同步手机端底部导航高亮
-      const isSecondary = ['insights', 'recurring', 'categories', 'import', 'auto-track', 'liabilities', 'subscriptions'].includes(navKey);
-      document.querySelectorAll('.mobile-bottom-nav .bnav-item').forEach(btn => {
-        if (btn.id === 'btnMoreSheet') {
-          btn.classList.toggle('active', isSecondary);
-        } else if (btn.dataset.nav) {
-          btn.classList.toggle('active', btn.dataset.nav === navKey);
-        }
-      });
-      // 2. 立即同步桌面端导航高亮
-      document.querySelectorAll('.desktop-nav-links a').forEach(a => {
-        a.classList.toggle('active', a.dataset.nav === navKey);
-      });
-      // 3. 立即同步底部抽屉高亮
-      document.querySelectorAll('.sheet-tile').forEach(tile => {
-        tile.classList.toggle('active', tile.dataset.nav === navKey);
-      });
+      updateActiveNav(url);
     }
+    if (typeof toggleMoreSheet === 'function') {
+      toggleMoreSheet(false);
+    }
+
+    // 拦截点击事件，直接由 InstantNav 引擎瞬间置换 DOM
+    e.preventDefault();
+    e.stopPropagation();
+    InstantNav.navigate(url);
   }, true);
 
-  // HTMX 事件监听器：连接顶部加载条、骨架屏与生命周期重新水合
+  // 3. 浏览器前进/后退历史平滑支持
+  window.addEventListener('popstate', function (e) {
+    const path = window.location.pathname + window.location.search;
+    InstantNav.navigate(path);
+  });
+
+  // 4. 数据变动时立即清空过期页面缓存（表单提交、记账变动）
+  document.addEventListener('submit', function () {
+    InstantNav.clearCache();
+  });
+
+  // 5. HTMX 事件监听器：连接顶部加载条与防抖骨架屏支持
   document.body.addEventListener('htmx:beforeRequest', function (evt) {
     showProgressBar();
     if (typeof toggleMoreSheet === 'function') {
@@ -2894,7 +3102,6 @@ document.addEventListener('DOMContentLoaded', function () {
     window.FLASH_SUCCESS = null;
     window.FLASH_ERROR = null;
 
-    // 页面级导航时立即展示优雅的微光骨架屏，杜绝空白或卡顿等待
     const target = evt.detail.target;
     const elt = evt.target || (evt.detail && evt.detail.elt);
     if (target && target.id === 'mainContainer') {
@@ -2909,29 +3116,38 @@ document.addEventListener('DOMContentLoaded', function () {
                           (evt.detail.requestConfig && evt.detail.requestConfig.path) || 
                           (elt && elt.getAttribute('href')) || 
                           (elt && elt.getAttribute('hx-get')) || '';
-        // 关键改进：在触发骨架屏展示的瞬间，立即同步点亮对应页面的 Navigation 按钮为 Active 状态！
         if (targetUrl) {
           updateActiveNav(targetUrl);
-        } else {
-          const navEl = elt && elt.closest('[data-nav]');
-          if (navEl && navEl.dataset.nav) {
-            updateActiveNav('/' + (navEl.dataset.nav === 'index' ? '' : navEl.dataset.nav));
-          }
         }
-        target.innerHTML = renderSkeletonScreen(targetUrl);
-        window.scrollTo({ top: 0, behavior: 'instant' });
+        // 延迟 120ms 防抖，快请求完全不展示骨架屏
+        if (window._htmxSkeletonTimer) clearTimeout(window._htmxSkeletonTimer);
+        window._htmxSkeletonTimer = setTimeout(() => {
+          target.innerHTML = renderSkeletonScreen(targetUrl);
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        }, 120);
       }
     }
   });
 
-  document.body.addEventListener('htmx:afterRequest', function () {
+  document.body.addEventListener('htmx:afterRequest', function (evt) {
+    if (window._htmxSkeletonTimer) {
+      clearTimeout(window._htmxSkeletonTimer);
+      window._htmxSkeletonTimer = null;
+    }
     finishProgressBar();
+    const reqMethod = (evt.detail && evt.detail.requestConfig && evt.detail.requestConfig.verb) || '';
+    if (reqMethod && reqMethod.toLowerCase() !== 'get') {
+      InstantNav.clearCache();
+    }
   });
 
   document.body.addEventListener('htmx:afterSwap', function (evt) {
+    if (window._htmxSkeletonTimer) {
+      clearTimeout(window._htmxSkeletonTimer);
+      window._htmxSkeletonTimer = null;
+    }
     const container = evt.detail.target;
     if (container && container.id === 'mainContainer') {
-      // 执行内联数据脚本，确保 window.CATEGORY_DATA 等变量生效
       container.querySelectorAll('script').forEach(s => {
         try {
           const fn = new Function(s.textContent);

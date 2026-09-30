@@ -1,9 +1,12 @@
-const CACHE_NAME = 'ledger-pwa-v8';
+const CACHE_NAME = 'ledger-pwa-v9';
 const PRECACHE_ASSETS = [
   '/static/manifest.json',
   '/static/style.css',
   '/static/app.js',
   '/static/offline.html',
+  '/static/vendor/htmx.min.js',
+  '/static/vendor/sweetalert2.all.min.js',
+  '/static/vendor/chart.umd.min.js',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
   '/static/icons/icon-maskable-512.png',

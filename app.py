@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import hmac
 import secrets
 import logging
@@ -226,11 +227,17 @@ def handle_csrf_error(error):
 
 @app.after_request
 def add_cache_control_headers(response):
-    """对 HTML 页面与敏感路由强制不缓存，确保每次加载都能获取最新会话和有效状态"""
+    """对 HTML 页面与敏感路由强制不缓存，确保每次加载都能获取最新会话和有效状态；对静态与第三方资源开启长效缓存加速"""
     if response.mimetype == 'text/html' or (request.path and request.path in ('/login', '/register')):
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
+    elif request.path and request.path.startswith('/static/'):
+        qs = request.query_string.decode('utf-8', errors='ignore') if request.query_string else ''
+        if any(request.path.startswith(v) for v in ('/static/vendor/', '/static/icons/')) or 'v=' in qs:
+            response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        else:
+            response.headers['Cache-Control'] = 'public, max-age=86400'
 
     # 同步 lang cookie，便于纯前端/离线状态保持语言
     if hasattr(g, 'current_lang') and g.current_lang:
@@ -432,9 +439,14 @@ def offline_page():
 @app.route('/', endpoint='index')
 def index():
     user_id = get_current_user_id()
-    generated = generate_due_recurring(user_id)
-    if generated:
-        flash(f'已自动生成本月固定收支 {generated} 条', 'success')
+    # 周期固定收支检查频控：同一会话 5 分钟内仅执行一次，避免频繁导航时反复全表扫描
+    now_ts = time.time()
+    last_recurring_check = session.get('last_recurring_check', 0)
+    if (now_ts - last_recurring_check) > 300:
+        generated = generate_due_recurring(user_id)
+        session['last_recurring_check'] = now_ts
+        if generated:
+            flash(f'已自动生成本月固定收支 {generated} 条', 'success')
 
     month = request.args.get('month') or date.today().strftime('%Y-%m')
     db = get_db()
