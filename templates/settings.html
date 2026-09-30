@@ -387,6 +387,13 @@
             <span class="settings-tip">{{ t('settings.repayment_offset_tip', '聚餐或日常分账垫付后，仅在该时间窗口内收到的还款转账才会自动冲减上一笔支出；超出时限或本人自转则作为正常收入入账。') }}</span>
           </div>
 
+          <!-- 本人银行转账户名 / DuitNow 姓名 (精准区分本人自转与朋友还款) -->
+          <div class="settings-item">
+            <label class="settings-label" for="bankHolderNamesInput">{{ t('settings.bank_holder_names', '本人银行户名 / DuitNow 姓名') }}</label>
+            <input type="text" id="bankHolderNamesInput" name="bank_holder_names" value="{{ settings.bank_holder_names|default('') }}" placeholder="{{ t('settings.bank_holder_names_placeholder', '如：LOH SIANG, SIANG LOH (多个用逗号隔开)') }}">
+            <span class="settings-tip">{{ t('settings.bank_holder_names_tip', '配置你在 Maybank/CIMB/TnG 等银行显示的法定姓名。自己手动从银行转账进电子钱包时，系统将 100% 自动识别为“本人自转”，绝不计入外部新收入，也不会误当成朋友还款。') }}</span>
+          </div>
+
           <!-- 触感反馈 -->
           <div class="settings-item settings-toggle-row">
             <div class="settings-toggle-info">

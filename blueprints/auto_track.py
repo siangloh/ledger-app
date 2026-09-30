@@ -453,7 +453,7 @@ def api_auto_track():
             for k in SELF_TRANSFER_KEYWORDS
         )
 
-        # 进一步核对用户已注册的自有银行/账户名称 (如 Maybank, CIMB, Touch 'n Go 等)
+        # 进一步核对用户已注册的自有银行/账户名称与本人银行转账法定户名别名 (如 LOH SIANG, SIANG LOH)
         if not is_self_transfer and target_user_id:
             try:
                 acc_rows = db.execute("SELECT name FROM accounts WHERE user_id = ?", (target_user_id,)).fetchall()
@@ -462,6 +462,14 @@ def api_auto_track():
                 if u_row and u_row['username'] and len(u_row['username'].strip()) >= 2:
                     user_acc_names.append(u_row['username'].strip().lower())
 
+                # 提取用户在偏好设置中配置的本人银行户名 / DuitNow 姓名别名
+                raw_holder_names = user_settings.get('bank_holder_names', '')
+                if raw_holder_names:
+                    for h_name in raw_holder_names.split(','):
+                        h_clean = h_name.strip().lower()
+                        if len(h_clean) >= 2:
+                            user_acc_names.append(h_clean)
+
                 for aname in user_acc_names:
                     if aname in raw_text_lower or aname in parsed_note_lower or aname in parsed_merchant_lower:
                         if any(prefix in raw_text_lower for prefix in [f"from {aname}", f"to {aname}", f"via {aname}", f"dari {aname}"]) or aname == parsed_merchant_lower:
@@ -469,6 +477,55 @@ def api_auto_track():
                             break
             except Exception as e:
                 logger.debug("Failed to check user accounts for self-transfer: %s", e)
+
+        # 5.1 检查短时间窗口（5分钟内）同金额镜像划转 (Mirror Pairing)
+        if not is_self_transfer and parsed['type'] == 'income' and target_user_id:
+            try:
+                recent_mirror = db.execute('''
+                    SELECT id, raw_text, transaction_id, created_at
+                    FROM processed_notifications
+                    WHERE user_id = ? AND ABS(amount - ?) < 0.01
+                      AND created_at >= datetime('now', '-5 minutes')
+                    ORDER BY id DESC LIMIT 1
+                ''', (str(target_user_id), parsed['amount'])).fetchone()
+
+                if recent_mirror:
+                    m_raw = (recent_mirror['raw_text'] or '').lower()
+                    is_mirror_out = any(k in m_raw for k in [
+                        'transfer to', 'transferred to', 'duitnow to', 'paid', 'deducted', 'debited', 'spent', '转账给', '扣款'
+                    ])
+                    if is_mirror_out:
+                        is_self_transfer = True
+                        logger.info("Detected mirror pair transfer within 5m for user %s: amount=%s", target_user_id, parsed['amount'])
+                        if recent_mirror['transaction_id']:
+                            db.execute(
+                                "UPDATE transactions SET category = '内部划转', note = note || ' [镜像互转对齐]' WHERE id = ?",
+                                (recent_mirror['transaction_id'],)
+                            )
+                            db.commit()
+            except Exception as e:
+                logger.debug("Failed to check mirror pair transfer: %s", e)
+
+        # 若识别为本人自转或内部划转，记录幂等后直接安全忽略，不计入日常收支
+        if is_self_transfer:
+            logger.info("Recognized self-transfer for user %s: %s", target_user_id, text)
+            try:
+                db.execute('''
+                    INSERT INTO processed_notifications (user_id, content_hash, raw_text, amount, transaction_id, created_at)
+                    VALUES (?, ?, ?, ?, NULL, ?)
+                ''', (str(target_user_id), content_hash, text, parsed['amount'], now))
+                db.commit()
+            except Exception as e:
+                logger.debug("Failed to record processed_notification on self_transfer: %s", e)
+
+            return jsonify({
+                'ok': True,
+                'verdict': 'ignored_internal_transfer',
+                'message': f"识别为本人账户间划转/充值 ({parsed.get('note') or '本人自转'})，已自动识别为内部资金划转，不计入日常收支",
+                'is_self_transfer': True,
+                'raw_text': text,
+                'parsed': parsed
+            }), 200
 
         is_repayment = (
             offset_window_minutes > 0

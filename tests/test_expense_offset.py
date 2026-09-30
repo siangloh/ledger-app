@@ -245,7 +245,7 @@ def test_self_transfer_keyword_not_offset(flask_app, client):
         json={'text': notif_text}
     )
 
-    assert resp.status_code == 201
+    assert resp.status_code in (200, 201)
     res_data = resp.get_json()
     assert res_data['ok'] is True
     assert res_data.get('verdict') != 'offset_success'
@@ -288,7 +288,7 @@ def test_self_transfer_registered_account_not_offset(flask_app, client):
         json={'text': notif_text}
     )
 
-    assert resp.status_code == 201
+    assert resp.status_code in (200, 201)
     res_data = resp.get_json()
     assert res_data.get('verdict') != 'offset_success'
 

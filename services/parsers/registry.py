@@ -87,15 +87,21 @@ class NotificationParserComposite:
 
         # 0.1 内部资金划转与充值
         if any(k in lower_text for k in INTERNAL_TRANSFER_KEYWORDS):
-            return ParsedNotification(
-                amount=0.0,
-                type='expense',
-                category='内部划转',
-                merchant='内部划转',
-                is_internal_transfer=True,
-                note='钱包内部资金划转/充值（如 GO+ 转存），已自动忽略不记入财务收支',
-                raw_text=raw_text
-            )
+            # 关键保障：如果通知包含明确的外部付款人 (如 from ..., received from ..., duitnow from ...)，
+            # 说明有可能是朋友/他人转账或带人名的自转，交由后续策略精准提取付款人与金额，并在业务层比对是否为本人自转或朋友还款
+            has_external_sender = any(p in lower_text for p in [
+                'from ', 'received from', 'duitnow from', 'dari ', '转账自', '来自'
+            ])
+            if not has_external_sender:
+                return ParsedNotification(
+                    amount=0.0,
+                    type='expense',
+                    category='内部划转',
+                    merchant='内部划转',
+                    is_internal_transfer=True,
+                    note='钱包内部资金划转/充值（如 GO+ 转存），已自动忽略不记入财务收支',
+                    raw_text=raw_text
+                )
 
         # 1. 遍历自注册策略责任链
         for strategy in self.strategies:

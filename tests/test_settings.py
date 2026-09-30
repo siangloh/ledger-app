@@ -263,4 +263,30 @@ def test_settings_language_customization_and_sync(logged_in_client, flask_app, a
     assert 'lang="zh"' in html_zh
 
 
+def test_bank_holder_names_setting_update(logged_in_client, flask_app, admin_user_id):
+    """验证用户配置本人银行法定户名/DuitNow姓名并在设置界面中正确保存与回显"""
+    payload = {
+        'bank_holder_names': 'LOH SIANG, SIANG LOH'
+    }
+    res = logged_in_client.post(
+        '/api/settings/update',
+        data=payload,
+        headers={'X-Requested-With': 'XMLHttpRequest'}
+    )
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data['ok'] is True
+
+    with flask_app.app.app_context():
+        st = get_user_settings(admin_user_id)
+        assert st['bank_holder_names'] == 'LOH SIANG, SIANG LOH'
+
+    # 访问设置页面验证 input 具备该值
+    res_page = logged_in_client.get('/settings')
+    assert res_page.status_code == 200
+    html = res_page.get_data(as_text=True)
+    assert 'value="LOH SIANG, SIANG LOH"' in html
+
+
+
 

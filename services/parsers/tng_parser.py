@@ -77,9 +77,10 @@ class TouchNGoParser(NotificationParserStrategy):
                     raw_text=text
                 )
 
-        # 2. 检查收款 / 朋友转账还款
+        # 2. 检查收款 / 朋友转账还款 (支持 DuitNow Transfer from ... 以及 Cashed in from ...)
         m_in = self.TRANSFER_IN_PATTERN.search(text)
-        if m_in or any(k in lower_text for k in ['received from', 'transfer from', '收到转账', '转入']):
+        has_in_keyword = any(k in lower_text for k in ['received from', 'transfer from', 'duitnow from', '收到转账', '转入', 'cashed in', 'cash in'])
+        if m_in or (has_in_keyword and any(p in lower_text for p in ['from ', 'received ', 'dari ', '来自'])):
             amt = None
             if m_in and m_in.group(1):
                 try:
@@ -92,7 +93,12 @@ class TouchNGoParser(NotificationParserStrategy):
                     amt = float(m_amt.group(1))
 
             if amt and amt > 0:
-                sender = (m_in.group(2).strip() if m_in and m_in.group(2) else '') or '朋友转账'
+                sender = (m_in.group(2).strip() if m_in and m_in.group(2) else '')
+                if not sender:
+                    m_from = re.search(r'(?:from|transfer from|duitnow from|转账自|来自|dari)\s+([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{2,35})', text, re.IGNORECASE)
+                    if m_from:
+                        sender = self._clean_merchant(m_from.group(1))
+                sender = sender or '转账收款'
                 return ParsedNotification(
                     amount=amt,
                     type='income',

@@ -320,6 +320,9 @@ TRANSLATIONS = {
         'settings.save_synced': '配置已同步',
         'settings.reset_box_title': '出厂配置恢复',
         'settings.reset_box_desc': '将主题、货币符号及自动化滑窗恢复为官方默认值。此操作绝不会影响您的交易数据与账本明细。',
+        'settings.bank_holder_names': '本人银行户名 / DuitNow 姓名',
+        'settings.bank_holder_names_placeholder': '如：LOH SIANG, SIANG LOH (多个用逗号隔开)',
+        'settings.bank_holder_names_tip': '配置你在 Maybank/CIMB/TnG 等银行显示的法定姓名。自己手动从银行转账进电子钱包时，系统将 100% 自动识别为“本人自转”，绝不计入外部新收入，也不会误当成朋友还款。',
 
         # 认证
         'auth.login_title': '登录记账本',
@@ -1299,6 +1302,9 @@ TRANSLATIONS = {
         'settings.save_synced': 'Preferences synced',
         'settings.reset_box_title': 'Factory Defaults',
         'settings.reset_box_desc': 'Reset visual theme, currency symbol, and automation rules to defaults. Your transactions will not be affected.',
+        'settings.bank_holder_names': 'My Bank Account / DuitNow Name',
+        'settings.bank_holder_names_placeholder': 'e.g., LOH SIANG, SIANG LOH (comma separated)',
+        'settings.bank_holder_names_tip': 'Configure your legal name shown on bank/wallet statements (Maybank/CIMB/TnG). When transferring from your bank to your e-wallet, it is 100% recognized as a self-transfer without inflating income.',
 
         # Auth
         'auth.login_title': 'Login to Ledger',
@@ -2278,6 +2284,9 @@ TRANSLATIONS = {
         'settings.save_synced': 'Konfigurasi telah disegerakkan',
         'settings.reset_box_title': 'Tetapan Semula Kilang',
         'settings.reset_box_desc': 'Tetapkan semula tema, simbol mata wang dan tetingkap automasi kepada lalai. Transaksi anda tidak akan dipadamkan.',
+        'settings.bank_holder_names': 'Nama Akaun Bank / DuitNow Saya',
+        'settings.bank_holder_names_placeholder': 'cth., LOH SIANG, SIANG LOH (pisahkan dengan koma)',
+        'settings.bank_holder_names_tip': 'Tetapkan nama sah anda pada penyata bank/e-dompet (Maybank/CIMB/TnG). Apabila anda memindahkan wang dari bank ke e-dompet, sistem mengenal pastinya sebagai pemindahan kendiri tanpa menggandakan pendapatan.',
 
         # Pengesahan
         'auth.login_title': 'Log Masuk Buku Lejar',
@@ -3257,6 +3266,9 @@ TRANSLATIONS = {
         'settings.save_synced': '設定已同步',
         'settings.reset_box_title': '出廠配置恢復',
         'settings.reset_box_desc': '將主題、貨幣符號及自動化滑窗恢復為官方默認值。此操作絕不會影響您的交易數據與賬本明細。',
+        'settings.bank_holder_names': '本人銀行戶名 / DuitNow 姓名',
+        'settings.bank_holder_names_placeholder': '如：LOH SIANG, SIANG LOH (多個用逗號隔開)',
+        'settings.bank_holder_names_tip': '配置你在 Maybank/CIMB/TnG 等銀行顯示的法定姓名。自己手動從銀行轉賬進電子錢包時，系統將 100% 自動識別為「本人自轉」，絕不計入外部新收入，也不會誤當成朋友還款。',
 
         # 認證
         'auth.login_title': '登入記賬本',

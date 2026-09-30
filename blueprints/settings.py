@@ -147,6 +147,10 @@ def api_update_settings():
         except (ValueError, TypeError):
             pass
 
+    # 7.2 本人银行转账户名与 DuitNow 姓名别名
+    if 'bank_holder_names' in data:
+        updates['bank_holder_names'] = str(data.get('bank_holder_names', '')).strip()[:255]
+
     # 8. 表格显示密度
     if 'table_density' in data:
         td = str(data.get('table_density', '')).strip().lower()

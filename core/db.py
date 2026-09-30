@@ -711,6 +711,7 @@ def init_db(app_logger=None):
         timezone TEXT DEFAULT 'Asia/Kuala_Lumpur',
         nlp_confirm_required INTEGER DEFAULT 1,
         language TEXT DEFAULT 'zh',
+        bank_holder_names TEXT DEFAULT '',
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     ''')
@@ -725,6 +726,12 @@ def init_db(app_logger=None):
 
     try:
         db.execute("ALTER TABLE user_settings ADD COLUMN repayment_offset_window_minutes INTEGER DEFAULT 120")
+        db.commit()
+    except Exception:
+        pass
+
+    try:
+        db.execute("ALTER TABLE user_settings ADD COLUMN bank_holder_names TEXT DEFAULT ''")
         db.commit()
     except Exception:
         pass
@@ -751,6 +758,7 @@ DEFAULT_USER_SETTINGS = {
     'timezone': 'Asia/Kuala_Lumpur',
     'nlp_confirm_required': 1,
     'language': 'zh',
+    'bank_holder_names': '',
 }
 
 
@@ -801,8 +809,8 @@ def update_user_settings(user_id, new_settings, db=None):
                 user_id, theme_mode, currency_symbol, default_currency, default_account_id,
                 default_group, budget_start_day, default_dashboard_view,
                 dedup_window_minutes, repayment_offset_window_minutes, table_density, haptic_feedback,
-                date_format, number_format, timezone, nlp_confirm_required, language, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                date_format, number_format, timezone, nlp_confirm_required, language, bank_holder_names, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 theme_mode=excluded.theme_mode,
                 currency_symbol=excluded.currency_symbol,
@@ -820,6 +828,7 @@ def update_user_settings(user_id, new_settings, db=None):
                 timezone=excluded.timezone,
                 nlp_confirm_required=excluded.nlp_confirm_required,
                 language=excluded.language,
+                bank_holder_names=excluded.bank_holder_names,
                 updated_at=excluded.updated_at
         ''', (
             str(user_id),
@@ -839,6 +848,7 @@ def update_user_settings(user_id, new_settings, db=None):
             current['timezone'],
             int(current.get('nlp_confirm_required', 1)),
             current.get('language', 'zh'),
+            current.get('bank_holder_names', ''),
             now_str
         ))
         db.commit()

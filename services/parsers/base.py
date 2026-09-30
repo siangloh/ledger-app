@@ -36,6 +36,7 @@ class ParsedNotification:
             'group_name': self.group_name,
             'category': self.category,
             'amount': self.amount,
+            'merchant': self.merchant,
             'note': self.note or self.merchant,
             'is_refund': self.is_refund,
             'is_friend_repayment': self.is_friend_repayment,

@@ -342,3 +342,37 @@ def test_tng_reward_points_is_rejected():
     assert res is not None
     assert res.is_promo is True
 
+
+def test_tng_friend_cash_in_is_not_blocked(client, admin_user_id):
+    """验证朋友通过 DuitNow 或 Cash In 转入资金绝不被误判为内部充值，而是被正确识别为收款入账"""
+    headers = {"X-API-KEY": "test-auto-track-key", "Content-Type": "application/json"}
+    t_friend = "Touch 'n Go eWallet: Cashed in RM 50.00 from TAN AH KOW via DuitNow Transfer."
+
+    r = client.post("/api/auto-track", json={"text": t_friend, "user_id": admin_user_id}, headers=headers)
+    assert r.status_code in (200, 201)
+    d = r.get_json()
+    assert d["ok"] is True
+    assert d["verdict"] in ("accepted", "offset_success")
+    assert d["parsed"]["amount"] == 50.0
+    assert "TAN AH KOW" in d["parsed"]["merchant"]
+
+
+def test_self_transfer_via_bank_holder_name(client, admin_user_id, flask_app):
+    """验证配置本人银行户名后，自己从银行转入钱包自动识别为本人自转，不虚增收入"""
+    from core.db import update_user_settings, get_db
+
+    with flask_app.app.app_context():
+        db = get_db()
+        update_user_settings(admin_user_id, {"bank_holder_names": "LOH SIANG, SIANG LOH"}, db=db)
+
+    headers = {"X-API-KEY": "test-auto-track-key", "Content-Type": "application/json"}
+    t_self = "Touch 'n Go eWallet: DuitNow Transfer from LOH SIANG: You have received RM 100.00."
+
+    r = client.post("/api/auto-track", json={"text": t_self, "user_id": admin_user_id}, headers=headers)
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True
+    assert d["verdict"] == "ignored_internal_transfer"
+    assert d.get("is_self_transfer") is True
+
+
