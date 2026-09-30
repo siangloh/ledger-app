@@ -79,6 +79,7 @@ TRANSLATIONS = {
         'common.success': '成功',
         'common.failed': '失败',
         'common.loading': '加载中...',
+        'common.saving': '保存中...',
         'common.no_data': '暂无数据',
         'common.currency': '货币',
         'common.back': '返回',
@@ -206,6 +207,7 @@ TRANSLATIONS = {
         'records.batch_delete': '批量删除',
         'records.offset_modal_title': '冲抵支出',
         'records.offset_modal_desc': '将此笔收入冲抵到之前的某笔支出中，自动减少该支出的实际记账金额。',
+        'records.offset_env_unsupported': '当前环境暂不支持弹窗操作',
 
         # 小票分账
         'split_bill.title': '小票拍照与智能 AA 分账 (Split Bill)',
@@ -285,6 +287,7 @@ TRANSLATIONS = {
         'categories.add_cat_placeholder': '新增子分类名称',
         'categories.budget_limit_placeholder': '月度限额 (0为不限)',
         'categories.spent_this_month': '本月已花',
+        'categories.click_edit_limit': '点击修改「{name}」月度限额',
         'categories.btn_add': '添加',
 
         # 设置
@@ -308,6 +311,7 @@ TRANSLATIONS = {
         'settings.tab_automation': '自动化规则',
         'settings.tab_backup': '数据与备份',
         'settings.unsaved_changes': '有未保存改动',
+        'settings.save_synced': '配置已同步',
         'settings.reset_box_title': '出厂配置恢复',
         'settings.reset_box_desc': '将主题、货币符号及自动化滑窗恢复为官方默认值。此操作绝不会影响您的交易数据与账本明细。',
 
@@ -619,6 +623,9 @@ TRANSLATIONS = {
         'settings.number_format_tip': '全局数值千分位间隔规范。',
         'settings.timezone': '时区管理',
         'settings.btn_detect_tz': '🌐 自动探测',
+        'settings.btn_detect_tz_title': '读取当前浏览器时区',
+        'settings.browser_detected': '浏览器侦测',
+        'settings.offset_window_120': '120 min (2 h - 推荐)',
         'settings.timezone_tip': '用于锁定记账日期基准，防止月末或跨国时因时区错位造成跨月数据漂移。',
         'settings.default_account': '快捷录入默认账户',
         'settings.account_manual': '-- 每次手动选择 --',
@@ -1045,6 +1052,7 @@ TRANSLATIONS = {
         'common.success': 'Success',
         'common.failed': 'Failed',
         'common.loading': 'Loading...',
+        'common.saving': 'Saving...',
         'common.no_data': 'No data available',
         'common.currency': 'Currency',
         'common.back': 'Back',
@@ -1172,6 +1180,7 @@ TRANSLATIONS = {
         'records.batch_delete': 'Batch Delete',
         'records.offset_modal_title': 'Offset Expense',
         'records.offset_modal_desc': 'Offset this income against a prior expense to reduce its booked amount.',
+        'records.offset_env_unsupported': 'Modal popups are not supported in the current environment',
 
         # Split Bill
         'split_bill.title': 'Receipt Photo & Smart AA Split Bill',
@@ -1251,6 +1260,7 @@ TRANSLATIONS = {
         'categories.add_cat_placeholder': 'New category name',
         'categories.budget_limit_placeholder': 'Monthly limit (0 for unlimited)',
         'categories.spent_this_month': 'Spent this month',
+        'categories.click_edit_limit': 'Click to edit monthly limit for "{name}"',
         'categories.btn_add': 'Add',
 
         # Settings
@@ -1274,6 +1284,7 @@ TRANSLATIONS = {
         'settings.tab_automation': 'Automation Rules',
         'settings.tab_backup': 'Data & Backup',
         'settings.unsaved_changes': 'Unsaved changes',
+        'settings.save_synced': 'Preferences synced',
         'settings.reset_box_title': 'Factory Defaults',
         'settings.reset_box_desc': 'Reset visual theme, currency symbol, and automation rules to defaults. Your transactions will not be affected.',
 
@@ -1585,6 +1596,9 @@ TRANSLATIONS = {
         'settings.number_format_tip': 'Global thousands separator format.',
         'settings.timezone': 'Timezone Management',
         'settings.btn_detect_tz': '🌐 Auto Detect',
+        'settings.btn_detect_tz_title': 'Detect browser timezone',
+        'settings.browser_detected': 'Browser Detected',
+        'settings.offset_window_120': '120 min (2 h - Recommended)',
         'settings.timezone_tip': 'Locks date calculations to prevent timezone drifts across months or regions.',
         'settings.default_account': 'Quick Entry Default Account',
         'settings.account_manual': '-- Select manually each time --',
@@ -2011,6 +2025,7 @@ TRANSLATIONS = {
         'common.success': 'Berjaya',
         'common.failed': 'Gagal',
         'common.loading': 'Memuatkan...',
+        'common.saving': 'Menyimpan...',
         'common.no_data': 'Tiada data',
         'common.currency': 'Mata Wang',
         'common.back': 'Kembali',
@@ -2138,6 +2153,7 @@ TRANSLATIONS = {
         'records.batch_delete': 'Padam Pukal',
         'records.offset_modal_title': 'Imbang Perbelanjaan',
         'records.offset_modal_desc': 'Imbang pendapatan ini ke perbelanjaan terdahulu untuk mengurangkan amaun rekod tersebut.',
+        'records.offset_env_unsupported': 'Tetingkap timbul tidak disokong dalam persekitaran semasa',
 
         # Bahagi Bil
         'split_bill.title': 'Foto Resit & Bahagi Bil Pintar (AA)',
@@ -2217,6 +2233,7 @@ TRANSLATIONS = {
         'categories.add_cat_placeholder': 'Nama kategori baharu',
         'categories.budget_limit_placeholder': 'Had bulanan (0 untuk tanpa had)',
         'categories.spent_this_month': 'Dibelanjakan bulan ini',
+        'categories.click_edit_limit': 'Klik untuk ubah had bulanan "{name}"',
         'categories.btn_add': 'Tambah',
 
         # Tetapan
@@ -2240,6 +2257,7 @@ TRANSLATIONS = {
         'settings.tab_automation': 'Peraturan Automasi',
         'settings.tab_backup': 'Data & Sandaran',
         'settings.unsaved_changes': 'Perubahan belum disimpan',
+        'settings.save_synced': 'Konfigurasi telah disegerakkan',
         'settings.reset_box_title': 'Tetapan Semula Kilang',
         'settings.reset_box_desc': 'Tetapkan semula tema, simbol mata wang dan tetingkap automasi kepada lalai. Transaksi anda tidak akan dipadamkan.',
 
@@ -2551,6 +2569,9 @@ TRANSLATIONS = {
         'settings.number_format_tip': 'Format pemisah ribu global.',
         'settings.timezone': 'Pengurusan Zon Masa',
         'settings.btn_detect_tz': '🌐 Kesan Automatik',
+        'settings.btn_detect_tz_title': 'Kesan zon masa pelayar',
+        'settings.browser_detected': 'Dikesan Pelayar',
+        'settings.offset_window_120': '120 min (2 h - Disyorkan)',
         'settings.timezone_tip': 'Kunci kiraan tarikh untuk elak anjakan data zon masa.',
         'settings.default_account': 'Akaun Lalai Kemasukan Pantas',
         'settings.account_manual': '-- Pilih manual setiap kali --',
@@ -2977,6 +2998,7 @@ TRANSLATIONS = {
         'common.success': '成功',
         'common.failed': '失敗',
         'common.loading': '載入中...',
+        'common.saving': '儲存中...',
         'common.no_data': '暫無數據',
         'common.currency': '貨幣',
         'common.back': '返回',
@@ -3104,6 +3126,7 @@ TRANSLATIONS = {
         'records.batch_delete': '批量刪除',
         'records.offset_modal_title': '衝抵支出',
         'records.offset_modal_desc': '將此筆收入衝抵到之前的某筆支出中，自動減少該支出的實際記賬金額。',
+        'records.offset_env_unsupported': '當前環境暫不支援彈窗操作',
 
         # 小票分賬
         'split_bill.title': '小票拍照與智能 AA 分賬 (Split Bill)',
@@ -3183,6 +3206,7 @@ TRANSLATIONS = {
         'categories.add_cat_placeholder': '新增子分類名稱',
         'categories.budget_limit_placeholder': '月度限額 (0為不限)',
         'categories.spent_this_month': '本月已花',
+        'categories.click_edit_limit': '點擊修改「{name}」月度限額',
         'categories.btn_add': '添加',
 
         # 設定
@@ -3206,6 +3230,7 @@ TRANSLATIONS = {
         'settings.tab_automation': '自動化規則',
         'settings.tab_backup': '數據與備份',
         'settings.unsaved_changes': '有未儲存改動',
+        'settings.save_synced': '設定已同步',
         'settings.reset_box_title': '出廠配置恢復',
         'settings.reset_box_desc': '將主題、貨幣符號及自動化滑窗恢復為官方默認值。此操作絕不會影響您的交易數據與賬本明細。',
 
@@ -3517,6 +3542,9 @@ TRANSLATIONS = {
         'settings.number_format_tip': '全局數值千分位間隔規範。',
         'settings.timezone': '時區管理',
         'settings.btn_detect_tz': '🌐 自動探測',
+        'settings.btn_detect_tz_title': '讀取當前瀏覽器時區',
+        'settings.browser_detected': '瀏覽器偵測',
+        'settings.offset_window_120': '120 min (2 h - 推薦)',
         'settings.timezone_tip': '用於鎖定記賬日期基準，防止月末或跨國時因時區錯位造成跨月數據漂移。',
         'settings.default_account': '快捷錄入預設賬戶',
         'settings.account_manual': '-- 每次手動選擇 --',
@@ -3934,13 +3962,13 @@ def get_current_locale():
             cand = request.args.get('lang')
             locale = normalize_locale(cand)
 
-        # 2. Session 会话
-        if not locale and session and session.get('lang'):
-            locale = normalize_locale(session.get('lang'))
-
-        # 3. 登录用户的个人设置缓存 (由 context processor 或 before_request 挂载)
+        # 2. 登录用户的个人偏好设置缓存 (自定义语言，最高优先级持久化设置)
         if not locale and hasattr(g, 'user_preferred_lang') and g.user_preferred_lang:
             locale = normalize_locale(g.user_preferred_lang)
+
+        # 3. Session 会话
+        if not locale and session and session.get('lang'):
+            locale = normalize_locale(session.get('lang'))
 
         # 4. Cookie
         if not locale and request and request.cookies and request.cookies.get('lang'):
@@ -3971,6 +3999,7 @@ def set_current_locale(lang_code):
     try:
         session['lang'] = locale
         g.current_lang = locale
+        g.user_preferred_lang = locale
     except Exception:
         pass
     return locale

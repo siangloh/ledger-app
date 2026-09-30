@@ -4,9 +4,14 @@ from datetime import datetime
 from flask import Blueprint, request, redirect, url_for, render_template, flash, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from core.db import get_db, init_user_default_categories
+import logging
+
+from core.db import get_db, init_user_default_categories, get_user_settings
 from core.config import get_app_password
 from core.extensions import csrf
+from core.i18n import set_current_locale
+
+logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -121,6 +126,12 @@ def login():
             session['logged_in'] = True
             session['user_id'] = user['id']
             session['username'] = user['username']
+            try:
+                user_settings = get_user_settings(user['id'], db=db)
+                if user_settings and user_settings.get('language'):
+                    set_current_locale(user_settings['language'])
+            except Exception as e:
+                logger.debug("Failed to set user locale on login: %s", e)
             flash(f'欢迎回来，{user["username"]}！', 'success')
             return redirect(next_url)
         elif username == 'admin' and password == get_app_password(db):
@@ -137,6 +148,12 @@ def login():
             session['logged_in'] = True
             session['user_id'] = admin_id
             session['username'] = 'admin'
+            try:
+                user_settings = get_user_settings(admin_id, db=db)
+                if user_settings and user_settings.get('language'):
+                    set_current_locale(user_settings['language'])
+            except Exception as e:
+                logger.debug("Failed to set admin locale on login: %s", e)
             flash('登录成功！', 'success')
             return redirect(next_url)
         else:

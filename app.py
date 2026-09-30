@@ -333,6 +333,19 @@ def require_login():
         target_next = request.full_path if request.full_path and request.full_path != '/?' else '/'
         return redirect(url_for('login', next=target_next))
 
+    # 已登录用户：优先加载并同步用户在系统设置中自定义的偏好语言
+    uid = session.get('user_id')
+    if not hasattr(g, 'user_preferred_lang') or not g.user_preferred_lang:
+        try:
+            user_st = get_user_settings(uid)
+            u_lang = user_st.get('language')
+            if u_lang:
+                g.user_preferred_lang = u_lang
+                if session.get('lang') != u_lang:
+                    session['lang'] = u_lang
+        except Exception as e:
+            logger.debug("Failed to sync user language in before_request: %s", e)
+
 
 def url_build_error_handler(error, endpoint, values):
     """自动兼容未加蓝图前缀的裸 endpoint（例如 'login' -> 'auth.login'）"""

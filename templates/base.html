@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" {% if current_user_theme in ('dark', 'light') %}data-theme="{{ current_user_theme }}"{% endif %} {% if current_table_density == 'compact' %}data-density="compact"{% endif %}>
+<html lang="{{ current_lang|default('zh') }}" {% if current_user_theme in ('dark', 'light') %}data-theme="{{ current_user_theme }}"{% endif %} {% if current_table_density == 'compact' %}data-density="compact"{% endif %}>
 
 <head>
     <meta charset="UTF-8">

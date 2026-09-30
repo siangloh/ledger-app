@@ -212,3 +212,55 @@ def test_custom_currency_renders_on_liabilities_and_subscriptions_and_accounts(l
     assert 'SGD' in html_acc
 
 
+def test_settings_no_duplicate_icons(logged_in_client):
+    """验证设置页面中的单选胶囊与按钮不存在重复 Emoji/Logo"""
+    res = logged_in_client.get('/settings')
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+
+    # 严禁出现双重重复图标
+    forbidden_duplicates = [
+        '🖥️ 🖥️', '🌙 🌙', '☀️ ☀️', '🛋️ 🛋️', '📑 📑',
+        '💾 💾', '🔄 🔄', '📥 📥', '📊 📊', '💼 💼',
+        '🌱 🌱', '📅 📅'
+    ]
+    for dup in forbidden_duplicates:
+        assert dup not in html, f"Found duplicate emoji '{dup}' in settings page HTML"
+
+
+def test_settings_language_customization_and_sync(logged_in_client, flask_app, admin_user_id):
+    """验证用户自定义语言后，界面即时生效且配置同步提示跟随语言"""
+    # 切换为英文
+    res = logged_in_client.post('/api/set-language?lang=en')
+    assert res.status_code == 302 or res.status_code == 200
+
+    # 检查数据库已更新
+    with flask_app.app.app_context():
+        st = get_user_settings(admin_user_id)
+        assert st['language'] == 'en'
+
+    # 访问设置页面
+    res_page = logged_in_client.get('/settings')
+    assert res_page.status_code == 200
+    html = res_page.get_data(as_text=True)
+
+    # 状态条应显示英文 "Preferences synced"，而非硬编码中文 "配置已同步"
+    assert 'Preferences synced' in html
+    assert '配置已同步' not in html
+
+    # html 标签 lang 属性应为 en
+    assert 'lang="en"' in html
+
+    # 按钮为单图标且英文
+    assert 'Save Preferences' in html
+    assert '💾 💾' not in html
+
+    # 恢复中文环境测试
+    logged_in_client.post('/api/set-language?lang=zh')
+    res_zh = logged_in_client.get('/settings')
+    html_zh = res_zh.get_data(as_text=True)
+    assert '配置已同步' in html_zh
+    assert 'lang="zh"' in html_zh
+
+
+
