@@ -161,36 +161,81 @@ def records():
     end = request.args.get('end', '')
     type_ = request.args.get('type', '')
     category = request.args.get('category', '')
+    page = request.args.get('page', 1, type=int)
+    if page < 1:
+        page = 1
+    page_size = request.args.get('page_size', 25, type=int)
+    if page_size < 1 or page_size > 100:
+        page_size = 25
 
-    query = 'SELECT * FROM transactions WHERE user_id = ?'
+    where_clauses = ['user_id = ?']
     params = [user_id]
     if start:
-        query += ' AND date >= ?'
+        where_clauses.append('date >= ?')
         params.append(start)
     if end:
-        query += ' AND date <= ?'
+        where_clauses.append('date <= ?')
         params.append(end)
     if type_:
-        query += ' AND type = ?'
+        where_clauses.append('type = ?')
         params.append(type_)
     if category:
-        query += ' AND category = ?'
+        where_clauses.append('category = ?')
         params.append(category)
-    query += ' ORDER BY date DESC, id DESC'
 
-    rows = db.execute(query, params).fetchall()
+    where_sql = ' AND '.join(where_clauses)
+
+    # 1. 单次快速聚合汇总统计总览金额与匹配总笔数（无需加载全量记录到内存）
+    agg_sql = f'''
+        SELECT
+            COUNT(*) as total_count,
+            COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0.0) as total_income,
+            COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0.0) as total_expense,
+            COALESCE(SUM(CASE WHEN type = 'savings' THEN amount ELSE 0 END), 0.0) as total_savings
+        FROM transactions
+        WHERE {where_sql}
+    '''
+    agg_row = db.execute(agg_sql, params).fetchone()
+    total_count = agg_row['total_count'] if agg_row else 0
+    total_income = agg_row['total_income'] if agg_row else 0.0
+    total_expense = agg_row['total_expense'] if agg_row else 0.0
+    total_savings = agg_row['total_savings'] if agg_row else 0.0
+
+    # 2. 分页懒加载：仅拉取当前页记录，滑动到底部时流式增量读取
+    offset = (page - 1) * page_size
+    query = f'SELECT * FROM transactions WHERE {where_sql} ORDER BY date DESC, id DESC LIMIT ? OFFSET ?'
+    rows = db.execute(query, params + [page_size, offset]).fetchall()
+
+    has_more = (offset + len(rows)) < total_count
+    next_page = page + 1 if has_more else None
+
     all_categories = db.execute(
         'SELECT DISTINCT category FROM transactions WHERE user_id = ? AND category IS NOT NULL ORDER BY category',
         (user_id,)
     ).fetchall()
-
-    total_income = sum(r['amount'] for r in rows if r['type'] == 'income')
-    total_expense = sum(r['amount'] for r in rows if r['type'] == 'expense')
-    total_savings = sum(r['amount'] for r in rows if r['type'] == 'savings')
+    categories = [c['category'] for c in all_categories]
 
     latest_evt = get_latest_event(user_id=user_id, db=db)
     latest_id = latest_evt['data'].get('id') if latest_evt and latest_evt.get('data') else None
 
+    # HTMX 触底流式加载更多行（仅返回追加的 <tr> 列表和下一个触底哨兵）
+    if request.args.get('partial_rows') == '1':
+        return render_template(
+            'partials/records_rows.html',
+            rows=rows,
+            has_more=has_more,
+            page=page,
+            next_page=next_page,
+            total_count=total_count,
+            latest_id=latest_id,
+            start=start,
+            end=end,
+            type=type_,
+            type_=type_,
+            category=category
+        )
+
+    # 局部更新（如筛选表单提交、实时 WebSocket/轮询同步）
     if request.args.get('partial') == '1':
         return render_template(
             'partials/records_content.html',
@@ -198,14 +243,27 @@ def records():
             total_income=total_income,
             total_expense=total_expense,
             total_savings=total_savings,
-            latest_id=latest_id
+            total_count=total_count,
+            has_more=has_more,
+            page=page,
+            next_page=next_page,
+            latest_id=latest_id,
+            start=start,
+            end=end,
+            type=type_,
+            type_=type_,
+            category=category
         )
 
     return render_template(
         'records.html',
-        rows=rows, start=start, end=end, type=type_, category=category,
-        categories=[c['category'] for c in all_categories],
+        rows=rows, start=start, end=end, type=type_, type_=type_, category=category,
+        categories=categories,
         total_income=total_income, total_expense=total_expense, total_savings=total_savings,
+        total_count=total_count,
+        has_more=has_more,
+        page=page,
+        next_page=next_page,
         latest_id=latest_id
     )
 

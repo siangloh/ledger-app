@@ -1,0 +1,59 @@
+{% for r in rows %}
+<tr class="record-row {{ 'row-highlight-new' if latest_id and r.id == latest_id }}" id="row-{{ r.id }}">
+  <td data-col="checkbox" style="text-align: center;">
+    <input type="checkbox" name="ids" value="{{ r.id }}" class="record-checkbox" onchange="updateBatchBar()">
+  </td>
+  <td data-col="date">{{ r.date|user_date }}</td>
+  <td data-col="type">
+    <span class="tag {{ 'tag-income' if r.type=='income' else ('tag-savings' if r.type=='savings' else 'tag-expense') }}">{{ t('common.income') if r.type=='income' else (t('common.savings') if r.type=='savings' else t('common.expense')) }}</span>
+    {% if r.from_savings %}<span class="tag tag-savings" style="margin-left: 4px; font-size: 10px; padding: 2px 6px;" title="{{ t('records.tag_from_savings', cat=(r.from_savings_category|t_cat) or t('common.savings')) }}">{{ t('records.tag_from_savings', cat=(r.from_savings_category|t_cat) or t('common.savings')) }}</span>{% endif %}
+  </td>
+  <td data-col="group">{{ {'main': t('records.tag_main'), 'side': t('records.tag_side')}.get(r.group_name, '') }}</td>
+  <td data-col="category" title="{{ r.category|t_cat }}"><strong>{{ r.category|t_cat }}</strong></td>
+  <td data-col="amount" class="amount-cell {{ 'income' if r.type=='income' else ('savings' if r.type=='savings' else 'expense') }}">{{ r.amount|money }}</td>
+  <td data-col="note" class="{{ 'has-note' if (r.note or r.tags) else 'no-note' }}">
+    {{ r.note }}
+    {% if r.tags %}
+      <div class="record-tags-box" style="margin-top: 3px; display: flex; gap: 4px; flex-wrap: wrap;">
+        {% for t_tag in r.tags.split(',') %}
+          {% if t_tag.strip() %}
+            <span class="tag tag-pill-sm" style="font-size: 10px; padding: 1px 6px; background: var(--surface-soft); color: var(--muted); border-radius: 10px; border: 1px solid var(--border);">#{{ t_tag.strip() }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
+  </td>
+  <td data-col="source"><span class="tag">{{ {'manual': t('records.src_manual'), 'nlp': t('records.src_nlp'), 'import': t('records.src_import'), 'recurring': t('records.src_recurring'), 'auto_track': t('records.src_auto_track'), 'split_bill': t('records.src_split_bill')}.get(r.source, r.source) }}</span></td>
+  <td data-col="actions" class="actions">
+    <div class="actions-inner">
+      {% if r.type == 'income' %}
+      <button type="button" class="btn-link" style="color: var(--primary); font-weight: 600;" onclick="openOffsetModal({{ r.id }}, {{ r.amount }}, '{{ r.note|e }}')" title="{{ t('records.btn_offset_title') }}">{{ t('records.btn_offset') }}</button>
+      {% endif %}
+      <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link" hx-get="{{ url_for('edit_record', tx_id=r.id) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">{{ t('common.edit') }}</a>
+      <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ t('common.income') if r.type=='income' else (t('common.savings') if r.type=='savings' else t('common.expense')) }} · {{ r.category|t_cat }} · {{ r.amount|money }}', this)">{{ t('common.delete') }}</button>
+    </div>
+  </td>
+</tr>
+{% endfor %}
+
+{% if has_more %}
+<tr id="recordsLoadMoreSentinel"
+    hx-get="{{ url_for('records', page=next_page, partial_rows=1, start=start or None, end=end or None, type=(type or type_) or None, category=category or None) }}"
+    hx-trigger="revealed, click"
+    hx-swap="outerHTML"
+    class="records-sentinel-row"
+    style="cursor: pointer;">
+  <td colspan="9" style="text-align: center; padding: 18px 12px; color: var(--muted); font-size: 13px;">
+    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+      <span class="sentinel-spinner"></span>
+      <span>{{ t('records.loading_more', '正在加载更多明细...') }}</span>
+    </div>
+  </td>
+</tr>
+{% elif total_count and total_count > 0 %}
+<tr class="records-end-row">
+  <td colspan="9" style="text-align: center; padding: 18px 12px; color: var(--muted); font-size: 12px; opacity: 0.85;">
+    — {{ t('records.all_loaded', '已加载全部记录') }} ({{ total_count }}) —
+  </td>
+</tr>
+{% endif %}

@@ -1532,6 +1532,34 @@ table.records-table td[data-col="actions"] .btn-danger-ghost {
   }
 }
 
+/* 交易明细触底无限滚动加载与哨兵样式 */
+.records-sentinel-row td {
+  background: var(--surface-soft);
+  border-top: 1px dashed var(--border);
+  transition: background 0.2s ease;
+}
+.records-sentinel-row:hover td {
+  background: rgba(182, 144, 47, 0.08);
+}
+.sentinel-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: sentinel-spin 0.75s linear infinite;
+  vertical-align: middle;
+}
+@keyframes sentinel-spin {
+  to { transform: rotate(360deg); }
+}
+.records-end-row td {
+  background: transparent;
+  border-top: 1px dashed var(--border-soft);
+  letter-spacing: 0.5px;
+}
+
 /* ---------- 分类管理 ---------- */
 
 .cat-list {

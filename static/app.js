@@ -2382,6 +2382,15 @@ function refreshRecordsPartials(event) {
     .then(res => res.text())
     .then(html => {
       container.innerHTML = html;
+      if (typeof htmx !== 'undefined') {
+        htmx.process(container);
+      }
+      if (typeof setupRecordsObserver === 'function') {
+        setupRecordsObserver();
+      }
+      if (typeof updateBatchBar === 'function') {
+        updateBatchBar();
+      }
 
       // 如果有新添加的交易 ID，添加脉冲动画
       if (event && event.data && event.data.id) {

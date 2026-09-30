@@ -495,6 +495,53 @@ function confirmSingleDelete(actionUrl, detailText, btnEl) {
       form.submit();
     }
   }
+// 触底无限滚动懒加载：预探测与平滑加载控制
+let recordsObserver = null;
+let isRecordsLoadingMore = false;
+
+function setupRecordsObserver() {
+  if (recordsObserver) {
+    recordsObserver.disconnect();
+    recordsObserver = null;
+  }
+  const sentinel = document.getElementById('recordsLoadMoreSentinel');
+  if (!sentinel) return;
+
+  if ('IntersectionObserver' in window) {
+    recordsObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && !isRecordsLoadingMore) {
+          isRecordsLoadingMore = true;
+          recordsObserver.disconnect();
+          recordsObserver = null;
+          if (typeof htmx !== 'undefined') {
+            htmx.trigger(sentinel, 'revealed');
+          } else {
+            sentinel.click();
+          }
+        }
+      });
+    }, { rootMargin: '250px 0px' });
+    recordsObserver.observe(sentinel);
+  }
+}
+
+// 监听 HTMX 替换和结算事件，恢复状态并初始化下一页哨兵监听
+document.addEventListener('htmx:afterSwap', function(evt) {
+  isRecordsLoadingMore = false;
+  setupRecordsObserver();
+  updateBatchBar();
+});
+
+document.addEventListener('htmx:afterRequest', function(evt) {
+  isRecordsLoadingMore = false;
+});
+
+// 初始化哨兵监听（首次加载及单页应用视图切换）
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupRecordsObserver);
+} else {
+  setupRecordsObserver();
 }
 
 // 全局事件代理：点击表格行任意位置快速选中/取消选中（批量删除或无感刷新后依然 100% 有效）
