@@ -495,6 +495,8 @@ function confirmSingleDelete(actionUrl, detailText, btnEl) {
       form.submit();
     }
   }
+}
+
 // 触底无限滚动懒加载：预探测与平滑加载控制
 let recordsObserver = null;
 let isRecordsLoadingMore = false;
@@ -512,6 +514,7 @@ function setupRecordsObserver() {
       entries.forEach(entry => {
         if (entry.isIntersecting && !isRecordsLoadingMore) {
           isRecordsLoadingMore = true;
+          setTimeout(() => { isRecordsLoadingMore = false; }, 8000);
           recordsObserver.disconnect();
           recordsObserver = null;
           if (typeof htmx !== 'undefined') {

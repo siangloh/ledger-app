@@ -3007,10 +3007,15 @@ const InstantNav = {
       }
     }, 120);
 
+    const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 5000) : null;
+
     fetch(url, {
       headers: { 'HX-Request': 'true' },
-      credentials: 'same-origin'
+      credentials: 'same-origin',
+      signal: controller ? controller.signal : undefined
     }).then(res => {
+      if (timeoutId) clearTimeout(timeoutId);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       return res.text();
     }).then(html => {
@@ -3025,16 +3030,14 @@ const InstantNav = {
       });
       this.renderContent(url, html);
     }).catch(err => {
+      if (timeoutId) clearTimeout(timeoutId);
       if (this.skeletonTimer) {
         clearTimeout(this.skeletonTimer);
         this.skeletonTimer = null;
       }
-      if (typeof htmx !== 'undefined') {
-        htmx.ajax('GET', url, { target: '#mainContainer', swap: 'innerHTML show:window:top' });
-        history.pushState({}, '', url);
-      } else {
-        window.location.href = url;
-      }
+      finishProgressBar();
+      // 遇异常或超时，直接原生跳转，绝不卡在骨架屏中
+      window.location.href = url;
     });
   }
 };

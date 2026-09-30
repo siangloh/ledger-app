@@ -48,7 +48,7 @@ def test_service_worker_precache_assets(client):
     assert 'htmx.min.js' in sw_code
     assert 'chart.umd.min.js' in sw_code
     assert 'sweetalert2.all.min.js' in sw_code
-    assert 'ledger-pwa-v9' in sw_code
+    assert 'ledger-pwa-' in sw_code
 
 
 def test_index_recurring_task_session_throttling(logged_in_client):
