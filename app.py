@@ -8,6 +8,11 @@ from calendar import monthrange
 from datetime import date, timedelta
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_wtf.csrf import CSRFError
+try:
+    from flask_compress import Compress as _FlaskCompress
+    _has_compress = True
+except ImportError:
+    _has_compress = False
 from flask import (
     Flask,
     g,
@@ -164,13 +169,26 @@ if not _secret_key:
 app.secret_key = _secret_key
 
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
-app.config['TEMPLATES_AUTO_RELOAD'] = True
+# Only reload templates in explicit dev mode; filesystem stat on every request is expensive
+_dev_mode = os.environ.get('FLASK_ENV') == 'development' or os.environ.get('FLASK_DEBUG', '0') == '1'
+app.config['TEMPLATES_AUTO_RELOAD'] = _dev_mode
 
 # 反向代理适配
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # 初始化 CSRF 保护
 csrf.init_app(app)
+
+# 启用 Gzip 压缩（降低传输体积约 70%，对 JS/CSS/HTML/JSON 均有效）
+if _has_compress:
+    _compress = _FlaskCompress()
+    app.config['COMPRESS_MIMETYPES'] = [
+        'text/html', 'text/css', 'application/javascript',
+        'application/json', 'text/javascript', 'image/svg+xml'
+    ]
+    app.config['COMPRESS_LEVEL'] = 6
+    app.config['COMPRESS_MIN_SIZE'] = 512
+    _compress.init_app(app)
 
 # 注册全局翻译函数
 app.jinja_env.globals['t'] = t
@@ -412,6 +430,20 @@ def jinja_t_cat_filter(name, default=None, lang=None):
 @app.route('/health')
 def health():
     return jsonify({'ok': True, 'status': 'online'})
+
+
+@app.route('/api/i18n.js')
+def i18n_script():
+    """Serve I18N translations as a cacheable versioned script (extracted from inline HTML to save ~36KB/page)."""
+    import json as _json
+    lang = g.current_lang if hasattr(g, 'current_lang') else get_current_locale()
+    translations = get_client_translations(lang)
+    js_body = f"window.I18N={_json.dumps(translations, ensure_ascii=False, separators=(',',':'))};"
+    resp = make_response(js_body, 200)
+    resp.headers['Content-Type'] = 'application/javascript; charset=utf-8'
+    resp.headers['Cache-Control'] = 'public, max-age=86400'
+    resp.headers['Vary'] = 'Cookie'
+    return resp
 
 
 @app.route('/manifest.json')

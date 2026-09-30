@@ -4,6 +4,7 @@ openpyxl==3.1.2
 gunicorn==22.0.0
 libsql-client>=0.3.0
 Flask-WTF>=1.2.0
+Flask-Compress>=1.14
 rapidocr_onnxruntime>=1.4.0
 opencv-python-headless>=4.8.0
 numpy>=1.24.0

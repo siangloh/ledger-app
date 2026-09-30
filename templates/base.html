@@ -38,7 +38,8 @@
                 window.LEDGER_DATE_FORMAT = '{{ current_date_format|default("YYYY-MM-DD") }}';
                 window.LEDGER_NLP_CONFIRM_REQUIRED = {{ current_nlp_confirm_required|default(1) }};
                 window.LEDGER_BUDGET_START_DAY = {{ current_budget_start_day|default(1) }};
-                window.I18N = {{ i18n_client_json | tojson }};
+                // I18N is loaded via external cached script (/api/i18n.js) to save ~36KB per page
+                window.I18N = window.I18N || {};
                 window.t = function(key, defaultVal, params) {
                     var str = (window.I18N && window.I18N[key] !== undefined) ? window.I18N[key] : (defaultVal !== undefined ? defaultVal : key);
                     if (params && typeof str === 'string') {
@@ -57,6 +58,7 @@
             } catch (e) { }
         })();
     </script>
+    <script src="/api/i18n.js?lang={{ current_lang|default('zh') }}" defer></script>
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
     <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
@@ -393,10 +395,10 @@
         </script>
         {% block content %}{% endblock %}
     </main>
-    <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v=20260930_v9"></script>
+    <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='vendor/sweetalert2.all.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=20260930_v10" defer></script>
     <script>
         // Nav dropdown: hover (CSS) + click to pin open/close
         (function () {
