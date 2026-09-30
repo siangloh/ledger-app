@@ -3,12 +3,14 @@
 
 {% block content %}
 <div class="settings-container">
+  <!-- 头部信息栏 -->
   <div class="settings-header">
     <div class="settings-header-left">
-      <h2 style="margin: 0; display: flex; align-items: center; gap: 10px;">
-        <span>⚙️</span> {{ t('settings.title', '个性化与偏好设置') }}
+      <h2 class="settings-title-main">
+        <span class="settings-title-icon">⚙️</span>
+        <span>{{ t('settings.title', '个性化与偏好设置') }}</span>
       </h2>
-      <p class="hint" style="margin: 6px 0 0 0;">
+      <p class="settings-subtitle">
         {{ t('settings.desc', '定制专属于你的视觉主题、默认记账偏好、自动化入账规则与数据备份。') }}
       </p>
     </div>
@@ -19,372 +21,632 @@
     </div>
   </div>
 
+  <!-- 分类标签页导航 (Tabbed Navigation) -->
+  <div class="settings-tab-nav" role="tablist" aria-label="Settings Categories">
+    <button type="button" class="settings-tab-btn active" id="tabBtn-visual" role="tab" aria-selected="true" aria-controls="tabPane-visual" onclick="switchSettingsTab('visual')">
+      <span class="tab-btn-icon">🎨</span>
+      <span class="tab-btn-text">{{ t('settings.tab_visual', '外观与语言') }}</span>
+    </button>
+    <button type="button" class="settings-tab-btn" id="tabBtn-preferences" role="tab" aria-selected="false" aria-controls="tabPane-preferences" onclick="switchSettingsTab('preferences')">
+      <span class="tab-btn-icon">💰</span>
+      <span class="tab-btn-text">{{ t('settings.tab_preferences', '记账与偏好') }}</span>
+    </button>
+    <button type="button" class="settings-tab-btn" id="tabBtn-automation" role="tab" aria-selected="false" aria-controls="tabPane-automation" onclick="switchSettingsTab('automation')">
+      <span class="tab-btn-icon">⚡</span>
+      <span class="tab-btn-text">{{ t('settings.tab_automation', '自动化规则') }}</span>
+    </button>
+    <button type="button" class="settings-tab-btn" id="tabBtn-backup" role="tab" aria-selected="false" aria-controls="tabPane-backup" onclick="switchSettingsTab('backup')">
+      <span class="tab-btn-icon">🛡️</span>
+      <span class="tab-btn-text">{{ t('settings.tab_backup', '数据与备份') }}</span>
+    </button>
+  </div>
+
   <form id="settingsForm" method="post" action="{{ url_for('settings.api_update_settings') }}" onsubmit="handleSettingsSave(event)">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-    <!-- 1. 视觉外观与布局 -->
-    <section class="panel settings-panel">
-      <div class="settings-panel-title">
-        <span class="settings-icon">🎨</span>
-        <div>
-          <h3>{{ t('settings.sec_visual', '视觉外观与排版') }}</h3>
-          <span class="settings-desc">{{ t('settings.sec_visual_desc', '自定义日间/夜间模式及数据表格显示紧凑度') }}</span>
-        </div>
-      </div>
-
-      <div class="settings-grid">
-        <div class="settings-item">
-          <label class="settings-label">{{ t('settings.theme_mode', '主题模式') }}</label>
-          <div class="settings-pill-group">
-            <label class="pill-radio">
-              <input type="radio" name="theme_mode" value="system" {{ 'checked' if settings.theme_mode == 'system' }} onchange="previewTheme('system')">
-              <span>{{ t('settings.theme_system', '🖥️ 跟随系统') }}</span>
-            </label>
-            <label class="pill-radio">
-              <input type="radio" name="theme_mode" value="dark" {{ 'checked' if settings.theme_mode == 'dark' }} onchange="previewTheme('dark')">
-              <span>{{ t('settings.theme_dark', '🌙 暗黑沉浸') }}</span>
-            </label>
-            <label class="pill-radio">
-              <input type="radio" name="theme_mode" value="light" {{ 'checked' if settings.theme_mode == 'light' }} onchange="previewTheme('light')">
-              <span>{{ t('settings.theme_light', '☀️ 明亮浅色') }}</span>
-            </label>
-          </div>
-          <span class="settings-tip">{{ t('settings.theme_tip', '默认随系统时间自动变换，亦可锁定暗色模式以获得舒适夜间护眼体验。') }}</span>
-        </div>
-
-        <div class="settings-item">
-          <label class="settings-label">{{ t('settings.table_density', '明细表格密度') }}</label>
-          <div class="settings-pill-group">
-            <label class="pill-radio">
-              <input type="radio" name="table_density" value="comfortable" {{ 'checked' if settings.table_density == 'comfortable' }} onchange="previewDensity('comfortable')">
-              <span>{{ t('settings.density_comfortable', '🛋️ 舒适模式 (推荐)') }}</span>
-            </label>
-            <label class="pill-radio">
-              <input type="radio" name="table_density" value="compact" {{ 'checked' if settings.table_density == 'compact' }} onchange="previewDensity('compact')">
-              <span>{{ t('settings.density_compact', '📑 紧凑高效模式') }}</span>
-            </label>
+    <!-- ======================================================== -->
+    <!-- Tab 1: 外观与语言 (Appearance & Language) -->
+    <!-- ======================================================== -->
+    <div class="settings-tab-pane active" id="tabPane-visual" role="tabpanel" aria-labelledby="tabBtn-visual">
+      <section class="panel settings-panel">
+        <div class="settings-panel-title">
+          <span class="settings-icon">🎨</span>
+          <div>
+            <h3>{{ t('settings.sec_visual', '视觉外观与排版') }}</h3>
+            <span class="settings-desc">{{ t('settings.sec_visual_desc', '自定义日间/夜间模式及数据表格显示紧凑度') }}</span>
           </div>
         </div>
 
-        <div class="settings-item">
-          <label class="settings-label">{{ t('settings.language_setting') }}</label>
-          <div class="settings-pill-group">
-            <label class="pill-radio">
-              <input type="radio" name="language" value="zh" {{ 'checked' if (settings.language or 'zh') == 'zh' }}>
-              <span><span class="lang-tag">ZH</span> 简体中文</span>
-            </label>
-            <label class="pill-radio">
-              <input type="radio" name="language" value="en" {{ 'checked' if settings.language == 'en' }}>
-              <span><span class="lang-tag">EN</span> English</span>
-            </label>
-            <label class="pill-radio">
-              <input type="radio" name="language" value="ms" {{ 'checked' if settings.language == 'ms' }}>
-              <span><span class="lang-tag">MS</span> Bahasa Melayu</span>
-            </label>
-            <label class="pill-radio">
-              <input type="radio" name="language" value="zh_TW" {{ 'checked' if settings.language == 'zh_TW' }}>
-              <span><span class="lang-tag">TW</span> 繁體中文</span>
-            </label>
+        <div class="settings-grid">
+          <!-- 主题模式 -->
+          <div class="settings-item">
+            <label class="settings-label">{{ t('settings.theme_mode', '主题模式') }}</label>
+            <div class="segmented-control">
+              <label class="segmented-pill">
+                <input type="radio" name="theme_mode" value="system" {{ 'checked' if settings.theme_mode == 'system' }} onchange="previewTheme('system')">
+                <span class="segmented-pill-inner">
+                  <span class="pill-icon">🖥️</span>
+                  <span>{{ t('settings.theme_system', '跟随系统') }}</span>
+                </span>
+              </label>
+              <label class="segmented-pill">
+                <input type="radio" name="theme_mode" value="dark" {{ 'checked' if settings.theme_mode == 'dark' }} onchange="previewTheme('dark')">
+                <span class="segmented-pill-inner">
+                  <span class="pill-icon">🌙</span>
+                  <span>{{ t('settings.theme_dark', '暗黑沉浸') }}</span>
+                </span>
+              </label>
+              <label class="segmented-pill">
+                <input type="radio" name="theme_mode" value="light" {{ 'checked' if settings.theme_mode == 'light' }} onchange="previewTheme('light')">
+                <span class="segmented-pill-inner">
+                  <span class="pill-icon">☀️</span>
+                  <span>{{ t('settings.theme_light', '明亮浅色') }}</span>
+                </span>
+              </label>
+            </div>
+            <span class="settings-tip">{{ t('settings.theme_tip', '默认随系统时间自动变换，亦可锁定暗色模式以获得舒适夜间护眼体验。') }}</span>
           </div>
-          <span class="settings-tip">{{ t('settings.language_tip') }}</span>
-        </div>
-      </div>
-    </section>
 
-    <!-- 2. 记账习惯与默认偏好 -->
-    <section class="panel settings-panel">
-      <div class="settings-panel-title">
-        <span class="settings-icon">💰</span>
-        <div>
-          <h3>{{ t('settings.sec_preferences', '记账偏好与周期规范') }}</h3>
-          <span class="settings-desc">{{ t('settings.sec_preferences_desc', '减少重复手动选择，契合你的日常薪资发放与结算周期') }}</span>
-        </div>
-      </div>
+          <!-- 表格密度 -->
+          <div class="settings-item">
+            <label class="settings-label">{{ t('settings.table_density', '明细表格密度') }}</label>
+            <div class="segmented-control">
+              <label class="segmented-pill">
+                <input type="radio" name="table_density" value="comfortable" {{ 'checked' if settings.table_density == 'comfortable' }} onchange="previewDensity('comfortable')">
+                <span class="segmented-pill-inner">
+                  <span class="pill-icon">🛋️</span>
+                  <span>{{ t('settings.density_comfortable', '舒适模式 (推荐)') }}</span>
+                </span>
+              </label>
+              <label class="segmented-pill">
+                <input type="radio" name="table_density" value="compact" {{ 'checked' if settings.table_density == 'compact' }} onchange="previewDensity('compact')">
+                <span class="segmented-pill-inner">
+                  <span class="pill-icon">📑</span>
+                  <span>{{ t('settings.density_compact', '紧凑高效模式') }}</span>
+                </span>
+              </label>
+            </div>
+          </div>
 
-      <div class="settings-grid">
-        <div class="settings-item">
-          <label class="settings-label" for="defaultCurrencySelect">{{ t('settings.default_currency', '默认结算货币与符号') }}</label>
-          <div class="settings-currency-wrapper">
-            <div class="settings-currency-main">
-              <select id="defaultCurrencySelect" name="default_currency" class="settings-currency-select" onchange="onCurrencySelectChange(this)">
-                {% for code, label in [
-                  ('MYR', 'MYR - RM (Ringgit Malaysia)'),
-                  ('SGD', 'SGD - S$ (Singapore Dollar)'),
-                  ('USD', 'USD - $ (US Dollar)'),
-                  ('CNY', 'CNY - ¥ (Chinese Yuan / 人民币)'),
-                  ('EUR', 'EUR - € (Euro)'),
-                  ('GBP', 'GBP - £ (British Pound)'),
-                  ('JPY', 'JPY - ¥ (Japanese Yen)'),
-                  ('HKD', 'HKD - HK$ (Hong Kong Dollar)'),
-                  ('AUD', 'AUD - A$ (Australian Dollar)'),
-                  ('CAD', 'CAD - C$ (Canadian Dollar)'),
-                  ('THB', 'THB - ฿ (Thai Baht)'),
-                  ('KRW', 'KRW - ₩ (Korean Won)'),
-                  ('TWD', 'TWD - NT$ (New Taiwan Dollar)')
+          <!-- 系统语言 -->
+          <div class="settings-item">
+            <label class="settings-label">{{ t('settings.language_setting', '系统语言 (Language)') }}</label>
+            <div class="segmented-control segmented-languages">
+              <label class="segmented-pill">
+                <input type="radio" name="language" value="zh" {{ 'checked' if (settings.language or 'zh') == 'zh' }}>
+                <span class="segmented-pill-inner">
+                  <span class="lang-tag">ZH</span>
+                  <span>简体中文</span>
+                </span>
+              </label>
+              <label class="segmented-pill">
+                <input type="radio" name="language" value="en" {{ 'checked' if settings.language == 'en' }}>
+                <span class="segmented-pill-inner">
+                  <span class="lang-tag">EN</span>
+                  <span>English</span>
+                </span>
+              </label>
+              <label class="segmented-pill">
+                <input type="radio" name="language" value="ms" {{ 'checked' if settings.language == 'ms' }}>
+                <span class="segmented-pill-inner">
+                  <span class="lang-tag">MS</span>
+                  <span>Bahasa Melayu</span>
+                </span>
+              </label>
+              <label class="segmented-pill">
+                <input type="radio" name="language" value="zh_TW" {{ 'checked' if settings.language == 'zh_TW' }}>
+                <span class="segmented-pill-inner">
+                  <span class="lang-tag">TW</span>
+                  <span>繁體中文</span>
+                </span>
+              </label>
+            </div>
+            <span class="settings-tip">{{ t('settings.language_tip', '选择应用界面显示语言，随时自由切换。') }}</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- Tab 2: 记账与偏好 (Ledger Preferences & Habits) -->
+    <!-- ======================================================== -->
+    <div class="settings-tab-pane" id="tabPane-preferences" role="tabpanel" aria-labelledby="tabBtn-preferences">
+      <!-- 货币与数值排版 -->
+      <section class="panel settings-panel">
+        <div class="settings-panel-title">
+          <span class="settings-icon">💰</span>
+          <div>
+            <h3>{{ t('settings.currency_and_symbol', '默认结算货币与符号') }}</h3>
+            <span class="settings-desc">{{ t('settings.default_currency_tip', '账本核心币种代号及前端金额、报表与自动记账的前置货币符号。') }}</span>
+          </div>
+        </div>
+
+        <div class="settings-grid">
+          <!-- 默认货币与符号 -->
+          <div class="settings-item settings-currency-item">
+            <label class="settings-label" for="defaultCurrencySelect">{{ t('settings.default_currency', '默认结算货币与符号') }}</label>
+            <div class="settings-currency-wrapper">
+              <div class="settings-currency-main">
+                <select id="defaultCurrencySelect" name="default_currency" class="settings-currency-select" onchange="onCurrencySelectChange(this)">
+                  {% for code, label in [
+                    ('MYR', 'MYR - RM (Ringgit Malaysia)'),
+                    ('SGD', 'SGD - S$ (Singapore Dollar)'),
+                    ('USD', 'USD - $ (US Dollar)'),
+                    ('CNY', 'CNY - ¥ (Chinese Yuan / 人民币)'),
+                    ('EUR', 'EUR - € (Euro)'),
+                    ('GBP', 'GBP - £ (British Pound)'),
+                    ('JPY', 'JPY - ¥ (Japanese Yen)'),
+                    ('HKD', 'HKD - HK$ (Hong Kong Dollar)'),
+                    ('AUD', 'AUD - A$ (Australian Dollar)'),
+                    ('CAD', 'CAD - C$ (Canadian Dollar)'),
+                    ('THB', 'THB - ฿ (Thai Baht)'),
+                    ('KRW', 'KRW - ₩ (Korean Won)'),
+                    ('TWD', 'TWD - NT$ (New Taiwan Dollar)')
+                  ] %}
+                  <option value="{{ code }}" {{ 'selected' if settings.default_currency == code }}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="settings-symbol-row">
+                <div class="settings-symbol-input-wrap">
+                  <span class="settings-symbol-prefix">{{ t('settings.symbol_label', '前置符号') }}:</span>
+                  <input type="text" id="currencySymbolInput" name="currency_symbol" value="{{ settings.currency_symbol }}" maxlength="8" class="settings-symbol-input" title="{{ t('settings.currency_symbol_title', '前置货币符号') }}" required>
+                </div>
+                <div class="quick-currency-chips">
+                  <button type="button" class="chip-btn" onclick="setCurrencySymbol('RM')">RM</button>
+                  <button type="button" class="chip-btn" onclick="setCurrencySymbol('S$')">S$</button>
+                  <button type="button" class="chip-btn" onclick="setCurrencySymbol('$')">$</button>
+                  <button type="button" class="chip-btn" onclick="setCurrencySymbol('¥')">¥</button>
+                  <button type="button" class="chip-btn" onclick="setCurrencySymbol('€')">€</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 日期格式 -->
+          <div class="settings-item">
+            <label class="settings-label" for="dateFormatSelect">{{ t('settings.date_format', '日期显示格式') }}</label>
+            <select id="dateFormatSelect" name="date_format">
+              <option value="YYYY-MM-DD" {{ 'selected' if settings.date_format == 'YYYY-MM-DD' }}>YYYY-MM-DD (2026-09-16 · ISO)</option>
+              <option value="DD/MM/YYYY" {{ 'selected' if settings.date_format == 'DD/MM/YYYY' }}>DD/MM/YYYY (16/09/2026)</option>
+              <option value="MM/DD/YYYY" {{ 'selected' if settings.date_format == 'MM/DD/YYYY' }}>MM/DD/YYYY (09/16/2026)</option>
+              <option value="YYYY/MM/DD" {{ 'selected' if settings.date_format == 'YYYY/MM/DD' }}>YYYY/MM/DD (2026/09/16)</option>
+            </select>
+            <span class="settings-tip">{{ t('settings.date_format_tip', '控制账目列表、报表卡片中交易日期的格式化展示。') }}</span>
+          </div>
+
+          <!-- 千分位 -->
+          <div class="settings-item">
+            <label class="settings-label">{{ t('settings.number_format', '数字千分位规范') }}</label>
+            <div class="segmented-control">
+              <label class="segmented-pill">
+                <input type="radio" name="number_format" value="comma" {{ 'checked' if settings.number_format != 'space' }}>
+                <span class="segmented-pill-inner">
+                  <span>{{ t('settings.number_comma', '1,234.56 (逗号分隔 · 推荐)') }}</span>
+                </span>
+              </label>
+              <label class="segmented-pill">
+                <input type="radio" name="number_format" value="space" {{ 'checked' if settings.number_format == 'space' }}>
+                <span class="segmented-pill-inner">
+                  <span>{{ t('settings.number_space', '1 234.56 (空格分隔)') }}</span>
+                </span>
+              </label>
+            </div>
+            <span class="settings-tip">{{ t('settings.number_format_tip', '全局数值千分位间隔规范。') }}</span>
+          </div>
+
+          <!-- 时区管理 -->
+          <div class="settings-item">
+            <label class="settings-label" for="timezoneSelect">{{ t('settings.timezone', '时区管理') }}</label>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <select id="timezoneSelect" name="timezone" style="flex: 1; min-width: 220px;">
+                {% for tz_val, tz_lbl in [
+                  ('Asia/Kuala_Lumpur', 'Asia/Kuala_Lumpur (UTC+8 · Kuala Lumpur / 吉隆坡)'),
+                  ('Asia/Singapore', 'Asia/Singapore (UTC+8 · Singapore / 新加坡)'),
+                  ('Asia/Shanghai', 'Asia/Shanghai (UTC+8 · Beijing / 上海/北京)'),
+                  ('Asia/Hong_Kong', 'Asia/Hong_Kong (UTC+8 · Hong Kong / 香港)'),
+                  ('Asia/Taipei', 'Asia/Taipei (UTC+8 · Taipei / 台北)'),
+                  ('Asia/Tokyo', 'Asia/Tokyo (UTC+9 · Tokyo / 东京)'),
+                  ('Asia/Bangkok', 'Asia/Bangkok (UTC+7 · Bangkok / 曼谷)'),
+                  ('UTC', 'UTC (UTC+0 · Universal Time)'),
+                  ('Europe/London', 'Europe/London (UTC+0/+1 · London / 伦敦)'),
+                  ('America/New_York', 'America/New_York (UTC-5/-4 · New York / 纽约)'),
+                  ('America/Los_Angeles', 'America/Los_Angeles (UTC-8/-7 · Los Angeles / 洛杉矶)'),
+                  ('Australia/Sydney', 'Australia/Sydney (UTC+10/+11 · Sydney / 悉尼)')
                 ] %}
-                <option value="{{ code }}" {{ 'selected' if settings.default_currency == code }}>{{ label }}</option>
+                <option value="{{ tz_val }}" {{ 'selected' if settings.timezone == tz_val }}>{{ tz_lbl }}</option>
                 {% endfor %}
               </select>
+              <button type="button" class="btn-secondary btn-sm" onclick="detectUserTimezone()" title="{{ t('settings.btn_detect_tz_title', '读取当前浏览器时区') }}">
+                {{ t('settings.btn_detect_tz', '🌐 自动探测') }}
+              </button>
             </div>
-            <div class="settings-symbol-row">
-              <div class="settings-symbol-input-wrap">
-                <span class="settings-symbol-prefix">{{ t('settings.symbol_label', '前置符号') }}:</span>
-                <input type="text" id="currencySymbolInput" name="currency_symbol" value="{{ settings.currency_symbol }}" maxlength="8" class="settings-symbol-input" title="{{ t('settings.currency_symbol_title', '前置货币符号') }}" required>
-              </div>
-              <div class="quick-currency-chips">
-                <button type="button" class="chip-btn" onclick="setCurrencySymbol('RM')">RM</button>
-                <button type="button" class="chip-btn" onclick="setCurrencySymbol('S$')">S$</button>
-                <button type="button" class="chip-btn" onclick="setCurrencySymbol('$')">$</button>
-                <button type="button" class="chip-btn" onclick="setCurrencySymbol('¥')">¥</button>
-                <button type="button" class="chip-btn" onclick="setCurrencySymbol('€')">€</button>
-              </div>
-            </div>
+            <span class="settings-tip">{{ t('settings.timezone_tip', '用于锁定记账日期基准，防止月末或跨国时因时区错位造成跨月数据漂移。') }}</span>
           </div>
-          <span class="settings-tip">{{ t('settings.default_currency_tip', '账本核心币种代号及前端金额、报表与自动记账的前置货币符号。') }}</span>
         </div>
+      </section>
 
-        <div class="settings-item">
-          <label class="settings-label" for="dateFormatSelect">{{ t('settings.date_format', '日期显示格式') }}</label>
-          <select id="dateFormatSelect" name="date_format">
-            <option value="YYYY-MM-DD" {{ 'selected' if settings.date_format == 'YYYY-MM-DD' }}>YYYY-MM-DD (2026-09-16 · ISO)</option>
-            <option value="DD/MM/YYYY" {{ 'selected' if settings.date_format == 'DD/MM/YYYY' }}>DD/MM/YYYY (16/09/2026)</option>
-            <option value="MM/DD/YYYY" {{ 'selected' if settings.date_format == 'MM/DD/YYYY' }}>MM/DD/YYYY (09/16/2026)</option>
-            <option value="YYYY/MM/DD" {{ 'selected' if settings.date_format == 'YYYY/MM/DD' }}>YYYY/MM/DD (2026/09/16)</option>
-          </select>
-          <span class="settings-tip">{{ t('settings.date_format_tip', '控制账目列表、报表卡片中交易日期的格式化展示。') }}</span>
-        </div>
-
-        <div class="settings-item">
-          <label class="settings-label">{{ t('settings.number_format', '数字千分位规范') }}</label>
-          <div class="settings-pill-group">
-            <label class="pill-radio">
-              <input type="radio" name="number_format" value="comma" {{ 'checked' if settings.number_format != 'space' }}>
-              <span>{{ t('settings.number_comma', '1,234.56 (逗号分隔 · 推荐)') }}</span>
-            </label>
-            <label class="pill-radio">
-              <input type="radio" name="number_format" value="space" {{ 'checked' if settings.number_format == 'space' }}>
-              <span>{{ t('settings.number_space', '1 234.56 (空格分隔)') }}</span>
-            </label>
+      <!-- 日常记账习惯 -->
+      <section class="panel settings-panel">
+        <div class="settings-panel-title">
+          <span class="settings-icon">📋</span>
+          <div>
+            <h3>{{ t('settings.sec_preferences', '记账偏好与周期规范') }}</h3>
+            <span class="settings-desc">{{ t('settings.sec_preferences_desc', '减少重复手动选择，契合你的日常薪资发放与结算周期') }}</span>
           </div>
-          <span class="settings-tip">{{ t('settings.number_format_tip', '全局数值千分位间隔规范。') }}</span>
         </div>
 
-        <div class="settings-item">
-          <label class="settings-label" for="timezoneSelect">{{ t('settings.timezone', '时区管理') }}</label>
-          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <select id="timezoneSelect" name="timezone" style="flex: 1; min-width: 220px;">
-              {% for tz_val, tz_lbl in [
-                ('Asia/Kuala_Lumpur', 'Asia/Kuala_Lumpur (UTC+8 · Kuala Lumpur / 吉隆坡)'),
-                ('Asia/Singapore', 'Asia/Singapore (UTC+8 · Singapore / 新加坡)'),
-                ('Asia/Shanghai', 'Asia/Shanghai (UTC+8 · Beijing / 上海/北京)'),
-                ('Asia/Hong_Kong', 'Asia/Hong_Kong (UTC+8 · Hong Kong / 香港)'),
-                ('Asia/Taipei', 'Asia/Taipei (UTC+8 · Taipei / 台北)'),
-                ('Asia/Tokyo', 'Asia/Tokyo (UTC+9 · Tokyo / 东京)'),
-                ('Asia/Bangkok', 'Asia/Bangkok (UTC+7 · Bangkok / 曼谷)'),
-                ('UTC', 'UTC (UTC+0 · Universal Time)'),
-                ('Europe/London', 'Europe/London (UTC+0/+1 · London / 伦敦)'),
-                ('America/New_York', 'America/New_York (UTC-5/-4 · New York / 纽约)'),
-                ('America/Los_Angeles', 'America/Los_Angeles (UTC-8/-7 · Los Angeles / 洛杉矶)'),
-                ('Australia/Sydney', 'Australia/Sydney (UTC+10/+11 · Sydney / 悉尼)')
-              ] %}
-              <option value="{{ tz_val }}" {{ 'selected' if settings.timezone == tz_val }}>{{ tz_lbl }}</option>
+        <div class="settings-grid">
+          <!-- 默认账户 -->
+          <div class="settings-item">
+            <label class="settings-label" for="defaultAccountSelect">{{ t('settings.default_account', '快捷录入默认账户') }}</label>
+            <select id="defaultAccountSelect" name="default_account_id">
+              <option value="none">{{ t('settings.account_manual', '-- 每次手动选择 --') }}</option>
+              {% for acc in accounts %}
+              <option value="{{ acc.id }}" {{ 'selected' if settings.default_account_id == acc.id }}>
+                🏦 {{ acc.name }} ({{ acc.currency }})
+              </option>
               {% endfor %}
             </select>
-            <button type="button" class="btn-secondary btn-sm" onclick="detectUserTimezone()" title="{{ t('settings.btn_detect_tz_title', '读取当前浏览器时区') }}">
-              {{ t('settings.btn_detect_tz', '🌐 自动探测') }}
-            </button>
+            <span class="settings-tip">{{ t('settings.default_account_tip', '在首页快速记账与自动扣款时，优先预选此账户。') }}<a href="{{ url_for('liabilities.accounts_page') }}" class="btn-link" style="font-size:12px; margin-left:6px;">{{ t('settings.manage_accounts', '管理账户 →') }}</a></span>
           </div>
-          <span class="settings-tip">{{ t('settings.timezone_tip', '用于锁定记账日期基准，防止月末或跨国时因时区错位造成跨月数据漂移。') }}</span>
-        </div>
 
-        <div class="settings-item">
-          <label class="settings-label" for="defaultAccountSelect">{{ t('settings.default_account', '快捷录入默认账户') }}</label>
-          <select id="defaultAccountSelect" name="default_account_id">
-            <option value="none">{{ t('settings.account_manual', '-- 每次手动选择 --') }}</option>
-            {% for acc in accounts %}
-            <option value="{{ acc.id }}" {{ 'selected' if settings.default_account_id == acc.id }}>
-              🏦 {{ acc.name }} ({{ acc.currency }})
-            </option>
-            {% endfor %}
-          </select>
-          <span class="settings-tip">{{ t('settings.default_account_tip', '在首页快速记账与自动扣款时，优先预选此账户。') }}<a href="{{ url_for('liabilities.accounts_page') }}" class="btn-link" style="font-size:12px; margin-left:6px;">{{ t('settings.manage_accounts', '管理账户 →') }}</a></span>
-        </div>
-
-        <div class="settings-item">
-          <label class="settings-label">{{ t('settings.default_income_group', '默认收入分组') }}</label>
-          <div class="settings-pill-group">
-            <label class="pill-radio">
-              <input type="radio" name="default_group" value="main" {{ 'checked' if settings.default_group == 'main' }}>
-              <span>{{ t('settings.group_main', '💼 主业收入') }}</span>
-            </label>
-            <label class="pill-radio">
-              <input type="radio" name="default_group" value="side" {{ 'checked' if settings.default_group == 'side' }}>
-              <span>{{ t('settings.group_side', '🌱 副业/投资收入') }}</span>
-            </label>
+          <!-- 默认收入分组 -->
+          <div class="settings-item">
+            <label class="settings-label">{{ t('settings.default_income_group', '默认收入分组') }}</label>
+            <div class="segmented-control">
+              <label class="segmented-pill">
+                <input type="radio" name="default_group" value="main" {{ 'checked' if settings.default_group == 'main' }}>
+                <span class="segmented-pill-inner">
+                  <span class="pill-icon">💼</span>
+                  <span>{{ t('settings.group_main', '主业收入') }}</span>
+                </span>
+              </label>
+              <label class="segmented-pill">
+                <input type="radio" name="default_group" value="side" {{ 'checked' if settings.default_group == 'side' }}>
+                <span class="segmented-pill-inner">
+                  <span class="pill-icon">🌱</span>
+                  <span>{{ t('settings.group_side', '副业/投资收入') }}</span>
+                </span>
+              </label>
+            </div>
+            <span class="settings-tip">{{ t('settings.default_group_tip', '录入收入时默认选中的分组归类。') }}</span>
           </div>
-          <span class="settings-tip">{{ t('settings.default_group_tip', '录入收入时默认选中的分组归类。') }}</span>
-        </div>
 
-        <div class="settings-item">
-          <label class="settings-label" for="budgetStartDayInput">{{ t('settings.budget_start_day', '月度预算与账单起始日') }}</label>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="color: var(--muted); font-size: 13.5px;">{{ t('settings.budget_prefix', '每月') }}</span>
-            <input type="number" id="budgetStartDayInput" name="budget_start_day" min="1" max="31" value="{{ settings.budget_start_day }}" style="width: 80px; text-align: center;" required>
-            <span style="color: var(--muted); font-size: 13.5px;">{{ t('settings.budget_suffix', '号开始统计') }}</span>
+          <!-- 月度预算起始日 -->
+          <div class="settings-item">
+            <label class="settings-label" for="budgetStartDayInput">{{ t('settings.budget_start_day', '月度预算与账单起始日') }}</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="color: var(--muted); font-size: 13.5px;">{{ t('settings.budget_prefix', '每月') }}</span>
+              <input type="number" id="budgetStartDayInput" name="budget_start_day" min="1" max="31" value="{{ settings.budget_start_day }}" style="width: 80px; text-align: center;" required>
+              <span style="color: var(--muted); font-size: 13.5px;">{{ t('settings.budget_suffix', '号开始统计') }}</span>
+            </div>
+            <span class="settings-tip">{{ t('settings.budget_start_day_tip', '如设为 25，则月度预算将按每月 25 日至次月 24 日发薪周期自动聚合。') }}</span>
           </div>
-          <span class="settings-tip">{{ t('settings.budget_start_day_tip', '如设为 25，则月度预算将按每月 25 日至次月 24 日发薪周期自动聚合。') }}</span>
-        </div>
 
-        <div class="settings-item">
-          <label class="settings-label">{{ t('settings.default_view', '首页初始视图') }}</label>
-          <div class="settings-pill-group">
-            <label class="pill-radio">
-              <input type="radio" name="default_dashboard_view" value="monthly" {{ 'checked' if settings.default_dashboard_view == 'monthly' }}>
-              <span>{{ t('settings.view_monthly', '📅 当月收支与录入卡片') }}</span>
-            </label>
-            <label class="pill-radio">
-              <input type="radio" name="default_dashboard_view" value="overview" {{ 'checked' if settings.default_dashboard_view == 'overview' }}>
-              <span>{{ t('settings.view_overview', '📊 总体宏观走势大盘') }}</span>
-            </label>
+          <!-- 首页初始视图 -->
+          <div class="settings-item">
+            <label class="settings-label">{{ t('settings.default_view', '首页初始视图') }}</label>
+            <div class="segmented-control">
+              <label class="segmented-pill">
+                <input type="radio" name="default_dashboard_view" value="monthly" {{ 'checked' if settings.default_dashboard_view == 'monthly' }}>
+                <span class="segmented-pill-inner">
+                  <span class="pill-icon">📅</span>
+                  <span>{{ t('settings.view_monthly', '当月收支与录入卡片') }}</span>
+                </span>
+              </label>
+              <label class="segmented-pill">
+                <input type="radio" name="default_dashboard_view" value="overview" {{ 'checked' if settings.default_dashboard_view == 'overview' }}>
+                <span class="segmented-pill-inner">
+                  <span class="pill-icon">📊</span>
+                  <span>{{ t('settings.view_overview', '总体宏观走势大盘') }}</span>
+                </span>
+              </label>
+            </div>
+            <span class="settings-tip">{{ t('settings.default_view_tip', '打开账本首页时默认聚焦的控制面板。') }}</span>
           </div>
-          <span class="settings-tip">{{ t('settings.default_view_tip', '打开账本首页时默认聚焦的控制面板。') }}</span>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
-    <!-- 3. 自动化记账与硬件交互 -->
-    <section class="panel settings-panel">
-      <div class="settings-panel-title">
-        <span class="settings-icon">⚡</span>
-        <div>
-          <h3>{{ t('settings.sec_automation', '自动化记账与交互反馈') }}</h3>
-          <span class="settings-desc">{{ t('settings.sec_automation_desc', '通知防重滑窗时长及原生端物理震动反馈') }}</span>
-        </div>
-      </div>
-
-      <div class="settings-grid">
-        <div class="settings-item">
-          <label class="settings-label" for="dedupWindowSelect">{{ t('settings.dedup_window', '通知幂等去重滑窗') }}</label>
-          <select id="dedupWindowSelect" name="dedup_window_minutes">
-            <option value="30" {{ 'selected' if settings.dedup_window_minutes == 30 }}>30 min</option>
-            <option value="60" {{ 'selected' if settings.dedup_window_minutes == 60 }}>60 min (1 h)</option>
-            <option value="120" {{ 'selected' if settings.dedup_window_minutes == 120 }}>120 min (2 h)</option>
-            <option value="240" {{ 'selected' if settings.dedup_window_minutes == 240 }}>240 min (4 h)</option>
-          </select>
-          <span class="settings-tip">{{ t('settings.dedup_window_tip', '银行或钱包在离线恢复时若补发同一条扣款通知，在此时间窗口内将自动拦截丢弃。') }}<a href="{{ url_for('auto_track.auto_track_page') }}" class="btn-link" style="font-size:12px; margin-left:6px;">{{ t('settings.configure_auto', '配置自动记账 →') }}</a></span>
+    <!-- ======================================================== -->
+    <!-- Tab 3: 自动化规则 (Automation & Smart Rules) -->
+    <!-- ======================================================== -->
+    <div class="settings-tab-pane" id="tabPane-automation" role="tabpanel" aria-labelledby="tabBtn-automation">
+      <section class="panel settings-panel">
+        <div class="settings-panel-title">
+          <span class="settings-icon">⚡</span>
+          <div>
+            <h3>{{ t('settings.sec_automation', '自动化记账与交互反馈') }}</h3>
+            <span class="settings-desc">{{ t('settings.sec_automation_desc', '通知防重滑窗时长及原生端物理震动反馈') }}</span>
+          </div>
         </div>
 
-        <div class="settings-item">
-          <label class="settings-label" for="repaymentOffsetWindowSelect">{{ t('settings.repayment_offset_window', '朋友还款自动冲抵时间窗口') }}</label>
-          <select id="repaymentOffsetWindowSelect" name="repayment_offset_window_minutes">
-            <option value="0" {{ 'selected' if settings.repayment_offset_window_minutes == 0 }}>{{ t('settings.offset_window_disabled', '停用自动冲抵 (仅记作普通收入)') }}</option>
-            <option value="30" {{ 'selected' if settings.repayment_offset_window_minutes == 30 }}>30 min</option>
-            <option value="60" {{ 'selected' if settings.repayment_offset_window_minutes == 60 }}>60 min (1 h)</option>
-            <option value="120" {{ 'selected' if settings.repayment_offset_window_minutes == 120 }}>120 min (2 h - 推荐)</option>
-            <option value="240" {{ 'selected' if settings.repayment_offset_window_minutes == 240 }}>240 min (4 h)</option>
-            <option value="480" {{ 'selected' if settings.repayment_offset_window_minutes == 480 }}>480 min (8 h)</option>
-          </select>
-          <span class="settings-tip">{{ t('settings.repayment_offset_tip', '聚餐或日常分账垫付后，仅在该时间窗口内收到的还款转账才会自动冲减上一笔支出；超出时限或本人自转则作为正常收入入账。') }}</span>
-        </div>
+        <div class="settings-grid">
+          <!-- 幂等滑窗 -->
+          <div class="settings-item">
+            <label class="settings-label" for="dedupWindowSelect">{{ t('settings.dedup_window', '通知幂等去重滑窗') }}</label>
+            <select id="dedupWindowSelect" name="dedup_window_minutes">
+              <option value="30" {{ 'selected' if settings.dedup_window_minutes == 30 }}>30 min</option>
+              <option value="60" {{ 'selected' if settings.dedup_window_minutes == 60 }}>60 min (1 h)</option>
+              <option value="120" {{ 'selected' if settings.dedup_window_minutes == 120 }}>120 min (2 h)</option>
+              <option value="240" {{ 'selected' if settings.dedup_window_minutes == 240 }}>240 min (4 h)</option>
+            </select>
+            <span class="settings-tip">{{ t('settings.dedup_window_tip', '银行或钱包在离线恢复时若补发同一条扣款通知，在此时间窗口内将自动拦截丢弃。') }}<a href="{{ url_for('auto_track.auto_track_page') }}" class="btn-link" style="font-size:12px; margin-left:6px;">{{ t('settings.configure_auto', '配置自动记账 →') }}</a></span>
+          </div>
 
-        <div class="settings-item">
-          <label class="settings-label">{{ t('settings.haptic_feedback', '触感与震动反馈 (Haptic)') }}</label>
-          <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
+          <!-- 还款冲抵滑窗 -->
+          <div class="settings-item">
+            <label class="settings-label" for="repaymentOffsetWindowSelect">{{ t('settings.repayment_offset_window', '朋友还款自动冲抵时间窗口') }}</label>
+            <select id="repaymentOffsetWindowSelect" name="repayment_offset_window_minutes">
+              <option value="0" {{ 'selected' if settings.repayment_offset_window_minutes == 0 }}>{{ t('settings.offset_window_disabled', '停用自动冲抵 (仅记作普通收入)') }}</option>
+              <option value="30" {{ 'selected' if settings.repayment_offset_window_minutes == 30 }}>30 min</option>
+              <option value="60" {{ 'selected' if settings.repayment_offset_window_minutes == 60 }}>60 min (1 h)</option>
+              <option value="120" {{ 'selected' if settings.repayment_offset_window_minutes == 120 }}>120 min (2 h - 推荐)</option>
+              <option value="240" {{ 'selected' if settings.repayment_offset_window_minutes == 240 }}>240 min (4 h)</option>
+              <option value="480" {{ 'selected' if settings.repayment_offset_window_minutes == 480 }}>480 min (8 h)</option>
+            </select>
+            <span class="settings-tip">{{ t('settings.repayment_offset_tip', '聚餐或日常分账垫付后，仅在该时间窗口内收到的还款转账才会自动冲减上一笔支出；超出时限或本人自转则作为正常收入入账。') }}</span>
+          </div>
+
+          <!-- 触感反馈 -->
+          <div class="settings-item settings-toggle-row">
+            <div class="settings-toggle-info">
+              <label class="settings-label" for="hapticToggle">{{ t('settings.haptic_feedback', '触感与震动反馈 (Haptic)') }}</label>
+              <span class="settings-tip">{{ t('settings.haptic_desc', '在记账成功、快捷操作及撤销时触发手机微震') }}（{{ t('settings.haptic_tip', '需设备支持 Vibration API') }}）</span>
+            </div>
             <label class="toggle-switch">
-              <input type="checkbox" name="haptic_feedback" value="1" {{ 'checked' if settings.haptic_feedback == 1 }}>
+              <input type="checkbox" id="hapticToggle" name="haptic_feedback" value="1" {{ 'checked' if settings.haptic_feedback == 1 }}>
               <span class="toggle-slider"></span>
             </label>
-            <span style="font-size: 13.5px; color: var(--ink);">{{ t('settings.haptic_desc', '在记账成功、快捷操作及撤销时触发手机微震') }}</span>
           </div>
-          <span class="settings-tip">{{ t('settings.haptic_tip', '需要设备支持 Vibration API 或运行在 Android 原生伴侣端。') }}</span>
-        </div>
 
-        <div class="settings-item">
-          <label class="settings-label">{{ t('settings.nlp_confirm', '自然语言智能记账确认') }}</label>
-          <div style="display: flex; align-items: center; gap: 12px; margin-top: 6px;">
+          <!-- 自然语言确认 -->
+          <div class="settings-item settings-toggle-row">
+            <div class="settings-toggle-info">
+              <label class="settings-label" for="nlpConfirmToggle">{{ t('settings.nlp_confirm', '自然语言智能记账二次确认') }}</label>
+              <span class="settings-tip" id="nlpConfirmLabel">
+                {{ t('settings.nlp_confirm_on', '自然语言解析后弹出二次确认弹窗 (推荐)') if settings.nlp_confirm_required == 1 else t('settings.nlp_confirm_off', '自然语言解析后直接自动入账 (免确认)') }}
+              </span>
+            </div>
             <label class="toggle-switch">
-              <input type="checkbox" name="nlp_confirm_required" value="1" id="nlpConfirmToggle" {{ 'checked' if settings.nlp_confirm_required == 1 }} onchange="document.getElementById('nlpConfirmLabel').textContent = this.checked ? (window.t ? window.t('settings.nlp_confirm_on', '自然语言解析后弹出二次确认弹窗 (推荐)') : '自然语言解析后弹出二次确认弹窗 (推荐)') : (window.t ? window.t('settings.nlp_confirm_off', '自然语言解析后直接自动入账 (免确认)') : '自然语言解析后直接自动入账 (免确认)');">
+              <input type="checkbox" name="nlp_confirm_required" value="1" id="nlpConfirmToggle" {{ 'checked' if settings.nlp_confirm_required == 1 }} onchange="updateNlpConfirmLabel(this.checked)">
               <span class="toggle-slider"></span>
             </label>
-            <span style="font-size: 13.5px; color: var(--ink);" id="nlpConfirmLabel">
-              {{ t('settings.nlp_confirm_on', '自然语言解析后弹出二次确认弹窗 (推荐)') if settings.nlp_confirm_required == 1 else t('settings.nlp_confirm_off', '自然语言解析后直接自动入账 (免确认)') }}
-            </span>
           </div>
-          <span class="settings-tip">{{ t('settings.nlp_confirm_tip', '关闭后，智能记账将在解析完成后直接保存入账；若遇到解析警告或金额不明确，系统仍会自动弹出确认以策安全。') }}</span>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
-    <!-- 底部保存浮动控制条 -->
-    <div class="settings-actions-bar">
-      <button type="submit" class="btn-primary" id="btnSaveSettings" style="min-width: 140px;">
-        {{ t('settings.btn_save', '💾 保存偏好设置') }}
-      </button>
-      <button type="button" class="btn-ghost" onclick="resetToDefaults()">
-        {{ t('settings.btn_reset', '🔄 恢复默认配置') }}
-      </button>
+    <!-- 底部常驻保存条 (Sticky Save Action Bar) -->
+    <div class="settings-sticky-bar" id="settingsStickyBar">
+      <div class="settings-save-status">
+        <span class="save-status-dot" id="saveStatusDot"></span>
+        <span class="save-status-text" id="saveStatusText">{{ t('settings.save_synced', '配置已同步') }}</span>
+      </div>
+      <div class="settings-save-btns">
+        <button type="submit" class="btn-primary btn-save-action" id="btnSaveSettings">
+          <span>💾</span> {{ t('settings.btn_save', '保存偏好设置') }}
+        </button>
+        <button type="button" class="btn-secondary btn-reset-action" onclick="resetToDefaults()">
+          <span>🔄</span> {{ t('settings.btn_reset', '恢复默认') }}
+        </button>
+      </div>
     </div>
   </form>
 
-  <!-- 4. 数据主权与全量备份导出 -->
-  <section class="panel settings-panel" style="margin-top: 32px; border-color: rgba(30, 122, 92, 0.25);">
-    <div class="settings-panel-title">
-      <span class="settings-icon">🛡️</span>
-      <div>
-        <h3>{{ t('settings.sec_backup', '数据备份与隐私主权') }}</h3>
-        <span class="settings-desc">{{ t('settings.sec_backup_desc', '随时导出当前账户名下全部财务数据，拥有完整离线数据控制权') }}</span>
+  <!-- ======================================================== -->
+  <!-- Tab 4: 数据主权与全量备份 (Data & Sovereignty Backup) -->
+  <!-- ======================================================== -->
+  <div class="settings-tab-pane" id="tabPane-backup" role="tabpanel" aria-labelledby="tabBtn-backup">
+    <section class="panel settings-panel">
+      <div class="settings-panel-title">
+        <span class="settings-icon">🛡️</span>
+        <div>
+          <h3>{{ t('settings.sec_backup', '数据备份与隐私主权') }}</h3>
+          <span class="settings-desc">{{ t('settings.sec_backup_desc', '随时导出当前账户名下全部财务数据，拥有完整离线数据控制权') }}</span>
+        </div>
       </div>
-    </div>
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 12px 0 16px 0; border-bottom: 1px solid var(--border);">
-      <div>
-        <div style="font-size: 14px; font-weight: 600; color: var(--ink);">{{ t('settings.export_json_title', '导出全量个人记账档案 (JSON 格式)') }}</div>
-        <div style="font-size: 12.5px; color: var(--muted); margin-top: 4px;">{{ t('settings.export_json_desc', '包含全部历史交易明细、多币种账户、分类预算、固定收支、分期与周期订阅。') }}</div>
-      </div>
-      <a href="{{ url_for('settings.api_export_data') }}" class="btn-secondary" download style="display: inline-flex; align-items: center; gap: 6px;">
-        {{ t('settings.btn_export_json', '📥 导出 JSON 备份') }}
-      </a>
-    </div>
 
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 16px 0 6px 0;">
-      <div>
-        <div style="font-size: 14px; font-weight: 600; color: var(--ink);">{{ t('settings.export_csv_title', '导出交易流水明细 (UTF-8 CSV 格式)') }}</div>
-        <div style="font-size: 12.5px; color: var(--muted); margin-top: 4px;">{{ t('settings.export_csv_desc', '标准 UTF-8 with BOM 编码格式，完美兼容 Microsoft Excel、WPS Office、Numbers 直接双击打开，中文及多币种符号绝不乱码。') }}</div>
+      <div class="settings-backup-cards">
+        <!-- JSON 全量备份卡片 -->
+        <div class="backup-card">
+          <div class="backup-card-header">
+            <div class="backup-card-icon json-icon">📦</div>
+            <div class="backup-card-text">
+              <div class="backup-card-title">
+                <span>{{ t('settings.export_json_title', '导出全量个人记账档案') }}</span>
+                <span class="badge-format">JSON</span>
+              </div>
+              <div class="backup-card-desc">{{ t('settings.export_json_desc', '包含全部历史交易明细、多币种账户、分类预算、固定收支、分期与周期订阅。') }}</div>
+            </div>
+          </div>
+          <div class="backup-card-action">
+            <a href="{{ url_for('settings.api_export_data') }}" class="btn-secondary backup-download-btn" download>
+              <span>📥</span> {{ t('settings.btn_export_json', '导出 JSON 备份') }}
+            </a>
+          </div>
+        </div>
+
+        <!-- Excel / CSV 报表卡片 -->
+        <div class="backup-card">
+          <div class="backup-card-header">
+            <div class="backup-card-icon csv-icon">📊</div>
+            <div class="backup-card-text">
+              <div class="backup-card-title">
+                <span>{{ t('settings.export_csv_title', '导出交易流水明细') }}</span>
+                <span class="badge-format badge-green">UTF-8 CSV</span>
+              </div>
+              <div class="backup-card-desc">{{ t('settings.export_csv_desc', '标准 UTF-8 with BOM 编码格式，完美兼容 Microsoft Excel、WPS Office、Numbers 直接双击打开，中文及多币种符号绝不乱码。') }}</div>
+            </div>
+          </div>
+          <div class="backup-card-action">
+            <a href="{{ url_for('settings.api_export_data', format='csv') }}" class="btn-secondary backup-download-btn csv-download-btn" download>
+              <span>📊</span> {{ t('settings.btn_export_csv', '导出 Excel / CSV') }}
+            </a>
+          </div>
+        </div>
       </div>
-      <a href="{{ url_for('settings.api_export_data', format='csv') }}" class="btn-secondary" download style="display: inline-flex; align-items: center; gap: 6px; border-color: rgba(16, 185, 129, 0.4); color: var(--income);">
-        {{ t('settings.btn_export_csv', '📊 导出 Excel/CSV') }}
-      </a>
-    </div>
-  </section>
+    </section>
+
+    <!-- 出厂重置与恢复默认危险区域 -->
+    <section class="panel settings-panel reset-danger-panel">
+      <div class="reset-danger-header">
+        <span class="reset-danger-icon">⚠️</span>
+        <div>
+          <h4 class="reset-danger-title">{{ t('settings.reset_box_title', '出厂配置恢复') }}</h4>
+          <p class="reset-danger-desc">{{ t('settings.reset_box_desc', '将主题、货币符号及自动化滑窗恢复为官方默认值。此操作绝不会影响您的交易数据与账本明细。') }}</p>
+        </div>
+      </div>
+      <div class="reset-danger-action">
+        <button type="button" class="btn-danger-outline" onclick="resetToDefaults()">
+          <span>🔄</span> {{ t('settings.btn_reset', '恢复默认配置') }}
+        </button>
+      </div>
+    </section>
+  </div>
 </div>
 
 <style>
+/* ==========================================================================
+   设置页现代化样式 (Settings Tabbed Design System)
+   ========================================================================== */
+
 .settings-container {
   max-width: 860px;
   margin: 0 auto;
+  padding-bottom: 40px;
 }
+
+/* 顶部标题区 */
 .settings-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
-.settings-user-pill {
+
+.settings-title-main {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.settings-title-icon {
+  font-size: 24px;
+}
+
+.settings-subtitle {
+  margin: 6px 0 0 0;
   font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.settings-user-pill {
+  font-size: 12.5px;
+  font-weight: 600;
   padding: 6px 14px;
   border-radius: 999px;
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--ink-soft);
-  box-shadow: var(--shadow-card);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
+
+/* 分段标签导航栏 (Segmented Tab Bar) */
+.settings-tab-nav {
+  display: flex;
+  gap: 6px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 5px;
+  margin-bottom: 22px;
+  box-shadow: 0 2px 6px rgba(16, 33, 59, 0.03);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.settings-tab-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-tab-btn {
+  flex: 1;
+  min-width: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+
+.settings-tab-btn:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.settings-tab-btn.active {
+  background: var(--surface);
+  color: var(--navy);
+  box-shadow: 0 2px 8px rgba(16, 33, 59, 0.08);
+  font-weight: 700;
+  border: 1px solid var(--border-soft);
+}
+
+.tab-btn-icon {
+  font-size: 16px;
+}
+
+/* 标签页面板切换与动画 */
+.settings-tab-pane {
+  display: none;
+  animation: tabPaneFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.settings-tab-pane.active {
+  display: block;
+}
+
+@keyframes tabPaneFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 卡片面板 */
 .settings-panel {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
   padding: 22px 24px;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
 }
+
 .settings-panel-title {
   display: flex;
   align-items: center;
@@ -393,134 +655,475 @@
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border-soft);
 }
+
 .settings-panel-title h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: 16.5px;
   font-weight: 700;
   color: var(--navy);
 }
+
 .settings-icon {
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1;
 }
+
 .settings-desc {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 2px;
   display: block;
 }
+
 .settings-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 20px;
+  gap: 18px;
 }
+
 .settings-item {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
+
 .settings-label {
   font-size: 13.5px;
   font-weight: 600;
   color: var(--ink);
 }
+
 .settings-tip {
   font-size: 12px;
   color: var(--muted);
   line-height: 1.4;
 }
-.settings-pill-group {
+
+/* 现代化分段控制器 (Segmented Control) */
+.segmented-control {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  padding: 4px;
+  border-radius: 14px;
+  width: fit-content;
+  max-width: 100%;
 }
-.pill-radio {
+
+.segmented-pill {
   cursor: pointer;
   margin: 0;
+  user-select: none;
 }
-.pill-radio input {
+
+.segmented-pill input {
   display: none;
 }
-.pill-radio span {
+
+.segmented-pill-inner {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 7px 14px;
-  border-radius: 999px;
+  border-radius: 10px;
   font-size: 13px;
-  background: var(--surface-soft);
-  border: 1px solid var(--border);
+  font-weight: 500;
   color: var(--ink-soft);
   transition: all 0.15s ease;
-  user-select: none;
 }
-.pill-radio input:checked + span {
-  background: var(--gold-soft);
-  border-color: var(--gold);
+
+.segmented-pill input:checked + .segmented-pill-inner {
+  background: var(--surface);
   color: var(--navy);
   font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
-.quick-currency-chips {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+
+.segmented-languages {
+  width: 100%;
 }
-.quick-currency-chips .chip-btn {
-  padding: 4px 10px;
-  font-size: 12px;
-  border-radius: 999px;
+
+.segmented-languages .segmented-pill {
+  flex: 1;
+  min-width: 130px;
 }
-.settings-actions-bar {
-  display: flex;
-  gap: 12px;
+
+.segmented-languages .segmented-pill-inner {
+  width: 100%;
+  justify-content: center;
+}
+
+/* 开关行 (Toggle Row) */
+.settings-toggle-row {
+  flex-direction: row;
   align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+}
+
+.settings-toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+/* 底部常驻保存条 (Sticky Action Bar) */
+.settings-sticky-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
   margin-top: 24px;
-  padding-top: 16px;
+  padding: 14px 20px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 18px rgba(16, 33, 59, 0.08);
+  transition: all 0.2s ease;
 }
-/* Toggle Switch */
-.toggle-switch {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
+
+.settings-save-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
 }
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-color: var(--border);
-  transition: .2s;
-  border-radius: 24px;
-}
-.toggle-slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: .2s;
+
+.save-status-dot {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  background: #10b981;
+  display: inline-block;
+  transition: background-color 0.2s ease;
 }
-.toggle-switch input:checked + .toggle-slider {
-  background-color: var(--gold);
+
+.save-status-dot.dirty {
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
 }
-.toggle-switch input:checked + .toggle-slider:before {
-  transform: translateX(20px);
+
+.settings-save-btns {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-save-action {
+  min-width: 135px;
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-reset-action {
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 数据备份卡片 */
+.settings-backup-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.backup-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  transition: border-color 0.15s ease;
+}
+
+.backup-card:hover {
+  border-color: var(--border);
+}
+
+.backup-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 240px;
+}
+
+.backup-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+}
+
+.backup-card-text {
+  flex: 1;
+}
+
+.backup-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.badge-format {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: rgba(16, 33, 59, 0.08);
+  color: var(--navy);
+  font-family: var(--font-mono);
+}
+
+.badge-format.badge-green {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+.backup-card-desc {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.backup-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.csv-download-btn {
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #059669;
+}
+
+/* 危险操作面板 */
+.reset-danger-panel {
+  border-color: rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 18px 22px;
+}
+
+.reset-danger-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 240px;
+}
+
+.reset-danger-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.reset-danger-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.reset-danger-desc {
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.btn-danger-outline {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-danger-outline:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.btn-danger-outline:active {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* 移动端响应式优化 */
+@media (max-width: 768px) {
+  .settings-tab-nav {
+    padding: 3px;
+  }
+  .settings-tab-btn {
+    min-width: 90px;
+    padding: 8px 10px;
+    font-size: 12.5px;
+  }
+  .settings-panel {
+    padding: 18px 16px;
+  }
+  .settings-sticky-bar {
+    position: sticky;
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    z-index: 99;
+    margin: 16px -8px 0 -8px;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.08);
+  }
+}
+
+/* 暗色模式适配 */
+[data-theme="dark"] .settings-tab-btn.active {
+  background: var(--surface-soft);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+[data-theme="dark"] .segmented-pill input:checked + .segmented-pill-inner {
+  background: var(--surface);
+  color: #38bdf8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .reset-danger-panel {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.35);
 }
 </style>
 
 <script>
+// ==========================================================================
+// 标签页切换逻辑与交互状态管理
+// ==========================================================================
+
+function switchSettingsTab(tabName) {
+  const tabs = ['visual', 'preferences', 'automation', 'backup'];
+  if (!tabs.includes(tabName)) tabName = 'visual';
+
+  // 1. 切换按钮状态
+  tabs.forEach(t => {
+    const btn = document.getElementById('tabBtn-' + t);
+    const pane = document.getElementById('tabPane-' + t);
+    if (btn) {
+      const isActive = t === tabName;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    }
+    if (pane) {
+      pane.classList.toggle('active', t === tabName);
+    }
+  });
+
+  // 2. 数据备份页隐藏表单保存条，其他标签页显示保存条
+  const stickyBar = document.getElementById('settingsStickyBar');
+  if (stickyBar) {
+    stickyBar.style.display = (tabName === 'backup') ? 'none' : 'flex';
+  }
+
+  // 3. 记录用户选中的标签页
+  try {
+    sessionStorage.setItem('ledger_settings_active_tab', tabName);
+    history.replaceState(null, '', '#tab=' + tabName);
+  } catch (e) {}
+}
+
+function restoreInitialSettingsTab() {
+  let targetTab = 'visual';
+  if (window.location.hash) {
+    const match = window.location.hash.match(/tab=([a-z]+)/);
+    if (match && match[1]) targetTab = match[1];
+  } else {
+    try {
+      const saved = sessionStorage.getItem('ledger_settings_active_tab');
+      if (saved) targetTab = saved;
+    } catch (e) {}
+  }
+  switchSettingsTab(targetTab);
+}
+
+// 监听表单输入变化以提示“未保存”
+function trackFormDirtyState() {
+  const form = document.getElementById('settingsForm');
+  if (!form) return;
+  const statusDot = document.getElementById('saveStatusDot');
+  const statusText = document.getElementById('saveStatusText');
+
+  const onFormChange = () => {
+    if (statusDot) statusDot.classList.add('dirty');
+    if (statusText) {
+      statusText.textContent = window.t ? window.t('settings.unsaved_changes', '有未保存改动') : '有未保存改动';
+      statusText.style.color = 'var(--gold, #b6902f)';
+    }
+  };
+
+  form.querySelectorAll('input, select').forEach(el => {
+    el.addEventListener('change', onFormChange);
+    el.addEventListener('input', onFormChange);
+  });
+}
+
+function markFormCleanState() {
+  const statusDot = document.getElementById('saveStatusDot');
+  const statusText = document.getElementById('saveStatusText');
+  if (statusDot) statusDot.classList.remove('dirty');
+  if (statusText) {
+    statusText.textContent = window.t ? window.t('settings.save_synced', '配置已同步') : '配置已同步';
+    statusText.style.color = 'var(--muted)';
+  }
+}
+
 function setCurrencySymbol(sym) {
   const el = document.getElementById('currencySymbolInput');
-  if (el) el.value = sym;
+  if (el) {
+    el.value = sym;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
 }
 
 function onCurrencySelectChange(sel) {
@@ -543,6 +1146,16 @@ function onCurrencySelectChange(sel) {
   const symInput = document.getElementById('currencySymbolInput');
   if (symInput && symbolMap[code]) {
     symInput.value = symbolMap[code];
+    symInput.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+
+function updateNlpConfirmLabel(isChecked) {
+  const label = document.getElementById('nlpConfirmLabel');
+  if (label) {
+    label.textContent = isChecked
+      ? (window.t ? window.t('settings.nlp_confirm_on', '自然语言解析后弹出二次确认弹窗 (推荐)') : '自然语言解析后弹出二次确认弹窗 (推荐)')
+      : (window.t ? window.t('settings.nlp_confirm_off', '自然语言解析后直接自动入账 (免确认)') : '自然语言解析后直接自动入账 (免确认)');
   }
 }
 
@@ -563,6 +1176,7 @@ function detectUserTimezone() {
         const opt = new Option(tz + ' (浏览器侦测)', tz, true, true);
         tzSelect.add(opt);
       }
+      tzSelect.dispatchEvent(new Event('change', { bubbles: true }));
       if (typeof Swal !== 'undefined') {
         Swal.fire({
           toast: true,
@@ -580,7 +1194,6 @@ function detectUserTimezone() {
 }
 
 function previewTheme(mode) {
-  // 即时预览并存入 localStorage
   try {
     localStorage.setItem('ledger_theme_mode', mode);
     if (mode === 'dark') {
@@ -609,7 +1222,10 @@ async function handleSettingsSave(e) {
   e.preventDefault();
   const form = e.target;
   const btn = document.getElementById('btnSaveSettings');
-  if (btn) btn.disabled = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner"></span> ' + (window.t ? window.t('common.saving', '保存中...') : '保存中...');
+  }
 
   try {
     const formData = new FormData(form);
@@ -623,6 +1239,7 @@ async function handleSettingsSave(e) {
     });
     const data = await res.json();
     if (data.ok) {
+      markFormCleanState();
       if (typeof Swal !== 'undefined') {
         Swal.fire({
           toast: true,
@@ -630,7 +1247,7 @@ async function handleSettingsSave(e) {
           icon: 'success',
           title: data.message || (window.t ? window.t('swal.saved_success', '个性化偏好已保存') : '个性化偏好已保存'),
           showConfirmButton: false,
-          timer: 2000,
+          timer: 2200,
           customClass: { popup: 'app-swal-toast' }
         });
       } else {
@@ -642,7 +1259,10 @@ async function handleSettingsSave(e) {
   } catch (err) {
     alert(window.t ? window.t('swal.network_error', '网络请求超时或服务错误') : '网络连接异常，未能完成保存');
   } finally {
-    if (btn) btn.disabled = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>💾</span> ' + (window.t ? window.t('settings.btn_save', '保存偏好设置') : '保存偏好设置');
+    }
   }
 }
 
@@ -650,7 +1270,8 @@ async function resetToDefaults() {
   const confirmMsg = window.t ? window.t('swal.reset_confirm', '确定要将所有偏好设置恢复为系统出厂默认值吗？') : '确定要将所有偏好设置恢复为系统出厂默认值吗？';
   if (!confirm(confirmMsg)) return;
   try {
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
+                 document.querySelector('input[name="csrf_token"]')?.value || '';
     const res = await fetch('/api/settings/reset', {
       method: 'POST',
       headers: {
@@ -673,5 +1294,18 @@ async function resetToDefaults() {
     alert(window.t ? window.t('swal.network_error', '网络请求超时或服务错误') : '网络异常');
   }
 }
+
+// 页面加载或切换后初始化
+document.addEventListener('DOMContentLoaded', () => {
+  restoreInitialSettingsTab();
+  trackFormDirtyState();
+});
+
+document.body.addEventListener('htmx:afterSwap', (evt) => {
+  if (document.getElementById('settingsForm')) {
+    restoreInitialSettingsTab();
+    trackFormDirtyState();
+  }
+});
 </script>
 {% endblock %}

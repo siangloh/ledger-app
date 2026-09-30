@@ -303,6 +303,13 @@ TRANSLATIONS = {
         'settings.currency_and_symbol': '默认结算货币与符号',
         'settings.save_settings': '保存设置',
         'settings.save_success': '设置已成功保存！',
+        'settings.tab_visual': '外观与语言',
+        'settings.tab_preferences': '记账与偏好',
+        'settings.tab_automation': '自动化规则',
+        'settings.tab_backup': '数据与备份',
+        'settings.unsaved_changes': '有未保存改动',
+        'settings.reset_box_title': '出厂配置恢复',
+        'settings.reset_box_desc': '将主题、货币符号及自动化滑窗恢复为官方默认值。此操作绝不会影响您的交易数据与账本明细。',
 
         # 认证
         'auth.login_title': '登录记账本',
@@ -1262,6 +1269,13 @@ TRANSLATIONS = {
         'settings.currency_and_symbol': 'Default Currency & Symbol',
         'settings.save_settings': 'Save Settings',
         'settings.save_success': 'Settings saved successfully!',
+        'settings.tab_visual': 'Appearance & Language',
+        'settings.tab_preferences': 'Ledger Preferences',
+        'settings.tab_automation': 'Automation Rules',
+        'settings.tab_backup': 'Data & Backup',
+        'settings.unsaved_changes': 'Unsaved changes',
+        'settings.reset_box_title': 'Factory Defaults',
+        'settings.reset_box_desc': 'Reset visual theme, currency symbol, and automation rules to defaults. Your transactions will not be affected.',
 
         # Auth
         'auth.login_title': 'Login to Ledger',
@@ -2221,6 +2235,13 @@ TRANSLATIONS = {
         'settings.currency_and_symbol': 'Mata Wang & Simbol Lalai',
         'settings.save_settings': 'Simpan Tetapan',
         'settings.save_success': 'Tetapan berjaya disimpan!',
+        'settings.tab_visual': 'Rupa & Bahasa',
+        'settings.tab_preferences': 'Keutamaan Lejar',
+        'settings.tab_automation': 'Peraturan Automasi',
+        'settings.tab_backup': 'Data & Sandaran',
+        'settings.unsaved_changes': 'Perubahan belum disimpan',
+        'settings.reset_box_title': 'Tetapan Semula Kilang',
+        'settings.reset_box_desc': 'Tetapkan semula tema, simbol mata wang dan tetingkap automasi kepada lalai. Transaksi anda tidak akan dipadamkan.',
 
         # Pengesahan
         'auth.login_title': 'Log Masuk Buku Lejar',
@@ -3180,6 +3201,13 @@ TRANSLATIONS = {
         'settings.currency_and_symbol': '預設結算貨幣與符號',
         'settings.save_settings': '保存設定',
         'settings.save_success': '設定已成功保存！',
+        'settings.tab_visual': '外觀與語言',
+        'settings.tab_preferences': '記賬與偏好',
+        'settings.tab_automation': '自動化規則',
+        'settings.tab_backup': '數據與備份',
+        'settings.unsaved_changes': '有未儲存改動',
+        'settings.reset_box_title': '出廠配置恢復',
+        'settings.reset_box_desc': '將主題、貨幣符號及自動化滑窗恢復為官方默認值。此操作絕不會影響您的交易數據與賬本明細。',
 
         # 認證
         'auth.login_title': '登入記賬本',
