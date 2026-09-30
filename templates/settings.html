@@ -986,26 +986,183 @@
   background: rgba(239, 68, 68, 0.15);
 }
 
-/* 移动端响应式优化 */
+/* 移动端响应式深度优化 (Mobile Phone View Perfection) */
 @media (max-width: 768px) {
-  .settings-tab-nav {
-    padding: 3px;
+  .settings-container {
+    padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
   }
-  .settings-tab-btn {
-    min-width: 90px;
-    padding: 8px 10px;
+
+  .settings-header {
+    margin-bottom: 14px;
+    gap: 10px;
+  }
+
+  .settings-title-main {
+    font-size: 20px;
+  }
+
+  .settings-subtitle {
     font-size: 12.5px;
   }
-  .settings-panel {
-    padding: 18px 16px;
+
+  /* 顶部标签栏：横向滑动手势，禁止压缩按钮导致文字重叠 */
+  .settings-tab-nav {
+    display: flex;
+    gap: 8px;
+    padding: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 14px;
+    margin-bottom: 16px;
+    scroll-behavior: smooth;
   }
+
+  .settings-tab-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-tab-btn {
+    flex: 0 0 auto !important; /* 关键：严禁压缩标签按钮导致文字折行与图标重叠 */
+    min-width: auto !important;
+    padding: 9px 16px;
+    font-size: 13px;
+    border-radius: 10px;
+    gap: 6px;
+  }
+
+  .settings-panel {
+    padding: 16px 14px;
+    margin-bottom: 14px;
+    border-radius: 14px;
+  }
+
+  .settings-panel-title {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    gap: 10px;
+  }
+
+  .settings-panel-title h3 {
+    font-size: 15.5px;
+  }
+
+  .settings-icon {
+    font-size: 20px;
+  }
+
+  .settings-grid {
+    gap: 14px;
+  }
+
+  /* 分段控制器手机端均分排布 */
+  .segmented-control {
+    width: 100%;
+    display: flex;
+  }
+
+  .segmented-pill {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .segmented-pill-inner {
+    width: 100%;
+    justify-content: center;
+    padding: 8px 6px;
+    font-size: 12.5px;
+    white-space: nowrap;
+    gap: 5px;
+  }
+
+  /* 语言选择：手机端对称 2x2 网格，避免单项孤立居中换行 */
+  .segmented-languages {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+
+  .segmented-languages .segmented-pill {
+    flex: unset !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .segmented-languages .segmented-pill-inner {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 9px 8px !important;
+  }
+
+  /* 底部保存条：手机端堆叠为状态提示 + 双按钮撑满，避免横向空间拥挤与底部导航栏重叠 */
   .settings-sticky-bar {
     position: sticky;
     bottom: calc(64px + env(safe-area-inset-bottom, 0px));
     z-index: 99;
-    margin: 16px -8px 0 -8px;
+    margin: 16px -6px 0 -6px;
     border-radius: 16px 16px 0 0;
     box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.08);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .settings-save-status {
+    justify-content: center;
+    font-size: 12.5px;
+    padding-bottom: 2px;
+  }
+
+  .settings-save-btns {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .btn-save-action {
+    flex: 1.6;
+    min-width: 0;
+    padding: 10px 14px;
+    font-size: 13.5px;
+    justify-content: center;
+  }
+
+  .btn-reset-action {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 10px;
+    font-size: 12.5px;
+    justify-content: center;
+  }
+
+  /* 备份与危险面板全宽适配 */
+  .backup-card-header {
+    min-width: 100%;
+  }
+
+  .backup-card-action {
+    width: 100%;
+  }
+
+  .backup-download-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .reset-danger-header {
+    min-width: 100%;
+  }
+
+  .reset-danger-action {
+    width: 100%;
+  }
+
+  .btn-danger-outline {
+    width: 100%;
+    justify-content: center;
   }
 }
 
@@ -1045,6 +1202,11 @@ function switchSettingsTab(tabName) {
       const isActive = t === tabName;
       btn.classList.toggle('active', isActive);
       btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      if (isActive) {
+        try {
+          btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        } catch (e) {}
+      }
     }
     if (pane) {
       pane.classList.toggle('active', t === tabName);
