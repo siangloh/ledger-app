@@ -278,11 +278,20 @@ def inject_globals():
         except Exception as e:
             logger.debug("Failed to load user settings in context processor: %s", e, exc_info=True)
 
+    current_data_version = DATA_VERSION
+    user_id = session.get('user_id')
+    if user_id:
+        try:
+            db = get_db()
+            current_data_version = get_data_version(user_id=user_id, db=db)
+        except Exception as e:
+            logger.debug("Failed to get_data_version in context processor: %s", e)
+
     current_lang = get_current_locale()
     return {
         'layout': 'partial.html' if is_hx else 'base.html',
         'is_hx': is_hx,
-        'data_version': DATA_VERSION,
+        'data_version': current_data_version,
         'current_user_theme': user_theme,
         'current_table_density': table_density,
         'current_user_currency': currency_symbol,

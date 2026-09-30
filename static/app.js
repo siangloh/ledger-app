@@ -2267,6 +2267,7 @@ function updateSyncBadge(state) {
 
 let _currentDataVersion = (typeof window !== 'undefined' && window.INITIAL_DATA_VERSION) ? window.INITIAL_DATA_VERSION : null;
 let _isPollingActive = false;
+const _notifiedAutoTrackTxIds = new Set();
 
 function flashSyncBadgeUpdated() {
   const badges = [document.getElementById('syncStatusBadge'), document.getElementById('desktopSyncStatusBadge')].filter(Boolean);
@@ -2416,30 +2417,39 @@ function handleRealtimeUpdate(event) {
     }
   }
 
-  // 显示优雅的非侵入式 Toast 提示并触发手机原生通知
-  if (event && event.data) {
+  // 仅在被动接收到外部自动记账（如银行通知/短信同步）且未曾提示过时才显示通知与轻提示
+  // 手动记账与常规后台同步保持静默无感更新，坚决不弹出冗余打扰的“⚡ 实时记账成功”
+  if (event && event.type === 'auto_track' && event.data) {
     const tx = event.data;
-    const amountStr = tx.amount ? ' RM ' + Number(tx.amount).toFixed(2) : '';
-    const noteStr = tx.note ? `【${tx.note}】` : '';
-    const catStr = tx.category ? `[${tx.category}] ` : '';
-    const title = event.type === 'auto_track' 
-      ? `🎉 自动记账入账${amountStr}`
-      : `⚡ 实时记账成功${amountStr}`;
-    const bodyStr = `${catStr}${noteStr} 记账成功`.trim();
+    const txId = tx.id || tx.tx_id || `${tx.amount}_${tx.timestamp || ''}`;
+    if (!_notifiedAutoTrackTxIds.has(txId)) {
+      _notifiedAutoTrackTxIds.add(txId);
+      if (_notifiedAutoTrackTxIds.size > 100) {
+        const first = _notifiedAutoTrackTxIds.values().next().value;
+        _notifiedAutoTrackTxIds.delete(first);
+      }
 
-    sendPhoneNotification(title, bodyStr);
+      const sym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
+      const amountStr = tx.amount ? ` ${sym} ` + Number(tx.amount).toFixed(2) : '';
+      const noteStr = tx.note ? `【${tx.note}】` : '';
+      const catStr = tx.category ? `[${tx.category}] ` : '';
+      const title = `🎉 自动记账入账${amountStr}`;
+      const bodyStr = `${catStr}${noteStr} 记账成功`.trim();
 
-    if (typeof Swal !== 'undefined') {
-      Swal.fire({
-        toast: true,
-        position: 'top-end',
-        icon: 'success',
-        title: title,
-        showConfirmButton: false,
-        timer: 3500,
-        background: 'var(--surface)',
-        color: 'var(--navy)'
-      });
+      sendPhoneNotification(title, bodyStr);
+
+      if (typeof Swal !== 'undefined') {
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: title,
+          showConfirmButton: false,
+          timer: 3500,
+          background: 'var(--surface)',
+          color: 'var(--navy)'
+        });
+      }
     }
   }
 }

@@ -15,9 +15,8 @@ from core.db import (
     get_db,
     get_current_user_id,
     bump_data_version,
-    get_categories,
-    LATEST_EVENT,
-    DATA_VERSION
+    get_latest_event,
+    get_categories
 )
 from core.auth import is_ajax_request
 from core.utils import (
@@ -78,7 +77,7 @@ def add_transaction():
          f.get('source', 'manual'), datetime.now().isoformat(), from_savings, from_savings_category, tags, account_id)
     )
     db.commit()
-    bump_data_version('add', {
+    new_version = bump_data_version('add', {
         'id': cur.lastrowid,
         'note': f.get('note', ''),
         'amount': amount,
@@ -89,7 +88,7 @@ def add_transaction():
         'from_savings_category': from_savings_category,
         'source': f.get('source', 'manual'),
         'user_id': user_id
-    })
+    }, user_id=user_id, db=db)
 
     budget_alert = None
     if tx_type == 'expense':
@@ -122,7 +121,7 @@ def add_transaction():
         return jsonify({
             'ok': True,
             'message': t('transactions.record_added', '记录已添加'),
-            'version': DATA_VERSION,
+            'version': new_version,
             'transaction': {
                 'id': cur.lastrowid,
                 'date': tx_date,
@@ -189,7 +188,8 @@ def records():
     total_expense = sum(r['amount'] for r in rows if r['type'] == 'expense')
     total_savings = sum(r['amount'] for r in rows if r['type'] == 'savings')
 
-    latest_id = LATEST_EVENT['data'].get('id') if LATEST_EVENT and LATEST_EVENT.get('data') else None
+    latest_evt = get_latest_event(user_id=user_id, db=db)
+    latest_id = latest_evt['data'].get('id') if latest_evt and latest_evt.get('data') else None
 
     if request.args.get('partial') == '1':
         return render_template(

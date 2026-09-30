@@ -68,6 +68,8 @@ def bump_data_version(event_type='update', data=None, user_id=None, db=None):
     except Exception as e:
         logger.warning("Failed to persist data version to system_metadata: %s", e, exc_info=True)
 
+    return DATA_VERSION
+
 
 def get_data_version(user_id=None, db=None):
     """获取最新数据版本号（优先从 system_metadata 读取以消除多 Worker 漂移，回退内存缓存）"""

@@ -47,3 +47,37 @@ def test_system_metadata_version_persistence(tmp_path, monkeypatch):
 
     conn1.close()
     conn2.close()
+
+
+def test_realtime_check_api(logged_in_client, flask_app, admin_user_id):
+    """测试 /api/realtime/check 接口在数据版本同步与更新时的响应"""
+    with flask_app.app.app_context():
+        db = flask_app.get_db()
+        v1 = bump_data_version("auto_track", {"id": 100, "amount": 12.5}, user_id=admin_user_id, db=db)
+        db.commit()
+
+    # 1. 客户端带上当前版本 v1 查询，应返回 has_update=False
+    res = logged_in_client.get(f'/api/realtime/check?v={v1}')
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data['ok'] is True
+    assert data['version'] == v1
+    assert data['has_update'] is False
+    assert data['event'] is None
+
+    # 2. 客户端带上旧版本查询，应返回 has_update=True 且携带 event
+    res = logged_in_client.get(f'/api/realtime/check?v={v1 - 1}')
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data['ok'] is True
+    assert data['has_update'] is True
+    assert data['event'] is not None
+    assert data['event']['type'] == 'auto_track'
+    assert data['event']['data']['amount'] == 12.5
+
+    # 3. 验证页面渲染注入的 INITIAL_DATA_VERSION 也是当前用户版本 v1
+    res = logged_in_client.get('/')
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert f'window.INITIAL_DATA_VERSION = {v1};' in html
+
