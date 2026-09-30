@@ -14,11 +14,6 @@
         {{ t('settings.desc', '定制专属于你的视觉主题、默认记账偏好、自动化入账规则与数据备份。') }}
       </p>
     </div>
-    <div class="settings-header-right">
-      <span class="settings-user-pill">
-        {{ t('settings.user_pill', '👤 {username} · 已录入 {count} 条交易', username=session.get('username', '用户'), count=stats.tx_count)|safe }}
-      </span>
-    </div>
   </div>
 
   <!-- 分类标签页导航 (Tabbed Navigation) -->
@@ -550,17 +545,6 @@
   font-size: 13px;
   color: var(--muted);
   line-height: 1.4;
-}
-
-.settings-user-pill {
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--ink-soft);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 
 /* 分段标签导航栏 (Segmented Tab Bar) */
