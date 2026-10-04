@@ -1544,9 +1544,53 @@ table.records-table td[data-col="actions"] .btn-danger-ghost {
   background: var(--surface-soft);
   border-top: 1px dashed var(--border);
   transition: background 0.2s ease;
+  user-select: none;
 }
 .records-sentinel-row:hover td {
   background: rgba(182, 144, 47, 0.08);
+}
+.records-sentinel-row .sentinel-idle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  transition: color 0.15s ease;
+}
+.records-sentinel-row:hover .sentinel-idle {
+  color: var(--primary);
+}
+.records-sentinel-row .sentinel-loading {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.records-sentinel-row.htmx-request .sentinel-idle,
+.records-sentinel-row.htmx-request .sentinel-error {
+  display: none !important;
+}
+.records-sentinel-row.htmx-request .sentinel-loading {
+  display: inline-flex !important;
+}
+.records-sentinel-row .sentinel-error {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--danger, #e53e3e);
+  font-size: 13px;
+  font-weight: 500;
+}
+.records-sentinel-row.has-error .sentinel-idle,
+.records-sentinel-row.has-error .sentinel-loading {
+  display: none !important;
+}
+.records-sentinel-row.has-error .sentinel-error {
+  display: inline-flex !important;
 }
 .sentinel-spinner {
   display: inline-block;

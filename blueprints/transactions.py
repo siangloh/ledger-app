@@ -232,7 +232,8 @@ def records():
             end=end,
             type=type_,
             type_=type_,
-            category=category
+            category=category,
+            page_size=page_size
         )
 
     # 局部更新（如筛选表单提交、实时 WebSocket/轮询同步）
@@ -252,7 +253,8 @@ def records():
             end=end,
             type=type_,
             type_=type_,
-            category=category
+            category=category,
+            page_size=page_size
         )
 
     return render_template(
@@ -264,7 +266,8 @@ def records():
         has_more=has_more,
         page=page,
         next_page=next_page,
-        latest_id=latest_id
+        latest_id=latest_id,
+        page_size=page_size
     )
 
 

@@ -500,6 +500,7 @@ function confirmSingleDelete(actionUrl, detailText, btnEl) {
 // 触底无限滚动懒加载：预探测与平滑加载控制
 let recordsObserver = null;
 let isRecordsLoadingMore = false;
+let recordsLoadingTimeout = null;
 
 function setupRecordsObserver() {
   if (recordsObserver) {
@@ -514,11 +515,14 @@ function setupRecordsObserver() {
       entries.forEach(entry => {
         if (entry.isIntersecting && !isRecordsLoadingMore) {
           isRecordsLoadingMore = true;
-          setTimeout(() => { isRecordsLoadingMore = false; }, 8000);
-          recordsObserver.disconnect();
-          recordsObserver = null;
+          if (recordsLoadingTimeout) clearTimeout(recordsLoadingTimeout);
+          recordsLoadingTimeout = setTimeout(() => { isRecordsLoadingMore = false; }, 8000);
+          if (recordsObserver) {
+            recordsObserver.disconnect();
+            recordsObserver = null;
+          }
           if (typeof htmx !== 'undefined') {
-            htmx.trigger(sentinel, 'revealed');
+            htmx.trigger(sentinel, 'click');
           } else {
             sentinel.click();
           }
@@ -529,15 +533,31 @@ function setupRecordsObserver() {
   }
 }
 
-// 监听 HTMX 替换和结算事件，恢复状态并初始化下一页哨兵监听
-document.addEventListener('htmx:afterSwap', function(evt) {
-  isRecordsLoadingMore = false;
-  setupRecordsObserver();
-  updateBatchBar();
+// 监听 HTMX 请求生命周期，精准控制加载状态与错误重试
+document.addEventListener('htmx:beforeRequest', function(evt) {
+  if (evt.target && evt.target.id === 'recordsLoadMoreSentinel') {
+    isRecordsLoadingMore = true;
+    evt.target.classList.remove('has-error');
+  }
 });
 
 document.addEventListener('htmx:afterRequest', function(evt) {
+  if (evt.target && evt.target.id === 'recordsLoadMoreSentinel') {
+    if (recordsLoadingTimeout) clearTimeout(recordsLoadingTimeout);
+    if (!evt.detail.successful) {
+      isRecordsLoadingMore = false;
+      evt.target.classList.add('has-error');
+      setupRecordsObserver();
+    }
+  }
+});
+
+// 监听 HTMX 节点结算完成事件（确保 HTMX 已为新插入的 DOM 节点完成处理与绑定）
+document.addEventListener('htmx:afterSettle', function(evt) {
+  if (recordsLoadingTimeout) clearTimeout(recordsLoadingTimeout);
   isRecordsLoadingMore = false;
+  setupRecordsObserver();
+  if (typeof updateBatchBar === 'function') updateBatchBar();
 });
 
 // 初始化哨兵监听（首次加载及单页应用视图切换）
@@ -546,23 +566,6 @@ if (document.readyState === 'loading') {
 } else {
   setupRecordsObserver();
 }
-
-// 全局事件代理：点击表格行任意位置快速选中/取消选中（批量删除或无感刷新后依然 100% 有效）
-document.addEventListener('click', function(e) {
-  if (e.target.closest('.actions') || e.target.closest('a') || e.target.closest('button') || e.target.closest('input')) {
-    return;
-  }
-  
-  const row = e.target.closest('tr.record-row');
-  if (!row) return;
-
-  const checkbox = row.querySelector('.record-checkbox');
-  if (checkbox) {
-    checkbox.checked = !checkbox.checked;
-    row.classList.toggle('selected-row', checkbox.checked);
-    updateBatchBar();
-  }
-});
 
 async function openOffsetModal(incomeId, incomeAmount, incomeNote) {
   if (typeof Swal === 'undefined') {
@@ -724,5 +727,15 @@ async function openOffsetModal(incomeId, incomeAmount, incomeNote) {
     });
   }
 }
+
+// 显式挂载至 window 作用域，确保内联属性及动态 DOM 派发 100% 可用
+window.setupRecordsObserver = setupRecordsObserver;
+window.updateBatchBar = updateBatchBar;
+window.toggleSelectAll = toggleSelectAll;
+window.clearAllSelections = clearAllSelections;
+window.confirmBatchDelete = confirmBatchDelete;
+window.confirmSingleDelete = confirmSingleDelete;
+window.openBatchEditDialog = openBatchEditDialog;
+window.openOffsetModal = openOffsetModal;
 </script>
 {% endblock %}

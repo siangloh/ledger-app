@@ -57,6 +57,10 @@ def test_records_pagination_with_filters(flask_app, logged_in_client, admin_user
     assert 'id="recordsLoadMoreSentinel"' in html
     assert 'type=expense' in html
     assert 'shopping-filter' in html
+    assert 'page_size=10' in html
+    assert 'hx-trigger="click"' in html
+    assert 'sentinel-idle' in html
+    assert 'sentinel-loading' in html
 
     # 拉取第 2 页 partial_rows
     res_page2 = logged_in_client.get('/records?type=expense&category=购物&page=2&page_size=10&partial_rows=1')
