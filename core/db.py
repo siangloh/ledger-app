@@ -335,6 +335,28 @@ def init_db(app_logger=None):
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        email TEXT
+    );
+    ''')
+    # 确保既有 users 表具备 email 字段
+    try:
+        user_cols = [r[1] for r in db.execute("PRAGMA table_info(users)").fetchall()]
+        if 'email' not in user_cols:
+            db.execute("ALTER TABLE users ADD COLUMN email TEXT")
+    except Exception as e:
+        logger.debug("Migrate users email column skipped: %s", e)
+
+    # 密码重置 OTP 记录表
+    db.execute('''
+    CREATE TABLE IF NOT EXISTS password_resets (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        email TEXT NOT NULL,
+        otp_code TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        attempts INTEGER DEFAULT 0,
+        used INTEGER DEFAULT 0,
         created_at TEXT NOT NULL
     );
     ''')

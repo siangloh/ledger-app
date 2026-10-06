@@ -83,10 +83,22 @@ def test_poster_service_with_transactions():
             assert data_en['persona']['title'] == 'Master Saver'
             assert 'Savings rate reached 75.0%' in data_en['persona']['commentary']
 
-            # 测试马来文人格生成
+            # 验证环比、同比与储蓄策略数据结构
+            assert 'comparison' in data_zh
+            assert 'mom' in data_zh['comparison']
+            assert 'yoy' in data_zh['comparison']
+            assert 'savings_strategies' in data_zh
+            assert len(data_zh['savings_strategies']) >= 3
+            assert data_zh['savings_strategies'][0]['title'] == '50/30/20 经典资产配置法则'
+
+            # 验证英文储蓄策略
+            assert data_en['savings_strategies'][0]['title'] == 'The 50/30/20 Budgeting Rule'
+
+            # 验证马来文储蓄策略
             data_ms = get_monthly_poster_data(user_id=user_id, month_str=test_month, lang='ms', db=db)
             assert data_ms['ok'] is True
             assert data_ms['persona']['title'] == 'Pakar Penabung'
+            assert data_ms['savings_strategies'][0]['title'] == 'Peraturan Belanjawan 50/30/20'
 
         finally:
             # 清理测试数据
@@ -111,3 +123,6 @@ def test_api_monthly_poster_success(client):
     assert 'top_categories' in json_data
     assert 'persona' in json_data
     assert 'currency_symbol' in json_data
+    assert 'comparison' in json_data
+    assert 'savings_strategies' in json_data
+

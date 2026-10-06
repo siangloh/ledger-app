@@ -3909,12 +3909,228 @@ if (window.matchMedia) {
   setTimeout(autoBindQuickAdd, 100);
 })();
 
+
 /* ==========================================================================
-   Aesthetic Monthly Financial Poster Generator & Exporter
+   Aesthetic Monthly Financial Poster & Deep Analysis Report Generator
    HTML5 Canvas 2D Engine with Retina 2x Supersampling
+   Features:
+     - 100% Dynamic Localization (zh, zh_TW, en, ms)
+     - Dynamic Color Mode Adaptation (Dark Obsidian & Light Alabaster)
+     - MoM & YoY Period Comparisons
+     - 50/30/20 Budgeting Rule Diagnostics & Personalized Savings Tactics
    ========================================================================== */
 (function () {
   'use strict';
+
+  function isDarkTheme() {
+    const dt = document.documentElement.getAttribute('data-theme');
+    if (dt === 'dark') return true;
+    if (dt === 'light') return false;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  function getThemeTokens(isDark) {
+    if (isDark) {
+      return {
+        isDark: true,
+        bgGradTop: '#0C1322',
+        bgGradMid: '#080D18',
+        bgGradBottom: '#04060B',
+        glow1: 'rgba(79, 70, 229, 0.16)',
+        glow2: 'rgba(245, 158, 11, 0.09)',
+        cardBg: 'rgba(30, 41, 59, 0.70)',
+        cardBorder: 'rgba(255, 255, 255, 0.08)',
+        outerBorder: 'rgba(255, 255, 255, 0.07)',
+        textPrimary: '#F8FAFC',
+        textSecondary: '#94A3B8',
+        textMuted: '#64748B',
+        textHeading: '#FFFFFF',
+        textHeadingEnd: '#E2E8F0',
+        divider: 'rgba(255, 255, 255, 0.08)',
+        accentGold: '#F59E0B',
+        accentGoldText: '#FCD34D',
+        accentGoldBg: 'rgba(245, 158, 11, 0.15)',
+        accentGoldBorder: 'rgba(245, 158, 11, 0.45)',
+        emerald: '#34D399',
+        rose: '#F43F5E',
+        barTrack: 'rgba(255, 255, 255, 0.06)',
+        badgeBg: 'rgba(255, 255, 255, 0.08)'
+      };
+    } else {
+      return {
+        isDark: false,
+        bgGradTop: '#FFFFFF',
+        bgGradMid: '#F8FAFC',
+        bgGradBottom: '#F1F5F9',
+        glow1: 'rgba(99, 102, 241, 0.08)',
+        glow2: 'rgba(245, 158, 11, 0.06)',
+        cardBg: '#FFFFFF',
+        cardBorder: 'rgba(15, 23, 42, 0.08)',
+        outerBorder: 'rgba(15, 23, 42, 0.09)',
+        textPrimary: '#0F172A',
+        textSecondary: '#475569',
+        textMuted: '#94A3B8',
+        textHeading: '#0F172A',
+        textHeadingEnd: '#1E293B',
+        divider: 'rgba(15, 23, 42, 0.08)',
+        accentGold: '#D97706',
+        accentGoldText: '#B45309',
+        accentGoldBg: 'rgba(245, 158, 11, 0.12)',
+        accentGoldBorder: 'rgba(217, 119, 6, 0.35)',
+        emerald: '#059669',
+        rose: '#E11D48',
+        barTrack: 'rgba(15, 23, 42, 0.06)',
+        badgeBg: 'rgba(15, 23, 42, 0.06)'
+      };
+    }
+  }
+
+  const I18N_POSTER = {
+    zh: {
+      brand: '✦ 我的账本',
+      issue_prefix: '财务月报',
+      digest_subtitle: '极美财务月度收支总览',
+      net_balance: '本月净结余',
+      total_income: '总收入',
+      total_expense: '总支出',
+      savings_rate: '储蓄率',
+      daily_avg: '日均支出',
+      tx_count: '记账笔数',
+      no_spend_days: '零支出天数',
+      max_expense: '单笔最大',
+      top_categories: '支出分类 TOP 5',
+      persona_title: '财务人格与月度评语',
+      footer_brand: 'MY LEDGER APP',
+      footer_tagline: '掌控生活收支 · 走向财务自由',
+      footer_verified: 'Verified & Generated',
+      deep_title: '深度洞察与同比环比分析',
+      deep_subtitle: '收支趋势变动 · 50/30/20诊断 · 专属储蓄策略',
+      mom_title: '环比上月 (MoM)',
+      yoy_title: '同比去年 (YoY)',
+      diff_expense: '支出',
+      diff_income: '收入',
+      diff_savings: '储蓄率',
+      no_prev_data: '无上一期对比数据',
+      rule_50_30_20: '50 / 30 / 20 预算法则健康诊断',
+      needs_label: '必要支出 (Needs 50%)',
+      wants_label: '弹性支出 (Wants 30%)',
+      savings_label: '储蓄结余 (Savings 20%)',
+      strategies_title: '💡 针对性储蓄与改善建议',
+      est_save_prefix: '预估月省',
+      persona_badge: '✨ 评定称号',
+      other_label: '其他'
+    },
+    zh_TW: {
+      brand: '✦ 我的賬本',
+      issue_prefix: '財務月報',
+      digest_subtitle: '極美財務月度收支總覽',
+      net_balance: '本月淨結餘',
+      total_income: '總收入',
+      total_expense: '總支出',
+      savings_rate: '儲蓄率',
+      daily_avg: '日均支出',
+      tx_count: '記賬筆數',
+      no_spend_days: '零支出天數',
+      max_expense: '單筆最大',
+      top_categories: '支出分類 TOP 5',
+      persona_title: '財務人格與月度評語',
+      footer_brand: 'MY LEDGER APP',
+      footer_tagline: '掌控生活收支 · 走向財務自由',
+      footer_verified: 'Verified & Generated',
+      deep_title: '深度洞察與同比環比分析',
+      deep_subtitle: '收支趨勢變動 · 50/30/20診斷 · 專屬儲蓄策略',
+      mom_title: '環比上月 (MoM)',
+      yoy_title: '同比去年 (YoY)',
+      diff_expense: '支出',
+      diff_income: '收入',
+      diff_savings: '儲蓄率',
+      no_prev_data: '無上一期對比數據',
+      rule_50_30_20: '50 / 30 / 20 預算法則健康診斷',
+      needs_label: '必要支出 (Needs 50%)',
+      wants_label: '彈性支出 (Wants 30%)',
+      savings_label: '儲蓄結餘 (Savings 20%)',
+      strategies_title: '💡 針對性儲蓄與改善建議',
+      est_save_prefix: '預估月省',
+      persona_badge: '✨ 評定稱號',
+      other_label: '其他'
+    },
+    en: {
+      brand: '✦ My Ledger',
+      issue_prefix: 'Monthly Digest',
+      digest_subtitle: 'Aesthetic Financial Performance Report',
+      net_balance: 'Net Surplus',
+      total_income: 'Total Income',
+      total_expense: 'Total Expense',
+      savings_rate: 'Savings Rate',
+      daily_avg: 'Daily Avg Spend',
+      tx_count: 'Transactions',
+      no_spend_days: 'Zero-Spend Days',
+      max_expense: 'Max Single Spend',
+      top_categories: 'Top 5 Expense Categories',
+      persona_title: 'Financial Persona & Monthly Verdict',
+      footer_brand: 'MY LEDGER APP',
+      footer_tagline: 'Master Your Cashflow · Path to Freedom',
+      footer_verified: 'Verified & Generated',
+      deep_title: 'Deep Financial Insights & Comparisons',
+      deep_subtitle: 'MoM/YoY Trends · 50/30/20 Rule · Personalized Savings Tactics',
+      mom_title: 'Month-over-Month (MoM)',
+      yoy_title: 'Year-over-Year (YoY)',
+      diff_expense: 'Expense',
+      diff_income: 'Income',
+      diff_savings: 'Savings Rate',
+      no_prev_data: 'No baseline data for comparison',
+      rule_50_30_20: '50 / 30 / 20 Budget Rule Diagnostic',
+      needs_label: 'Needs (Benchmark 50%)',
+      wants_label: 'Wants (Benchmark 30%)',
+      savings_label: 'Savings (Benchmark 20%)',
+      strategies_title: '💡 Actionable Savings & Optimization Tactics',
+      est_save_prefix: 'Est. Save',
+      persona_badge: '✨ Persona Title',
+      other_label: 'Others'
+    },
+    ms: {
+      brand: '✦ Buku Wang Saya',
+      issue_prefix: 'Penyata Bulanan',
+      digest_subtitle: 'Ringkasan Aliran Kewangan Bulanan',
+      net_balance: 'Baki Bersih',
+      total_income: 'Jumlah Pendapatan',
+      total_expense: 'Jumlah Belanja',
+      savings_rate: 'Kadar Simpanan',
+      daily_avg: 'Purata Belanja Harian',
+      tx_count: 'Bilangan Transaksi',
+      no_spend_days: 'Hari Tanpa Belanja',
+      max_expense: 'Belanja Terbesar',
+      top_categories: 'Kategori Belanja Teratas (TOP 5)',
+      persona_title: 'Persona Kewangan & Ulasan Bulanan',
+      footer_brand: 'MY LEDGER APP',
+      footer_tagline: 'Urus Aliran Wang · Menuju Kebebasan Kewangan',
+      footer_verified: 'Verified & Generated',
+      deep_title: 'Wawasan Mendalam & Perbandingan Tempoh',
+      deep_subtitle: 'Trend MoM/YoY · Peraturan 50/30/20 · Pelan Simpanan Pintar',
+      mom_title: 'Bulan-ke-Bulan (MoM)',
+      yoy_title: 'Tahun-ke-Tahun (YoY)',
+      diff_expense: 'Belanja',
+      diff_income: 'Pendapatan',
+      diff_savings: 'Kadar Simpanan',
+      no_prev_data: 'Tiada data perbandingan sebelumnya',
+      rule_50_30_20: 'Diagnosis Peraturan Belanjawan 50 / 30 / 20',
+      needs_label: 'Keperluan (Sasaran 50%)',
+      wants_label: 'Kehendak (Sasaran 30%)',
+      savings_label: 'Simpanan (Sasaran 20%)',
+      strategies_title: '💡 Cadangan Penjimatan & Pengurusan Pintar',
+      est_save_prefix: 'Anggaran Jimat',
+      persona_badge: '✨ Gelaran Persona',
+      other_label: 'Lain-lain'
+    }
+  };
+
+  function getPosterLocale() {
+    const raw = (document.documentElement.lang || 'zh').toLowerCase();
+    if (raw.startsWith('zh_tw') || raw.startsWith('zh-tw') || raw.startsWith('zh-hant')) return 'zh_TW';
+    if (raw.startsWith('en')) return 'en';
+    if (raw.startsWith('ms') || raw.startsWith('my')) return 'ms';
+    return 'zh';
+  }
 
   function formatMoney(num) {
     return Number(num || 0).toLocaleString('en-US', {
@@ -3931,312 +4147,246 @@ if (window.matchMedia) {
     ctx.arcTo(x + w, y, x + w, y + h, r);
     ctx.arcTo(x + w, y + h, x, y + h, r);
     ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
+    ctx.arcTo(x, y + x, y, r);
     ctx.closePath();
   }
 
-  function drawGlassCard(ctx, x, y, w, h, r, bgAlpha, borderAlpha) {
+  function drawGlassCard(ctx, x, y, w, h, r, tokens) {
     ctx.save();
-    ctx.fillStyle = `rgba(30, 41, 59, ${bgAlpha !== undefined ? bgAlpha : 0.65})`;
+    ctx.fillStyle = tokens.cardBg;
     roundRect(ctx, x, y, w, h, r);
     ctx.fill();
-    ctx.strokeStyle = `rgba(255, 255, 255, ${borderAlpha !== undefined ? borderAlpha : 0.08})`;
+
+    ctx.strokeStyle = tokens.cardBorder;
     ctx.lineWidth = 1;
+    roundRect(ctx, x, y, w, h, r);
     ctx.stroke();
     ctx.restore();
   }
 
   function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
-    if (!text) return;
-    maxLines = maxLines || 4;
-    const chars = Array.from(text);
+    const chars = Array.from(text || '');
     let line = '';
-    let count = 0;
+    let curY = y;
+    let linesDrawn = 0;
 
     for (let i = 0; i < chars.length; i++) {
       const testLine = line + chars[i];
-      const testWidth = ctx.measureText(testLine).width;
-      if (testWidth > maxWidth && i > 0) {
-        count++;
-        if (count >= maxLines) {
-          ctx.fillText(line + '...', x, y);
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth && i > 0) {
+        linesDrawn++;
+        if (maxLines && linesDrawn >= maxLines) {
+          ctx.fillText(line.slice(0, -1) + '...', x, curY);
           return;
         }
-        ctx.fillText(line, x, y);
+        ctx.fillText(line, x, curY);
         line = chars[i];
-        y += lineHeight;
+        curY += lineHeight;
       } else {
         line = testLine;
       }
     }
     if (line) {
-      ctx.fillText(line, x, y);
+      ctx.fillText(line, x, curY);
     }
   }
 
-  function renderPosterCanvas(data) {
-    const W = 750;
-    const H = 1260;
-    const scale = 2; // 2x Retina sharpness
+  // 1. 绘制月度精粹海报 (Summary Poster)
+  function renderPosterCanvas(data, isDark) {
+    const tokens = getThemeTokens(isDark);
+    const locale = getPosterLocale();
+    const txt = I18N_POSTER[locale] || I18N_POSTER.zh;
+
+    const W = 640;
+    const H = 1240;
+    const scale = 2; // Retina 2x
 
     const canvas = document.createElement('canvas');
     canvas.width = W * scale;
     canvas.height = H * scale;
+
     const ctx = canvas.getContext('2d');
     ctx.scale(scale, scale);
 
-    const curr = data.currency_symbol || (window.LEDGER_CURRENCY_SYMBOL || 'RM');
-    const m = data.metrics || {};
-    const persona = data.persona || {};
-
-    // 1. 背景渐变与氛围光晕 (Deep Obsidian & Ambient Glow)
+    // 背景深/浅色渐变
     const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-    bgGrad.addColorStop(0, '#0C1322');
-    bgGrad.addColorStop(0.35, '#080D18');
-    bgGrad.addColorStop(1, '#04060B');
+    bgGrad.addColorStop(0, tokens.bgGradTop);
+    bgGrad.addColorStop(0.5, tokens.bgGradMid);
+    bgGrad.addColorStop(1, tokens.bgGradBottom);
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, W, H);
 
-    // 氛围光 1: 右上角极光蓝紫
-    const glow1 = ctx.createRadialGradient(W - 60, 80, 10, W - 60, 80, 360);
-    glow1.addColorStop(0, 'rgba(79, 70, 229, 0.16)');
-    glow1.addColorStop(1, 'rgba(79, 70, 229, 0)');
+    // 氛围背景微光光晕
+    ctx.save();
+    const glow1 = ctx.createRadialGradient(120, 160, 20, 120, 160, 360);
+    glow1.addColorStop(0, tokens.glow1);
+    glow1.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = glow1;
     ctx.fillRect(0, 0, W, H);
 
-    // 氛围光 2: 左侧中央暖金星辉
-    const glow2 = ctx.createRadialGradient(60, 680, 10, 60, 680, 320);
-    glow2.addColorStop(0, 'rgba(245, 158, 11, 0.09)');
-    glow2.addColorStop(1, 'rgba(245, 158, 11, 0)');
+    const glow2 = ctx.createRadialGradient(W - 100, 780, 20, W - 100, 780, 420);
+    glow2.addColorStop(0, tokens.glow2);
+    glow2.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = glow2;
     ctx.fillRect(0, 0, W, H);
+    ctx.restore();
 
-    // 外层极细金属质感装饰边框
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+    // 细致精致外框
+    ctx.strokeStyle = tokens.outerBorder;
     ctx.lineWidth = 1;
-    roundRect(ctx, 22, 22, W - 44, H - 44, 26);
+    roundRect(ctx, 16, 16, W - 32, H - 32, 24);
     ctx.stroke();
 
-    // 2. 顶部 Header (Y: 55 - 150)
-    // 品牌 Pill
-    ctx.save();
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
-    roundRect(ctx, 44, 52, 126, 26, 13);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    const curr = data.currency || 'RM';
+    const metrics = data.metrics || {};
+    const persona = data.persona || {};
 
-    ctx.fillStyle = '#FCD34D';
-    ctx.font = '600 11px system-ui, -apple-system, sans-serif';
-    ctx.fillText('✦ MY LEDGER', 58, 69);
+    // 1. Header (Y: 48 - 140)
+    ctx.fillStyle = tokens.accentGold;
+    ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(txt.brand, 44, 68);
 
-    // 右侧期号
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = '500 11.5px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'right';
-    const issueText = `MONTHLY REPORT · ${data.month || ''}`;
-    ctx.fillText(issueText, W - 44, 69);
+    ctx.fillStyle = tokens.textMuted;
+    ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${txt.issue_prefix} · ${data.month}`, W - 44, 68);
     ctx.textAlign = 'left';
 
-    // 月度标题 (大号 Serif)
-    const titleGrad = ctx.createLinearGradient(44, 95, 400, 130);
-    titleGrad.addColorStop(0, '#FFFFFF');
-    titleGrad.addColorStop(1, '#E2E8F0');
-    ctx.fillStyle = titleGrad;
-    ctx.font = 'bold 32px "Playfair Display", Georgia, "Songti SC", serif';
-    const mainTitleText = data.month_name_en ? `${data.month_name_en} ${data.year}` : (data.month_name_zh || data.month);
-    ctx.fillText(mainTitleText, 44, 116);
+    ctx.fillStyle = tokens.textHeading;
+    ctx.font = 'bold 28px system-ui, -apple-system, sans-serif';
+    ctx.fillText(data.month, 44, 114);
 
-    // 副标题
-    ctx.fillStyle = '#64748B';
-    ctx.font = '500 12px system-ui, -apple-system, sans-serif';
-    ctx.fillText(data.month_name_zh ? `${data.month_name_zh} · 极美财务月度收支总览` : 'MONTHLY FINANCIAL SUMMARY', 44, 138);
+    ctx.fillStyle = tokens.textSecondary;
+    ctx.font = '13.5px system-ui, -apple-system, sans-serif';
+    ctx.fillText(txt.digest_subtitle, 44, 138);
 
-    // 金色纤细渐变分割线
-    const lineGrad = ctx.createLinearGradient(44, 152, W - 44, 152);
-    lineGrad.addColorStop(0, 'rgba(245, 158, 11, 0)');
-    lineGrad.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
-    lineGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
-    ctx.fillStyle = lineGrad;
-    ctx.fillRect(44, 152, W - 88, 1);
-    ctx.restore();
+    // 2. Net Balance Hero Card (Y: 165 - 345, H: 180)
+    const heroY = 165;
+    drawGlassCard(ctx, 44, heroY, W - 88, 175, 20, tokens);
 
-    // 3. 核心净结余卡片 (Y: 170 - 390, H: 220)
-    drawGlassCard(ctx, 44, 170, W - 88, 215, 20, 0.7, 0.12);
+    ctx.fillStyle = tokens.textSecondary;
+    ctx.font = '600 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(txt.net_balance, 68, heroY + 38);
 
-    // 卡片内顶行：标签 + 人格徽章
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = '600 12.5px system-ui, -apple-system, sans-serif';
-    ctx.fillText(window.t ? window.t('poster.net_balance', '本月净结余') : '本月净结余', 68, 205);
+    const netBal = Number(metrics.net_balance || 0);
+    const isNetPositive = netBal >= 0;
+    ctx.fillStyle = isNetPositive ? tokens.emerald : tokens.rose;
+    ctx.font = 'bold 36px "SF Pro Display", -apple-system, sans-serif';
+    const netBalStr = `${isNetPositive ? '+' : ''}${curr} ${formatMoney(netBal)}`;
+    ctx.fillText(netBalStr, 68, heroY + 84);
 
-    if (persona.badge) {
-      ctx.save();
-      const badgeText = persona.badge;
-      ctx.font = '600 12px system-ui, -apple-system, sans-serif';
-      const badgeW = ctx.measureText(badgeText).width + 24;
-      const badgeX = W - 68 - badgeW;
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
-      roundRect(ctx, badgeX, 188, badgeW, 26, 13);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
+    // Hero Card 内部分割线
+    ctx.fillStyle = tokens.divider;
+    ctx.fillRect(68, heroY + 104, W - 136, 1);
 
-      ctx.fillStyle = '#FCD34D';
-      ctx.fillText(badgeText, badgeX + 12, 205);
-      ctx.restore();
-    }
+    // 收入、支出与储蓄率三栏指标
+    const colW = (W - 136) / 3;
+    const statBaseY = heroY + 128;
 
-    // 净结余大金额
-    const netBal = m.net_balance || 0;
-    const isPositive = netBal >= 0;
-    ctx.save();
-    ctx.font = 'bold 40px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = isPositive ? '#34D399' : '#F43F5E';
-    const sign = isPositive ? '+' : '';
-    const netText = `${sign}${curr} ${formatMoney(netBal)}`;
-    ctx.fillText(netText, 68, 258);
-    ctx.restore();
-
-    // 卡片内底部分割线
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
-    ctx.fillRect(68, 285, W - 136, 1);
-
-    // 三栏核心指标: 总收入, 总支出, 储蓄率
-    const colY = 320;
-    // 收入
-    ctx.fillStyle = '#94A3B8';
+    // 总收入
+    ctx.fillStyle = tokens.textMuted;
     ctx.font = '11.5px system-ui, -apple-system, sans-serif';
-    ctx.fillText(window.t ? window.t('poster.income', '总收入') : '总收入', 68, colY);
-    ctx.fillStyle = '#10B981';
-    ctx.font = 'bold 18px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`${curr} ${formatMoney(m.total_income)}`, 68, colY + 24);
+    ctx.fillText(txt.total_income, 68, statBaseY);
+    ctx.fillStyle = tokens.emerald;
+    ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${curr} ${formatMoney(metrics.total_income)}`, 68, statBaseY + 22);
 
-    // 支出
-    ctx.fillStyle = '#94A3B8';
+    // 总支出
+    ctx.fillStyle = tokens.textMuted;
     ctx.font = '11.5px system-ui, -apple-system, sans-serif';
-    ctx.fillText(window.t ? window.t('poster.expense', '总支出') : '总支出', 290, colY);
-    ctx.fillStyle = '#F43F5E';
-    ctx.font = 'bold 18px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`${curr} ${formatMoney(m.total_expense)}`, 290, colY + 24);
+    ctx.fillText(txt.total_expense, 68 + colW, statBaseY);
+    ctx.fillStyle = tokens.rose;
+    ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${curr} ${formatMoney(metrics.total_expense)}`, 68 + colW, statBaseY + 22);
 
     // 储蓄率
-    ctx.fillStyle = '#94A3B8';
+    ctx.fillStyle = tokens.textMuted;
     ctx.font = '11.5px system-ui, -apple-system, sans-serif';
-    ctx.fillText(window.t ? window.t('poster.savings_rate', '储蓄率') : '储蓄率', 520, colY);
-    ctx.fillStyle = '#FBBF24';
-    ctx.font = 'bold 18px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`${m.savings_rate || 0}%`, 520, colY + 24);
+    ctx.fillText(txt.savings_rate, 68 + colW * 2, statBaseY);
+    ctx.fillStyle = tokens.accentGold;
+    ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${metrics.savings_rate}%`, 68 + colW * 2, statBaseY + 22);
 
-    // 4. 四格统计网格 (Y: 405 - 495, H: 90)
-    const gridY = 405;
-    const cardW = 154;
-    const cardH = 88;
-    const gap = 15;
-    const startX = 44;
-
-    const gridItems = [
-      {
-        label: window.t ? window.t('poster.daily_avg', '日均支出') : '日均支出',
-        val: `${curr} ${formatMoney(m.avg_daily_expense)}`,
-        color: '#E2E8F0'
-      },
-      {
-        label: window.t ? window.t('poster.tx_count', '记账笔数') : '记账笔数',
-        val: `${m.tx_count || 0} 笔`,
-        color: '#60A5FA'
-      },
-      {
-        label: window.t ? window.t('poster.no_spend_days', '零支出天数') : '零支出天数',
-        val: `${m.no_spend_days || 0} 天`,
-        color: '#FCD34D'
-      },
-      {
-        label: window.t ? window.t('poster.max_expense', '单笔最大') : '单笔最大',
-        val: `${curr} ${formatMoney((data.max_expense && data.max_expense.amount) || 0)}`,
-        color: '#F87171'
-      }
+    // 3. 统计小方块四宫格 (Y: 360 - 455, H: 90)
+    const gridY = 360;
+    const gridCardW = (W - 88 - 36) / 4;
+    const gridCardH = 82;
+    const subStats = [
+      { label: txt.daily_avg, val: `${curr} ${formatMoney(metrics.daily_avg_expense)}` },
+      { label: txt.tx_count, val: `${metrics.tx_count || 0}` },
+      { label: txt.no_spend_days, val: `${metrics.zero_spend_days || 0}` },
+      { label: txt.max_expense, val: `${curr} ${formatMoney(metrics.max_expense)}` }
     ];
 
-    gridItems.forEach((item, idx) => {
-      const cx = startX + idx * (cardW + gap);
-      drawGlassCard(ctx, cx, gridY, cardW, cardH, 14, 0.55, 0.08);
+    subStats.forEach((st, i) => {
+      const gx = 44 + i * (gridCardW + 12);
+      drawGlassCard(ctx, gx, gridY, gridCardW, gridCardH, 14, tokens);
 
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = '11.5px system-ui, -apple-system, sans-serif';
-      ctx.fillText(item.label, cx + 14, gridY + 28);
+      ctx.fillStyle = tokens.textMuted;
+      ctx.font = '10.5px system-ui, -apple-system, sans-serif';
+      ctx.fillText(st.label, gx + 12, gridY + 28);
 
-      ctx.fillStyle = item.color;
-      ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
-      ctx.fillText(item.val, cx + 14, gridY + 60);
+      ctx.fillStyle = tokens.textPrimary;
+      ctx.font = 'bold 13.5px system-ui, -apple-system, sans-serif';
+      ctx.fillText(st.val, gx + 12, gridY + 56);
     });
 
-    // 5. 支出分类排行 TOP 5 (Y: 512 - 805, H: 285)
-    const catY = 512;
-    ctx.fillStyle = '#CBD5E1';
+    // 4. TOP 5 支出分类 (Y: 465 - 805, H: 335)
+    const topCatY = 468;
+    ctx.fillStyle = tokens.textSecondary;
     ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
-    ctx.fillText(window.t ? window.t('poster.top_categories', '支出分类 TOP 5') : '支出分类 TOP 5', 44, catY);
+    ctx.fillText(txt.top_categories, 44, topCatY);
 
-    const catCardY = catY + 14;
-    drawGlassCard(ctx, 44, catCardY, W - 88, 275, 18, 0.6, 0.09);
+    const topCardY = topCatY + 14;
+    const topCardH = 320;
+    drawGlassCard(ctx, 44, topCardY, W - 88, topCardH, 18, tokens);
 
-    const topCats = data.top_categories || [];
-    const barPalette = [
-      ['#F59E0B', '#FCD34D'],
-      ['#3B82F6', '#93C5FD'],
-      ['#8B5CF6', '#C4B5FD'],
-      ['#EC4899', '#F472B6'],
-      ['#10B981', '#6EE7B7']
+    const categories = data.top_categories || [];
+    const catSlotH = 56;
+    const catColors = [
+      ['#F59E0B', '#D97706'],
+      ['#6366F1', '#4F46E5'],
+      ['#EC4899', '#DB2777'],
+      ['#10B981', '#059669'],
+      ['#8B5CF6', '#7C3AED']
     ];
 
-    if (topCats.length === 0) {
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = '14px system-ui, -apple-system, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('✨ ' + (window.t ? window.t('poster.empty_hint', '本月暂无支出记录，保持了充沛的储蓄蓄水池') : '本月暂无支出记录，保持了充沛的储蓄蓄水池'), W / 2, catCardY + 145);
-      ctx.textAlign = 'left';
+    if (categories.length === 0) {
+      ctx.fillStyle = tokens.textMuted;
+      ctx.font = '13px system-ui, -apple-system, sans-serif';
+      ctx.fillText('No expense recorded this month.', 68, topCardY + 45);
     } else {
-      const rowStartY = catCardY + 40;
-      topCats.slice(0, 5).forEach((c, idx) => {
-        const ry = rowStartY + idx * 48;
-        const cName = window.t_cat ? window.t_cat(c.name) : c.name;
-        const colors = barPalette[idx % barPalette.length];
+      categories.slice(0, 5).forEach((c, idx) => {
+        const ry = topCardY + 20 + idx * catSlotH;
+        const colors = catColors[idx % catColors.length];
 
-        // 排行数字
-        ctx.fillStyle = colors[1];
-        ctx.font = 'bold 12.5px system-ui, -apple-system, sans-serif';
-        ctx.fillText(`0${idx + 1}`, 66, ry);
-
-        // 分类名称
-        ctx.fillStyle = '#F1F5F9';
-        ctx.font = '600 13px system-ui, -apple-system, sans-serif';
-        ctx.fillText(cName, 94, ry);
-
-        // 占比徽标
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-        roundRect(ctx, 160, ry - 14, 46, 18, 9);
+        ctx.fillStyle = colors[0];
+        ctx.beginPath();
+        ctx.arc(74, ry - 4, 4.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = '#94A3B8';
-        ctx.font = '500 10.5px system-ui, -apple-system, sans-serif';
-        ctx.fillText(`${c.percentage}%`, 168, ry - 1);
 
-        // 金额
+        const catName = window.t_cat ? window.t_cat(c.name) : c.name;
+        ctx.fillStyle = tokens.textPrimary;
+        ctx.font = '500 13px system-ui, -apple-system, sans-serif';
+        ctx.fillText(catName, 88, ry);
+
         ctx.textAlign = 'right';
-        ctx.fillStyle = '#E2E8F0';
+        ctx.fillStyle = tokens.textMuted;
+        ctx.font = '12px system-ui, -apple-system, sans-serif';
+        ctx.fillText(`${c.percentage}%`, W - 146, ry);
+
+        ctx.fillStyle = tokens.textPrimary;
         ctx.font = '600 13px system-ui, -apple-system, sans-serif';
         ctx.fillText(`${curr} ${formatMoney(c.amount)}`, W - 66, ry);
         ctx.textAlign = 'left';
 
-        // 进度条背景
         const barTrackX = 66;
         const barTrackY = ry + 8;
         const barTrackW = W - 132;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.fillStyle = tokens.barTrack;
         roundRect(ctx, barTrackX, barTrackY, barTrackW, 5, 2.5);
         ctx.fill();
 
-        // 进度条填充
         const fillW = Math.max(8, Math.min(barTrackW, (c.percentage / 100) * barTrackW));
         const barGrad = ctx.createLinearGradient(barTrackX, 0, barTrackX + fillW, 0);
         barGrad.addColorStop(0, colors[0]);
@@ -4247,81 +4397,390 @@ if (window.matchMedia) {
       });
     }
 
-    // 6. 财务人格与月度评语 (Y: 825 - 1045, H: 210)
+    // 5. 财务人格与月度评语 (Y: 825 - 1045, H: 200)
     const personaY = 825;
-    ctx.fillStyle = '#CBD5E1';
+    ctx.fillStyle = tokens.textSecondary;
     ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
-    ctx.fillText(window.t ? window.t('poster.persona_eval', '财务人格与月度评语') : '财务人格与月度评语', 44, personaY);
+    ctx.fillText(txt.persona_title, 44, personaY);
 
     const personaCardY = personaY + 14;
     const personaCardH = 200;
-    drawGlassCard(ctx, 44, personaCardY, W - 88, personaCardH, 18, 0.65, 0.1);
+    drawGlassCard(ctx, 44, personaCardY, W - 88, personaCardH, 18, tokens);
 
-    // 左侧微光金色高光竖条
     ctx.save();
     const goldAccent = ctx.createLinearGradient(0, personaCardY, 0, personaCardY + personaCardH);
-    goldAccent.addColorStop(0, '#F59E0B');
+    goldAccent.addColorStop(0, tokens.accentGold);
     goldAccent.addColorStop(1, '#D97706');
     ctx.fillStyle = goldAccent;
     roundRect(ctx, 44, personaCardY, 5, personaCardH, 2.5);
     ctx.fill();
     ctx.restore();
 
-    // 人格称号
-    ctx.fillStyle = '#FCD34D';
+    ctx.fillStyle = tokens.accentGoldText;
     ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
-    const personaTitleText = `✨ 评定称号: ${persona.title || '理财探寻者'}`;
+    const personaTitleText = `${txt.persona_badge}: ${persona.title || '理财探寻者'}`;
     ctx.fillText(personaTitleText, 68, personaCardY + 36);
 
-    // 评语正文
-    ctx.fillStyle = '#E2E8F0';
+    ctx.fillStyle = tokens.textPrimary;
     ctx.font = '13.5px system-ui, -apple-system, "PingFang SC", sans-serif';
     wrapText(ctx, persona.commentary || '保持记账习惯，清晰掌控每一分财务未来。', 68, personaCardY + 68, W - 136, 23, 4);
 
-    // 灵感名言
     if (data.quote) {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.fillStyle = tokens.badgeBg;
       roundRect(ctx, 68, personaCardY + 145, W - 136, 38, 10);
       ctx.fill();
 
-      ctx.fillStyle = '#94A3B8';
+      ctx.fillStyle = tokens.textSecondary;
       ctx.font = 'italic 12px "Playfair Display", Georgia, serif';
       ctx.fillText(`“${data.quote}”`, 82, personaCardY + 168);
     }
 
-    // 7. 底部落款与水印 (Y: 1060 - 1220)
+    // 6. 底部落款与水印 (Y: 1060 - 1220)
     const footerY = 1060;
-    // 渐变分割线
-    const fGrad = ctx.createLinearGradient(44, footerY, W - 44, footerY);
-    fGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-    fGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.12)');
-    fGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = fGrad;
+    ctx.fillStyle = tokens.divider;
     ctx.fillRect(44, footerY, W - 88, 1);
 
-    // 左侧品牌标语
-    ctx.fillStyle = '#94A3B8';
+    ctx.fillStyle = tokens.textSecondary;
     ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
-    ctx.fillText('MY LEDGER APP', 44, footerY + 34);
+    ctx.fillText(txt.footer_brand, 44, footerY + 34);
 
-    ctx.fillStyle = '#64748B';
+    ctx.fillStyle = tokens.textMuted;
     ctx.font = '11.5px system-ui, -apple-system, sans-serif';
-    ctx.fillText('掌控生活收支 · 走向财务自由', 44, footerY + 52);
+    ctx.fillText(txt.footer_tagline, 44, footerY + 52);
 
-    // 右侧生成日期
     const todayStr = new Date().toISOString().slice(0, 10);
     ctx.textAlign = 'right';
-    ctx.fillStyle = '#64748B';
+    ctx.fillStyle = tokens.textMuted;
     ctx.font = '11px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`Verified & Generated on ${todayStr}`, W - 44, footerY + 34);
+    ctx.fillText(`${txt.footer_verified} on ${todayStr}`, W - 44, footerY + 34);
     ctx.fillText('Self-Hosted Secure Ledger', W - 44, footerY + 52);
     ctx.textAlign = 'left';
 
     return canvas;
   }
 
-  function downloadPosterImage(dataUrl, monthStr) {
-    const filename = `Ledger_Poster_${monthStr || 'Monthly'}.png`;
+  // 2. 绘制深度洞察与对比长图 (Deep Analysis Report)
+  function renderDeepAnalysisCanvas(data, isDark) {
+    const tokens = getThemeTokens(isDark);
+    const locale = getPosterLocale();
+    const txt = I18N_POSTER[locale] || I18N_POSTER.zh;
+
+    const W = 640;
+    const H = 1640;
+    const scale = 2; // Retina 2x
+
+    const canvas = document.createElement('canvas');
+    canvas.width = W * scale;
+    canvas.height = H * scale;
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+
+    // 背景深/浅色渐变
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+    bgGrad.addColorStop(0, tokens.bgGradTop);
+    bgGrad.addColorStop(0.35, tokens.bgGradMid);
+    bgGrad.addColorStop(1, tokens.bgGradBottom);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // 细致高贵微光光晕
+    ctx.save();
+    const glow1 = ctx.createRadialGradient(160, 220, 30, 160, 220, 420);
+    glow1.addColorStop(0, tokens.glow1);
+    glow1.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow1;
+    ctx.fillRect(0, 0, W, H);
+
+    const glow2 = ctx.createRadialGradient(W - 120, 1000, 30, W - 120, 1000, 500);
+    glow2.addColorStop(0, tokens.glow2);
+    glow2.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow2;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+
+    // 外边框
+    ctx.strokeStyle = tokens.outerBorder;
+    ctx.lineWidth = 1;
+    roundRect(ctx, 16, 16, W - 32, H - 32, 24);
+    ctx.stroke();
+
+    const curr = data.currency || 'RM';
+    const comp = data.comparison || {};
+    const diag = data.budget_diagnostic || {};
+    const strategies = data.savings_strategies || [];
+
+    // 1. Header (Y: 48 - 140)
+    ctx.fillStyle = tokens.accentGold;
+    ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(txt.brand, 44, 68);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = tokens.textMuted;
+    ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${txt.deep_title} · ${data.month}`, W - 44, 68);
+    ctx.textAlign = 'left';
+
+    ctx.fillStyle = tokens.textHeading;
+    ctx.font = 'bold 26px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${data.month} ${txt.deep_title}`, 44, 114);
+
+    ctx.fillStyle = tokens.textSecondary;
+    ctx.font = '13.5px system-ui, -apple-system, sans-serif';
+    ctx.fillText(txt.deep_subtitle, 44, 138);
+
+    // 2. 期间对比双卡片: 环比上月 (MoM) & 同比去年 (YoY) (Y: 165 - 390, H: 215)
+    const compY = 165;
+    const halfCardW = (W - 88 - 16) / 2;
+    const compCardH = 205;
+
+    function drawComparisonBox(x, y, w, h, title, diffData, targetMonthStr) {
+      drawGlassCard(ctx, x, y, w, h, 18, tokens);
+
+      ctx.fillStyle = tokens.textSecondary;
+      ctx.font = 'bold 13.5px system-ui, -apple-system, sans-serif';
+      ctx.fillText(title, x + 18, y + 32);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = tokens.textMuted;
+      ctx.font = '11px system-ui, -apple-system, sans-serif';
+      ctx.fillText(targetMonthStr || '', x + w - 18, y + 32);
+      ctx.textAlign = 'left';
+
+      ctx.fillStyle = tokens.divider;
+      ctx.fillRect(x + 18, y + 46, w - 36, 1);
+
+      if (!diffData || !diffData.has_baseline) {
+        ctx.fillStyle = tokens.textMuted;
+        ctx.font = '12.5px system-ui, -apple-system, sans-serif';
+        ctx.fillText(txt.no_prev_data, x + 18, y + 110);
+        return;
+      }
+
+      const rows = [
+        { label: txt.diff_expense, val: diffData.expense_diff, pct: diffData.expense_pct, isExpense: true },
+        { label: txt.diff_income, val: diffData.income_diff, pct: diffData.income_pct, isExpense: false },
+        { label: txt.diff_savings, val: diffData.savings_rate_diff, isRate: true }
+      ];
+
+      rows.forEach((r, idx) => {
+        const ry = y + 76 + idx * 40;
+        ctx.fillStyle = tokens.textMuted;
+        ctx.font = '12px system-ui, -apple-system, sans-serif';
+        ctx.fillText(r.label, x + 18, ry);
+
+        ctx.textAlign = 'right';
+        let isPositive = false;
+        let str = '';
+
+        if (r.isRate) {
+          const rateVal = Number(r.val || 0);
+          isPositive = rateVal >= 0;
+          str = `${rateVal >= 0 ? '+' : ''}${rateVal.toFixed(1)}%`;
+        } else {
+          const numVal = Number(r.val || 0);
+          isPositive = r.isExpense ? (numVal <= 0) : (numVal >= 0);
+          const sign = numVal >= 0 ? '+' : '';
+          const pctStr = r.pct !== null && r.pct !== undefined ? ` (${r.pct >= 0 ? '+' : ''}${r.pct}%)` : '';
+          str = `${sign}${curr} ${formatMoney(Math.abs(numVal))}${pctStr}`;
+        }
+
+        ctx.fillStyle = isPositive ? tokens.emerald : tokens.rose;
+        ctx.font = '600 12.5px system-ui, -apple-system, sans-serif';
+        ctx.fillText(str, x + w - 18, ry);
+        ctx.textAlign = 'left';
+      });
+    }
+
+    drawComparisonBox(44, compY, halfCardW, compCardH, txt.mom_title, comp.mom, comp.mom ? comp.mom.prev_month : '');
+    drawComparisonBox(44 + halfCardW + 16, compY, halfCardW, compCardH, txt.yoy_title, comp.yoy, comp.yoy ? comp.yoy.prev_month : '');
+
+    // 3. 50/30/20 预算法则健康诊断 (Y: 395 - 615, H: 215)
+    const diagY = 395;
+    ctx.fillStyle = tokens.textSecondary;
+    ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(txt.rule_50_30_20, 44, diagY);
+
+    const diagCardY = diagY + 14;
+    const diagCardH = 205;
+    drawGlassCard(ctx, 44, diagCardY, W - 88, diagCardH, 18, tokens);
+
+    const needsPct = Number(diag.needs_pct || 0);
+    const wantsPct = Number(diag.wants_pct || 0);
+    const savPct = Number(diag.savings_pct || 0);
+
+    // 三段式比例进度条
+    const barX = 68;
+    const barY = diagCardY + 28;
+    const barW = W - 136;
+    const barH = 14;
+
+    const needsW = Math.max(0, Math.min(barW, (needsPct / 100) * barW));
+    const wantsW = Math.max(0, Math.min(barW - needsW, (wantsPct / 100) * barW));
+    const savW = Math.max(0, barW - needsW - wantsW);
+
+    ctx.fillStyle = tokens.barTrack;
+    roundRect(ctx, barX, barY, barW, barH, 7);
+    ctx.fill();
+
+    // Needs (青色)
+    if (needsW > 0) {
+      ctx.fillStyle = '#38BDF8';
+      roundRect(ctx, barX, barY, needsW, barH, 7);
+      ctx.fill();
+    }
+    // Wants (紫粉色)
+    if (wantsW > 0) {
+      ctx.fillStyle = '#F472B6';
+      roundRect(ctx, barX + needsW, barY, wantsW, barH, 7);
+      ctx.fill();
+    }
+    // Savings (翡翠绿)
+    if (savW > 0) {
+      ctx.fillStyle = tokens.emerald;
+      roundRect(ctx, barX + needsW + wantsW, barY, savW, barH, 7);
+      ctx.fill();
+    }
+
+    // 进度条下方图例与实际金额
+    const legY = barY + 36;
+    const legSlots = [
+      { color: '#38BDF8', label: txt.needs_label, pct: needsPct, amt: diag.needs_amount },
+      { color: '#F472B6', label: txt.wants_label, pct: wantsPct, amt: diag.wants_amount },
+      { color: tokens.emerald, label: txt.savings_label, pct: savPct, amt: diag.savings_amount }
+    ];
+
+    const slotW = (W - 136) / 3;
+    legSlots.forEach((ls, i) => {
+      const sx = barX + i * slotW;
+      ctx.fillStyle = ls.color;
+      ctx.beginPath();
+      ctx.arc(sx + 5, legY, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = tokens.textPrimary;
+      ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+      ctx.fillText(`${ls.pct}%`, sx + 16, legY + 4);
+
+      ctx.fillStyle = tokens.textMuted;
+      ctx.font = '11px system-ui, -apple-system, sans-serif';
+      ctx.fillText(ls.label, sx, legY + 24);
+
+      ctx.fillStyle = tokens.textSecondary;
+      ctx.font = '500 11.5px system-ui, -apple-system, sans-serif';
+      ctx.fillText(`${curr} ${formatMoney(ls.amt)}`, sx, legY + 42);
+    });
+
+    // 诊断评定徽章与建议总结
+    const diagNoteY = diagCardY + 145;
+    ctx.fillStyle = tokens.badgeBg;
+    roundRect(ctx, 68, diagNoteY, W - 136, 42, 12);
+    ctx.fill();
+
+    ctx.fillStyle = tokens.accentGoldText;
+    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`⚡ ${diag.status_title || '财务配置平稳'}:`, 82, diagNoteY + 26);
+
+    ctx.fillStyle = tokens.textPrimary;
+    ctx.font = '12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(diag.status_desc || '保持当前的预算把控，可继续稳固财务基础。', 210, diagNoteY + 26);
+
+    // 4. 专属储蓄改善建议 (Y: 635 - 1460, H: 810)
+    const stratY = 635;
+    ctx.fillStyle = tokens.textSecondary;
+    ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(txt.strategies_title, 44, stratY);
+
+    const stratCardY = stratY + 14;
+    const stratCardH = 780;
+    drawGlassCard(ctx, 44, stratCardY, W - 88, stratCardH, 20, tokens);
+
+    ctx.save();
+    const gStripe = ctx.createLinearGradient(0, stratCardY, 0, stratCardY + stratCardH);
+    gStripe.addColorStop(0, tokens.accentGold);
+    gStripe.addColorStop(1, tokens.emerald);
+    ctx.fillStyle = gStripe;
+    roundRect(ctx, 44, stratCardY, 5, stratCardH, 2.5);
+    ctx.fill();
+    ctx.restore();
+
+    const itemSlotH = 180;
+    strategies.slice(0, 4).forEach((s, idx) => {
+      const sy = stratCardY + 20 + idx * itemSlotH;
+
+      ctx.fillStyle = tokens.textPrimary;
+      ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
+      ctx.fillText(`${s.icon || '💡'} ${s.title}`, 68, sy + 18);
+
+      if (s.badge) {
+        ctx.save();
+        ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+        const bW = ctx.measureText(s.badge).width + 20;
+        const bX = W - 68 - bW;
+        ctx.fillStyle = tokens.badgeBg;
+        roundRect(ctx, bX, sy + 2, bW, 22, 11);
+        ctx.fill();
+        ctx.fillStyle = tokens.accentGoldText;
+        ctx.fillText(s.badge, bX + 10, sy + 17);
+        ctx.restore();
+      }
+
+      ctx.fillStyle = tokens.textSecondary;
+      ctx.font = '13px system-ui, -apple-system, "PingFang SC", sans-serif';
+      wrapText(ctx, s.detail || '', 68, sy + 48, W - 136, 21, 3);
+
+      if (s.est_saving) {
+        ctx.fillStyle = tokens.accentGoldBg;
+        roundRect(ctx, 68, sy + 118, 220, 26, 13);
+        ctx.fill();
+        ctx.fillStyle = tokens.accentGoldText;
+        ctx.font = '600 11.5px system-ui, -apple-system, sans-serif';
+        ctx.fillText(`💰 ${txt.est_save_prefix}: ${s.est_saving}`, 80, sy + 135);
+      }
+
+      if (idx < 3) {
+        ctx.fillStyle = tokens.divider;
+        ctx.fillRect(68, sy + itemSlotH - 12, W - 136, 1);
+      }
+    });
+
+    // 5. Footer (Y: 1485 - 1640)
+    const footerY = 1485;
+    if (data.quote) {
+      ctx.fillStyle = tokens.badgeBg;
+      roundRect(ctx, 44, footerY, W - 88, 44, 12);
+      ctx.fill();
+
+      ctx.fillStyle = tokens.textSecondary;
+      ctx.font = 'italic 12.5px "Playfair Display", Georgia, serif';
+      ctx.fillText(`“${data.quote}”`, 64, footerY + 27);
+    }
+
+    const fLineY = footerY + 65;
+    ctx.fillStyle = tokens.divider;
+    ctx.fillRect(44, fLineY, W - 88, 1);
+
+    ctx.fillStyle = tokens.textSecondary;
+    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(txt.footer_brand, 44, fLineY + 34);
+
+    ctx.fillStyle = tokens.textMuted;
+    ctx.font = '11.5px system-ui, -apple-system, sans-serif';
+    ctx.fillText(txt.footer_tagline, 44, fLineY + 52);
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = tokens.textMuted;
+    ctx.font = '11px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${txt.footer_verified} on ${todayStr}`, W - 44, fLineY + 34);
+    ctx.fillText('Comprehensive Financial Diagnosis', W - 44, fLineY + 52);
+    ctx.textAlign = 'left';
+
+    return canvas;
+  }
+
+  function downloadPosterImage(dataUrl, monthStr, reportType) {
+    const filename = `Ledger_Report_${monthStr || 'Monthly'}_${reportType || 'summary'}.png`;
     const link = document.createElement('a');
     link.download = filename;
     link.href = dataUrl;
@@ -4377,6 +4836,7 @@ if (window.matchMedia) {
     }
   }
 
+  // 3. 打开月度海报与深度分析弹窗
   window.openMonthlyPosterModal = async function (monthStr) {
     if (!monthStr) {
       const curEl = document.querySelector('.month-nav-current');
@@ -4408,16 +4868,41 @@ if (window.matchMedia) {
         throw new Error(data.message || 'Failed to fetch poster data');
       }
 
-      const canvas = renderPosterCanvas(data);
-      const dataUrl = canvas.toDataURL('image/png');
+      let activeReportType = 'summary'; // 'summary' or 'deep'
+      let activeIsDark = isDarkTheme();
+
+      let currentCanvas = null;
+      let currentDataUrl = '';
+
+      function getPosterCanvas() {
+        return activeReportType === 'deep'
+          ? renderDeepAnalysisCanvas(data, activeIsDark)
+          : renderPosterCanvas(data, activeIsDark);
+      }
+
+      currentCanvas = getPosterCanvas();
+      currentDataUrl = currentCanvas.toDataURL('image/png');
+
+      const modalTitleText = window.t ? window.t('poster.modal_title', '月度财务长图海报') : '月度财务长图海报';
+      const summaryBtnText = window.t ? window.t('poster.type_summary', '月度精粹长图') : '月度精粹长图';
+      const deepBtnText = window.t ? window.t('poster.type_deep', '深度洞察与对比') : '深度洞察与对比';
 
       if (window.Swal) {
         Swal.fire({
-          title: `<div style="font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;"><span>🎨</span> ${window.t ? window.t('poster.modal_title', '月度财务长图海报') : '月度财务长图海报'} (${data.month})</div>`,
+          title: `<div style="font-size: 16.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;"><span>🎨</span> ${modalTitleText} (${data.month})</div>`,
           html: `
             <div class="poster-modal-body">
-              <div class="poster-preview-viewport">
-                <img src="${dataUrl}" class="poster-preview-img" alt="Monthly Financial Poster" />
+              <div class="poster-control-bar">
+                <div class="poster-tabs" role="tablist">
+                  <button type="button" class="poster-tab-btn active" id="btnTabSummary">📊 ${summaryBtnText}</button>
+                  <button type="button" class="poster-tab-btn" id="btnTabDeep">🔬 ${deepBtnText}</button>
+                </div>
+                <button type="button" class="poster-theme-toggle" id="btnTogglePosterTheme">
+                  <span>🌓</span> <span id="posterThemeText">${activeIsDark ? (window.t ? window.t('poster.theme_dark', '深色风格') : '深色风格') : (window.t ? window.t('poster.theme_light', '浅色风格') : '浅色风格')}</span>
+                </button>
+              </div>
+              <div class="poster-preview-viewport ${activeIsDark ? '' : 'light-frame'}" id="posterPreviewViewport">
+                <img src="${currentDataUrl}" class="poster-preview-img" id="posterPreviewImg" alt="Financial Poster" />
               </div>
               <div class="poster-actions-row">
                 <button type="button" class="btn-poster-action btn-poster-download" id="swalBtnDownloadPoster">
@@ -4436,13 +4921,74 @@ if (window.matchMedia) {
           showConfirmButton: false,
           showCloseButton: true,
           didOpen: () => {
+            const btnSummary = document.getElementById('btnTabSummary');
+            const btnDeep = document.getElementById('btnTabDeep');
+            const btnTheme = document.getElementById('btnTogglePosterTheme');
+            const themeTxt = document.getElementById('posterThemeText');
+            const viewport = document.getElementById('posterPreviewViewport');
+            const imgEl = document.getElementById('posterPreviewImg');
             const downloadBtn = document.getElementById('swalBtnDownloadPoster');
             const copyBtn = document.getElementById('swalBtnCopyPoster');
-            if (downloadBtn) {
-              downloadBtn.addEventListener('click', () => downloadPosterImage(dataUrl, data.month));
+
+            function refreshDisplay() {
+              currentCanvas = getPosterCanvas();
+              currentDataUrl = currentCanvas.toDataURL('image/png');
+              if (imgEl) {
+                imgEl.src = currentDataUrl;
+              }
+              if (viewport) {
+                if (activeIsDark) {
+                  viewport.classList.remove('light-frame');
+                } else {
+                  viewport.classList.add('light-frame');
+                }
+              }
+              if (themeTxt) {
+                themeTxt.textContent = activeIsDark
+                  ? (window.t ? window.t('poster.theme_dark', '深色风格') : '深色风格')
+                  : (window.t ? window.t('poster.theme_light', '浅色风格') : '浅色风格');
+              }
             }
+
+            if (btnSummary) {
+              btnSummary.addEventListener('click', () => {
+                if (activeReportType === 'summary') return;
+                activeReportType = 'summary';
+                btnSummary.classList.add('active');
+                if (btnDeep) btnDeep.classList.remove('active');
+                refreshDisplay();
+              });
+            }
+
+            if (btnDeep) {
+              btnDeep.addEventListener('click', () => {
+                if (activeReportType === 'deep') return;
+                activeReportType = 'deep';
+                btnDeep.classList.add('active');
+                if (btnSummary) btnSummary.classList.remove('active');
+                refreshDisplay();
+              });
+            }
+
+            if (btnTheme) {
+              btnTheme.addEventListener('click', () => {
+                activeIsDark = !activeIsDark;
+                refreshDisplay();
+              });
+            }
+
+            if (downloadBtn) {
+              downloadBtn.addEventListener('click', () => {
+                downloadPosterImage(currentDataUrl, data.month, activeReportType);
+              });
+            }
+
             if (copyBtn) {
-              copyBtn.addEventListener('click', () => copyPosterImage(canvas));
+              copyBtn.addEventListener('click', () => {
+                if (currentCanvas) {
+                  copyPosterImage(currentCanvas);
+                }
+              });
             }
           }
         });
@@ -4460,4 +5006,3 @@ if (window.matchMedia) {
     }
   };
 })();
-

@@ -32,10 +32,50 @@ LLM_TIMEOUT = float(os.environ.get('LLM_TIMEOUT', '4.5'))
 
 APP_PASSWORD = os.environ.get('APP_PASSWORD')
 
+# 邮件服务配置 (SMTP)
+SMTP_HOST = os.environ.get('SMTP_HOST', '').strip()
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USER = os.environ.get('SMTP_USER', '').strip()
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '').strip()
+SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', '1') == '1'
+SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', '0') == '1'
+SMTP_SENDER_NAME = os.environ.get('SMTP_SENDER_NAME', '我的记账本 · My Ledger App').strip()
+
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def get_smtp_config(db=None):
+    """获取有效 SMTP 邮件配置（优先环境变量，次选数据库 system_settings）"""
+    cfg = {
+        'host': SMTP_HOST,
+        'port': SMTP_PORT,
+        'user': SMTP_USER,
+        'password': SMTP_PASSWORD,
+        'use_tls': SMTP_USE_TLS,
+        'use_ssl': SMTP_USE_SSL,
+        'sender_name': SMTP_SENDER_NAME
+    }
+    if db:
+        try:
+            rows = db.execute("SELECT key, value FROM system_settings WHERE key LIKE 'smtp_%'").fetchall()
+            for r in rows:
+                k = r['key'].replace('smtp_', '')
+                if k in cfg and r['value'] is not None and str(r['value']).strip():
+                    if k == 'port':
+                        try:
+                            cfg[k] = int(r['value'])
+                        except ValueError:
+                            pass
+                    elif k in ('use_tls', 'use_ssl'):
+                        cfg[k] = str(r['value']).lower() in ('1', 'true', 'yes')
+                    else:
+                        cfg[k] = str(r['value']).strip()
+        except Exception as e:
+            logger.debug("Read system_settings smtp config skipped: %s", e)
+    return cfg
 
 
 def get_auto_track_key(db=None):

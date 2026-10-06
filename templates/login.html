@@ -12,7 +12,7 @@
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
 <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260910_v4">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20261006_v5">
 <style>
   .login-page-wrapper {
     min-height: 100vh;
@@ -123,6 +123,20 @@
 </style>
 </head>
 <body>
+<!-- 页面右上角专属精致多语言切换悬浮胶囊 -->
+<aside class="auth-top-bar" aria-label="Language Selector">
+  <div class="auth-lang-group">
+    <span class="auth-lang-globe">🌐</span>
+    {% for l in supported_languages %}
+    <a href="{{ url_for('settings.api_set_language', lang=l.code, next=request.path) }}"
+       class="auth-lang-pill {% if current_lang == l.code %}active{% endif %}"
+       title="{{ l.name }}">
+      {{ l.flag }} {{ l.label if l.label is defined else l.name }}
+    </a>
+    {% endfor %}
+  </div>
+</aside>
+
 <div class="login-page-wrapper">
   <div class="login-card">
     <div class="login-logo">💰</div>
@@ -163,10 +177,17 @@
         {{ t('auth.username') }}
         <input type="text" name="username" value="{{ username or 'admin' }}" placeholder="Username" required autofocus autocomplete="username">
       </label>
-      <label>
-        {{ t('auth.password') }}
-        <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
-      </label>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <label for="pwdInput" style="font-size: 12.5px; font-weight: 600; color: var(--ink-soft); margin: 0;">
+            {{ t('auth.password') }}
+          </label>
+          <a href="{{ url_for('auth.forgot_password') }}" style="font-size: 12px; color: var(--gold); text-decoration: none; font-weight: 500;">
+            {{ t('auth.forgot_password') }}
+          </a>
+        </div>
+        <input type="password" id="pwdInput" name="password" placeholder="Password" required autocomplete="current-password">
+      </div>
       {% if next %}
       <input type="hidden" name="next" value="{{ next }}">
       {% endif %}
@@ -175,15 +196,6 @@
 
     <div style="margin-top: 20px; font-size: 13px; color: var(--muted);">
       {{ t('auth.no_account') }} <a href="{{ url_for('register') }}" style="color: var(--gold); text-decoration: none; font-weight: 600;">{{ t('auth.signup_btn') }} &rarr;</a>
-    </div>
-
-    <!-- 语言切换选项 -->
-    <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 22px; font-size: 12px;">
-      {% for l in supported_languages %}
-      <a href="{{ url_for('settings.api_set_language', lang=l.code) }}" style="text-decoration: none; padding: 4px 8px; border-radius: 6px; border: 1px solid {% if current_lang == l.code %}var(--gold){% else %}var(--border){% endif %}; background: {% if current_lang == l.code %}var(--gold-soft){% else %}var(--surface-soft){% endif %}; color: var(--navy); font-weight: {% if current_lang == l.code %}700{% else %}normal{% endif %};">
-        {{ l.flag }} {{ l.name }}
-      </a>
-      {% endfor %}
     </div>
   </div>
 </div>

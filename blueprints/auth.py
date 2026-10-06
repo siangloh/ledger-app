@@ -10,6 +10,7 @@ from core.db import get_db, init_user_default_categories, get_user_settings
 from core.config import get_app_password
 from core.extensions import csrf
 from core.i18n import set_current_locale
+from services.auth_service import request_password_reset_otp, verify_and_reset_password
 
 logger = logging.getLogger(__name__)
 
@@ -42,49 +43,60 @@ def register():
 
     if request.method == 'POST':
         username = (request.form.get('username') or '').strip()
+        email = (request.form.get('email') or '').strip()
         password = request.form.get('password', '')
         confirm_password = request.form.get('confirm_password', '')
 
         if not username:
             flash('用户名不能为空', 'error')
-            return render_template('register.html')
+            return render_template('register.html', username=username, email=email)
         if len(username) < 3 or len(username) > 30:
             flash('用户名长度需在 3 到 30 个字符之间', 'error')
-            return render_template('register.html')
+            return render_template('register.html', username=username, email=email)
         if not re.match(r'^[a-zA-Z0-9_\-\u4e00-\u9fa5]+$', username):
             flash('用户名仅支持中文、字母、数字及下划线', 'error')
-            return render_template('register.html')
+            return render_template('register.html', username=username, email=email)
+        if email:
+            if not re.match(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', email):
+                flash('邮箱格式不正确，请输入有效的电子邮箱地址', 'error')
+                return render_template('register.html', username=username, email=email)
         if not password or len(password) < 6:
             flash('密码长度至少需要 6 个字符', 'error')
-            return render_template('register.html')
+            return render_template('register.html', username=username, email=email)
         if not re.search(r'[A-Z]', password):
             flash('密码需包含至少一个大写字母 (A-Z)', 'error')
-            return render_template('register.html')
+            return render_template('register.html', username=username, email=email)
         if not re.search(r'[a-z]', password):
             flash('密码需包含至少一个小写字母 (a-z)', 'error')
-            return render_template('register.html')
+            return render_template('register.html', username=username, email=email)
         if not re.search(r'[0-9]', password):
             flash('密码需包含至少一个数字 (0-9)', 'error')
-            return render_template('register.html')
+            return render_template('register.html', username=username, email=email)
         if not re.search(r'[^a-zA-Z0-9]', password):
             flash('密码需包含至少一个特殊符号（如 !@#$%^&* 等）', 'error')
-            return render_template('register.html')
+            return render_template('register.html', username=username, email=email)
         if password != confirm_password:
             flash('两次输入的密码不一致', 'error')
-            return render_template('register.html')
+            return render_template('register.html', username=username, email=email)
 
         db = get_db()
         existing = db.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()
         if existing:
             flash('该用户名已被注册，请直接登录或换一个用户名', 'error')
-            return render_template('register.html')
+            return render_template('register.html', username=username, email=email)
+
+        if email:
+            existing_email = db.execute('SELECT id FROM users WHERE LOWER(email) = LOWER(?)', (email,)).fetchone()
+            if existing_email:
+                flash('该邮箱已被注册绑定，请直接登录或使用其他邮箱', 'error')
+                return render_template('register.html', username=username, email=email)
 
         user_id = str(uuid.uuid4())
         pw_hash = generate_password_hash(password)
         now_str = datetime.now().isoformat()
         db.execute(
-            'INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)',
-            (user_id, username, pw_hash, now_str)
+            'INSERT INTO users (id, username, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)',
+            (user_id, username, email or None, pw_hash, now_str)
         )
         db.commit()
 
@@ -168,3 +180,79 @@ def logout():
     session.clear()
     flash('您已成功退出登录。', 'success')
     return redirect(url_for('login'))
+
+
+@auth_bp.route('/forgot-password', methods=['GET', 'POST'], endpoint='forgot_password')
+@csrf.exempt
+def forgot_password():
+    """忘记密码页面与表单提交处理"""
+    if session.get('logged_in') and session.get('user_id'):
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        identifier = (request.form.get('identifier') or '').strip()
+        otp_code = (request.form.get('otp_code') or '').strip()
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        db = get_db()
+        ok, msg = verify_and_reset_password(
+            identifier, otp_code, new_password, confirm_password, db=db
+        )
+        if ok:
+            flash(msg, 'success')
+            return redirect(url_for('login'))
+        else:
+            flash(msg, 'error')
+            return render_template(
+                'forgot_password.html',
+                identifier=identifier,
+                otp_code=otp_code
+            ), 400
+
+    return render_template('forgot_password.html')
+
+
+@auth_bp.route('/api/auth/send-otp', methods=['POST'], endpoint='api_send_otp')
+@csrf.exempt
+def api_send_otp():
+    """发送邮箱 OTP 验证码 API"""
+    data = request.get_json(silent=True) or request.form or {}
+    identifier = (data.get('identifier') or '').strip()
+
+    if not identifier:
+        return jsonify({'ok': False, 'message': '请输入用户名或绑定的邮箱地址'}), 400
+
+    db = get_db()
+    ok, msg, payload = request_password_reset_otp(identifier, db=db)
+    if not ok:
+        return jsonify({'ok': False, 'message': msg}), 400
+
+    return jsonify({
+        'ok': True,
+        'message': msg,
+        'data': payload
+    })
+
+
+@auth_bp.route('/api/auth/verify-reset', methods=['POST'], endpoint='api_verify_reset')
+@csrf.exempt
+def api_verify_reset():
+    """验证 OTP 并重置密码 API"""
+    data = request.get_json(silent=True) or request.form or {}
+    identifier = (data.get('identifier') or '').strip()
+    otp_code = (data.get('otp_code') or '').strip()
+    new_password = data.get('new_password', '')
+    confirm_password = data.get('confirm_password', '')
+
+    db = get_db()
+    ok, msg = verify_and_reset_password(
+        identifier, otp_code, new_password, confirm_password, db=db
+    )
+    if not ok:
+        return jsonify({'ok': False, 'message': msg}), 400
+
+    return jsonify({
+        'ok': True,
+        'message': msg
+    })
