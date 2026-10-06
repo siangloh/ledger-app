@@ -1038,8 +1038,151 @@ async function openEditRecordModal(txId) {
   }).then(async function (result) {
     if (!result.isConfirmed || !result.value) return;
 
-    if (typeof showProgressBar === 'function') showProgressBar();
     const v = result.value;
+    const rowEl = document.getElementById('row-' + txId);
+
+    // 1. 乐观更新（Optimistic UI Update）：前端即刻就地展示最新修改结果，零延迟无顿挫
+    const prevInnerHTML = rowEl ? rowEl.innerHTML : '';
+    const prevDataset = rowEl ? { ...rowEl.dataset } : {};
+
+    function formatUserDate(dateStr) {
+      if (!dateStr) return '';
+      const fmt = window.LEDGER_DATE_FORMAT || 'YYYY-MM-DD';
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return dateStr;
+      const [y, m, d] = parts;
+      if (fmt === 'DD/MM/YYYY') return `${d}/${m}/${y}`;
+      if (fmt === 'MM/DD/YYYY') return `${m}/${d}/${y}`;
+      if (fmt === 'YYYY/MM/DD') return `${y}/${m}/${d}`;
+      return `${y}-${m}-${d}`;
+    }
+
+    if (rowEl) {
+      // 更新行上的结构化 dataset
+      rowEl.dataset.date = v.date;
+      rowEl.dataset.type = v.type;
+      rowEl.dataset.groupName = v.group_name || '';
+      rowEl.dataset.category = v.category;
+      rowEl.dataset.amount = v.amount.toFixed(2);
+      rowEl.dataset.note = v.note;
+      rowEl.dataset.tags = v.tags;
+      rowEl.dataset.fromSavings = v.from_savings ? '1' : '0';
+      rowEl.dataset.fromSavingsCategory = v.from_savings_category || '';
+
+      // 更新日期列
+      const dateCol = rowEl.querySelector('td[data-col="date"]');
+      if (dateCol) dateCol.textContent = formatUserDate(v.date);
+
+      // 更新交易类型列
+      const typeCol = rowEl.querySelector('td[data-col="type"]');
+      if (typeCol) {
+        const typeClass = (v.type === 'income') ? 'tag-income' : ((v.type === 'savings') ? 'tag-savings' : 'tag-expense');
+        const typeText = (v.type === 'income')
+          ? (window.t ? window.t('common.income', '收入') : '收入')
+          : ((v.type === 'savings') ? (window.t ? window.t('common.savings', '结余储蓄') : '结余储蓄') : (window.t ? window.t('common.expense', '支出') : '支出'));
+        let typeHtml = `<span class="tag ${typeClass}">${typeText}</span>`;
+        if (v.from_savings) {
+          const savCat = v.from_savings_category || (window.t ? window.t('common.savings', '储蓄') : '储蓄');
+          const savCatLabel = window.t_cat ? window.t_cat(savCat) : savCat;
+          const fromSavTitle = window.t ? window.t('records.tag_from_savings', '自储蓄: {cat}', {cat: savCatLabel}) : `自储蓄: ${savCatLabel}`;
+          typeHtml += ` <span class="tag tag-savings" style="margin-left: 4px; font-size: 10px; padding: 2px 6px;" title="${fromSavTitle}">${fromSavTitle}</span>`;
+        }
+        typeCol.innerHTML = typeHtml;
+      }
+
+      // 更新收入分组列
+      const groupCol = rowEl.querySelector('td[data-col="group"]');
+      if (groupCol) {
+        let groupText = '';
+        if (v.type === 'income') {
+          groupText = (v.group_name === 'side')
+            ? (window.t ? window.t('records.tag_side', '副业') : '副业')
+            : (window.t ? window.t('records.tag_main', '主业') : '主业');
+        }
+        groupCol.textContent = groupText;
+      }
+
+      // 更新分类列
+      const catCol = rowEl.querySelector('td[data-col="category"]');
+      if (catCol) {
+        const catLabel = window.t_cat ? window.t_cat(v.category) : v.category;
+        catCol.title = catLabel;
+        catCol.innerHTML = `<strong>${catLabel}</strong>`;
+      }
+
+      // 更新金额列
+      const amtCol = rowEl.querySelector('td[data-col="amount"]');
+      if (amtCol) {
+        amtCol.className = `amount-cell ${v.type}`;
+        const sym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
+        amtCol.textContent = `${sym} ${v.amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+      }
+
+      // 更新备注与自定义标签列
+      const noteCol = rowEl.querySelector('td[data-col="note"]');
+      if (noteCol) {
+        noteCol.className = (v.note || v.tags) ? 'has-note' : 'no-note';
+        let tagsHtml = '';
+        if (v.tags) {
+          const pills = v.tags.split(',').map(s => s.trim()).filter(Boolean).map(t =>
+            `<span class="tag tag-pill-sm" style="font-size: 10px; padding: 1px 6px; background: var(--surface-soft); color: var(--muted); border-radius: 10px; border: 1px solid var(--border);">#${t}</span>`
+          ).join(' ');
+          tagsHtml = `<div class="record-tags-box" style="margin-top: 3px; display: flex; gap: 4px; flex-wrap: wrap;">${pills}</div>`;
+        }
+        const noteDiv = document.createElement('div');
+        noteDiv.textContent = v.note;
+        noteCol.innerHTML = noteDiv.innerHTML + tagsHtml;
+      }
+
+      // 更新操作列联动（如收入冲抵按钮增删与删除提示文本）
+      const actionsInner = rowEl.querySelector('.actions-inner');
+      if (actionsInner) {
+        let offsetBtn = actionsInner.querySelector('.btn-offset-ghost');
+        if (v.type === 'income') {
+          if (!offsetBtn) {
+            const newOffset = document.createElement('button');
+            newOffset.type = 'button';
+            newOffset.className = 'btn-offset-ghost';
+            newOffset.setAttribute('onclick', `openOffsetModal(${txId}, ${v.amount}, ${JSON.stringify(v.note)})`);
+            newOffset.title = window.t ? window.t('records.btn_offset_title', '冲抵支出') : '冲抵支出';
+            newOffset.textContent = window.t ? window.t('records.btn_offset', '冲抵') : '冲抵';
+            actionsInner.insertBefore(newOffset, actionsInner.firstChild);
+          } else {
+            offsetBtn.setAttribute('onclick', `openOffsetModal(${txId}, ${v.amount}, ${JSON.stringify(v.note)})`);
+          }
+        } else if (offsetBtn) {
+          offsetBtn.remove();
+        }
+
+        const delBtn = actionsInner.querySelector('.btn-danger-ghost');
+        if (delBtn) {
+          const sym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
+          const typeLabel = (v.type === 'income') ? (window.t ? window.t('common.income', '收入') : '收入') : ((v.type === 'savings') ? (window.t ? window.t('common.savings', '结余储蓄') : '结余储蓄') : (window.t ? window.t('common.expense', '支出') : '支出'));
+          const catLabel = window.t_cat ? window.t_cat(v.category) : v.category;
+          const summaryTxt = `${v.date} · ${typeLabel} · ${catLabel} · ${sym} ${v.amount.toFixed(2)}`;
+          delBtn.setAttribute('onclick', `confirmSingleDelete('/records/${txId}/delete', ${JSON.stringify(summaryTxt)}, this)`);
+        }
+      }
+
+      // 添加高质感发光呼吸动画
+      rowEl.classList.remove('row-highlight-new');
+      void rowEl.offsetWidth; // 触发 reflow 重置动画
+      rowEl.classList.add('row-highlight-new');
+      setTimeout(() => { if (rowEl) rowEl.classList.remove('row-highlight-new'); }, 3500);
+    }
+
+    // 即刻弹出成功提示 Toast
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'success',
+      title: window.t ? window.t('transactions.record_updated', '记录已更新') : '记录已更新',
+      showConfirmButton: false,
+      timer: 1800,
+      customClass: { popup: 'app-swal-toast' }
+    });
+
+    // 2. 后台静默提交与状态同步（Background Sync & Rollback Protection）
     const formData = new FormData();
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
     formData.append('csrf_token', csrfToken);
@@ -1059,28 +1202,31 @@ async function openEditRecordModal(txId) {
     formData.append('note', v.note);
     formData.append('tags', v.tags);
 
-    try {
-      const resp = await fetch('/records/' + txId + '/edit', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest',
-          'Accept': 'application/json'
-        }
-      });
-      const data = await resp.json();
-      if (typeof finishProgressBar === 'function') finishProgressBar();
-
+    fetch('/records/' + txId + '/edit', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json'
+      }
+    })
+    .then(r => r.json())
+    .then(data => {
       if (data.ok) {
-        Swal.fire({
-          toast: true,
-          position: 'top-end',
-          icon: 'success',
-          title: data.message || (window.t ? window.t('transactions.record_updated', '记录已更新') : '记录已更新'),
-          showConfirmButton: false,
-          timer: 2000,
-          customClass: { popup: 'app-swal-toast' }
-        });
+        // 静默刷新顶栏汇总数据（无闪烁、无整页拉取）
+        const fetchUrl = window.location.href + (window.location.href.includes('?') ? '&' : '?') + 'partial=1';
+        fetch(fetchUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newHint = doc.getElementById('recordsSummaryHint');
+            const oldHint = document.getElementById('recordsSummaryHint');
+            if (newHint && oldHint) {
+              oldHint.innerHTML = newHint.innerHTML;
+            }
+          })
+          .catch(() => {});
 
         if (data.budget_alert) {
           setTimeout(() => {
@@ -1089,22 +1235,25 @@ async function openEditRecordModal(txId) {
               title: window.t ? window.t('swal.title_budget_alert', '预算预警提醒') : '预算预警提醒',
               text: data.budget_alert.message
             });
-          }, 500);
-        }
-
-        // 局部或完整刷新页面列表
-        if (typeof htmx !== 'undefined') {
-          htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
-        } else {
-          window.location.reload();
+          }, 400);
         }
       } else {
+        // 后端失败：回滚前端状态
+        if (rowEl) {
+          rowEl.innerHTML = prevInnerHTML;
+          Object.assign(rowEl.dataset, prevDataset);
+        }
         errorAlert(data.message || (window.t ? window.t('swal.save_failed', '保存失败') : '保存失败'));
       }
-    } catch (err) {
-      if (typeof finishProgressBar === 'function') finishProgressBar();
+    })
+    .catch(() => {
+      // 网络断开：回滚前端状态
+      if (rowEl) {
+        rowEl.innerHTML = prevInnerHTML;
+        Object.assign(rowEl.dataset, prevDataset);
+      }
       errorAlert(window.t ? window.t('swal.network_error', '网络请求超时或服务错误') : '网络请求超时或服务错误');
-    }
+    });
   });
 }
 
