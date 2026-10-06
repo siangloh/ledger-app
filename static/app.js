@@ -2306,7 +2306,7 @@ function refreshDashboardPartials(event) {
         wrap.querySelectorAll('.card').forEach(c => c.classList.add('card-updated'));
         setTimeout(() => {
           wrap.querySelectorAll('.card').forEach(c => c.classList.remove('card-updated'));
-        }, 2500);
+        }, 1500);
       }
     })
     .catch(console.error);
@@ -2331,7 +2331,7 @@ function refreshDashboardPartials(event) {
         const p = document.getElementById(id)?.closest('.panel');
         if (p) {
           p.classList.add('card-updated');
-          setTimeout(() => p.classList.remove('card-updated'), 2500);
+          setTimeout(() => p.classList.remove('card-updated'), 1500);
         }
       });
     })
@@ -2349,7 +2349,7 @@ function refreshDashboardPartials(event) {
         budgetWrap.querySelectorAll('.budget-dash-card').forEach(c => c.classList.add('card-updated'));
         setTimeout(() => {
           budgetWrap.querySelectorAll('.budget-dash-card').forEach(c => c.classList.remove('card-updated'));
-        }, 2500);
+        }, 1500);
       })
       .catch(console.error);
   }
@@ -2397,7 +2397,7 @@ function refreshRecordsPartials(event) {
         const row = document.getElementById('row-' + event.data.id);
         if (row) {
           row.classList.add('row-highlight-new');
-          setTimeout(() => row.classList.remove('row-highlight-new'), 3500);
+          setTimeout(() => row.classList.remove('row-highlight-new'), 1900);
         }
       }
     })

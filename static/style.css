@@ -548,6 +548,17 @@ a, button, input, select, textarea, [role="button"], .bnav-item, .card, .action-
   transform: scale(1.16);
 }
 
+@keyframes bnavIndicatorIn {
+  from {
+    opacity: 0;
+    transform: scaleX(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
 .bnav-item.active::after {
   content: '';
   position: absolute;
@@ -556,6 +567,7 @@ a, button, input, select, textarea, [role="button"], .bnav-item, .card, .action-
   height: 3px;
   background: var(--navy);
   border-radius: 999px;
+  animation: bnavIndicatorIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* ---------- 手机端“更多”功能底部抽屉 (Bottom Sheet) ---------- */
@@ -637,6 +649,14 @@ a, button, input, select, textarea, [role="button"], .bnav-item, .card, .action-
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1);
+}
+.sheet-close-btn:hover {
+  background: rgba(27, 27, 31, 0.14);
+  color: var(--ink);
+}
+.sheet-close-btn:active {
+  transform: scale(0.92);
 }
 
 /* ---------- 现代化移动端底部弹层 (Bottom Sheet Redesign) ---------- */
@@ -1008,12 +1028,24 @@ a, button, input, select, textarea, [role="button"], .bnav-item, .card, .action-
 
 /* ---------- 提示条 ---------- */
 
+@keyframes flashBannerFade {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .flash {
   background: var(--gold-soft);
   border: 1px solid rgba(182, 144, 47, 0.35);
   padding: 12px 16px;
   border-radius: var(--radius-sm);
   margin-bottom: 20px;
+  animation: flashBannerFade 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 .flash-msg { color: #6b5620; font-size: 14px; }
 
@@ -1046,9 +1078,25 @@ h3 {
   font-size: 14px;
   padding: 6px 12px;
   border-radius: 999px;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.month-nav-arrow:hover { background: var(--navy-soft); color: var(--navy); }
+.month-nav-arrow:active {
+  transform: scale(0.93);
+}
+@media (hover: hover) and (pointer: fine) {
+  .month-nav-arrow:hover {
+    background: var(--navy-soft);
+    color: var(--navy);
+  }
+  .month-nav-arrow:first-of-type:hover {
+    transform: translateX(-3px);
+  }
+  .month-nav-arrow:last-of-type:hover {
+    transform: translateX(3px);
+  }
+}
 .month-nav-current {
   font-family: var(--font-serif);
   font-size: 18px;
@@ -1084,9 +1132,11 @@ h3 {
   box-sizing: border-box;
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
-.card:hover {
-  box-shadow: var(--shadow-card-hover);
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
+  }
 }
 .card-label {
   font-size: 13px;
@@ -1158,7 +1208,14 @@ h3 {
   letter-spacing: 0.01em;
 }
 
-input[type=text], input[type=date], input[type=number], input[type=file], select {
+input[type=text],
+input[type=email],
+input[type=password],
+input[type=date],
+input[type=number],
+input[type=file],
+select,
+textarea {
   padding: 9px 11px;
   font-size: 14px;
   font-family: var(--font-sans);
@@ -1166,15 +1223,24 @@ input[type=text], input[type=date], input[type=number], input[type=file], select
   border: 1px solid var(--border);
   background: var(--surface-soft);
   color: var(--ink);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  transition: border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.18s ease;
 }
-input:hover, select:hover { border-color: rgba(27, 27, 31, 0.18); }
-input::placeholder { color: var(--muted); opacity: 1; }
-input:focus, select:focus {
+input:hover, select:hover, textarea:hover { border-color: rgba(27, 27, 31, 0.22); }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
+input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--gold);
   background: var(--surface);
   box-shadow: 0 0 0 3px var(--gold-soft);
+}
+
+input[type="checkbox"], input[type="radio"] {
+  cursor: pointer;
+  accent-color: var(--navy);
+  transition: transform 0.12s ease;
+}
+input[type="checkbox"]:active, input[type="radio"]:active {
+  transform: scale(0.92);
 }
 
 select option {
@@ -1238,10 +1304,10 @@ button { font-family: var(--font-sans); cursor: pointer; }
   font-weight: 600;
   letter-spacing: 0.02em;
   box-shadow: 0 6px 16px -6px rgba(16, 33, 59, 0.55);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.15s ease, filter 0.15s ease;
 }
 .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -8px rgba(16, 33, 59, 0.6); filter: brightness(1.06); }
-.btn-primary:active { transform: translateY(0); }
+.btn-primary:active { transform: scale(0.97); }
 
 .btn-secondary {
   background: var(--surface);
@@ -1257,7 +1323,7 @@ button { font-family: var(--font-sans); cursor: pointer; }
   justify-content: center;
   gap: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: all 0.15s ease;
+  transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1), background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
   cursor: pointer;
 }
 .btn-secondary:hover {
@@ -1268,7 +1334,7 @@ button { font-family: var(--font-sans); cursor: pointer; }
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
 }
 .btn-secondary:active {
-  transform: translateY(0);
+  transform: scale(0.97);
 }
 .btn-secondary,
 .btn-secondary:visited {
@@ -1285,9 +1351,10 @@ button { font-family: var(--font-sans); cursor: pointer; }
   font-size: 13px;
   text-decoration: none;
   display: inline-block;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1);
 }
 .btn-ghost:hover { background: var(--navy-soft); border-color: rgba(16, 33, 59, 0.2); color: var(--navy); }
+.btn-ghost:active { transform: scale(0.97); }
 
 .btn-danger-ghost {
   background: transparent;
@@ -1296,9 +1363,10 @@ button { font-family: var(--font-sans); cursor: pointer; }
   padding: 6px 13px;
   border-radius: 999px;
   font-size: 12.5px;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1);
 }
 .btn-danger-ghost:hover { background: var(--rose-soft); }
+.btn-danger-ghost:active { transform: scale(0.95); }
 
 .btn-edit-ghost {
   background: transparent;
@@ -1312,13 +1380,14 @@ button { font-family: var(--font-sans); cursor: pointer; }
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1);
 }
 .btn-edit-ghost:hover {
   background: var(--navy-soft);
   border-color: var(--navy);
   color: var(--navy);
 }
+.btn-edit-ghost:active { transform: scale(0.95); }
 
 .btn-offset-ghost {
   background: transparent;
@@ -1332,13 +1401,14 @@ button { font-family: var(--font-sans); cursor: pointer; }
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1);
 }
 .btn-offset-ghost:hover {
   background: var(--green-soft);
   border-color: var(--green);
   color: var(--green);
 }
+.btn-offset-ghost:active { transform: scale(0.95); }
 
 .btn-danger-solid {
   background: linear-gradient(135deg, #b3505d, #8f3947);
@@ -1350,10 +1420,10 @@ button { font-family: var(--font-sans); cursor: pointer; }
   font-weight: 600;
   letter-spacing: 0.02em;
   box-shadow: 0 6px 16px -6px rgba(168, 71, 90, 0.55);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.15s ease, filter 0.15s ease;
 }
 .btn-danger-solid:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -8px rgba(168, 71, 90, 0.6); filter: brightness(1.05); }
-.btn-danger-solid:active { transform: translateY(0); }
+.btn-danger-solid:active { transform: scale(0.97); }
 
 .btn-link,
 .btn-link:visited {
@@ -1366,18 +1436,20 @@ button { font-family: var(--font-sans); cursor: pointer; }
   text-decoration: none;
   font-size: 13px;
   padding: 6px 4px;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1);
 }
 .btn-link:hover { color: var(--gold); border-color: var(--gold); }
+.btn-link:active { transform: scale(0.96); opacity: 0.85; }
 
 .btn-cancel {
   margin-left: 14px;
   color: var(--muted);
   text-decoration: none;
   font-size: 13.5px;
-  transition: color 0.15s ease;
+  transition: color 0.15s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1);
 }
 .btn-cancel:hover { color: var(--ink); }
+.btn-cancel:active { transform: scale(0.96); }
 
 .btn-sm { padding: 6px 13px; font-size: 12.5px; }
 
@@ -1395,7 +1467,10 @@ button { font-family: var(--font-sans); cursor: pointer; }
   font-size: 13.5px;
   font-weight: 500;
   color: var(--ink-soft);
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1);
+}
+.seg:active {
+  transform: scale(0.95);
 }
 .seg input { position: absolute; opacity: 0; width: 0; height: 0; }
 .seg:has(input:checked), .seg.seg-checked {
@@ -2073,10 +2148,13 @@ table.records-table td[data-col="actions"] .btn-danger-ghost:hover {
   padding: 4px;
   border-radius: 4px;
   user-select: none;
-  transition: background 0.15s;
+  transition: background 0.15s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1);
 }
 .budget-dash-expand:hover {
   background: rgba(0, 0, 0, 0.04);
+}
+.budget-dash-expand:active {
+  transform: scale(0.96);
 }
 
 /* ---------- 图表画布 ---------- */
@@ -2113,6 +2191,12 @@ canvas {
 .app-swal-html .warning-box { text-align: left; margin-bottom: 16px; }
 .app-swal-actions {
   gap: 10px !important;
+}
+.swal2-styled {
+  transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1), filter 0.15s ease, box-shadow 0.15s ease !important;
+}
+.swal2-styled:active {
+  transform: scale(0.96) !important;
 }
 .app-swal-popup-wide {
   width: 34em !important;
@@ -2793,6 +2877,10 @@ canvas {
   margin-bottom: 24px;
 }
 
+.dashboard-view {
+  animation: pageEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 .view-tabs {
   display: inline-flex;
   background: var(--surface);
@@ -2812,12 +2900,16 @@ canvas {
   font-weight: 500;
   color: var(--ink-soft);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease, box-shadow 0.18s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1);
   white-space: nowrap;
 }
 
 .tab-btn:hover {
   color: var(--navy);
+}
+
+.tab-btn:active {
+  transform: scale(0.96);
 }
 
 .tab-btn.active {
@@ -2855,7 +2947,10 @@ canvas {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pill-btn:active {
+  transform: scale(0.95);
 }
 
 .pill-btn:hover {
@@ -3121,7 +3216,7 @@ canvas {
   border-radius: 999px;
   font-size: 12.5px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
 }
 
@@ -3133,7 +3228,7 @@ canvas {
 }
 
 .chip-btn:active {
-  transform: translateY(0);
+  transform: scale(0.95);
 }
 
 .chip-btn.chip-active {
@@ -3782,13 +3877,13 @@ html[data-theme="dark"] {
 /* ---------- 实时无刷新局部更新动态反馈 ---------- */
 @keyframes livePulseGlow {
   0% {
-    background-color: rgba(30, 122, 92, 0.35) !important;
-    box-shadow: 0 0 16px rgba(30, 122, 92, 0.45);
-    transform: scale(1.008);
+    background-color: rgba(30, 122, 92, 0.28) !important;
+    box-shadow: 0 0 14px rgba(30, 122, 92, 0.35);
+    transform: scale(1.006);
   }
-  50% {
-    background-color: rgba(30, 122, 92, 0.18) !important;
-    box-shadow: 0 0 8px rgba(30, 122, 92, 0.25);
+  40% {
+    background-color: rgba(30, 122, 92, 0.14) !important;
+    box-shadow: 0 0 6px rgba(30, 122, 92, 0.2);
   }
   100% {
     background-color: transparent !important;
@@ -3798,15 +3893,15 @@ html[data-theme="dark"] {
 }
 
 .row-highlight-new {
-  animation: livePulseGlow 3.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: livePulseGlow 1.8s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .card-live-pulse {
-  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 
 .card-updated {
-  animation: livePulseGlow 2.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: livePulseGlow 1.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .sync-badge.live-active {
@@ -3962,6 +4057,24 @@ html[data-theme="dark"] {
 #quickAddForm:has(input[name="type"][value="expense"]:checked) #groupRow,
 #quickAddForm:has(input[name="type"][value="savings"]:checked) #groupRow {
   display: none !important;
+}
+
+@keyframes subRowReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#groupRow,
+#expenseSubRow,
+#fromSavingsCategoryBox,
+#quickChipsRow {
+  animation: subRowReveal 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* 按钮加载旋转动效 */
@@ -4555,7 +4668,7 @@ html[data-theme="dark"] {
 }
 
 .btn-poster-pill:active {
-  transform: translateY(0);
+  transform: scale(0.96);
 }
 
 .btn-poster-pill .poster-icon {
@@ -4658,6 +4771,10 @@ html[data-theme="dark"] {
   transition: all 0.18s ease;
 }
 
+.poster-tab-btn:active {
+  transform: scale(0.95);
+}
+
 .poster-tab-btn.active {
   background: var(--card-bg, #ffffff);
   color: var(--navy);
@@ -4687,6 +4804,10 @@ html[data-theme="dark"] {
 .poster-theme-toggle:hover {
   background: var(--navy-soft);
   color: var(--navy);
+}
+
+.poster-theme-toggle:active {
+  transform: scale(0.95);
 }
 
 .poster-modal-body {
@@ -4741,9 +4862,12 @@ html[data-theme="dark"] {
   font-weight: 600;
   border: none;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   flex: 1;
   min-width: 140px;
+}
+.btn-poster-action:active {
+  transform: scale(0.96);
 }
 
 .btn-poster-download {
@@ -4822,6 +4946,9 @@ html[data-theme="dark"] {
   text-decoration: none;
   transition: all 0.16s ease;
   border: 1px solid transparent;
+}
+.auth-lang-pill:active {
+  transform: scale(0.94);
 }
 
 .auth-lang-pill:hover {
