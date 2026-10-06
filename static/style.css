@@ -1457,7 +1457,9 @@ th {
 }
 tbody tr { transition: background-color 0.12s ease; cursor: pointer; }
 tbody tr:hover { background: var(--surface-soft); }
-tbody tr.selected-row { background: var(--gold-soft) !important; }
+tbody tr.selected-row { background: #f5efe3 !important; }
+tbody tr.selected-row > td { background-color: transparent !important; }
+[data-theme="dark"] tbody tr.selected-row { background: #252e3e !important; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr .actions { cursor: default; }
 
@@ -1606,7 +1608,10 @@ table.records-table td[data-col="actions"] .btn-danger-ghost:hover {
     background: var(--surface-soft);
   }
   table.records-table tr.selected-row td[data-col="actions"] {
-    background: var(--gold-soft) !important;
+    background: #f5efe3 !important;
+  }
+  [data-theme="dark"] table.records-table tr.selected-row td[data-col="actions"] {
+    background: #252e3e !important;
   }
 }
 
@@ -2284,7 +2289,11 @@ canvas {
     transition: background-color 0.15s ease, opacity 0.3s ease !important;
   }
   table.records-table tr.record-row.selected-row {
-    background: var(--gold-soft) !important;
+    background: #f5efe3 !important;
+    border-color: var(--gold) !important;
+  }
+  [data-theme="dark"] table.records-table tr.record-row.selected-row {
+    background: #252e3e !important;
     border-color: var(--gold) !important;
   }
   table.records-table tr.record-row td {
