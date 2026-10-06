@@ -123,6 +123,13 @@ def get_db():
         else:
             g.db = sqlite3.connect(DB_PATH)
             g.db.row_factory = sqlite3.Row
+            try:
+                g.db.execute("PRAGMA journal_mode = WAL;")
+                g.db.execute("PRAGMA synchronous = NORMAL;")
+                g.db.execute("PRAGMA temp_store = MEMORY;")
+                g.db.execute("PRAGMA foreign_keys = ON;")
+            except Exception as e:
+                logger.debug("SQLite PRAGMA configuration notice: %s", e)
     return g.db
 
 
@@ -328,6 +335,13 @@ def init_db(app_logger=None):
     else:
         db = sqlite3.connect(DB_PATH)
         db.row_factory = sqlite3.Row
+        try:
+            db.execute("PRAGMA journal_mode = WAL;")
+            db.execute("PRAGMA synchronous = NORMAL;")
+            db.execute("PRAGMA temp_store = MEMORY;")
+            db.execute("PRAGMA foreign_keys = ON;")
+        except Exception as e:
+            logger.debug("SQLite PRAGMA configuration notice in init_db: %s", e)
 
     # 1. 用户表与系统元数据表
     db.execute('''
@@ -769,10 +783,12 @@ def init_db(app_logger=None):
     core_indices = [
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC, id DESC)",
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_type ON transactions(user_id, type)",
+        "CREATE INDEX IF NOT EXISTS idx_transactions_user_cat ON transactions(user_id, category_id)",
         "CREATE INDEX IF NOT EXISTS idx_categories_user_type ON categories(user_id, type, group_name)",
         "CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id, is_active)",
         "CREATE INDEX IF NOT EXISTS idx_user_settings_uid ON user_settings(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_recurring_user ON recurring_rules(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_password_resets_lookup ON password_resets(user_id, is_used, expires_at)",
     ]
     for idx_sql in core_indices:
         try:

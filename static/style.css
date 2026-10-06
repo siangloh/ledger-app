@@ -31,7 +31,10 @@
   --font-mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
-html { color-scheme: light; }
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+}
 
 body {
   font-family: var(--font-sans);
@@ -43,6 +46,26 @@ body {
   color: var(--ink);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* 消除移动端 300ms 触控点击延迟，全局提升瞬时交互反馈 */
+a, button, input, select, textarea, [role="button"], .bnav-item, .card, .action-btn, .sheet-action-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 尊重用户系统的减少动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 /* ---------- 极速即时换页进度条与转场动效 ---------- */

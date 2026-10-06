@@ -2914,7 +2914,9 @@ const InstantNav = {
   },
 
   prefetchIdleRoutes() {
-    const commonRoutes = ['/records', '/split_bill_page', '/accounts_page', '/settings_page'];
+    const curPath = window.location.pathname;
+    const baseRoutes = ['/', '/records', '/split-bill', '/accounts', '/settings', '/categories', '/subscriptions', '/liabilities'];
+    const commonRoutes = baseRoutes.filter(r => r !== curPath);
     const doPrefetch = () => {
       if (navigator.connection && (navigator.connection.saveData || navigator.connection.effectiveType === '2g')) {
         return;
@@ -2922,14 +2924,14 @@ const InstantNav = {
       commonRoutes.forEach((route, idx) => {
         setTimeout(() => {
           this.prefetch(route);
-        }, idx * 180);
+        }, idx * 160);
       });
     };
 
     if ('requestIdleCallback' in window) {
       requestIdleCallback(doPrefetch, { timeout: 2000 });
     } else {
-      setTimeout(doPrefetch, 600);
+      setTimeout(doPrefetch, 500);
     }
   },
 
