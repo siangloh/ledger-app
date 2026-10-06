@@ -257,10 +257,22 @@ def records():
             page_size=page_size
         )
 
+    income_categories = {
+        'main': get_categories(db, 'income', 'main', user_id),
+        'side': get_categories(db, 'income', 'side', user_id),
+    }
+    expense_categories = get_categories(db, 'expense', None, user_id)
+    savings_categories = get_categories(db, 'savings', None, user_id)
+    savings_pool_by_category, total_savings_pool = get_savings_breakdown(db, user_id)
+
     return render_template(
         'records.html',
         rows=rows, start=start, end=end, type=type_, type_=type_, category=category,
         categories=categories,
+        income_categories=income_categories,
+        expense_categories=expense_categories,
+        savings_categories=savings_categories,
+        savings_pool_by_category=savings_pool_by_category,
         total_income=total_income, total_expense=total_expense, total_savings=total_savings,
         total_count=total_count,
         has_more=has_more,
@@ -324,6 +336,12 @@ def edit_record(tx_id):
         return redirect(url_for('records'))
 
     row = db.execute('SELECT * FROM transactions WHERE id=? AND user_id=?', (tx_id, user_id)).fetchone()
+    if not row:
+        if request.args.get('format') == 'json' or request.headers.get('Accept') == 'application/json':
+            return jsonify({'ok': False, 'message': t('records.empty', '记录未找到')}), 404
+        flash(t('records.empty', '记录未找到'), 'error')
+        return redirect(url_for('records'))
+
     income_categories = {
         'main': get_categories(db, 'income', 'main', user_id),
         'side': get_categories(db, 'income', 'side', user_id),
@@ -331,6 +349,17 @@ def edit_record(tx_id):
     expense_categories = get_categories(db, 'expense', None, user_id)
     savings_categories = get_categories(db, 'savings', None, user_id)
     savings_pool_by_category, total_savings_pool = get_savings_breakdown(db, user_id)
+
+    if request.args.get('format') == 'json' or request.headers.get('Accept') == 'application/json':
+        return jsonify({
+            'ok': True,
+            'row': dict(row),
+            'income_categories': income_categories,
+            'expense_categories': expense_categories,
+            'savings_categories': savings_categories,
+            'savings_pool_by_category': savings_pool_by_category,
+        })
+
     return render_template(
         'edit_record.html', row=row,
         income_categories=income_categories,

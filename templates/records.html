@@ -47,6 +47,14 @@
 
 <script>
 window.ALL_CATEGORIES = {{ categories | tojson }};
+window.CATEGORY_DATA = {
+  expense: {{ expense_categories | default([]) | tojson }},
+  income_main: {{ (income_categories.main if income_categories else []) | default([]) | tojson }},
+  income_side: {{ (income_categories.side if income_categories else []) | default([]) | tojson }},
+  savings: {{ savings_categories | default([]) | tojson }}
+};
+window.SAVINGS_POOL = {{ savings_pool_by_category | default({}) | tojson }};
+window.SAVINGS_CATEGORIES = {{ savings_categories | default([]) | tojson }};
 
 function openBatchEditDialog() {
   const selected = document.querySelectorAll('.record-checkbox:checked');
@@ -728,6 +736,378 @@ async function openOffsetModal(incomeId, incomeAmount, incomeNote) {
   }
 }
 
+async function openEditRecordModal(txId) {
+  if (typeof Swal === 'undefined') {
+    window.location.href = '/records/' + txId + '/edit';
+    return;
+  }
+
+  // 1. 获取当前行数据
+  const rowEl = document.getElementById('row-' + txId);
+  let rowData = {};
+  if (rowEl && rowEl.dataset) {
+    rowData = {
+      id: txId,
+      date: rowEl.dataset.date || '',
+      type: rowEl.dataset.type || 'expense',
+      group_name: rowEl.dataset.groupName || 'main',
+      category: rowEl.dataset.category || '',
+      amount: rowEl.dataset.amount || '',
+      note: rowEl.dataset.note || '',
+      tags: rowEl.dataset.tags || '',
+      from_savings: rowEl.dataset.fromSavings === '1',
+      from_savings_category: rowEl.dataset.fromSavingsCategory || ''
+    };
+  }
+
+  // 2. 若缺少分类字典或行数据不全，尝试调用 /records/<id>/edit?format=json 补全
+  if (!window.CATEGORY_DATA || !window.CATEGORY_DATA.expense || window.CATEGORY_DATA.expense.length === 0 || !rowData.date) {
+    try {
+      if (typeof showProgressBar === 'function') showProgressBar();
+      const res = await fetch('/records/' + txId + '/edit?format=json', {
+        headers: { 'Accept': 'application/json' }
+      });
+      const d = await res.json();
+      if (typeof finishProgressBar === 'function') finishProgressBar();
+      if (d.ok) {
+        if (d.row) {
+          rowData = {
+            id: txId,
+            date: d.row.date || '',
+            type: d.row.type || 'expense',
+            group_name: d.row.group_name || 'main',
+            category: d.row.category || '',
+            amount: d.row.amount ? parseFloat(d.row.amount).toFixed(2) : '',
+            note: d.row.note || '',
+            tags: d.row.tags || '',
+            from_savings: !!d.row.from_savings,
+            from_savings_category: d.row.from_savings_category || ''
+          };
+        }
+        window.CATEGORY_DATA = {
+          expense: d.expense_categories || [],
+          income_main: (d.income_categories && d.income_categories.main) || [],
+          income_side: (d.income_categories && d.income_categories.side) || [],
+          savings: d.savings_categories || []
+        };
+        window.SAVINGS_POOL = d.savings_pool_by_category || {};
+        window.SAVINGS_CATEGORIES = d.savings_categories || [];
+      }
+    } catch (e) {
+      if (typeof finishProgressBar === 'function') finishProgressBar();
+      console.debug('Failed to fetch json details:', e);
+    }
+  }
+
+  // 3. 构建多语言文本
+  const sym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
+  const dlgTitle = (window.t ? window.t('common.edit', '编辑记录') : '编辑记录') + ' #' + txId;
+  const optExpense = window.t ? window.t('common.expense', '支出') : '支出';
+  const optIncome = window.t ? window.t('common.income', '收入') : '收入';
+  const optSavings = window.t ? window.t('common.savings', '结余储蓄') : '结余储蓄';
+  const optMain = window.t ? window.t('dashboard.main_income', '主业收入') : '主业收入';
+  const optSide = window.t ? window.t('dashboard.side_income', '副业收入') : '副业收入';
+  const optRegularExpense = window.t ? window.t('dashboard.regular_expense', '常规支出') : '常规支出';
+  const optSavingsExpense = window.t ? window.t('dashboard.savings_expense', '储蓄支出') : '储蓄支出';
+  const lblFromSavings = window.t ? window.t('dashboard.from_savings_label', '扣除自储蓄分类：') : '扣除自储蓄分类：';
+  const lblDate = window.t ? window.t('common.date', '日期') : '日期';
+  const lblAmount = window.t ? window.t('common.amount', '金额') : '金额';
+  const lblCategory = window.t ? window.t('common.category', '分类') : '分类';
+  const lblNote = window.t ? window.t('common.note', '备注') : '备注';
+  const lblTags = window.t ? window.t('dashboard.custom_tags', '自定义标签') : '自定义标签';
+  const placeholderNote = window.t ? window.t('dashboard.note_placeholder', '商户或备注信息') : '商户或备注信息';
+  const placeholderTags = window.t ? window.t('dashboard.tags_placeholder', '如: 外食, 聚餐 (逗号分隔)') : '如: 外食, 聚餐 (逗号分隔)';
+  const btnSave = window.t ? window.t('common.save', '保存') : '保存';
+  const btnCancel = window.t ? window.t('common.cancel', '取消') : '取消';
+  const balPrefix = window.t ? window.t('dashboard.balance_prefix', '可用余额') : '可用余额';
+
+  // 4. 构建储蓄分类选项
+  const pool = window.SAVINGS_POOL || {};
+  const savCats = window.SAVINGS_CATEGORIES || Object.keys(pool);
+  let savingsOptsHtml = '';
+  const preselectedSavingsCat = rowData.from_savings_category || '';
+
+  if (Object.keys(pool).length > 0) {
+    for (const [scat, samt] of Object.entries(pool)) {
+      const isSel = (scat === preselectedSavingsCat) ? 'selected' : '';
+      savingsOptsHtml += `<option value="${scat}" ${isSel}>${scat} (${balPrefix}: ${sym} ${parseFloat(samt).toFixed(2)})</option>`;
+    }
+  }
+  savCats.forEach(scat => {
+    if (!pool[scat]) {
+      const isSel = (scat === preselectedSavingsCat) ? 'selected' : '';
+      savingsOptsHtml += `<option value="${scat}" ${isSel}>${scat} (${balPrefix}: ${sym} 0.00)</option>`;
+    }
+  });
+  if (!savingsOptsHtml) {
+    const defSav = window.t ? window.t('dashboard.default_savings', '默认储蓄') : '默认储蓄';
+    savingsOptsHtml = `<option value="默认储蓄">${defSav}</option>`;
+  }
+
+  // 5. 弹出 SweetAlert2 交互表单
+  Swal.fire({
+    title: dlgTitle,
+    html: `
+      <form id="swalEditRecordForm" class="quick-add" onsubmit="return false;" style="margin-top: 10px; text-align: left;">
+        <div class="row seg-row" style="margin-bottom: 10px; justify-content: flex-start;">
+          <label class="seg"><input type="radio" name="swalEditType" value="expense"><span>${optExpense}</span></label>
+          <label class="seg"><input type="radio" name="swalEditType" value="income"><span>${optIncome}</span></label>
+          <label class="seg"><input type="radio" name="swalEditType" value="savings"><span>${optSavings}</span></label>
+        </div>
+
+        <div class="row seg-row" id="swalEditGroupRow" style="display:none; margin-bottom: 10px; justify-content: flex-start;">
+          <label class="seg"><input type="radio" name="swalEditGroup" value="main"><span>${optMain}</span></label>
+          <label class="seg"><input type="radio" name="swalEditGroup" value="side"><span>${optSide}</span></label>
+        </div>
+
+        <div class="row seg-row" id="swalEditExpenseSubRow" style="display:none; margin-bottom: 10px; justify-content: flex-start;">
+          <label class="seg"><input type="radio" name="swalEditExpenseMode" value="regular"><span>${optRegularExpense}</span></label>
+          <label class="seg"><input type="radio" name="swalEditExpenseMode" value="savings"><span>${optSavingsExpense}</span></label>
+        </div>
+
+        <div id="swalEditFromSavingsBox" class="from-savings-box" style="display:none; margin-bottom: 12px;">
+          <label class="from-savings-label" style="font-size:12.5px; font-weight:600; display:block; margin-bottom:4px; color:var(--ink-soft);">${lblFromSavings}</label>
+          <select id="swalEditFromSavingsSelect" class="from-savings-select" style="width: 100%; height: 38px; border-radius: 8px; font-size: 13.5px;">
+            ${savingsOptsHtml}
+          </select>
+        </div>
+
+        <div class="row" style="display: flex; gap: 12px; margin-bottom: 10px;">
+          <label style="flex: 1; text-align: left;">
+            <span style="font-size: 13px; font-weight: 600; color: var(--ink); display:block; margin-bottom:4px;">${lblDate}</span>
+            <input type="date" id="swalEditDate" value="${rowData.date}" required style="width: 100%; height: 38px; box-sizing: border-box; border-radius: 8px;">
+          </label>
+          <label style="flex: 1; text-align: left;">
+            <span style="font-size: 13px; font-weight: 600; color: var(--ink); display:block; margin-bottom:4px;">${lblAmount} (${sym})</span>
+            <input type="number" step="0.01" min="0.01" id="swalEditAmount" value="${rowData.amount}" required style="width: 100%; height: 38px; box-sizing: border-box; border-radius: 8px;">
+          </label>
+        </div>
+
+        <div class="row" style="display: flex; gap: 12px; margin-bottom: 10px;">
+          <label style="flex: 1; text-align: left;">
+            <span style="font-size: 13px; font-weight: 600; color: var(--ink); display:block; margin-bottom:4px;">${lblCategory}</span>
+            <select id="swalEditCategory" data-preselect="${rowData.category}" style="width: 100%; height: 38px; box-sizing: border-box; border-radius: 8px;"></select>
+          </label>
+          <label style="flex: 1; text-align: left;">
+            <span style="font-size: 13px; font-weight: 600; color: var(--ink); display:block; margin-bottom:4px;">${lblNote}</span>
+            <input type="text" id="swalEditNote" value="${rowData.note || ''}" placeholder="${placeholderNote}" style="width: 100%; height: 38px; box-sizing: border-box; border-radius: 8px;">
+          </label>
+        </div>
+
+        <div class="row" style="margin-bottom: 4px;">
+          <label style="width: 100%; text-align: left;">
+            <span style="font-size: 13px; font-weight: 600; color: var(--ink); display:block; margin-bottom:4px;">${lblTags}</span>
+            <input type="text" id="swalEditTags" value="${rowData.tags || ''}" placeholder="${placeholderTags}" style="width: 100%; height: 38px; box-sizing: border-box; border-radius: 8px;">
+          </label>
+        </div>
+      </form>
+    `,
+    showCancelButton: true,
+    confirmButtonText: btnSave,
+    cancelButtonText: btnCancel,
+    reverseButtons: true,
+    buttonsStyling: false,
+    focusConfirm: false,
+    customClass: {
+      popup: 'app-swal-popup app-swal-popup-wide',
+      title: 'app-swal-title',
+      htmlContainer: 'app-swal-html',
+      confirmButton: 'btn-primary',
+      cancelButton: 'btn-ghost',
+      actions: 'app-swal-actions'
+    },
+    didOpen: function () {
+      const popup = Swal.getPopup();
+      const typeInputs = popup.querySelectorAll('input[name="swalEditType"]');
+      const groupInputs = popup.querySelectorAll('input[name="swalEditGroup"]');
+      const expenseModeInputs = popup.querySelectorAll('input[name="swalEditExpenseMode"]');
+      const groupRow = popup.querySelector('#swalEditGroupRow');
+      const expenseSubRow = popup.querySelector('#swalEditExpenseSubRow');
+      const fromSavingsBox = popup.querySelector('#swalEditFromSavingsBox');
+      const categorySelect = popup.querySelector('#swalEditCategory');
+
+      function syncFormView() {
+        const typeChecked = popup.querySelector('input[name="swalEditType"]:checked');
+        const curType = typeChecked ? typeChecked.value : 'expense';
+
+        if (curType === 'income') {
+          groupRow.style.display = 'flex';
+          expenseSubRow.style.display = 'none';
+          fromSavingsBox.style.display = 'none';
+        } else if (curType === 'expense') {
+          groupRow.style.display = 'none';
+          expenseSubRow.style.display = 'flex';
+          const modeChecked = popup.querySelector('input[name="swalEditExpenseMode"]:checked');
+          fromSavingsBox.style.display = (modeChecked && modeChecked.value === 'savings') ? 'block' : 'none';
+        } else {
+          groupRow.style.display = 'none';
+          expenseSubRow.style.display = 'none';
+          fromSavingsBox.style.display = 'none';
+        }
+
+        // 分类选项填充
+        const groupChecked = popup.querySelector('input[name="swalEditGroup"]:checked');
+        const curGroup = groupChecked ? groupChecked.value : 'main';
+        let options = [];
+        if (window.CATEGORY_DATA) {
+          if (curType === 'income') {
+            options = window.CATEGORY_DATA['income_' + curGroup] || [];
+          } else if (curType === 'savings') {
+            options = window.CATEGORY_DATA.savings || [];
+          } else {
+            options = window.CATEGORY_DATA.expense || [];
+          }
+        }
+        const preselect = categorySelect.dataset.preselect || '';
+        categorySelect.innerHTML = options.map(c => {
+          const label = window.t_cat ? window.t_cat(c) : c;
+          const isSelected = (c === preselect) ? 'selected' : '';
+          return `<option value="${c}" ${isSelected}>${label}</option>`;
+        }).join('');
+
+        // 同步标签高亮样式 (.seg-checked)
+        popup.querySelectorAll('.seg').forEach(label => {
+          const inp = label.querySelector('input');
+          label.classList.toggle('seg-checked', !!(inp && inp.checked));
+        });
+      }
+
+      typeInputs.forEach(i => i.addEventListener('change', syncFormView));
+      groupInputs.forEach(i => i.addEventListener('change', syncFormView));
+      expenseModeInputs.forEach(i => i.addEventListener('change', syncFormView));
+
+      // 初始选中值
+      const typeRadio = popup.querySelector(`input[name="swalEditType"][value="${rowData.type || 'expense'}"]`);
+      if (typeRadio) typeRadio.checked = true;
+
+      const groupRadio = popup.querySelector(`input[name="swalEditGroup"][value="${rowData.group_name || 'main'}"]`);
+      if (groupRadio) groupRadio.checked = true;
+
+      const expModeRadio = popup.querySelector(`input[name="swalEditExpenseMode"][value="${rowData.from_savings ? 'savings' : 'regular'}"]`);
+      if (expModeRadio) expModeRadio.checked = true;
+
+      syncFormView();
+    },
+    preConfirm: function () {
+      const popup = Swal.getPopup();
+      const typeInput = popup.querySelector('input[name="swalEditType"]:checked');
+      if (!typeInput) {
+        Swal.showValidationMessage(window.t ? window.t('records.batch_edit_need_selection', '请选择交易类型') : '请选择交易类型');
+        return false;
+      }
+      const type = typeInput.value;
+      const groupInput = popup.querySelector('input[name="swalEditGroup"]:checked');
+      const group = groupInput ? groupInput.value : 'main';
+      const expenseModeInput = popup.querySelector('input[name="swalEditExpenseMode"]:checked');
+      const fromSavings = (type === 'expense' && expenseModeInput && expenseModeInput.value === 'savings');
+      const fromSavingsCatSelect = popup.querySelector('#swalEditFromSavingsSelect');
+      const fromSavingsCategory = fromSavings && fromSavingsCatSelect ? fromSavingsCatSelect.value : '';
+
+      const dateVal = popup.querySelector('#swalEditDate').value;
+      const amountVal = popup.querySelector('#swalEditAmount').value;
+      const amount = parseFloat(amountVal);
+      const categoryVal = popup.querySelector('#swalEditCategory').value;
+      const noteVal = popup.querySelector('#swalEditNote').value.trim();
+      const tagsVal = popup.querySelector('#swalEditTags').value.trim();
+
+      if (!dateVal) {
+        Swal.showValidationMessage(window.t ? window.t('swal.nlp_select_date', '请选择日期') : '请选择日期');
+        return false;
+      }
+      if (!amountVal || isNaN(amount) || amount <= 0) {
+        Swal.showValidationMessage(window.t ? window.t('transactions.amount_must_be_positive', '金额必须是大于 0 的数字') : '金额必须是大于 0 的数字');
+        return false;
+      }
+      if (!categoryVal) {
+        Swal.showValidationMessage(window.t ? window.t('swal.nlp_need_category', '请选择分类') : '请选择分类');
+        return false;
+      }
+
+      return {
+        type: type,
+        group_name: type === 'income' ? group : '',
+        from_savings: fromSavings,
+        from_savings_category: fromSavingsCategory,
+        date: dateVal,
+        amount: amount,
+        category: categoryVal,
+        note: noteVal,
+        tags: tagsVal
+      };
+    }
+  }).then(async function (result) {
+    if (!result.isConfirmed || !result.value) return;
+
+    if (typeof showProgressBar === 'function') showProgressBar();
+    const v = result.value;
+    const formData = new FormData();
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+    formData.append('csrf_token', csrfToken);
+    formData.append('type', v.type);
+    if (v.type === 'income') {
+      formData.append('group_name', v.group_name);
+    }
+    if (v.type === 'expense') {
+      formData.append('from_savings', v.from_savings ? '1' : '0');
+      if (v.from_savings && v.from_savings_category) {
+        formData.append('from_savings_category', v.from_savings_category);
+      }
+    }
+    formData.append('date', v.date);
+    formData.append('amount', v.amount);
+    formData.append('category', v.category);
+    formData.append('note', v.note);
+    formData.append('tags', v.tags);
+
+    try {
+      const resp = await fetch('/records/' + txId + '/edit', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json'
+        }
+      });
+      const data = await resp.json();
+      if (typeof finishProgressBar === 'function') finishProgressBar();
+
+      if (data.ok) {
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: data.message || (window.t ? window.t('transactions.record_updated', '记录已更新') : '记录已更新'),
+          showConfirmButton: false,
+          timer: 2000,
+          customClass: { popup: 'app-swal-toast' }
+        });
+
+        if (data.budget_alert) {
+          setTimeout(() => {
+            Swal.fire({
+              icon: data.budget_alert.threshold >= 100 ? 'error' : 'warning',
+              title: window.t ? window.t('swal.title_budget_alert', '预算预警提醒') : '预算预警提醒',
+              text: data.budget_alert.message
+            });
+          }, 500);
+        }
+
+        // 局部或完整刷新页面列表
+        if (typeof htmx !== 'undefined') {
+          htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
+        } else {
+          window.location.reload();
+        }
+      } else {
+        errorAlert(data.message || (window.t ? window.t('swal.save_failed', '保存失败') : '保存失败'));
+      }
+    } catch (err) {
+      if (typeof finishProgressBar === 'function') finishProgressBar();
+      errorAlert(window.t ? window.t('swal.network_error', '网络请求超时或服务错误') : '网络请求超时或服务错误');
+    }
+  });
+}
+
 // 显式挂载至 window 作用域，确保内联属性及动态 DOM 派发 100% 可用
 window.setupRecordsObserver = setupRecordsObserver;
 window.updateBatchBar = updateBatchBar;
@@ -737,5 +1117,6 @@ window.confirmBatchDelete = confirmBatchDelete;
 window.confirmSingleDelete = confirmSingleDelete;
 window.openBatchEditDialog = openBatchEditDialog;
 window.openOffsetModal = openOffsetModal;
+window.openEditRecordModal = openEditRecordModal;
 </script>
 {% endblock %}

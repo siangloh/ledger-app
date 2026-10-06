@@ -1,5 +1,16 @@
 {% for r in rows %}
-<tr class="record-row {{ 'row-highlight-new' if latest_id and r.id == latest_id }}" id="row-{{ r.id }}">
+<tr class="record-row {{ 'row-highlight-new' if latest_id and r.id == latest_id }}" id="row-{{ r.id }}"
+    data-id="{{ r.id }}"
+    data-date="{{ r.date }}"
+    data-type="{{ r.type }}"
+    data-group-name="{{ r.group_name or '' }}"
+    data-category="{{ (r.category or '')|e }}"
+    data-amount="{{ '%.2f'|format(r.amount) if r.amount is number else r.amount }}"
+    data-note="{{ (r.note or '')|e }}"
+    data-tags="{{ (r.tags or '')|e }}"
+    data-from-savings="{{ 1 if r.from_savings else 0 }}"
+    data-from-savings-category="{{ (r.from_savings_category or '')|e }}"
+    data-source="{{ r.source or '' }}">
   <td data-col="checkbox" style="text-align: center;">
     <input type="checkbox" name="ids" value="{{ r.id }}" class="record-checkbox" onchange="updateBatchBar()">
   </td>
@@ -29,7 +40,7 @@
       {% if r.type == 'income' %}
       <button type="button" class="btn-link" style="color: var(--primary); font-weight: 600;" onclick="openOffsetModal({{ r.id }}, {{ r.amount }}, '{{ r.note|e }}')" title="{{ t('records.btn_offset_title') }}">{{ t('records.btn_offset') }}</button>
       {% endif %}
-      <a href="{{ url_for('edit_record', tx_id=r.id) }}" class="btn-link" hx-get="{{ url_for('edit_record', tx_id=r.id) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">{{ t('common.edit') }}</a>
+      <button type="button" class="btn-link btn-edit-record" onclick="openEditRecordModal({{ r.id }})" title="{{ t('common.edit') }}">{{ t('common.edit') }}</button>
       <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ t('common.income') if r.type=='income' else (t('common.savings') if r.type=='savings' else t('common.expense')) }} · {{ r.category|t_cat }} · {{ r.amount|money }}', this)">{{ t('common.delete') }}</button>
     </div>
   </td>
