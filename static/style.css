@@ -1,4 +1,5 @@
 *, *::before, *::after { box-sizing: border-box; }
+img, canvas, svg, video { max-width: 100%; height: auto; }
 
 :root {
   --bg: #f2efe8;
@@ -2176,6 +2177,35 @@ canvas {
     border-radius: 16px;
   }
 
+  /* 统计大盘卡片与KPI看板：手机端自适应 2x2 网格，避免单列下卡片被过分拉长拉宽 */
+  .cards-four, .kpi-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  .cards-four > .card, .kpi-grid > .card {
+    padding: 13px 12px !important;
+    min-height: 80px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+  .cards-four .card-label, .kpi-grid .card > div:first-child {
+    font-size: 11.5px !important;
+    margin-bottom: 2px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .cards-four .amount, .kpi-grid .sensitive-val {
+    font-size: clamp(15px, 4.2vw, 20px) !important;
+    line-height: 1.25 !important;
+  }
+  .cards-four .card-sub-stats {
+    font-size: 11px !important;
+    margin-top: 4px !important;
+  }
+
   .month-nav {
     gap: 10px;
     margin-bottom: 12px;
@@ -2215,6 +2245,64 @@ canvas {
     width: 100%;
     flex: none;
     font-size: 13px;
+  }
+
+  /* 确保分段单选按钮（支出/收入/储蓄、主业/副业）在手机端保持水平紧凑分栏，严禁纵向拉长 */
+  .row.seg-row, .seg-row {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+  .row.seg-row label.seg, .seg-row label.seg {
+    width: auto !important;
+    flex: 1 1 0 !important;
+    display: inline-flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    text-align: center !important;
+    padding: 8px 4px !important;
+    font-size: 13px !important;
+    min-width: 0 !important;
+  }
+  .seg span {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  /* 分类添加行在手机端保持单行内联排列 */
+  form.js-validate-category {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    align-items: center !important;
+  }
+  form.js-validate-category input[type="text"] {
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+  form.js-validate-category button {
+    flex-shrink: 0 !important;
+    width: auto !important;
+  }
+
+  /* 预算监控标题栏手机端防折行溢出 */
+  .budget-dash-header {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  /* 响应式表格外容器在移动端支持平滑局部横向滑动 */
+  .table-responsive {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    box-sizing: border-box !important;
+  }
+  .table-responsive table {
+    min-width: 520px !important;
   }
 
   /* 输入框与选择框适配手机大触控面积，字号 15px 防止 iOS 自动缩放 */
@@ -4492,12 +4580,41 @@ html[data-theme="dark"] {
     padding: 8px 16px;
     font-size: 13.5px;
   }
+  .poster-control-bar {
+    gap: 6px !important;
+  }
+  .poster-tabs {
+    flex: 1 !important;
+    display: flex !important;
+    justify-content: center !important;
+  }
+  .poster-tab-btn {
+    flex: 1 !important;
+    text-align: center !important;
+    padding: 6px 8px !important;
+    font-size: 11.5px !important;
+  }
+  .poster-preview-viewport {
+    max-height: 55dvh !important;
+    max-height: 55vh !important;
+    padding: 8px !important;
+  }
+  .poster-actions-row {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+  .btn-poster-action {
+    width: 100% !important;
+    min-width: unset !important;
+  }
 }
 
 /* 海报预览弹窗 */
 .poster-swal-popup {
-  padding: 16px 16px 20px 16px !important;
-  max-width: 580px !important;
+  padding: 16px 14px 20px 14px !important;
+  width: min(580px, 94vw) !important;
+  max-width: 94vw !important;
+  box-sizing: border-box !important;
   border-radius: 20px !important;
   background: var(--card-bg, #ffffff) !important;
 }

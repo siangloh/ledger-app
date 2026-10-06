@@ -12,14 +12,22 @@
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
 <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20261006_v7">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20261006_v8">
 <style>
   .login-page-wrapper {
     min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  @media (max-width: 400px) {
+    .login-card {
+      padding: 26px 18px !important;
+      border-radius: 16px !important;
+    }
   }
   .login-card {
     background: var(--surface);
