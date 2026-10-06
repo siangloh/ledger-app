@@ -131,6 +131,8 @@ TRANSLATIONS = {
         'poster.no_prev_data': '暂无历史对比数据',
         'poster.deep_analysis_report': 'DEEP FINANCIAL ANALYSIS',
         'poster.footer_tagline': '掌控生活收支 · 走向财务自由',
+        'poster.error_title': '生成海报失败',
+        'poster.error_desc': '请稍后重试',
 
         # 仪表盘
         'dashboard.title': '财务概览',
@@ -968,6 +970,7 @@ TRANSLATIONS = {
         'category.投资理财': '投资理财',
         'category.心愿基金': '心愿基金',
         'category.房租': '房租',
+        'category.数码': '数码',
         'nav.sheet_download_app': '下载应用',
         'nav.sheet_download_desc': '点击下载 Android 原生应用包',
         'nav.sheet_insights_desc': '支出环比与走势图',
@@ -1177,6 +1180,8 @@ TRANSLATIONS = {
         'poster.no_prev_data': 'No baseline comparison data',
         'poster.deep_analysis_report': 'DEEP FINANCIAL ANALYSIS',
         'poster.footer_tagline': 'Mindful Finances · True Financial Freedom',
+        'poster.error_title': 'Failed to Generate Poster',
+        'poster.error_desc': 'Please try again later',
 
         # Dashboard
         'dashboard.title': 'Financial Overview',
@@ -2013,6 +2018,7 @@ TRANSLATIONS = {
         'category.投资理财': 'Investment',
         'category.心愿基金': 'Wishlist Fund',
         'category.房租': 'Rent',
+        'category.数码': 'Digital & Tech',
         'nav.sheet_download_app': 'Download App',
         'nav.sheet_download_desc': 'Download Android APK package',
         'nav.sheet_insights_desc': 'Expense trends & MoM charts',
@@ -2223,6 +2229,8 @@ TRANSLATIONS = {
         'poster.no_prev_data': 'Tiada data perbandingan sejarah',
         'poster.deep_analysis_report': 'ANALISIS KEWANGAN MENDALAM',
         'poster.footer_tagline': 'Pengurusan Kewangan Pintar · Kebebasan Masa Depan',
+        'poster.error_title': 'Gagal Menjana Poster',
+        'poster.error_desc': 'Sila cuba sebentar lagi',
 
         # Papan Pemuka
         'dashboard.title': 'Gambaran Kewangan',
@@ -3059,6 +3067,7 @@ TRANSLATIONS = {
         'category.投资理财': 'Pelaburan',
         'category.心愿基金': 'Dana Impian',
         'category.房租': 'Sewa',
+        'category.数码': 'Elektronik / Digital',
         'nav.sheet_download_app': 'Muat Turun Aplikasi',
         'nav.sheet_download_desc': 'Muat turun pakej Android APK',
         'nav.sheet_insights_desc': 'Aliran & graf perbelanjaan MoM',
@@ -3269,6 +3278,8 @@ TRANSLATIONS = {
         'poster.no_prev_data': '暫無歷史對比數據',
         'poster.deep_analysis_report': 'DEEP FINANCIAL ANALYSIS',
         'poster.footer_tagline': '掌控生活收支 · 走向財務自由',
+        'poster.error_title': '生成海報失敗',
+        'poster.error_desc': '請稍後重試',
 
         # 儀表盤
         'dashboard.title': '財務概覽',
@@ -4105,6 +4116,7 @@ TRANSLATIONS = {
         'category.投资理财': '投資理財',
         'category.心愿基金': '心願基金',
         'category.房租': '房租',
+        'category.数码': '數碼',
         'nav.sheet_download_app': '下載應用',
         'nav.sheet_download_desc': '點擊下載 Android 原生應用包',
         'nav.sheet_insights_desc': '支出環比與走勢圖',

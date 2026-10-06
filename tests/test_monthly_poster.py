@@ -77,16 +77,23 @@ def test_poster_service_with_transactions():
             assert len(data_zh['top_categories']) == 2
             assert data_zh['top_categories'][0]['name'] == '数码'
 
-            # 测试英文人格生成
+            # 测试英文人格生成与分类翻译
             data_en = get_monthly_poster_data(user_id=user_id, month_str=test_month, lang='en', db=db)
             assert data_en['ok'] is True
             assert data_en['persona']['title'] == 'Master Saver'
             assert 'Savings rate reached 75.0%' in data_en['persona']['commentary']
+            assert data_en['top_categories'][0]['name'] == 'Digital & Tech'
+            assert data_en['max_expense']['category'] == 'Digital & Tech'
+            assert data_en['month_display_title'] == 'MAY 2026'
+            assert data_en['budget_diagnostic']['status_title'] == 'Golden Allocation'
 
             # 验证环比、同比与储蓄策略数据结构
             assert 'comparison' in data_zh
             assert 'mom' in data_zh['comparison']
+            assert data_zh['comparison']['mom']['has_baseline'] is not None
             assert 'yoy' in data_zh['comparison']
+            assert 'budget_diagnostic' in data_zh
+            assert data_zh['budget_diagnostic']['status_title'] == '黄金资产配置'
             assert 'savings_strategies' in data_zh
             assert len(data_zh['savings_strategies']) >= 3
             assert data_zh['savings_strategies'][0]['title'] == '50/30/20 经典资产配置法则'
@@ -94,11 +101,21 @@ def test_poster_service_with_transactions():
             # 验证英文储蓄策略
             assert data_en['savings_strategies'][0]['title'] == 'The 50/30/20 Budgeting Rule'
 
-            # 验证马来文储蓄策略
+            # 验证马来文储蓄策略与分类
             data_ms = get_monthly_poster_data(user_id=user_id, month_str=test_month, lang='ms', db=db)
             assert data_ms['ok'] is True
             assert data_ms['persona']['title'] == 'Pakar Penabung'
             assert data_ms['savings_strategies'][0]['title'] == 'Peraturan Belanjawan 50/30/20'
+            assert data_ms['top_categories'][0]['name'] == 'Elektronik / Digital'
+            assert data_ms['month_display_title'] == 'MEI 2026'
+            assert data_ms['budget_diagnostic']['status_title'] == 'Agihan Emas'
+
+            # 验证繁体中文分类与诊断
+            data_tw = get_monthly_poster_data(user_id=user_id, month_str=test_month, lang='zh_TW', db=db)
+            assert data_tw['ok'] is True
+            assert data_tw['persona']['title'] == '儲蓄大師'
+            assert data_tw['top_categories'][0]['name'] == '數碼'
+            assert data_tw['budget_diagnostic']['status_title'] == '黃金資產配置'
 
         finally:
             # 清理测试数据
@@ -115,14 +132,16 @@ def test_api_monthly_poster_unauthorized():
 
 def test_api_monthly_poster_success(client):
     """测试登录用户调用海报接口成功返回 200 与完整 JSON 数据结构"""
-    res = client.get('/api/reports/monthly_poster?month=2026-05')
+    res = client.get('/api/reports/monthly_poster?month=2026-05&lang=en')
     assert res.status_code == 200
     json_data = res.get_json()
     assert json_data['ok'] is True
+    assert json_data['lang'] == 'en'
     assert 'metrics' in json_data
     assert 'top_categories' in json_data
     assert 'persona' in json_data
     assert 'currency_symbol' in json_data
     assert 'comparison' in json_data
+    assert 'budget_diagnostic' in json_data
     assert 'savings_strategies' in json_data
 

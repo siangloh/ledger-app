@@ -10,6 +10,7 @@ import logging
 from typing import Dict, Any, Optional, List
 
 from core.db import get_user_settings
+from core.i18n import t_cat
 from core.utils import shift_month
 
 logger = logging.getLogger(__name__)
@@ -151,7 +152,9 @@ def _calculate_comparison(
     if not has_data:
         return {
             'has_data': False,
+            'has_baseline': False,
             'month': baseline['month'],
+            'prev_month': baseline['month'],
             'income_diff': 0.0,
             'income_pct': 0.0,
             'expense_diff': 0.0,
@@ -175,7 +178,9 @@ def _calculate_comparison(
 
     return {
         'has_data': True,
+        'has_baseline': True,
         'month': baseline['month'],
+        'prev_month': baseline['month'],
         'income_diff': inc_diff,
         'income_pct': inc_pct,
         'expense_diff': exp_diff,
@@ -327,16 +332,87 @@ def _generate_savings_strategies(
         s4_badge = f"本月已达成: {no_spend_days} 天"
         s4_desc = f"本月已实现 {no_spend_days} 天零支出！下月可尝试挑战 {target_no_spend} 天零消费日，集中采购食材、自备咖啡，能有效减少零星微额开销。"
 
+    days_unit = 'Days' if lang == 'en' else ('Hari' if lang == 'ms' else '天')
     strategies.append({
         'id': 'no_spend_challenge',
         'icon': '🗓️',
         'title': s4_title,
         'badge': s4_badge,
         'detail': s4_desc,
-        'est_saving': f"{target_no_spend} Days"
+        'est_saving': f"{target_no_spend} {days_unit}"
     })
 
     return strategies
+
+
+def _generate_budget_diagnostic(
+    total_income: float,
+    total_expense: float,
+    needs_expense: float,
+    wants_expense: float,
+    net_balance: float,
+    savings_rate: float,
+    lang: str
+) -> Dict[str, Any]:
+    """生成 50/30/20 预算法则健康诊断与多语言评级"""
+    needs_pct = round((needs_expense / total_income * 100), 1) if total_income > 0 else (
+        round((needs_expense / total_expense * 100), 1) if total_expense > 0 else 0.0
+    )
+    wants_pct = round((wants_expense / total_income * 100), 1) if total_income > 0 else (
+        round((wants_expense / total_expense * 100), 1) if total_expense > 0 else 0.0
+    )
+    savings_pct = max(savings_rate, 0.0)
+
+    if savings_rate >= 20 and needs_pct <= 55:
+        if lang == 'en':
+            title = 'Golden Allocation'
+            desc = 'Needs are well controlled, and savings beat the classic 20% benchmark.'
+        elif lang == 'ms':
+            title = 'Agihan Emas'
+            desc = 'Keperluan asas terkawal rapi, simpanan melepasi penanda aras 20%.'
+        elif lang == 'zh_TW':
+            title = '黃金資產配置'
+            desc = '生存剛需克制合理，儲蓄比例達成黃金基準，財務韌性極高。'
+        else:
+            title = '黄金资产配置'
+            desc = '生存刚需克制合理，储蓄比例达成黄金基准，财务韧性极高。'
+    elif savings_rate < 10 or net_balance < 0:
+        if lang == 'en':
+            title = 'Room for Optimization'
+            desc = 'Wants or overall spending are relatively high. Trim non-essentials to build safety.'
+        elif lang == 'ms':
+            title = 'Perlu Pengoptimuman'
+            desc = 'Perbelanjaan kehendak agak tinggi. Kurangkan belanja sampingan untuk membina simpanan.'
+        elif lang == 'zh_TW':
+            title = '建議優化結構'
+            desc = '彈性或總體支出佔比較高，建議逐步精簡非必要消費以提升儲蓄防線。'
+        else:
+            title = '建议优化结构'
+            desc = '弹性或总体支出占比较高，建议逐步精简非必要消费以提升储蓄防线。'
+    else:
+        if lang == 'en':
+            title = 'Balanced & Steady'
+            desc = 'Healthy balance across categories. Keep tracking to maintain solid financial momentum.'
+        elif lang == 'ms':
+            title = 'Seimbang & Stabil'
+            desc = 'Keseimbangan sihat merentasi kategori. Teruskan catatan untuk mengekalkan kestabilan.'
+        elif lang == 'zh_TW':
+            title = '財務配置平穩'
+            desc = '整體收支平衡適中，保持穩健記賬與預算把控即可持續沉澱資產。'
+        else:
+            title = '财务配置平稳'
+            desc = '整体收支平衡适中，保持稳健记账与预算把控即可持续沉淀资产。'
+
+    return {
+        'needs_pct': needs_pct,
+        'needs_amount': round(needs_expense, 2),
+        'wants_pct': wants_pct,
+        'wants_amount': round(wants_expense, 2),
+        'savings_pct': savings_pct,
+        'savings_amount': round(max(net_balance, 0.0), 2),
+        'status_title': title,
+        'status_desc': desc
+    }
 
 
 def get_monthly_poster_data(
@@ -449,6 +525,12 @@ def get_monthly_poster_data(
             elif tx_type == 'savings':
                 savings_allocated += amt
 
+        if max_expense['category']:
+            raw_cat = max_expense['category']
+            max_expense['raw_category'] = raw_cat
+            max_expense['category'] = t_cat(raw_cat, default=raw_cat, lang=lang)
+            max_expense['category_display'] = max_expense['category']
+
         # 净储蓄与储蓄率计算
         net_balance = round(total_income - total_expense, 2)
         savings_rate = round((net_balance / total_income * 100), 1) if total_income > 0 else 0.0
@@ -471,12 +553,16 @@ def get_monthly_poster_data(
         for cname, camt in sorted_cats[:5]:
             pct = round((camt / total_expense * 100), 1) if total_expense > 0 else 0.0
             top_categories.append({
-                'name': cname,
+                'name': t_cat(cname, default=cname, lang=lang),
+                'raw_name': cname,
                 'amount': round(camt, 2),
                 'percentage': pct
             })
 
-        top_cat_name = top_categories[0]['name'] if top_categories else ('无支出' if lang.startswith('zh') else 'None')
+        empty_top_cat = (
+            '无支出' if lang == 'zh' else ('無支出' if lang == 'zh_TW' else ('Tiada Belanja' if lang == 'ms' else 'No Expenses'))
+        )
+        top_cat_name = top_categories[0]['name'] if top_categories else empty_top_cat
 
         # 智能理财人格判定 (Financial Persona)
         if total_income == 0 and total_expense == 0:
@@ -543,14 +629,28 @@ def get_monthly_poster_data(
             'savings_rate': savings_rate,
             'tx_count': tx_count,
             'no_spend_days': no_spend_days,
+            'zero_spend_days': no_spend_days,
             'avg_daily_expense': round(total_expense / max(evaluated_days, 1), 2),
+            'daily_avg_expense': round(total_expense / max(evaluated_days, 1), 2),
             'needs_expense': round(needs_expense, 2),
             'wants_expense': round(wants_expense, 2),
             'needs_ratio': needs_ratio,
-            'wants_ratio': wants_ratio
+            'wants_ratio': wants_ratio,
+            'max_expense': max_expense['amount']
         }
 
-        # 4. 生成专属储蓄建议
+        # 4. 预算健康诊断
+        budget_diagnostic = _generate_budget_diagnostic(
+            total_income=total_income,
+            total_expense=total_expense,
+            needs_expense=needs_expense,
+            wants_expense=wants_expense,
+            net_balance=net_balance,
+            savings_rate=savings_rate,
+            lang=lang
+        )
+
+        # 5. 生成专属储蓄建议
         savings_strategies = _generate_savings_strategies(
             metrics=metrics_dict,
             top_categories=top_categories,
@@ -596,6 +696,7 @@ def get_monthly_poster_data(
                 'mom': mom_comparison,
                 'yoy': yoy_comparison
             },
+            'budget_diagnostic': budget_diagnostic,
             'savings_strategies': savings_strategies
         }
     except Exception as e:

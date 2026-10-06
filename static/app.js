@@ -4005,6 +4005,8 @@ if (window.matchMedia) {
       footer_brand: 'MY LEDGER APP',
       footer_tagline: '掌控生活收支 · 走向财务自由',
       footer_verified: 'Verified & Generated',
+      footer_secure: '本地安全加密账本',
+      footer_diagnosis: '全方位财务健康诊断报告',
       deep_title: '深度洞察与同比环比分析',
       deep_subtitle: '收支趋势变动 · 50/30/20诊断 · 专属储蓄策略',
       mom_title: '环比上月 (MoM)',
@@ -4013,6 +4015,7 @@ if (window.matchMedia) {
       diff_income: '收入',
       diff_savings: '储蓄率',
       no_prev_data: '无上一期对比数据',
+      no_expense_recorded: '本月暂无支出记录',
       rule_50_30_20: '50 / 30 / 20 预算法则健康诊断',
       needs_label: '必要支出 (Needs 50%)',
       wants_label: '弹性支出 (Wants 30%)',
@@ -4039,6 +4042,8 @@ if (window.matchMedia) {
       footer_brand: 'MY LEDGER APP',
       footer_tagline: '掌控生活收支 · 走向財務自由',
       footer_verified: 'Verified & Generated',
+      footer_secure: '本地安全加密賬本',
+      footer_diagnosis: '全方位財務健康診斷報告',
       deep_title: '深度洞察與同比環比分析',
       deep_subtitle: '收支趨勢變動 · 50/30/20診斷 · 專屬儲蓄策略',
       mom_title: '環比上月 (MoM)',
@@ -4047,6 +4052,7 @@ if (window.matchMedia) {
       diff_income: '收入',
       diff_savings: '儲蓄率',
       no_prev_data: '無上一期對比數據',
+      no_expense_recorded: '本月暫無支出記錄',
       rule_50_30_20: '50 / 30 / 20 預算法則健康診斷',
       needs_label: '必要支出 (Needs 50%)',
       wants_label: '彈性支出 (Wants 30%)',
@@ -4073,6 +4079,8 @@ if (window.matchMedia) {
       footer_brand: 'MY LEDGER APP',
       footer_tagline: 'Master Your Cashflow · Path to Freedom',
       footer_verified: 'Verified & Generated',
+      footer_secure: 'Self-Hosted Secure Ledger',
+      footer_diagnosis: 'Comprehensive Financial Diagnosis',
       deep_title: 'Deep Financial Insights & Comparisons',
       deep_subtitle: 'MoM/YoY Trends · 50/30/20 Rule · Personalized Savings Tactics',
       mom_title: 'Month-over-Month (MoM)',
@@ -4081,6 +4089,7 @@ if (window.matchMedia) {
       diff_income: 'Income',
       diff_savings: 'Savings Rate',
       no_prev_data: 'No baseline data for comparison',
+      no_expense_recorded: 'No expenses recorded this month.',
       rule_50_30_20: '50 / 30 / 20 Budget Rule Diagnostic',
       needs_label: 'Needs (Benchmark 50%)',
       wants_label: 'Wants (Benchmark 30%)',
@@ -4107,6 +4116,8 @@ if (window.matchMedia) {
       footer_brand: 'MY LEDGER APP',
       footer_tagline: 'Urus Aliran Wang · Menuju Kebebasan Kewangan',
       footer_verified: 'Verified & Generated',
+      footer_secure: 'Buku Wang Selamat Sendiri',
+      footer_diagnosis: 'Diagnosis Kesihatan Kewangan Menyeluruh',
       deep_title: 'Wawasan Mendalam & Perbandingan Tempoh',
       deep_subtitle: 'Trend MoM/YoY · Peraturan 50/30/20 · Pelan Simpanan Pintar',
       mom_title: 'Bulan-ke-Bulan (MoM)',
@@ -4115,6 +4126,7 @@ if (window.matchMedia) {
       diff_income: 'Pendapatan',
       diff_savings: 'Kadar Simpanan',
       no_prev_data: 'Tiada data perbandingan sebelumnya',
+      no_expense_recorded: 'Tiada perbelanjaan direkodkan bulan ini.',
       rule_50_30_20: 'Diagnosis Peraturan Belanjawan 50 / 30 / 20',
       needs_label: 'Keperluan (Sasaran 50%)',
       wants_label: 'Kehendak (Sasaran 30%)',
@@ -4126,8 +4138,16 @@ if (window.matchMedia) {
     }
   };
 
-  function getPosterLocale() {
-    const raw = (document.documentElement.lang || 'zh').toLowerCase();
+  function getPosterLocale(serverLang) {
+    if (serverLang && I18N_POSTER[serverLang]) return serverLang;
+    const raw = (
+      serverLang ||
+      window.LEDGER_LANG ||
+      (window.I18N && window.I18N.__locale) ||
+      document.documentElement.lang ||
+      document.documentElement.getAttribute('data-lang') ||
+      'zh'
+    ).toLowerCase();
     if (raw.startsWith('zh_tw') || raw.startsWith('zh-tw') || raw.startsWith('zh-hant')) return 'zh_TW';
     if (raw.startsWith('en')) return 'en';
     if (raw.startsWith('ms') || raw.startsWith('my')) return 'ms';
@@ -4201,7 +4221,7 @@ if (window.matchMedia) {
   // 1. 绘制月度精粹海报 (Summary Poster)
   function renderPosterCanvas(data, isDark) {
     const tokens = getThemeTokens(isDark);
-    const locale = getPosterLocale();
+    const locale = getPosterLocale(data && data.lang);
     const txt = I18N_POSTER[locale] || I18N_POSTER.zh;
 
     const W = 640;
@@ -4244,7 +4264,7 @@ if (window.matchMedia) {
     roundRect(ctx, 16, 16, W - 32, H - 32, 24);
     ctx.stroke();
 
-    const curr = data.currency || 'RM';
+    const curr = data.currency_symbol || data.currency || 'RM';
     const metrics = data.metrics || {};
     const persona = data.persona || {};
 
@@ -4261,7 +4281,8 @@ if (window.matchMedia) {
 
     ctx.fillStyle = tokens.textHeading;
     ctx.font = 'bold 28px system-ui, -apple-system, sans-serif';
-    ctx.fillText(data.month, 44, 114);
+    const monthTitle = data.month_display_title || data.month;
+    ctx.fillText(monthTitle, 44, 114);
 
     ctx.fillStyle = tokens.textSecondary;
     ctx.font = '13.5px system-ui, -apple-system, sans-serif';
@@ -4318,11 +4339,12 @@ if (window.matchMedia) {
     const gridY = 360;
     const gridCardW = (W - 88 - 36) / 4;
     const gridCardH = 82;
+    const maxExpAmt = data.max_expense ? data.max_expense.amount : (metrics.max_expense || 0);
     const subStats = [
-      { label: txt.daily_avg, val: `${curr} ${formatMoney(metrics.daily_avg_expense)}` },
+      { label: txt.daily_avg, val: `${curr} ${formatMoney(metrics.daily_avg_expense || metrics.avg_daily_expense)}` },
       { label: txt.tx_count, val: `${metrics.tx_count || 0}` },
-      { label: txt.no_spend_days, val: `${metrics.zero_spend_days || 0}` },
-      { label: txt.max_expense, val: `${curr} ${formatMoney(metrics.max_expense)}` }
+      { label: txt.no_spend_days, val: `${metrics.zero_spend_days || metrics.no_spend_days || 0}` },
+      { label: txt.max_expense, val: `${curr} ${formatMoney(maxExpAmt)}` }
     ];
 
     subStats.forEach((st, i) => {
@@ -4361,7 +4383,7 @@ if (window.matchMedia) {
     if (categories.length === 0) {
       ctx.fillStyle = tokens.textMuted;
       ctx.font = '13px system-ui, -apple-system, sans-serif';
-      ctx.fillText('No expense recorded this month.', 68, topCardY + 45);
+      ctx.fillText(txt.no_expense_recorded, 68, topCardY + 45);
     } else {
       categories.slice(0, 5).forEach((c, idx) => {
         const ry = topCardY + 20 + idx * catSlotH;
@@ -4372,7 +4394,7 @@ if (window.matchMedia) {
         ctx.arc(74, ry - 4, 4.5, 0, Math.PI * 2);
         ctx.fill();
 
-        const catName = window.t_cat ? window.t_cat(c.name) : c.name;
+        const catName = c.name || (window.t_cat ? window.t_cat(c.raw_name) : (c.raw_name || ''));
         ctx.fillStyle = tokens.textPrimary;
         ctx.font = '500 13px system-ui, -apple-system, sans-serif';
         ctx.fillText(catName, 88, ry);
@@ -4425,12 +4447,14 @@ if (window.matchMedia) {
 
     ctx.fillStyle = tokens.accentGoldText;
     ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
-    const personaTitleText = `${txt.persona_badge}: ${persona.title || '理财探寻者'}`;
+    const fallbackTitle = (locale === 'en' ? 'Wealth Explorer' : (locale === 'ms' ? 'Peneroka Kewangan' : (locale === 'zh_TW' ? '理財探尋者' : '理财探寻者')));
+    const personaTitleText = `${txt.persona_badge}: ${persona.title || fallbackTitle}`;
     ctx.fillText(personaTitleText, 68, personaCardY + 36);
 
     ctx.fillStyle = tokens.textPrimary;
     ctx.font = '13.5px system-ui, -apple-system, "PingFang SC", sans-serif';
-    wrapText(ctx, persona.commentary || '保持记账习惯，清晰掌控每一分财务未来。', 68, personaCardY + 68, W - 136, 23, 4);
+    const fallbackComment = (locale === 'en' ? 'Track your expenses consistently to master your financial destiny.' : (locale === 'ms' ? 'Kekalkan tabiat mencatat perbelanjaan untuk masa depan kewangan yang kukuh.' : (locale === 'zh_TW' ? '保持記賬習慣，清晰掌控每一分財務未來。' : '保持记账习惯，清晰掌控每一分财务未来。')));
+    wrapText(ctx, persona.commentary || fallbackComment, 68, personaCardY + 68, W - 136, 23, 4);
 
     if (data.quote) {
       ctx.fillStyle = tokens.badgeBg;
@@ -4459,8 +4483,8 @@ if (window.matchMedia) {
     ctx.textAlign = 'right';
     ctx.fillStyle = tokens.textMuted;
     ctx.font = '11px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`${txt.footer_verified} on ${todayStr}`, W - 44, footerY + 34);
-    ctx.fillText('Self-Hosted Secure Ledger', W - 44, footerY + 52);
+    ctx.fillText(`${txt.footer_verified} · ${todayStr}`, W - 44, footerY + 34);
+    ctx.fillText(txt.footer_secure, W - 44, footerY + 52);
     ctx.textAlign = 'left';
 
     return canvas;
@@ -4469,7 +4493,7 @@ if (window.matchMedia) {
   // 2. 绘制深度洞察与对比长图 (Deep Analysis Report)
   function renderDeepAnalysisCanvas(data, isDark) {
     const tokens = getThemeTokens(isDark);
-    const locale = getPosterLocale();
+    const locale = getPosterLocale(data && data.lang);
     const txt = I18N_POSTER[locale] || I18N_POSTER.zh;
 
     const W = 640;
@@ -4512,7 +4536,7 @@ if (window.matchMedia) {
     roundRect(ctx, 16, 16, W - 32, H - 32, 24);
     ctx.stroke();
 
-    const curr = data.currency || 'RM';
+    const curr = data.currency_symbol || data.currency || 'RM';
     const comp = data.comparison || {};
     const diag = data.budget_diagnostic || {};
     const strategies = data.savings_strategies || [];
@@ -4530,7 +4554,8 @@ if (window.matchMedia) {
 
     ctx.fillStyle = tokens.textHeading;
     ctx.font = 'bold 26px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`${data.month} ${txt.deep_title}`, 44, 114);
+    const monthTitle = data.month_display_title || data.month;
+    ctx.fillText(`${monthTitle} ${txt.deep_title}`, 44, 114);
 
     ctx.fillStyle = tokens.textSecondary;
     ctx.font = '13.5px system-ui, -apple-system, sans-serif';
@@ -4557,7 +4582,7 @@ if (window.matchMedia) {
       ctx.fillStyle = tokens.divider;
       ctx.fillRect(x + 18, y + 46, w - 36, 1);
 
-      if (!diffData || !diffData.has_baseline) {
+      if (!diffData || !(diffData.has_baseline || diffData.has_data)) {
         ctx.fillStyle = tokens.textMuted;
         ctx.font = '12.5px system-ui, -apple-system, sans-serif';
         ctx.fillText(txt.no_prev_data, x + 18, y + 110);
@@ -4599,8 +4624,8 @@ if (window.matchMedia) {
       });
     }
 
-    drawComparisonBox(44, compY, halfCardW, compCardH, txt.mom_title, comp.mom, comp.mom ? comp.mom.prev_month : '');
-    drawComparisonBox(44 + halfCardW + 16, compY, halfCardW, compCardH, txt.yoy_title, comp.yoy, comp.yoy ? comp.yoy.prev_month : '');
+    drawComparisonBox(44, compY, halfCardW, compCardH, txt.mom_title, comp.mom, (comp.mom && (comp.mom.prev_month || comp.mom.month)) || '');
+    drawComparisonBox(44 + halfCardW + 16, compY, halfCardW, compCardH, txt.yoy_title, comp.yoy, (comp.yoy && (comp.yoy.prev_month || comp.yoy.month)) || '');
 
     // 3. 50/30/20 预算法则健康诊断 (Y: 395 - 615, H: 215)
     const diagY = 395;
@@ -4684,13 +4709,16 @@ if (window.matchMedia) {
     roundRect(ctx, 68, diagNoteY, W - 136, 42, 12);
     ctx.fill();
 
+    const fallbackDiagTitle = (locale === 'en' ? 'Balanced & Steady' : (locale === 'ms' ? 'Seimbang & Stabil' : (locale === 'zh_TW' ? '財務配置平穩' : '财务配置平稳')));
+    const fallbackDiagDesc = (locale === 'en' ? 'Healthy balance across categories. Keep tracking to maintain solid momentum.' : (locale === 'ms' ? 'Keseimbangan sihat merentasi kategori. Teruskan catatan untuk mengekalkan kestabilan.' : (locale === 'zh_TW' ? '整體收支平衡適中，保持穩健記賬與預算把控即可持續沉澱資產。' : '整体收支平衡适中，保持稳健记账与预算把控即可持续沉淀资产。')));
+
     ctx.fillStyle = tokens.accentGoldText;
     ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`⚡ ${diag.status_title || '财务配置平稳'}:`, 82, diagNoteY + 26);
+    ctx.fillText(`⚡ ${diag.status_title || fallbackDiagTitle}:`, 82, diagNoteY + 26);
 
     ctx.fillStyle = tokens.textPrimary;
     ctx.font = '12px system-ui, -apple-system, sans-serif';
-    ctx.fillText(diag.status_desc || '保持当前的预算把控，可继续稳固财务基础。', 210, diagNoteY + 26);
+    ctx.fillText(diag.status_desc || fallbackDiagDesc, 210, diagNoteY + 26);
 
     // 4. 专属储蓄改善建议 (Y: 635 - 1460, H: 810)
     const stratY = 635;
@@ -4779,8 +4807,8 @@ if (window.matchMedia) {
     ctx.textAlign = 'right';
     ctx.fillStyle = tokens.textMuted;
     ctx.font = '11px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`${txt.footer_verified} on ${todayStr}`, W - 44, fLineY + 34);
-    ctx.fillText('Comprehensive Financial Diagnosis', W - 44, fLineY + 52);
+    ctx.fillText(`${txt.footer_verified} · ${todayStr}`, W - 44, fLineY + 34);
+    ctx.fillText(txt.footer_diagnosis, W - 44, fLineY + 52);
     ctx.textAlign = 'left';
 
     return canvas;
@@ -4861,7 +4889,8 @@ if (window.matchMedia) {
     }
 
     try {
-      const res = await fetch(`/api/reports/monthly_poster?month=${encodeURIComponent(monthStr)}`, {
+      const locale = getPosterLocale();
+      const res = await fetch(`/api/reports/monthly_poster?month=${encodeURIComponent(monthStr)}&lang=${encodeURIComponent(locale)}`, {
         headers: {
           'Accept': 'application/json',
           'X-Requested-With': 'XMLHttpRequest'
@@ -4893,10 +4922,11 @@ if (window.matchMedia) {
       const modalTitleText = window.t ? window.t('poster.modal_title', '月度财务长图海报') : '月度财务长图海报';
       const summaryBtnText = window.t ? window.t('poster.type_summary', '月度精粹长图') : '月度精粹长图';
       const deepBtnText = window.t ? window.t('poster.type_deep', '深度洞察与对比') : '深度洞察与对比';
+      const monthTitle = data.month_display_title || data.month;
 
       if (window.Swal) {
         Swal.fire({
-          title: `<div style="font-size: 16.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;"><span>🎨</span> ${modalTitleText} (${data.month})</div>`,
+          title: `<div style="font-size: 16.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;"><span>🎨</span> ${modalTitleText} (${monthTitle})</div>`,
           html: `
             <div class="poster-modal-body">
               <div class="poster-control-bar">
@@ -5005,9 +5035,9 @@ if (window.matchMedia) {
       if (window.Swal) {
         Swal.fire({
           icon: 'error',
-          title: '生成海报失败',
-          text: err.message || '请稍后重试',
-          confirmButtonText: '确定'
+          title: window.t ? window.t('poster.error_title', '生成海报失败') : '生成海报失败',
+          text: err.message || (window.t ? window.t('poster.error_desc', '请稍后重试') : '请稍后重试'),
+          confirmButtonText: window.t ? window.t('common.confirm', '确定') : '确定'
         });
       }
     }

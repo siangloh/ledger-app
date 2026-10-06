@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify, render_template, session
 
 from core.db import get_db, get_current_user_id
 from core.utils import shift_month
-from core.i18n import t
+from core.i18n import t, get_current_locale
 from services.poster_service import get_monthly_poster_data
 
 analytics_bp = Blueprint('analytics', __name__)
@@ -413,7 +413,8 @@ def api_monthly_poster():
         return jsonify({'ok': False, 'message': 'Unauthorized'}), 401
 
     month_str = request.args.get('month', '').strip()
-    lang = session.get('locale', 'zh')
+    raw_lang = request.args.get('lang', '').strip()
+    lang = raw_lang if raw_lang in ('zh', 'zh_TW', 'en', 'ms') else get_current_locale()
     db = get_db()
     data = get_monthly_poster_data(user_id=user_id, month_str=month_str, lang=lang, db=db)
     return jsonify(data)
