@@ -3908,3 +3908,556 @@ if (window.matchMedia) {
   document.addEventListener('htmx:afterSettle', autoBindQuickAdd);
   setTimeout(autoBindQuickAdd, 100);
 })();
+
+/* ==========================================================================
+   Aesthetic Monthly Financial Poster Generator & Exporter
+   HTML5 Canvas 2D Engine with Retina 2x Supersampling
+   ========================================================================== */
+(function () {
+  'use strict';
+
+  function formatMoney(num) {
+    return Number(num || 0).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    if (w < 2 * r) r = w / 2;
+    if (h < 2 * r) r = h / 2;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawGlassCard(ctx, x, y, w, h, r, bgAlpha, borderAlpha) {
+    ctx.save();
+    ctx.fillStyle = `rgba(30, 41, 59, ${bgAlpha !== undefined ? bgAlpha : 0.65})`;
+    roundRect(ctx, x, y, w, h, r);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255, 255, 255, ${borderAlpha !== undefined ? borderAlpha : 0.08})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+    if (!text) return;
+    maxLines = maxLines || 4;
+    const chars = Array.from(text);
+    let line = '';
+    let count = 0;
+
+    for (let i = 0; i < chars.length; i++) {
+      const testLine = line + chars[i];
+      const testWidth = ctx.measureText(testLine).width;
+      if (testWidth > maxWidth && i > 0) {
+        count++;
+        if (count >= maxLines) {
+          ctx.fillText(line + '...', x, y);
+          return;
+        }
+        ctx.fillText(line, x, y);
+        line = chars[i];
+        y += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    if (line) {
+      ctx.fillText(line, x, y);
+    }
+  }
+
+  function renderPosterCanvas(data) {
+    const W = 750;
+    const H = 1260;
+    const scale = 2; // 2x Retina sharpness
+
+    const canvas = document.createElement('canvas');
+    canvas.width = W * scale;
+    canvas.height = H * scale;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+
+    const curr = data.currency_symbol || (window.LEDGER_CURRENCY_SYMBOL || 'RM');
+    const m = data.metrics || {};
+    const persona = data.persona || {};
+
+    // 1. 背景渐变与氛围光晕 (Deep Obsidian & Ambient Glow)
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+    bgGrad.addColorStop(0, '#0C1322');
+    bgGrad.addColorStop(0.35, '#080D18');
+    bgGrad.addColorStop(1, '#04060B');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // 氛围光 1: 右上角极光蓝紫
+    const glow1 = ctx.createRadialGradient(W - 60, 80, 10, W - 60, 80, 360);
+    glow1.addColorStop(0, 'rgba(79, 70, 229, 0.16)');
+    glow1.addColorStop(1, 'rgba(79, 70, 229, 0)');
+    ctx.fillStyle = glow1;
+    ctx.fillRect(0, 0, W, H);
+
+    // 氛围光 2: 左侧中央暖金星辉
+    const glow2 = ctx.createRadialGradient(60, 680, 10, 60, 680, 320);
+    glow2.addColorStop(0, 'rgba(245, 158, 11, 0.09)');
+    glow2.addColorStop(1, 'rgba(245, 158, 11, 0)');
+    ctx.fillStyle = glow2;
+    ctx.fillRect(0, 0, W, H);
+
+    // 外层极细金属质感装饰边框
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, 22, 22, W - 44, H - 44, 26);
+    ctx.stroke();
+
+    // 2. 顶部 Header (Y: 55 - 150)
+    // 品牌 Pill
+    ctx.save();
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
+    roundRect(ctx, 44, 52, 126, 26, 13);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#FCD34D';
+    ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+    ctx.fillText('✦ MY LEDGER', 58, 69);
+
+    // 右侧期号
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '500 11.5px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    const issueText = `MONTHLY REPORT · ${data.month || ''}`;
+    ctx.fillText(issueText, W - 44, 69);
+    ctx.textAlign = 'left';
+
+    // 月度标题 (大号 Serif)
+    const titleGrad = ctx.createLinearGradient(44, 95, 400, 130);
+    titleGrad.addColorStop(0, '#FFFFFF');
+    titleGrad.addColorStop(1, '#E2E8F0');
+    ctx.fillStyle = titleGrad;
+    ctx.font = 'bold 32px "Playfair Display", Georgia, "Songti SC", serif';
+    const mainTitleText = data.month_name_en ? `${data.month_name_en} ${data.year}` : (data.month_name_zh || data.month);
+    ctx.fillText(mainTitleText, 44, 116);
+
+    // 副标题
+    ctx.fillStyle = '#64748B';
+    ctx.font = '500 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(data.month_name_zh ? `${data.month_name_zh} · 极美财务月度收支总览` : 'MONTHLY FINANCIAL SUMMARY', 44, 138);
+
+    // 金色纤细渐变分割线
+    const lineGrad = ctx.createLinearGradient(44, 152, W - 44, 152);
+    lineGrad.addColorStop(0, 'rgba(245, 158, 11, 0)');
+    lineGrad.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
+    lineGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+    ctx.fillStyle = lineGrad;
+    ctx.fillRect(44, 152, W - 88, 1);
+    ctx.restore();
+
+    // 3. 核心净结余卡片 (Y: 170 - 390, H: 220)
+    drawGlassCard(ctx, 44, 170, W - 88, 215, 20, 0.7, 0.12);
+
+    // 卡片内顶行：标签 + 人格徽章
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '600 12.5px system-ui, -apple-system, sans-serif';
+    ctx.fillText(window.t ? window.t('poster.net_balance', '本月净结余') : '本月净结余', 68, 205);
+
+    if (persona.badge) {
+      ctx.save();
+      const badgeText = persona.badge;
+      ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+      const badgeW = ctx.measureText(badgeText).width + 24;
+      const badgeX = W - 68 - badgeW;
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
+      roundRect(ctx, badgeX, 188, badgeW, 26, 13);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = '#FCD34D';
+      ctx.fillText(badgeText, badgeX + 12, 205);
+      ctx.restore();
+    }
+
+    // 净结余大金额
+    const netBal = m.net_balance || 0;
+    const isPositive = netBal >= 0;
+    ctx.save();
+    ctx.font = 'bold 40px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = isPositive ? '#34D399' : '#F43F5E';
+    const sign = isPositive ? '+' : '';
+    const netText = `${sign}${curr} ${formatMoney(netBal)}`;
+    ctx.fillText(netText, 68, 258);
+    ctx.restore();
+
+    // 卡片内底部分割线
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.fillRect(68, 285, W - 136, 1);
+
+    // 三栏核心指标: 总收入, 总支出, 储蓄率
+    const colY = 320;
+    // 收入
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '11.5px system-ui, -apple-system, sans-serif';
+    ctx.fillText(window.t ? window.t('poster.income', '总收入') : '总收入', 68, colY);
+    ctx.fillStyle = '#10B981';
+    ctx.font = 'bold 18px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${curr} ${formatMoney(m.total_income)}`, 68, colY + 24);
+
+    // 支出
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '11.5px system-ui, -apple-system, sans-serif';
+    ctx.fillText(window.t ? window.t('poster.expense', '总支出') : '总支出', 290, colY);
+    ctx.fillStyle = '#F43F5E';
+    ctx.font = 'bold 18px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${curr} ${formatMoney(m.total_expense)}`, 290, colY + 24);
+
+    // 储蓄率
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '11.5px system-ui, -apple-system, sans-serif';
+    ctx.fillText(window.t ? window.t('poster.savings_rate', '储蓄率') : '储蓄率', 520, colY);
+    ctx.fillStyle = '#FBBF24';
+    ctx.font = 'bold 18px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${m.savings_rate || 0}%`, 520, colY + 24);
+
+    // 4. 四格统计网格 (Y: 405 - 495, H: 90)
+    const gridY = 405;
+    const cardW = 154;
+    const cardH = 88;
+    const gap = 15;
+    const startX = 44;
+
+    const gridItems = [
+      {
+        label: window.t ? window.t('poster.daily_avg', '日均支出') : '日均支出',
+        val: `${curr} ${formatMoney(m.avg_daily_expense)}`,
+        color: '#E2E8F0'
+      },
+      {
+        label: window.t ? window.t('poster.tx_count', '记账笔数') : '记账笔数',
+        val: `${m.tx_count || 0} 笔`,
+        color: '#60A5FA'
+      },
+      {
+        label: window.t ? window.t('poster.no_spend_days', '零支出天数') : '零支出天数',
+        val: `${m.no_spend_days || 0} 天`,
+        color: '#FCD34D'
+      },
+      {
+        label: window.t ? window.t('poster.max_expense', '单笔最大') : '单笔最大',
+        val: `${curr} ${formatMoney((data.max_expense && data.max_expense.amount) || 0)}`,
+        color: '#F87171'
+      }
+    ];
+
+    gridItems.forEach((item, idx) => {
+      const cx = startX + idx * (cardW + gap);
+      drawGlassCard(ctx, cx, gridY, cardW, cardH, 14, 0.55, 0.08);
+
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '11.5px system-ui, -apple-system, sans-serif';
+      ctx.fillText(item.label, cx + 14, gridY + 28);
+
+      ctx.fillStyle = item.color;
+      ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
+      ctx.fillText(item.val, cx + 14, gridY + 60);
+    });
+
+    // 5. 支出分类排行 TOP 5 (Y: 512 - 805, H: 285)
+    const catY = 512;
+    ctx.fillStyle = '#CBD5E1';
+    ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(window.t ? window.t('poster.top_categories', '支出分类 TOP 5') : '支出分类 TOP 5', 44, catY);
+
+    const catCardY = catY + 14;
+    drawGlassCard(ctx, 44, catCardY, W - 88, 275, 18, 0.6, 0.09);
+
+    const topCats = data.top_categories || [];
+    const barPalette = [
+      ['#F59E0B', '#FCD34D'],
+      ['#3B82F6', '#93C5FD'],
+      ['#8B5CF6', '#C4B5FD'],
+      ['#EC4899', '#F472B6'],
+      ['#10B981', '#6EE7B7']
+    ];
+
+    if (topCats.length === 0) {
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '14px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('✨ ' + (window.t ? window.t('poster.empty_hint', '本月暂无支出记录，保持了充沛的储蓄蓄水池') : '本月暂无支出记录，保持了充沛的储蓄蓄水池'), W / 2, catCardY + 145);
+      ctx.textAlign = 'left';
+    } else {
+      const rowStartY = catCardY + 40;
+      topCats.slice(0, 5).forEach((c, idx) => {
+        const ry = rowStartY + idx * 48;
+        const cName = window.t_cat ? window.t_cat(c.name) : c.name;
+        const colors = barPalette[idx % barPalette.length];
+
+        // 排行数字
+        ctx.fillStyle = colors[1];
+        ctx.font = 'bold 12.5px system-ui, -apple-system, sans-serif';
+        ctx.fillText(`0${idx + 1}`, 66, ry);
+
+        // 分类名称
+        ctx.fillStyle = '#F1F5F9';
+        ctx.font = '600 13px system-ui, -apple-system, sans-serif';
+        ctx.fillText(cName, 94, ry);
+
+        // 占比徽标
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+        roundRect(ctx, 160, ry - 14, 46, 18, 9);
+        ctx.fill();
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = '500 10.5px system-ui, -apple-system, sans-serif';
+        ctx.fillText(`${c.percentage}%`, 168, ry - 1);
+
+        // 金额
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#E2E8F0';
+        ctx.font = '600 13px system-ui, -apple-system, sans-serif';
+        ctx.fillText(`${curr} ${formatMoney(c.amount)}`, W - 66, ry);
+        ctx.textAlign = 'left';
+
+        // 进度条背景
+        const barTrackX = 66;
+        const barTrackY = ry + 8;
+        const barTrackW = W - 132;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+        roundRect(ctx, barTrackX, barTrackY, barTrackW, 5, 2.5);
+        ctx.fill();
+
+        // 进度条填充
+        const fillW = Math.max(8, Math.min(barTrackW, (c.percentage / 100) * barTrackW));
+        const barGrad = ctx.createLinearGradient(barTrackX, 0, barTrackX + fillW, 0);
+        barGrad.addColorStop(0, colors[0]);
+        barGrad.addColorStop(1, colors[1]);
+        ctx.fillStyle = barGrad;
+        roundRect(ctx, barTrackX, barTrackY, fillW, 5, 2.5);
+        ctx.fill();
+      });
+    }
+
+    // 6. 财务人格与月度评语 (Y: 825 - 1045, H: 210)
+    const personaY = 825;
+    ctx.fillStyle = '#CBD5E1';
+    ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+    ctx.fillText(window.t ? window.t('poster.persona_eval', '财务人格与月度评语') : '财务人格与月度评语', 44, personaY);
+
+    const personaCardY = personaY + 14;
+    const personaCardH = 200;
+    drawGlassCard(ctx, 44, personaCardY, W - 88, personaCardH, 18, 0.65, 0.1);
+
+    // 左侧微光金色高光竖条
+    ctx.save();
+    const goldAccent = ctx.createLinearGradient(0, personaCardY, 0, personaCardY + personaCardH);
+    goldAccent.addColorStop(0, '#F59E0B');
+    goldAccent.addColorStop(1, '#D97706');
+    ctx.fillStyle = goldAccent;
+    roundRect(ctx, 44, personaCardY, 5, personaCardH, 2.5);
+    ctx.fill();
+    ctx.restore();
+
+    // 人格称号
+    ctx.fillStyle = '#FCD34D';
+    ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
+    const personaTitleText = `✨ 评定称号: ${persona.title || '理财探寻者'}`;
+    ctx.fillText(personaTitleText, 68, personaCardY + 36);
+
+    // 评语正文
+    ctx.fillStyle = '#E2E8F0';
+    ctx.font = '13.5px system-ui, -apple-system, "PingFang SC", sans-serif';
+    wrapText(ctx, persona.commentary || '保持记账习惯，清晰掌控每一分财务未来。', 68, personaCardY + 68, W - 136, 23, 4);
+
+    // 灵感名言
+    if (data.quote) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+      roundRect(ctx, 68, personaCardY + 145, W - 136, 38, 10);
+      ctx.fill();
+
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = 'italic 12px "Playfair Display", Georgia, serif';
+      ctx.fillText(`“${data.quote}”`, 82, personaCardY + 168);
+    }
+
+    // 7. 底部落款与水印 (Y: 1060 - 1220)
+    const footerY = 1060;
+    // 渐变分割线
+    const fGrad = ctx.createLinearGradient(44, footerY, W - 44, footerY);
+    fGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    fGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.12)');
+    fGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = fGrad;
+    ctx.fillRect(44, footerY, W - 88, 1);
+
+    // 左侧品牌标语
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText('MY LEDGER APP', 44, footerY + 34);
+
+    ctx.fillStyle = '#64748B';
+    ctx.font = '11.5px system-ui, -apple-system, sans-serif';
+    ctx.fillText('掌控生活收支 · 走向财务自由', 44, footerY + 52);
+
+    // 右侧生成日期
+    const todayStr = new Date().toISOString().slice(0, 10);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#64748B';
+    ctx.font = '11px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`Verified & Generated on ${todayStr}`, W - 44, footerY + 34);
+    ctx.fillText('Self-Hosted Secure Ledger', W - 44, footerY + 52);
+    ctx.textAlign = 'left';
+
+    return canvas;
+  }
+
+  function downloadPosterImage(dataUrl, monthStr) {
+    const filename = `Ledger_Poster_${monthStr || 'Monthly'}.png`;
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  async function copyPosterImage(canvas) {
+    try {
+      if (navigator.clipboard && window.ClipboardItem && canvas.toBlob) {
+        canvas.toBlob(async function (blob) {
+          if (!blob) {
+            fallbackCopyNotice();
+            return;
+          }
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({ 'image/png': blob })
+            ]);
+            if (window.Swal) {
+              Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: window.t ? window.t('poster.copied_toast', '海报已复制到剪贴板！') : '海报已复制到剪贴板！',
+                showConfirmButton: false,
+                timer: 2200
+              });
+            }
+          } catch (err) {
+            fallbackCopyNotice();
+          }
+        }, 'image/png');
+      } else {
+        fallbackCopyNotice();
+      }
+    } catch (e) {
+      fallbackCopyNotice();
+    }
+  }
+
+  function fallbackCopyNotice() {
+    if (window.Swal) {
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'info',
+        title: window.t ? window.t('poster.copy_fallback', '请长按或右键图片另存为') : '请长按或右键图片另存为',
+        showConfirmButton: false,
+        timer: 2600
+      });
+    }
+  }
+
+  window.openMonthlyPosterModal = async function (monthStr) {
+    if (!monthStr) {
+      const curEl = document.querySelector('.month-nav-current');
+      monthStr = curEl ? curEl.textContent.trim() : '';
+    }
+
+    if (window.Swal) {
+      Swal.fire({
+        title: window.t ? window.t('poster.generating', '正在绘制极美长图海报...') : '正在绘制极美长图海报...',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+    }
+
+    try {
+      const res = await fetch(`/api/reports/monthly_poster?month=${encodeURIComponent(monthStr)}`, {
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (!data.ok) {
+        throw new Error(data.message || 'Failed to fetch poster data');
+      }
+
+      const canvas = renderPosterCanvas(data);
+      const dataUrl = canvas.toDataURL('image/png');
+
+      if (window.Swal) {
+        Swal.fire({
+          title: `<div style="font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;"><span>🎨</span> ${window.t ? window.t('poster.modal_title', '月度财务长图海报') : '月度财务长图海报'} (${data.month})</div>`,
+          html: `
+            <div class="poster-modal-body">
+              <div class="poster-preview-viewport">
+                <img src="${dataUrl}" class="poster-preview-img" alt="Monthly Financial Poster" />
+              </div>
+              <div class="poster-actions-row">
+                <button type="button" class="btn-poster-action btn-poster-download" id="swalBtnDownloadPoster">
+                  ${window.t ? window.t('poster.download_png', '📥 保存高清海报 (PNG)') : '📥 保存高清海报 (PNG)'}
+                </button>
+                <button type="button" class="btn-poster-action btn-poster-copy" id="swalBtnCopyPoster">
+                  ${window.t ? window.t('poster.copy_img', '📋 复制图片') : '📋 复制图片'}
+                </button>
+              </div>
+              <span class="poster-hint-text">${window.t ? window.t('poster.copy_fallback', '长按或右键图片亦可直接保存') : '长按或右键图片亦可直接保存'}</span>
+            </div>
+          `,
+          customClass: {
+            popup: 'poster-swal-popup'
+          },
+          showConfirmButton: false,
+          showCloseButton: true,
+          didOpen: () => {
+            const downloadBtn = document.getElementById('swalBtnDownloadPoster');
+            const copyBtn = document.getElementById('swalBtnCopyPoster');
+            if (downloadBtn) {
+              downloadBtn.addEventListener('click', () => downloadPosterImage(dataUrl, data.month));
+            }
+            if (copyBtn) {
+              copyBtn.addEventListener('click', () => copyPosterImage(canvas));
+            }
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Error generating monthly poster:', err);
+      if (window.Swal) {
+        Swal.fire({
+          icon: 'error',
+          title: '生成海报失败',
+          text: err.message || '请稍后重试',
+          confirmButtonText: '确定'
+        });
+      }
+    }
+  };
+})();
+

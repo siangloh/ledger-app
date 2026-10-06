@@ -1,10 +1,11 @@
 from calendar import monthrange
 from datetime import date
-from flask import Blueprint, request, jsonify, render_template
+from flask import Blueprint, request, jsonify, render_template, session
 
 from core.db import get_db, get_current_user_id
 from core.utils import shift_month
 from core.i18n import t
+from services.poster_service import get_monthly_poster_data
 
 analytics_bp = Blueprint('analytics', __name__)
 
@@ -403,3 +404,18 @@ def api_overview():
             'side_ratio': side_ratio
         }
     })
+
+
+@analytics_bp.route('/api/reports/monthly_poster', methods=['GET'], endpoint='api_monthly_poster')
+def api_monthly_poster():
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'ok': False, 'message': 'Unauthorized'}), 401
+
+    month_str = request.args.get('month', '').strip()
+    lang = session.get('locale', 'zh')
+    db = get_db()
+    data = get_monthly_poster_data(user_id=user_id, month_str=month_str, lang=lang, db=db)
+    return jsonify(data)
+
+
