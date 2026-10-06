@@ -4407,3 +4407,13 @@ html[data-theme="dark"] {
   color: #cbd5e1;
   background: rgba(0, 0, 0, 0.3);
 }
+
+/* 页面极速 View Transition 硬件加速与毫秒级转场 */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.1s !important;
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1) !important;
+  }
+}
+

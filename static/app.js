@@ -2913,6 +2913,26 @@ const InstantNav = {
     this.prefetchInflight.set(url, p);
   },
 
+  prefetchIdleRoutes() {
+    const commonRoutes = ['/records', '/split_bill_page', '/accounts_page', '/settings_page'];
+    const doPrefetch = () => {
+      if (navigator.connection && (navigator.connection.saveData || navigator.connection.effectiveType === '2g')) {
+        return;
+      }
+      commonRoutes.forEach((route, idx) => {
+        setTimeout(() => {
+          this.prefetch(route);
+        }, idx * 180);
+      });
+    };
+
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(doPrefetch, { timeout: 2000 });
+    } else {
+      setTimeout(doPrefetch, 600);
+    }
+  },
+
   applyHtmlWithTransition(container, newHtml, callback) {
     if (document.startViewTransition) {
       document.startViewTransition(() => {
@@ -2925,9 +2945,9 @@ const InstantNav = {
         container.innerHTML = newHtml;
         container.classList.remove('page-fade-out');
         container.classList.add('page-fade-in');
-        setTimeout(() => container.classList.remove('page-fade-in'), 220);
+        setTimeout(() => container.classList.remove('page-fade-in'), 120);
         if (callback) callback();
-      }, 35);
+      }, 15);
     }
   },
 
@@ -3045,26 +3065,32 @@ const InstantNav = {
 document.addEventListener('DOMContentLoaded', function () {
   initPageLifecycle();
 
-  // 1. 预测性预取：当手指触碰或鼠标指针移入导航元素时，提前 100~300ms 在后台静默预取目标页 HTML
-  document.addEventListener('pointerenter', function (e) {
-    const navLink = e.target.closest('.mobile-bottom-nav .bnav-item, .desktop-nav-links a, .mobile-bottom-sheet a, a[data-nav]');
-    if (!navLink) return;
-    const url = navLink.getAttribute('hx-get') || navLink.getAttribute('href');
-    if (url) InstantNav.prefetch(url);
-  }, true);
+  // 0. 空闲期推测性预取：用户浏览当前页面时，后台静默将核心高频页面载入内存缓存
+  if (typeof InstantNav !== 'undefined' && typeof InstantNav.prefetchIdleRoutes === 'function') {
+    InstantNav.prefetchIdleRoutes();
+  }
 
-  document.addEventListener('touchstart', function (e) {
-    const navLink = e.target.closest('.mobile-bottom-nav .bnav-item, .desktop-nav-links a, .mobile-bottom-sheet a, a[data-nav]');
+  // 1. 预测性预取：鼠标悬停或手指触碰任意内链时，提前在后台静默预取目标页 HTML
+  const prefetchTarget = function (e) {
+    const navLink = e.target.closest('a[href^="/"], a[hx-get^="/"], .mobile-bottom-nav .bnav-item, .sheet-action-btn, .sheet-list-item');
     if (!navLink) return;
+    if (navLink.getAttribute('target') === '_blank' || navLink.hasAttribute('download')) return;
     const url = navLink.getAttribute('hx-get') || navLink.getAttribute('href');
-    if (url) InstantNav.prefetch(url);
-  }, { passive: true, capture: true });
+    if (url && InstantNav.isNavigable(url)) {
+      InstantNav.prefetch(url);
+    }
+  };
 
-  // 2. 导航按钮点击：0ms 立即高亮状态 + 优先从缓存瞬间挂载 (0ms 无闪烁)
+  document.addEventListener('mouseover', prefetchTarget, { passive: true });
+  document.addEventListener('touchstart', prefetchTarget, { passive: true, capture: true });
+
+  // 2. 全局内链与导航按钮点击拦截：0ms 立即高亮状态 + 优先从缓存瞬间挂载 (0ms 瞬时秒开)
   document.addEventListener('click', function (e) {
-    const navItem = e.target.closest('.mobile-bottom-nav .bnav-item, .desktop-nav-links a, .sheet-action-btn, .sheet-list-item');
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const navItem = e.target.closest('a[href^="/"], a[hx-get^="/"], .mobile-bottom-nav .bnav-item, .sheet-action-btn, .sheet-list-item');
     if (!navItem) return;
     if (navItem.id === 'btnMoreSheet') return;
+    if (navItem.getAttribute('target') === '_blank' || navItem.hasAttribute('download') || navItem.dataset.noInstant) return;
 
     const url = navItem.getAttribute('hx-get') || navItem.getAttribute('href');
     if (!url || !InstantNav.isNavigable(url)) return;

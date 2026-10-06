@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ledger-pwa-v12';
+const CACHE_NAME = 'ledger-pwa-v13';
 const PRECACHE_ASSETS = [
   '/static/manifest.json',
   '/static/style.css',
