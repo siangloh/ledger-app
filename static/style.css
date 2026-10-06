@@ -4221,5 +4221,180 @@ html[data-theme="dark"] {
   filter: blur(6px) !important;
 }
 
+/* ---------- 智能商户自动补全 (Smart Merchant Autocomplete) ---------- */
+.merchant-autocomplete-wrapper {
+  position: relative;
+  display: block;
+  width: 100%;
+}
 
+.merchant-autocomplete-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 14px 36px rgba(16, 33, 59, 0.16), 0 4px 12px rgba(0, 0, 0, 0.08);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 1050;
+  backdrop-filter: blur(12px);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: autocompleteFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
+@keyframes autocompleteFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.merchant-autocomplete-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 2px;
+}
+
+.merchant-autocomplete-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  border: 1px solid transparent;
+}
+
+.merchant-autocomplete-item:hover,
+.merchant-autocomplete-item.active {
+  background: var(--surface-soft);
+  border-color: rgba(182, 144, 47, 0.3);
+}
+
+.merchant-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.merchant-item-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.merchant-item-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--navy);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.merchant-item-match {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.merchant-item-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.merchant-badge-category {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(16, 33, 59, 0.06);
+  color: var(--navy);
+  border: 1px solid rgba(16, 33, 59, 0.1);
+}
+
+.merchant-badge-amount {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--surface-soft);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.merchant-badge-count {
+  font-size: 10.5px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.merchant-matched-feedback {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--gold);
+  font-weight: 600;
+  margin-top: 4px;
+  padding: 3px 8px;
+  background: rgba(182, 144, 47, 0.1);
+  border-radius: 6px;
+  animation: feedbackPillFade 0.3s ease;
+}
+
+@keyframes feedbackPillFade {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Dark mode overrides for autocomplete */
+[data-theme="dark"] .merchant-autocomplete-dropdown {
+  background: rgba(22, 33, 54, 0.96);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="dark"] .merchant-autocomplete-item:hover,
+[data-theme="dark"] .merchant-autocomplete-item.active {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(230, 194, 94, 0.4);
+}
+
+[data-theme="dark"] .merchant-item-name {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .merchant-badge-category {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+[data-theme="dark"] .merchant-badge-amount {
+  color: #cbd5e1;
+  background: rgba(0, 0, 0, 0.3);
+}

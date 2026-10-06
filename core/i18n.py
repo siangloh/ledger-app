@@ -86,6 +86,12 @@ TRANSLATIONS = {
         'common.view': '查看',
         'common.name': '名称',
 
+        # 商户自动补全
+        'merchant.frequent_merchants': '常用商户',
+        'merchant.times_used': '{count}次',
+        'merchant.matched_hint': '✨ 匹配: {category} · 上次 {amount}',
+        'merchant.select_hint': '↑↓ 键切换，回车确认',
+
         # 仪表盘
         'dashboard.title': '财务概览',
         'dashboard.desc': '清晰掌控你的资产净值、每月收支与预算健康度。',
@@ -1069,6 +1075,12 @@ TRANSLATIONS = {
         'common.back': 'Back',
         'common.view': 'View',
         'common.name': 'Name',
+
+        # Merchant Autocomplete
+        'merchant.frequent_merchants': 'Frequent Merchants',
+        'merchant.times_used': '{count} times',
+        'merchant.matched_hint': '✨ Matched: {category} · Last {amount}',
+        'merchant.select_hint': '↑↓ to navigate, Enter to select',
 
         # Dashboard
         'dashboard.title': 'Financial Overview',
@@ -2054,6 +2066,12 @@ TRANSLATIONS = {
         'common.view': 'Lihat',
         'common.name': 'Nama',
 
+        # Autolengkap Peniaga
+        'merchant.frequent_merchants': 'Peniaga Kerap',
+        'merchant.times_used': '{count} kali',
+        'merchant.matched_hint': '✨ Dipadankan: {category} · Lalu {amount}',
+        'merchant.select_hint': '↑↓ untuk navigasi, Enter untuk sah',
+
         # Papan Pemuka
         'dashboard.title': 'Gambaran Kewangan',
         'dashboard.desc': 'Jejaki nilai bersih, pendapatan & perbelanjaan bulanan, serta kesihatan belanjawan anda.',
@@ -3037,6 +3055,12 @@ TRANSLATIONS = {
         'common.back': '返回',
         'common.view': '查看',
         'common.name': '名稱',
+
+        # 商戶自動補全
+        'merchant.frequent_merchants': '常用商戶',
+        'merchant.times_used': '{count}次',
+        'merchant.matched_hint': '✨ 配對: {category} · 上次 {amount}',
+        'merchant.select_hint': '↑↓ 鍵切換，Enter 確認',
 
         # 儀表盤
         'dashboard.title': '財務概覽',

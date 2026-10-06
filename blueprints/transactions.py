@@ -6,7 +6,7 @@ import logging
 from calendar import monthrange
 from datetime import datetime, date
 import pandas as pd
-from flask import Blueprint, request, redirect, url_for, render_template, flash, jsonify
+from flask import Blueprint, request, redirect, url_for, render_template, flash, jsonify, session
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,7 @@ from core.utils import (
 )
 from services.ai_service import parse_nlp_with_llm
 from services.notification_service import parse_nlp_text
+from services.merchant_service import get_merchant_suggestions
 from core.i18n import t
 
 transactions_bp = Blueprint('transactions', __name__)
@@ -76,6 +77,18 @@ def add_transaction():
         (user_id, tx_date, tx_type, group_name, f.get('category'), amount, f.get('note', ''),
          f.get('source', 'manual'), datetime.now().isoformat(), from_savings, from_savings_category, tags, account_id)
     )
+
+    clean_tx_note = (f.get('note') or '').strip()
+    clean_tx_cat = (f.get('category') or '').strip()
+    if clean_tx_note and clean_tx_cat and tx_type == 'expense':
+        try:
+            db.execute(
+                'INSERT OR REPLACE INTO merchant_category_overrides (merchant_note, category, updated_at) VALUES (?, ?, ?)',
+                (clean_tx_note, clean_tx_cat, datetime.now().isoformat())
+            )
+        except Exception as e:
+            logger.debug("Auto-save merchant override in add_transaction skipped: %s", e)
+
     db.commit()
     new_version = bump_data_version('add', {
         'id': cur.lastrowid,
@@ -1054,3 +1067,26 @@ def import_confirm():
 
     flash(t('transactions.import_completed', '导入完成：成功 {inserted} 条，跳过 {skipped} 条', inserted=inserted, skipped=skipped), 'success')
     return redirect(url_for('records'))
+
+
+@transactions_bp.route('/api/merchants/suggestions', methods=['GET'], endpoint='api_merchant_suggestions')
+def api_merchant_suggestions():
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'ok': False, 'message': 'Unauthorized'}), 401
+
+    q = request.args.get('q', '').strip()
+    tx_type = request.args.get('type')
+    if tx_type not in ('expense', 'income'):
+        tx_type = None
+    try:
+        limit = int(request.args.get('limit', 10))
+    except (ValueError, TypeError):
+        limit = 10
+
+    db = get_db()
+    suggestions = get_merchant_suggestions(user_id=user_id, query=q, tx_type=tx_type, limit=limit, db=db)
+    return jsonify({
+        'ok': True,
+        'suggestions': suggestions
+    })

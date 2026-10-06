@@ -64,5 +64,14 @@ window.CATEGORY_DATA = {
 if (typeof onTypeChange === 'function') {
   onTypeChange();
 }
+if (typeof initMerchantAutocomplete === 'function') {
+  const noteInput = document.querySelector('input[name="note"]');
+  if (noteInput) {
+    initMerchantAutocomplete(noteInput, {
+      categorySelect: '#categorySelect',
+      amountInput: 'input[name="amount"]'
+    });
+  }
+}
 </script>
 {% endblock %}

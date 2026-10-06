@@ -987,6 +987,19 @@ async function openEditRecordModal(txId) {
       if (expModeRadio) expModeRadio.checked = true;
 
       syncFormView();
+
+      // 绑定商户智能自动补全与分类即时联动
+      const noteInput = popup.querySelector('#swalEditNote');
+      if (noteInput && window.initMerchantAutocomplete) {
+        window.initMerchantAutocomplete(noteInput, {
+          categorySelect: '#swalEditCategory',
+          amountInput: '#swalEditAmount',
+          typeGetter: () => {
+            const tChecked = popup.querySelector('input[name="swalEditType"]:checked');
+            return tChecked ? tChecked.value : 'expense';
+          }
+        });
+      }
     },
     preConfirm: function () {
       const popup = Swal.getPopup();

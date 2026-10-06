@@ -3576,3 +3576,309 @@ if (window.matchMedia) {
   } catch (e) {}
 }
 
+// ============================================================================
+// 智能商户自动补全与分类智能匹配 (Smart Merchant Autocomplete)
+// ============================================================================
+(function () {
+  const _merchantCache = new Map();
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function highlightMatch(text, query) {
+    if (!query) return escapeHtml(text);
+    const escapedText = escapeHtml(text);
+    const escapedQuery = escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp('(' + escapedQuery + ')', 'gi');
+    return escapedText.replace(regex, '<span class="merchant-item-match">$1</span>');
+  }
+
+  function fetchSuggestions(query, txType, limit) {
+    const cacheKey = (query || '') + '|' + (txType || '') + '|' + (limit || 10);
+    if (_merchantCache.has(cacheKey)) {
+      return Promise.resolve(_merchantCache.get(cacheKey));
+    }
+    const params = new URLSearchParams();
+    if (query) params.append('q', query);
+    if (txType) params.append('type', txType);
+    if (limit) params.append('limit', limit);
+
+    return fetch('/api/merchants/suggestions?' + params.toString(), {
+      headers: { 'HX-Request': 'true' },
+      credentials: 'same-origin'
+    })
+      .then(res => (res.ok ? res.json() : { ok: false, suggestions: [] }))
+      .then(data => {
+        const suggestions = (data && data.suggestions) || [];
+        _merchantCache.set(cacheKey, suggestions);
+        return suggestions;
+      })
+      .catch(err => {
+        console.debug('Merchant suggestions fetch error:', err);
+        return [];
+      });
+  }
+
+  window.initMerchantAutocomplete = function (inputEl, options) {
+    if (!inputEl || inputEl._hasMerchantAutocomplete) return;
+    inputEl._hasMerchantAutocomplete = true;
+    options = options || {};
+
+    // 确保输入框外部具有相对定位容器
+    let wrapper = inputEl.parentElement;
+    if (!wrapper.classList.contains('merchant-autocomplete-wrapper')) {
+      const parent = inputEl.parentNode;
+      const newWrapper = document.createElement('div');
+      newWrapper.className = 'merchant-autocomplete-wrapper';
+      parent.insertBefore(newWrapper, inputEl);
+      newWrapper.appendChild(inputEl);
+      wrapper = newWrapper;
+    }
+
+    // 创建浮动下拉面板
+    const dropdown = document.createElement('div');
+    dropdown.className = 'merchant-autocomplete-dropdown';
+    dropdown.style.display = 'none';
+    dropdown.setAttribute('role', 'listbox');
+    wrapper.appendChild(dropdown);
+
+    // 匹配反馈胶囊
+    const feedbackPill = document.createElement('div');
+    feedbackPill.className = 'merchant-matched-feedback';
+    feedbackPill.style.display = 'none';
+    wrapper.appendChild(feedbackPill);
+
+    let debounceTimer = null;
+    let activeIndex = -1;
+    let currentSuggestions = [];
+
+    function getTxType() {
+      if (typeof options.typeGetter === 'function') {
+        return options.typeGetter();
+      }
+      const checked = document.querySelector('input[name="type"]:checked');
+      return checked ? checked.value : 'expense';
+    }
+
+    function renderDropdown(items, query) {
+      currentSuggestions = items || [];
+      activeIndex = -1;
+      dropdown.innerHTML = '';
+
+      if (!items || items.length === 0) {
+        dropdown.style.display = 'none';
+        return;
+      }
+
+      const header = document.createElement('div');
+      header.className = 'merchant-autocomplete-header';
+      header.innerHTML = `
+        <span>${window.t ? window.t('merchant.frequent_merchants', '常用商户与推荐') : '常用商户与推荐'}</span>
+        <span style="font-weight:400; font-size:10px;">${window.t ? window.t('merchant.select_hint', '↑↓ 切换，回车确认') : '↑↓ 切换，回车确认'}</span>
+      `;
+      dropdown.appendChild(header);
+
+      const currSym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
+
+      items.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'merchant-autocomplete-item';
+        row.setAttribute('role', 'option');
+        row.setAttribute('data-index', idx);
+
+        const catName = window.t_cat ? window.t_cat(item.category) : item.category;
+        const countText = window.t
+          ? window.t('merchant.times_used', '{count}次', { count: item.count })
+          : item.count + '次';
+        const amountDisplay = item.last_amount > 0 ? `${currSym} ${item.last_amount.toFixed(2)}` : '';
+
+        row.innerHTML = `
+          <div class="merchant-item-left">
+            <span class="merchant-item-icon">🏪</span>
+            <span class="merchant-item-name">${highlightMatch(item.name, query)}</span>
+          </div>
+          <div class="merchant-item-right">
+            <span class="merchant-badge-category">${escapeHtml(catName)}</span>
+            ${amountDisplay ? `<span class="merchant-badge-amount">${escapeHtml(amountDisplay)}</span>` : ''}
+            <span class="merchant-badge-count">${escapeHtml(countText)}</span>
+          </div>
+        `;
+
+        row.addEventListener('mousedown', function (e) {
+          e.preventDefault(); // 防止 input 失焦导致下拉提前关闭
+          selectItem(item);
+        });
+
+        dropdown.appendChild(row);
+      });
+
+      dropdown.style.display = 'flex';
+    }
+
+    function selectItem(item) {
+      if (!item) return;
+      inputEl.value = item.name;
+      dropdown.style.display = 'none';
+
+      // 1. 自动关联匹配分类选择框
+      const catSelect =
+        typeof options.categorySelect === 'string'
+          ? document.querySelector(options.categorySelect)
+          : options.categorySelect;
+
+      let matchedCat = false;
+      if (catSelect && item.category) {
+        for (let i = 0; i < catSelect.options.length; i++) {
+          if (
+            catSelect.options[i].value === item.category ||
+            catSelect.options[i].text.includes(item.category)
+          ) {
+            catSelect.selectedIndex = i;
+            catSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            matchedCat = true;
+            break;
+          }
+        }
+      }
+
+      // 2. 若金额输入框为空或为0，自动回填上次金额作为贴心参考
+      const amtInput =
+        typeof options.amountInput === 'string'
+          ? document.querySelector(options.amountInput)
+          : options.amountInput;
+
+      if (amtInput && item.last_amount > 0) {
+        const curVal = parseFloat(amtInput.value || 0);
+        if (isNaN(curVal) || curVal <= 0) {
+          amtInput.value = item.last_amount.toFixed(2);
+          amtInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+
+      // 3. 若有绑定的账户下拉框且当前为默认值，自动填入常用账户
+      const accSelect =
+        typeof options.accountSelect === 'string'
+          ? document.querySelector(options.accountSelect)
+          : options.accountSelect;
+
+      if (accSelect && item.last_account_id) {
+        const opt = accSelect.querySelector(`option[value="${item.last_account_id}"]`);
+        if (opt && (!accSelect.value || accSelect.value === '')) {
+          accSelect.value = String(item.last_account_id);
+          accSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+
+      // 4. 展示微提示胶囊与触觉轻震反馈
+      if (matchedCat) {
+        const catName = window.t_cat ? window.t_cat(item.category) : item.category;
+        const currSym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
+        const amtStr = item.last_amount > 0 ? `${currSym} ${item.last_amount.toFixed(2)}` : '';
+        feedbackPill.textContent = window.t
+          ? window.t('merchant.matched_hint', '✨ 匹配: {category} · 上次 {amount}', {
+              category: catName,
+              amount: amtStr
+            })
+          : `✨ 匹配: ${catName} ${amtStr ? '· 上次 ' + amtStr : ''}`;
+        feedbackPill.style.display = 'inline-flex';
+        clearTimeout(feedbackPill._hideTimer);
+        feedbackPill._hideTimer = setTimeout(() => {
+          feedbackPill.style.display = 'none';
+        }, 3200);
+      }
+
+      if (navigator.vibrate) {
+        try {
+          navigator.vibrate(12);
+        } catch (e) {}
+      }
+
+      if (typeof options.onSelect === 'function') {
+        options.onSelect(item);
+      }
+    }
+
+    function updateActiveItem(index) {
+      const items = dropdown.querySelectorAll('.merchant-autocomplete-item');
+      items.forEach((it, idx) => {
+        it.classList.toggle('active', idx === index);
+        if (idx === index) {
+          it.scrollIntoView({ block: 'nearest' });
+        }
+      });
+      activeIndex = index;
+    }
+
+    inputEl.addEventListener('input', function () {
+      const q = inputEl.value.trim();
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchSuggestions(q, getTxType(), 10).then(items => {
+          renderDropdown(items, q);
+        });
+      }, 120);
+    });
+
+    inputEl.addEventListener('focus', function () {
+      const q = inputEl.value.trim();
+      fetchSuggestions(q, getTxType(), 10).then(items => {
+        renderDropdown(items, q);
+      });
+    });
+
+    inputEl.addEventListener('keydown', function (e) {
+      if (dropdown.style.display === 'none' || currentSuggestions.length === 0) {
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = activeIndex + 1 >= currentSuggestions.length ? 0 : activeIndex + 1;
+        updateActiveItem(next);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = activeIndex - 1 < 0 ? currentSuggestions.length - 1 : activeIndex - 1;
+        updateActiveItem(prev);
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        if (activeIndex >= 0 && activeIndex < currentSuggestions.length) {
+          e.preventDefault();
+          selectItem(currentSuggestions[activeIndex]);
+        }
+      } else if (e.key === 'Escape') {
+        dropdown.style.display = 'none';
+      }
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!wrapper.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    });
+  };
+
+  // 页面加载或 HTMX 局部刷新后自动绑定主面板的快速记账商户输入框
+  function autoBindQuickAdd() {
+    const quickNote = document.getElementById('quickAddNote');
+    if (quickNote && !quickNote._hasMerchantAutocomplete) {
+      window.initMerchantAutocomplete(quickNote, {
+        categorySelect: '#categorySelect',
+        amountInput: '#quickAddAmount',
+        accountSelect: '#quickAddAccountSelect',
+        typeGetter: () => {
+          const checked = document.querySelector('input[name="type"]:checked');
+          return checked ? checked.value : 'expense';
+        }
+      });
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', autoBindQuickAdd);
+  document.addEventListener('htmx:afterSettle', autoBindQuickAdd);
+  setTimeout(autoBindQuickAdd, 100);
+})();
