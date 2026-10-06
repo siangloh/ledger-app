@@ -28,8 +28,9 @@ def test_records_row_data_attributes_and_edit_button(flask_app, logged_in_client
     assert 'data-note="A Cafe &amp; Resto"' in html or 'data-note="A Cafe & Resto"' in html
     assert 'data-tags="午餐, 特色"' in html
 
-    # 验证包含 openEditRecordModal 调用按钮且不再跳转
+    # 验证包含 openEditRecordModal 调用按钮且采用统一的幽灵胶囊按钮模式 (btn-edit-ghost)
     assert f'openEditRecordModal({tx_id})' in html
+    assert 'btn-edit-ghost' in html
     assert 'window.openEditRecordModal = openEditRecordModal;' in html
     assert 'window.CATEGORY_DATA =' in html
 

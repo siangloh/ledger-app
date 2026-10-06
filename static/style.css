@@ -1276,6 +1276,46 @@ button { font-family: var(--font-sans); cursor: pointer; }
 }
 .btn-danger-ghost:hover { background: var(--rose-soft); }
 
+.btn-edit-ghost {
+  background: transparent;
+  color: var(--navy);
+  border: 1px solid rgba(16, 33, 59, 0.28);
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.btn-edit-ghost:hover {
+  background: var(--navy-soft);
+  border-color: var(--navy);
+  color: var(--navy);
+}
+
+.btn-offset-ghost {
+  background: transparent;
+  color: var(--green);
+  border: 1px solid rgba(46, 125, 90, 0.35);
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.btn-offset-ghost:hover {
+  background: var(--green-soft);
+  border-color: var(--green);
+  color: var(--green);
+}
+
 .btn-danger-solid {
   background: linear-gradient(135deg, #b3505d, #8f3947);
   color: #fff;
@@ -1293,11 +1333,15 @@ button { font-family: var(--font-sans); cursor: pointer; }
 
 .btn-link,
 .btn-link:visited {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  font-family: inherit;
+  cursor: pointer;
   color: var(--navy);
   text-decoration: none;
   font-size: 13px;
   padding: 6px 4px;
-  border-bottom: 1px solid transparent;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 .btn-link:hover { color: var(--gold); border-color: var(--gold); }
@@ -1495,24 +1539,51 @@ table.records-table td[data-col="actions"] {
   min-width: 120px;
   padding-right: 14px;
 }
-table.records-table td[data-col="actions"] .btn-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 8px;
-  font-size: 12.5px;
-  font-weight: 500;
-  border-radius: 6px;
-  line-height: 1.2;
-}
+table.records-table td[data-col="actions"] .btn-link,
+table.records-table td[data-col="actions"] .btn-edit-ghost,
+table.records-table td[data-col="actions"] .btn-offset-ghost,
 table.records-table td[data-col="actions"] .btn-danger-ghost {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 4px 10px;
   font-size: 12px;
+  font-weight: 500;
   line-height: 1.2;
   border-radius: 999px;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  background: transparent;
+  transition: all 0.15s ease;
+}
+table.records-table td[data-col="actions"] .btn-edit-ghost {
+  color: var(--navy);
+  border: 1px solid rgba(16, 33, 59, 0.28);
+}
+table.records-table td[data-col="actions"] .btn-edit-ghost:hover {
+  background: var(--navy-soft);
+  border-color: var(--navy);
+  color: var(--navy);
+}
+table.records-table td[data-col="actions"] .btn-offset-ghost {
+  color: var(--green);
+  border: 1px solid rgba(46, 125, 90, 0.35);
+}
+table.records-table td[data-col="actions"] .btn-offset-ghost:hover {
+  background: var(--green-soft);
+  border-color: var(--green);
+  color: var(--green);
+}
+table.records-table td[data-col="actions"] .btn-danger-ghost {
+  color: var(--rose);
+  border: 1px solid rgba(168, 71, 90, 0.35);
+}
+table.records-table td[data-col="actions"] .btn-danger-ghost:hover {
+  background: var(--rose-soft);
+  border-color: var(--rose);
+  color: var(--rose);
 }
 
 /* 桌面端支持右侧操作列粘性轻吸附，即使在极窄视口下横向滑动也绝不截断操作按钮 */
@@ -3176,6 +3247,39 @@ html[data-theme="dark"] {
 [data-theme="dark"] .btn-link:hover {
   color: #dfb552 !important;
   border-color: #dfb552 !important;
+}
+[data-theme="dark"] .btn-edit-ghost,
+[data-theme="dark"] table.records-table td[data-col="actions"] .btn-edit-ghost {
+  color: #8cb4e6 !important;
+  border-color: rgba(140, 180, 230, 0.35) !important;
+}
+[data-theme="dark"] .btn-edit-ghost:hover,
+[data-theme="dark"] table.records-table td[data-col="actions"] .btn-edit-ghost:hover {
+  background: rgba(140, 180, 230, 0.16) !important;
+  border-color: #8cb4e6 !important;
+  color: #a8cdfc !important;
+}
+[data-theme="dark"] .btn-offset-ghost,
+[data-theme="dark"] table.records-table td[data-col="actions"] .btn-offset-ghost {
+  color: #34d399 !important;
+  border-color: rgba(52, 211, 153, 0.35) !important;
+}
+[data-theme="dark"] .btn-offset-ghost:hover,
+[data-theme="dark"] table.records-table td[data-col="actions"] .btn-offset-ghost:hover {
+  background: rgba(52, 211, 153, 0.16) !important;
+  border-color: #34d399 !important;
+  color: #6ee7b7 !important;
+}
+[data-theme="dark"] .btn-danger-ghost,
+[data-theme="dark"] table.records-table td[data-col="actions"] .btn-danger-ghost {
+  color: #f87171 !important;
+  border-color: rgba(248, 113, 113, 0.35) !important;
+}
+[data-theme="dark"] .btn-danger-ghost:hover,
+[data-theme="dark"] table.records-table td[data-col="actions"] .btn-danger-ghost:hover {
+  background: rgba(248, 113, 113, 0.16) !important;
+  border-color: #f87171 !important;
+  color: #fca5a5 !important;
 }
 [data-theme="dark"] .btn-primary {
   background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;

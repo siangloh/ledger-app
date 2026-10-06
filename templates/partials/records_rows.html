@@ -38,9 +38,9 @@
   <td data-col="actions" class="actions">
     <div class="actions-inner">
       {% if r.type == 'income' %}
-      <button type="button" class="btn-link" style="color: var(--primary); font-weight: 600;" onclick="openOffsetModal({{ r.id }}, {{ r.amount }}, '{{ r.note|e }}')" title="{{ t('records.btn_offset_title') }}">{{ t('records.btn_offset') }}</button>
+      <button type="button" class="btn-offset-ghost" onclick="openOffsetModal({{ r.id }}, {{ r.amount }}, '{{ r.note|e }}')" title="{{ t('records.btn_offset_title') }}">{{ t('records.btn_offset') }}</button>
       {% endif %}
-      <button type="button" class="btn-link btn-edit-record" onclick="openEditRecordModal({{ r.id }})" title="{{ t('common.edit') }}">{{ t('common.edit') }}</button>
+      <button type="button" class="btn-edit-ghost btn-edit-record" onclick="openEditRecordModal({{ r.id }})" title="{{ t('common.edit') }}">{{ t('common.edit') }}</button>
       <button type="button" class="btn-danger-ghost" onclick="confirmSingleDelete('{{ url_for('delete_record', tx_id=r.id) }}', '{{ r.date }} · {{ t('common.income') if r.type=='income' else (t('common.savings') if r.type=='savings' else t('common.expense')) }} · {{ r.category|t_cat }} · {{ r.amount|money }}', this)">{{ t('common.delete') }}</button>
     </div>
   </td>
