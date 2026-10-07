@@ -257,6 +257,11 @@ def add_cache_control_headers(response):
         else:
             response.headers['Cache-Control'] = 'public, max-age=86400'
 
+    # 基础 HTTP 安全响应头防护 (OWASP 推荐安全规范)
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+
     # 同步 lang cookie，便于纯前端/离线状态保持语言
     if hasattr(g, 'current_lang') and g.current_lang:
         if request.cookies.get('lang') != g.current_lang:

@@ -121,3 +121,13 @@ def test_login_and_register_are_csrf_exempt_to_prevent_login_loops(client):
     assert resp.status_code == 401
     assert b"\xe7\x94\xa8\xe6\x88\xb7\xe5\x90\x8d\xe6\x88\x96\xe5\xaf\x86\xe7\xa0\x81\xe9\x94\x99\xe8\xaf\xaf" in resp.data or b"login" in resp.data
 
+
+def test_security_headers_present_in_responses(client):
+    """Test that OWASP recommended HTTP security headers are present in responses."""
+    resp = client.get("/login")
+    assert resp.status_code == 200
+    assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+    assert resp.headers.get("X-Frame-Options") == "SAMEORIGIN"
+    assert resp.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
+
+
