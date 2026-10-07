@@ -3069,24 +3069,28 @@ const InstantNav = {
   },
 
   prefetchIdleRoutes() {
+    if (document.hidden) return;
     const curPath = window.location.pathname;
     const baseRoutes = ['/', '/records', '/split-bill', '/accounts', '/settings', '/categories', '/subscriptions', '/liabilities'];
     const commonRoutes = baseRoutes.filter(r => r !== curPath);
     const doPrefetch = () => {
+      if (document.hidden) return;
       if (navigator.connection && (navigator.connection.saveData || navigator.connection.effectiveType === '2g')) {
         return;
       }
       commonRoutes.forEach((route, idx) => {
         setTimeout(() => {
-          this.prefetch(route);
-        }, idx * 160);
+          if (!document.hidden) {
+            this.prefetch(route);
+          }
+        }, idx * 250);
       });
     };
 
     if ('requestIdleCallback' in window) {
-      requestIdleCallback(doPrefetch, { timeout: 2000 });
+      requestIdleCallback(doPrefetch, { timeout: 3000 });
     } else {
-      setTimeout(doPrefetch, 500);
+      setTimeout(doPrefetch, 800);
     }
   },
 
@@ -5100,6 +5104,128 @@ if (window.matchMedia) {
     return canvas;
   }
 
+  function convertCanvasToPdfBlob(canvas, title) {
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const base64Data = dataUrl.split(',')[1];
+    const binaryStr = atob(base64Data);
+    const imgLen = binaryStr.length;
+    const imgBytes = new Uint8Array(imgLen);
+    for (let i = 0; i < imgLen; i++) {
+      imgBytes[i] = binaryStr.charCodeAt(i);
+    }
+
+    const imgW = canvas.width;
+    const imgH = canvas.height;
+    // Standard PDF page width: 595.28 pt (A4 width), height scaled proportionally to preserve exact aspect ratio
+    const pageW = 595.28;
+    const pageH = Number(((pageW * imgH) / imgW).toFixed(2));
+
+    const chunks = [];
+    const offsets = [];
+    let currentOffset = 0;
+
+    function pushString(str) {
+      const bytes = new Uint8Array(str.length);
+      for (let i = 0; i < str.length; i++) {
+        bytes[i] = str.charCodeAt(i) & 0xff;
+      }
+      chunks.push(bytes);
+      currentOffset += bytes.length;
+    }
+
+    function pushBytes(u8Arr) {
+      chunks.push(u8Arr);
+      currentOffset += u8Arr.length;
+    }
+
+    function markObj() {
+      offsets.push(currentOffset);
+    }
+
+    pushString('%PDF-1.4\n%\xe2\xe3\xcf\xd3\n');
+
+    // Obj 1: Catalog
+    markObj();
+    pushString('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+
+    // Obj 2: Pages
+    markObj();
+    pushString('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+
+    // Obj 3: Page
+    markObj();
+    pushString('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pageW + ' ' + pageH + '] /Resources << /ProcSet [/PDF /ImageC] /XObject << /Im1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n');
+
+    // Obj 4: Image XObject
+    markObj();
+    pushString('4 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + imgW + ' ' + imgH + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + imgLen + ' >>\nstream\n');
+    pushBytes(imgBytes);
+    pushString('\nendstream\nendobj\n');
+
+    // Obj 5: Content stream
+    markObj();
+    const contentStream = 'q\n' + pageW + ' 0 0 ' + pageH + ' 0 0 cm\n/Im1 Do\nQ\n';
+    pushString('5 0 obj\n<< /Length ' + contentStream.length + ' >>\nstream\n' + contentStream + 'endstream\nendobj\n');
+
+    // Obj 6: Document Info
+    markObj();
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const dateStr = 'D:' + now.getUTCFullYear() +
+      pad(now.getUTCMonth() + 1) +
+      pad(now.getUTCDate()) +
+      pad(now.getUTCHours()) +
+      pad(now.getUTCMinutes()) +
+      pad(now.getUTCSeconds()) + 'Z';
+    const safeTitle = (title || 'Ledger Monthly Financial Report').replace(/[\(\)\\\r\n]/g, '');
+    pushString('6 0 obj\n<< /Title (' + safeTitle + ') /Author (My Ledger App) /Creator (Ledger App) /Producer (Ledger App PDF Exporter) /CreationDate (' + dateStr + ') >>\nendobj\n');
+
+    // Xref table
+    const startXref = currentOffset;
+    pushString('xref\n0 7\n0000000000 65535 f \n');
+    for (let k = 0; k < offsets.length; k++) {
+      const offStr = String(offsets[k]).padStart(10, '0');
+      pushString(offStr + ' 00000 n \n');
+    }
+
+    // Trailer
+    pushString('trailer\n<< /Size 7 /Root 1 0 R /Info 6 0 R >>\nstartxref\n' + startXref + '\n%%EOF\n');
+
+    return new Blob(chunks, { type: 'application/pdf' });
+  }
+
+  function downloadPosterPdf(canvas, monthStr, reportType) {
+    try {
+      const title = `Ledger Monthly Financial Report (${monthStr || ''} - ${reportType || 'summary'})`;
+      const blob = convertCanvasToPdfBlob(canvas, title);
+      const url = URL.createObjectURL(blob);
+      const filename = `Ledger_Report_${monthStr || 'Monthly'}_${reportType || 'summary'}.pdf`;
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 3000);
+
+      if (window.Swal) {
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: window.t ? window.t('poster.pdf_downloaded_toast', '📄 PDF 月报已生成并开始下载！') : '📄 PDF 月报已生成并开始下载！',
+          showConfirmButton: false,
+          timer: 2400
+        });
+      }
+    } catch (err) {
+      console.error('Failed to generate PDF from poster canvas:', err);
+      downloadPosterImage(canvas.toDataURL('image/png'), monthStr, reportType);
+    }
+  }
+
   function downloadPosterImage(dataUrl, monthStr, reportType) {
     const filename = `Ledger_Report_${monthStr || 'Monthly'}_${reportType || 'summary'}.png`;
     const link = document.createElement('a');
@@ -5205,7 +5331,7 @@ if (window.matchMedia) {
       currentCanvas = getPosterCanvas();
       currentDataUrl = currentCanvas.toDataURL('image/png');
 
-      const modalTitleText = window.t ? window.t('poster.modal_title', '月度财务长图海报') : '月度财务长图海报';
+      const modalTitleText = window.t ? window.t('poster.modal_title', '月度财务报告 (PDF / 海报)') : '月度财务报告 (PDF / 海报)';
       const summaryBtnText = window.t ? window.t('poster.type_summary', '月度精粹长图') : '月度精粹长图';
       const deepBtnText = window.t ? window.t('poster.type_deep', '深度洞察与对比') : '深度洞察与对比';
       const monthTitle = data.month_display_title || data.month;
@@ -5228,8 +5354,11 @@ if (window.matchMedia) {
                 <img src="${currentDataUrl}" class="poster-preview-img" id="posterPreviewImg" alt="Financial Poster" />
               </div>
               <div class="poster-actions-row">
+                <button type="button" class="btn-poster-action btn-poster-download-pdf" id="swalBtnDownloadPosterPdf">
+                  ${window.t ? window.t('poster.download_pdf', '📄 导出 PDF 格式') : '📄 导出 PDF 格式'}
+                </button>
                 <button type="button" class="btn-poster-action btn-poster-download" id="swalBtnDownloadPoster">
-                  ${window.t ? window.t('poster.download_png', '📥 保存高清海报 (PNG)') : '📥 保存高清海报 (PNG)'}
+                  ${window.t ? window.t('poster.download_png', '🖼️ 保存图片 (PNG)') : '🖼️ 保存图片 (PNG)'}
                 </button>
                 <button type="button" class="btn-poster-action btn-poster-copy" id="swalBtnCopyPoster">
                   ${window.t ? window.t('poster.copy_img', '📋 复制图片') : '📋 复制图片'}
@@ -5250,6 +5379,7 @@ if (window.matchMedia) {
             const themeTxt = document.getElementById('posterThemeText');
             const viewport = document.getElementById('posterPreviewViewport');
             const imgEl = document.getElementById('posterPreviewImg');
+            const downloadPdfBtn = document.getElementById('swalBtnDownloadPosterPdf');
             const downloadBtn = document.getElementById('swalBtnDownloadPoster');
             const copyBtn = document.getElementById('swalBtnCopyPoster');
 
@@ -5297,6 +5427,14 @@ if (window.matchMedia) {
               btnTheme.addEventListener('click', () => {
                 activeIsDark = !activeIsDark;
                 refreshDisplay();
+              });
+            }
+
+            if (downloadPdfBtn) {
+              downloadPdfBtn.addEventListener('click', () => {
+                if (currentCanvas) {
+                  downloadPosterPdf(currentCanvas, data.month, activeReportType);
+                }
               });
             }
 

@@ -145,3 +145,23 @@ def test_api_monthly_poster_success(client):
     assert 'budget_diagnostic' in json_data
     assert 'savings_strategies' in json_data
 
+
+def test_poster_pdf_translations():
+    """测试海报 PDF 与图片导出文案在全部 4 种语言中完整存在"""
+    from core.i18n import t, get_client_translations
+    locales = ['zh', 'en', 'ms', 'zh_TW']
+    for loc in locales:
+        pdf_txt = t('poster.download_pdf', lang=loc)
+        assert 'PDF' in pdf_txt
+        png_txt = t('poster.download_png', lang=loc)
+        assert 'PNG' in png_txt
+        toast_txt = t('poster.pdf_downloaded_toast', lang=loc)
+        assert len(toast_txt) > 0
+        btn_txt = t('poster.generate_btn', lang=loc)
+        assert 'PDF' in btn_txt
+
+        client_dict = get_client_translations(loc)
+        assert 'poster.download_pdf' in client_dict
+        assert 'poster.download_png' in client_dict
+        assert 'poster.pdf_downloaded_toast' in client_dict
+
