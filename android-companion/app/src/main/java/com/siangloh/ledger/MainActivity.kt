@@ -81,7 +81,10 @@ class MainActivity : AppCompatActivity() {
         initWebView()
         checkNotificationPermission()
         checkBatteryOptimization()
+        checkDrivingPermissions()
         setupBackNavigation()
+
+        DrivingDetectionManager.requestActivityTransitionUpdates(this)
 
         loadContent()
     }
@@ -230,6 +233,13 @@ class MainActivity : AppCompatActivity() {
             fun scanReceipt() {
                 runOnUiThread { showReceiptScanChooser() }
             }
+            // 驾车状态感知与设置
+            @JavascriptInterface
+            fun isDriving(): Boolean = DrivingDetectionManager.isCurrentlyDriving(this@MainActivity)
+            @JavascriptInterface
+            fun openDrivingSettings() {
+                runOnUiThread { showCarDrivingSettingsDialog() }
+            }
         }, "LedgerNativeBridge")
 
         swipeRefreshLayout.setColorSchemeResources(R.color.gold_accent, R.color.navy_primary)
@@ -371,7 +381,8 @@ class MainActivity : AppCompatActivity() {
             "🔄 手动同步",
             "👤 绑定记账用户 (当前: $currentBound)",
             "🌐 服务器地址设置",
-            "🔑 自动记账 API Key 设置"
+            "🔑 自动记账 API Key 设置",
+            "🚗 车载蓝牙与自动驾车检测设置"
         )
         AlertDialog.Builder(this)
             .setTitle("快捷菜单")
@@ -387,9 +398,114 @@ class MainActivity : AppCompatActivity() {
                     4 -> showUsernameDialog()
                     5 -> showServerUrlDialog()
                     6 -> showApiKeyDialog()
+                    7 -> showCarDrivingSettingsDialog()
                 }
             }
             .show()
+    }
+
+    private fun showCarDrivingSettingsDialog() {
+        val isEnabled = DrivingDetectionManager.isTrackingEnabled(this)
+        val isDriving = DrivingDetectionManager.isCurrentlyDriving(this)
+        val boundName = DrivingDetectionManager.getSavedCarBluetoothName(this).ifEmpty { "未绑定 (自动按车载音频识别)" }
+        val source = DrivingDetectionManager.getDrivingSource(this)
+        val stateText = if (isDriving) "🚗 正在驾车中 (来源: $source)" else "⚪ 未在驾车"
+
+        val options = arrayOf(
+            if (isEnabled) "✅ 自动检测功能：已开启 (点击切换)" else "❌ 自动检测功能：已关闭 (点击切换)",
+            "📡 绑定我的车载蓝牙设备 (当前: $boundName)",
+            "ℹ️ 查看检测原理与免费说明"
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("🚗 自动驾车检测设置")
+            .setMessage("当前状态：$stateText\n绑定车机：$boundName\n\n通过【车载蓝牙】(0%耗电) 与【Google活动识别】双引擎自动感知上下车，下车时自动提醒记录过路费、加油与泊车。")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> {
+                        val newStatus = !isEnabled
+                        DrivingDetectionManager.setTrackingEnabled(this, newStatus)
+                        Toast.makeText(this, if (newStatus) "已开启自动驾车检测" else "已关闭自动驾车检测", Toast.LENGTH_SHORT).show()
+                    }
+                    1 -> showSelectCarBluetoothDialog()
+                    2 -> {
+                        AlertDialog.Builder(this)
+                            .setTitle("驾车检测原理说明")
+                            .setMessage("1. 车载蓝牙感知：连上车机蓝牙即开始驾车，断开蓝牙即结束驾车，系统级 0 延迟且 0 额外耗电。\n\n2. Google 活动识别 (IN_VEHICLE)：采用手机底层低功耗协处理器，不常驻 GPS，上无蓝牙车或借车时每天耗电低于 2%。\n\n3. 100% 本地离线运行，完全免费，不消耗任何费用。")
+                            .setPositiveButton("我知道了", null)
+                            .show()
+                    }
+                }
+            }
+            .setNegativeButton("关闭", null)
+            .show()
+    }
+
+    private fun showSelectCarBluetoothDialog() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.BLUETOOTH_CONNECT), 2005)
+            Toast.makeText(this, "需要蓝牙权限以读取已配对设备列表", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val btAdapter = BluetoothAdapter.getDefaultAdapter()
+        if (btAdapter == null) {
+            Toast.makeText(this, "当前设备不支持蓝牙", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val bondedDevices: Set<BluetoothDevice> = try {
+            btAdapter.bondedDevices ?: emptySet()
+        } catch (_: SecurityException) {
+            emptySet()
+        }
+
+        if (bondedDevices.isEmpty()) {
+            Toast.makeText(this, "手机暂无已配对的蓝牙设备，请先在手机设置中配对车机蓝牙", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val devList = bondedDevices.toList()
+        val devNames = mutableListOf<String>()
+        devList.forEach { dev ->
+            val dName = try { dev.name ?: dev.address } catch (_: SecurityException) { dev.address }
+            devNames.add(dName)
+        }
+        devNames.add("❌ 清除绑定 (恢复全自动识别)")
+
+        AlertDialog.Builder(this)
+            .setTitle("选择你的车载蓝牙设备")
+            .setItems(devNames.toTypedArray()) { _, idx ->
+                if (idx < devList.size) {
+                    val chosen = devList[idx]
+                    val cName = try { chosen.name ?: chosen.address } catch (_: SecurityException) { chosen.address }
+                    DrivingDetectionManager.setSavedCarBluetooth(this, chosen.address, cName)
+                    Toast.makeText(this, "已绑定车机：$cName", Toast.LENGTH_SHORT).show()
+                } else {
+                    DrivingDetectionManager.setSavedCarBluetooth(this, "", "")
+                    Toast.makeText(this, "已清除绑定，将通过硬件类型和名称自动识别", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun checkDrivingPermissions() {
+        val permissionsNeeded = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (checkSelfPermission(android.Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
+                permissionsNeeded.add(android.Manifest.permission.ACTIVITY_RECOGNITION)
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                permissionsNeeded.add(android.Manifest.permission.BLUETOOTH_CONNECT)
+            }
+        }
+        if (permissionsNeeded.isNotEmpty()) {
+            requestPermissions(permissionsNeeded.toTypedArray(), 2005)
+        }
     }
 
     private fun showUsernameDialog() {
