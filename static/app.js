@@ -2819,6 +2819,143 @@ function getGenericSkeletonHtml() {
   </div>`;
 }
 
+function getSplitBillSkeletonHtml() {
+  return `
+  <div class="skeleton-screen">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+      <div>
+        <div class="skeleton-shimmer" style="height:28px; width:170px; margin-bottom:8px;"></div>
+        <div class="skeleton-shimmer" style="height:14px; width:260px;"></div>
+      </div>
+    </div>
+    <div class="panel skeleton-panel" style="margin-bottom:24px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div class="skeleton-shimmer" style="height:20px; width:130px;"></div>
+        <div style="display:flex; gap:8px;">
+          <div class="skeleton-shimmer" style="height:28px; width:80px; border-radius:6px;"></div>
+          <div class="skeleton-shimmer" style="height:28px; width:80px; border-radius:6px;"></div>
+        </div>
+      </div>
+      <div style="border:2px dashed var(--border); border-radius:12px; padding:36px 20px; text-align:center; display:flex; flex-direction:column; align-items:center; background:var(--surface-soft);">
+        <div class="skeleton-shimmer" style="height:48px; width:48px; border-radius:50%; margin-bottom:12px;"></div>
+        <div class="skeleton-shimmer" style="height:18px; width:150px; margin-bottom:8px;"></div>
+        <div class="skeleton-shimmer" style="height:13px; width:220px; margin-bottom:18px;"></div>
+        <div style="display:flex; gap:10px;">
+          <div class="skeleton-shimmer" style="height:36px; width:110px; border-radius:8px;"></div>
+          <div class="skeleton-shimmer" style="height:36px; width:110px; border-radius:8px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function getAccountsSkeletonHtml() {
+  return `
+  <div class="skeleton-screen">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+      <div class="skeleton-shimmer" style="height:28px; width:160px; border-radius:6px;"></div>
+      <div class="skeleton-shimmer" style="height:34px; width:100px; border-radius:8px;"></div>
+    </div>
+    <div class="cards cards-four" style="margin-bottom:22px;">
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:55px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:26px; width:80px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:55px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:26px; width:80px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:55px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:26px; width:80px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:55px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:26px; width:80px;"></div></div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px;">
+      <div class="skeleton-card" style="padding:18px;"><div class="skeleton-shimmer" style="height:20px; width:120px; margin-bottom:12px;"></div><div class="skeleton-shimmer" style="height:14px; width:80%; margin-bottom:8px;"></div><div class="skeleton-shimmer" style="height:14px; width:50%;"></div></div>
+      <div class="skeleton-card" style="padding:18px;"><div class="skeleton-shimmer" style="height:20px; width:120px; margin-bottom:12px;"></div><div class="skeleton-shimmer" style="height:14px; width:80%; margin-bottom:8px;"></div><div class="skeleton-shimmer" style="height:14px; width:50%;"></div></div>
+      <div class="skeleton-card" style="padding:18px;"><div class="skeleton-shimmer" style="height:20px; width:120px; margin-bottom:12px;"></div><div class="skeleton-shimmer" style="height:14px; width:80%; margin-bottom:8px;"></div><div class="skeleton-shimmer" style="height:14px; width:50%;"></div></div>
+    </div>
+  </div>`;
+}
+
+function getLiabilitiesSkeletonHtml() {
+  return `
+  <div class="skeleton-screen">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+      <div class="skeleton-shimmer" style="height:28px; width:180px; border-radius:6px;"></div>
+      <div class="skeleton-shimmer" style="height:34px; width:130px; border-radius:8px;"></div>
+    </div>
+    <div class="cards cards-four" style="margin-bottom:22px;">
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:65px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:24px; width:95px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:65px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:24px; width:95px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:65px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:24px; width:95px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:65px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:24px; width:95px;"></div></div>
+    </div>
+    <div class="panel skeleton-panel" style="margin-bottom:20px;">
+      <div class="skeleton-shimmer" style="height:20px; width:140px; margin-bottom:18px;"></div>
+      <div class="skeleton-shimmer" style="height:36px; width:100%; border-radius:8px; margin-bottom:12px;"></div>
+      <div class="skeleton-shimmer" style="height:36px; width:100%; border-radius:8px;"></div>
+    </div>
+  </div>`;
+}
+
+function getSubscriptionsSkeletonHtml() {
+  return `
+  <div class="skeleton-screen">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+      <div>
+        <div class="skeleton-shimmer" style="height:28px; width:220px; margin-bottom:8px;"></div>
+        <div class="skeleton-shimmer" style="height:14px; width:300px;"></div>
+      </div>
+      <div class="skeleton-shimmer" style="height:34px; width:120px; border-radius:8px;"></div>
+    </div>
+    <div class="cards cards-four" style="margin-bottom:22px;">
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:70px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:26px; width:100px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:70px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:26px; width:100px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:70px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:26px; width:100px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:70px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:26px; width:100px;"></div></div>
+    </div>
+    <div class="panel skeleton-panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div class="skeleton-shimmer" style="height:20px; width:150px;"></div>
+      </div>
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="height:32px; width:32px; border-radius:8px;"></div><div class="skeleton-shimmer" style="height:16px; width:120px;"></div><div class="skeleton-shimmer" style="height:14px; flex:1; margin:0 14px;"></div><div class="skeleton-shimmer" style="height:18px; width:70px;"></div></div>
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="height:32px; width:32px; border-radius:8px;"></div><div class="skeleton-shimmer" style="height:16px; width:120px;"></div><div class="skeleton-shimmer" style="height:14px; flex:1; margin:0 14px;"></div><div class="skeleton-shimmer" style="height:18px; width:70px;"></div></div>
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="height:32px; width:32px; border-radius:8px;"></div><div class="skeleton-shimmer" style="height:16px; width:120px;"></div><div class="skeleton-shimmer" style="height:14px; flex:1; margin:0 14px;"></div><div class="skeleton-shimmer" style="height:18px; width:70px;"></div></div>
+    </div>
+  </div>`;
+}
+
+function getSettingsSkeletonHtml() {
+  return `
+  <div class="skeleton-screen">
+    <div style="margin-bottom:24px;">
+      <div class="skeleton-shimmer" style="height:28px; width:160px; margin-bottom:8px;"></div>
+      <div class="skeleton-shimmer" style="height:14px; width:260px;"></div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:18px;">
+      <div class="panel skeleton-panel"><div class="skeleton-shimmer" style="height:20px; width:130px; margin-bottom:16px;"></div><div class="skeleton-shimmer" style="height:40px; width:100%; border-radius:8px;"></div></div>
+      <div class="panel skeleton-panel"><div class="skeleton-shimmer" style="height:20px; width:130px; margin-bottom:16px;"></div><div class="skeleton-shimmer" style="height:40px; width:100%; border-radius:8px;"></div></div>
+      <div class="panel skeleton-panel"><div class="skeleton-shimmer" style="height:20px; width:130px; margin-bottom:16px;"></div><div class="skeleton-shimmer" style="height:40px; width:100%; border-radius:8px;"></div></div>
+    </div>
+  </div>`;
+}
+
+function getInsightsSkeletonHtml() {
+  return `
+  <div class="skeleton-screen">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+      <div class="skeleton-shimmer" style="height:28px; width:170px;"></div>
+      <div style="display:flex; gap:8px;">
+        <div class="skeleton-shimmer" style="height:32px; width:75px; border-radius:8px;"></div>
+        <div class="skeleton-shimmer" style="height:32px; width:75px; border-radius:8px;"></div>
+      </div>
+    </div>
+    <div class="cards cards-four" style="margin-bottom:22px;">
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:60px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:24px; width:90px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:60px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:24px; width:90px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:60px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:24px; width:90px;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-shimmer" style="height:12px; width:60px; margin-bottom:10px;"></div><div class="skeleton-shimmer" style="height:24px; width:90px;"></div></div>
+    </div>
+    <div class="panel skeleton-panel" style="min-height:260px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+      <div class="skeleton-shimmer" style="height:150px; width:150px; border-radius:50%; margin-bottom:16px;"></div>
+      <div class="skeleton-shimmer" style="height:14px; width:180px;"></div>
+    </div>
+  </div>`;
+}
+
 function renderSkeletonScreen(urlStr) {
   let path = urlStr || '';
   try {
@@ -2831,6 +2968,24 @@ function renderSkeletonScreen(urlStr) {
   }
   if (path.startsWith('/records')) {
     return getRecordsSkeletonHtml();
+  }
+  if (path.startsWith('/split-bill')) {
+    return getSplitBillSkeletonHtml();
+  }
+  if (path.startsWith('/accounts')) {
+    return getAccountsSkeletonHtml();
+  }
+  if (path.startsWith('/liabilities')) {
+    return getLiabilitiesSkeletonHtml();
+  }
+  if (path.startsWith('/subscriptions')) {
+    return getSubscriptionsSkeletonHtml();
+  }
+  if (path.startsWith('/settings')) {
+    return getSettingsSkeletonHtml();
+  }
+  if (path.startsWith('/category-insights') || path.startsWith('/insights')) {
+    return getInsightsSkeletonHtml();
   }
   return getGenericSkeletonHtml();
 }
@@ -2983,54 +3138,64 @@ const InstantNav = {
     });
   },
 
-  navigate(urlStr) {
+  navigate(urlStr, pushState = true) {
     if (!this.isNavigable(urlStr)) {
       window.location.href = urlStr;
       return;
     }
     const url = this.cleanUrl(urlStr);
-    updateActiveNav(url);
-    showProgressBar();
+    const container = document.getElementById('mainContainer');
 
+    // 1. 立即同步导航高亮状态
+    updateActiveNav(url);
+
+    // 2. 检查是否有新鲜的高速内存缓存 (0ms 瞬时秒开)
     const cached = this.cache.get(url);
     const curVersion = window.INITIAL_DATA_VERSION || 0;
     const now = Date.now();
 
-    // 1. 命中有效缓存：0ms 瞬间挂载并呈现！
     if (cached && (now - cached.timestamp < this.maxCacheAgeMs) && (cached.dataVersion === curVersion)) {
-      this.renderContent(url, cached.html);
+      this.renderContent(url, cached.html, pushState);
       return;
     }
 
-    // 2. 检查是否有正在飞行的预加载请求
+    // 3. 只要未命中有效缓存，0ms 立即挂载目标页面骨架屏，杜绝停滞在旧页面看进度条
+    if (container) {
+      container.innerHTML = renderSkeletonScreen(url);
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+    if (pushState) {
+      history.pushState({ instantNav: true, url: url }, '', url);
+    }
+    showProgressBar();
+
+    // 4. 优先衔接正在在途的预取请求
     const inFlight = this.prefetchInflight.get(url);
     if (inFlight) {
       inFlight.then(html => {
         if (html) {
-          this.renderContent(url, html);
+          this.cache.set(url, {
+            html: html,
+            timestamp: Date.now(),
+            dataVersion: window.INITIAL_DATA_VERSION || 0
+          });
+          this.renderContent(url, html, false);
         } else {
-          this._fallbackFetch(url);
+          this._fallbackFetch(url, false);
         }
+      }).catch(() => {
+        this._fallbackFetch(url, false);
       });
       return;
     }
 
-    this._fallbackFetch(url);
+    // 5. 无在途预取时，直接发起增量拉取
+    this._fallbackFetch(url, false);
   },
 
-  _fallbackFetch(url) {
-    const container = document.getElementById('mainContainer');
-    if (this.skeletonTimer) clearTimeout(this.skeletonTimer);
-    // 延迟 120ms 防抖展示骨架屏：若网络在 120ms 内极速响应，坚决杜绝骨架屏闪烁！
-    this.skeletonTimer = setTimeout(() => {
-      if (container) {
-        container.innerHTML = renderSkeletonScreen(url);
-        window.scrollTo({ top: 0, behavior: 'instant' });
-      }
-    }, 120);
-
+  _fallbackFetch(url, pushState = false) {
     const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), 5000) : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
 
     fetch(url, {
       headers: { 'HX-Request': 'true' },
@@ -3041,22 +3206,14 @@ const InstantNav = {
       if (!res.ok) throw new Error('HTTP ' + res.status);
       return res.text();
     }).then(html => {
-      if (this.skeletonTimer) {
-        clearTimeout(this.skeletonTimer);
-        this.skeletonTimer = null;
-      }
       this.cache.set(url, {
         html: html,
         timestamp: Date.now(),
         dataVersion: window.INITIAL_DATA_VERSION || 0
       });
-      this.renderContent(url, html);
+      this.renderContent(url, html, pushState);
     }).catch(err => {
       if (timeoutId) clearTimeout(timeoutId);
-      if (this.skeletonTimer) {
-        clearTimeout(this.skeletonTimer);
-        this.skeletonTimer = null;
-      }
       finishProgressBar();
       // 遇异常或超时，直接原生跳转，绝不卡在骨架屏中
       window.location.href = url;
@@ -3114,7 +3271,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // 3. 浏览器前进/后退历史平滑支持
   window.addEventListener('popstate', function (e) {
     const path = window.location.pathname + window.location.search;
-    InstantNav.navigate(path);
+    InstantNav.navigate(path, false);
   });
 
   // 4. 数据变动时立即清空过期页面缓存（表单提交、记账变动）
@@ -3122,7 +3279,7 @@ document.addEventListener('DOMContentLoaded', function () {
     InstantNav.clearCache();
   });
 
-  // 5. HTMX 事件监听器：连接顶部加载条与防抖骨架屏支持
+  // 5. HTMX 事件监听器：连接顶部加载条与即时骨架屏支持
   document.body.addEventListener('htmx:beforeRequest', function (evt) {
     showProgressBar();
     if (typeof toggleMoreSheet === 'function') {
@@ -3150,12 +3307,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (targetUrl) {
           updateActiveNav(targetUrl);
         }
-        // 延迟 120ms 防抖，快请求完全不展示骨架屏
+        // 0ms 立即挂载目标页专属骨架屏，杜绝停滞在旧页面看进度条
         if (window._htmxSkeletonTimer) clearTimeout(window._htmxSkeletonTimer);
-        window._htmxSkeletonTimer = setTimeout(() => {
-          target.innerHTML = renderSkeletonScreen(targetUrl);
-          window.scrollTo({ top: 0, behavior: 'instant' });
-        }, 120);
+        target.innerHTML = renderSkeletonScreen(targetUrl);
+        window.scrollTo({ top: 0, behavior: 'instant' });
       }
     }
   });
