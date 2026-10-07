@@ -3237,31 +3237,122 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// 智能判断当前是否已在独立 App 模式内运行（含 Android 原生伴侣 APK、iOS/Android 桌面 PWA 全屏/独立模式、TWA 等）
+function isRunningInApp() {
+  // 1. Android 原生伴侣 App 环境 (WebView Bridge / Custom User-Agent)
+  if (
+    typeof window.LedgerNativeBridge !== 'undefined' ||
+    (navigator.userAgent && (navigator.userAgent.includes('LedgerAppNative') || navigator.userAgent.includes('wv'))) ||
+    typeof window.AndroidBridge !== 'undefined' ||
+    typeof window.Android !== 'undefined'
+  ) {
+    return true;
+  }
+
+  // 2. 现代浏览器 PWA 独立/全屏/最小窗口显示模式
+  try {
+    if (
+      (window.matchMedia && (
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.matchMedia('(display-mode: fullscreen)').matches ||
+        window.matchMedia('(display-mode: minimal-ui)').matches ||
+        window.matchMedia('(display-mode: window-controls-overlay)').matches
+      )) ||
+      window.navigator.standalone === true
+    ) {
+      return true;
+    }
+  } catch (e) {}
+
+  // 3. Android TWA (Trusted Web Activity) 或原生 App 来源
+  if (document.referrer && document.referrer.startsWith('android-app://')) {
+    return true;
+  }
+
+  // 4. 从手机桌面 PWA 快捷方式或 Manifest start_url 启动
+  if (window.location.search && (
+    window.location.search.includes('source=pwa') ||
+    window.location.search.includes('pwa=1')
+  )) {
+    return true;
+  }
+
+  return false;
+}
+
+// 判断当前设备是否已经安装了应用（Native APK 或桌面 PWA），或已由用户标记已安装
+function isPwaOrAppInstalled() {
+  if (isRunningInApp()) return true;
+
+  try {
+    if (localStorage.getItem('ledger_app_installed') === 'true') return true;
+    if (localStorage.getItem('ledger_pwa_installed') === 'true') return true;
+    if (localStorage.getItem('ledger_app_downloaded') === 'true') return true;
+  } catch (e) {}
+
+  return false;
+}
+
+// 判断是否应当展示浮动安装横幅
+function shouldShowPwaBanner() {
+  // 正在 App 内运行：坚决不展示
+  if (isRunningInApp()) return false;
+
+  // 已经安装过（或已下载过安装包）：坚决不展示
+  if (isPwaOrAppInstalled()) return false;
+
+  // 用户此前点击关闭过横幅：持久化记忆（localStorage + sessionStorage），不重复骚扰
+  try {
+    if (localStorage.getItem('pwa_banner_dismissed') === 'true') return false;
+    if (sessionStorage.getItem('pwa_banner_closed') === 'true') return false;
+  } catch (e) {}
+
+  return true;
+}
+
 // 检查并更新 PWA 安装入口与浮动横幅状态
 function checkPwaUi() {
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  const sheetBtn = document.getElementById('pwaSheetInstallBtn');
+  const inApp = isRunningInApp();
   const banner = document.getElementById('pwaInstallBanner');
+  const sheetBtn = document.getElementById('pwaSheetInstallBtn');
 
-  if (isStandalone) {
+  // 如果当前已在 App 内运行，立即将状态写入 localStorage，彻底避免日后在普通浏览器中反复误报
+  if (inApp) {
+    try {
+      localStorage.setItem('ledger_app_installed', 'true');
+      localStorage.setItem('ledger_pwa_installed', 'true');
+    } catch (e) {}
+
+    // 如果 URL 中有 source=pwa / pwa=1，静默清洗 URL，保持地址栏美观
+    try {
+      if (window.location.search && (window.location.search.includes('source=pwa') || window.location.search.includes('pwa=1'))) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('source');
+        url.searchParams.delete('pwa');
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : '') + url.hash);
+      }
+    } catch (e) {}
+
+    if (banner) banner.style.display = 'none';
     if (sheetBtn) sheetBtn.style.display = 'none';
+    return;
+  }
+
+  // 检查是否已安装或已被关闭
+  if (!shouldShowPwaBanner()) {
     if (banner) banner.style.display = 'none';
     return;
   }
 
-  // 非独立 App 模式下，在“更多”面板中始终展示安装入口
-  if (sheetBtn) {
-    sheetBtn.style.display = 'flex';
-  }
-
-  // 手机端且当前会话尚未关闭过提示条，延迟 1 秒平滑滑出
-  if (banner && !sessionStorage.getItem('pwa_banner_closed')) {
+  // 仅在未安装且未关闭的情况下，延迟 1.2 秒平滑滑出提示条
+  if (banner) {
     setTimeout(() => {
-      const stillNotStandalone = !(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true);
-      if (stillNotStandalone && !sessionStorage.getItem('pwa_banner_closed')) {
+      if (shouldShowPwaBanner()) {
         banner.style.display = 'flex';
+      } else {
+        banner.style.display = 'none';
       }
-    }, 1000);
+    }, 1200);
   }
 }
 
@@ -3276,6 +3367,11 @@ window.addEventListener('beforeinstallprompt', (e) => {
 window.addEventListener('appinstalled', () => {
   deferredPwaPrompt = null;
   console.log('[PWA] App successfully installed');
+  try {
+    localStorage.setItem('ledger_app_installed', 'true');
+    localStorage.setItem('ledger_pwa_installed', 'true');
+    localStorage.setItem('pwa_banner_dismissed', 'true');
+  } catch (e) {}
   const banner = document.getElementById('pwaInstallBanner');
   if (banner) banner.style.display = 'none';
   const sheetBtn = document.getElementById('pwaSheetInstallBtn');
@@ -3285,7 +3381,7 @@ window.addEventListener('appinstalled', () => {
       toast: true,
       position: 'top',
       icon: 'success',
-      title: '已成功添加到主屏幕！',
+      title: window.t ? window.t('pwa.installed_success', '已成功添加到主屏幕！') : '已成功添加到主屏幕！',
       showConfirmButton: false,
       timer: 2500
     });
@@ -3299,6 +3395,11 @@ window.installPwaApp = function () {
     deferredPwaPrompt.userChoice.then((choiceResult) => {
       if (choiceResult && choiceResult.outcome === 'accepted') {
         console.log('[PWA] User accepted install prompt');
+        try {
+          localStorage.setItem('ledger_app_installed', 'true');
+          localStorage.setItem('ledger_pwa_installed', 'true');
+          localStorage.setItem('pwa_banner_dismissed', 'true');
+        } catch (e) {}
         const banner = document.getElementById('pwaInstallBanner');
         if (banner) banner.style.display = 'none';
       }
@@ -3307,25 +3408,52 @@ window.installPwaApp = function () {
   } else {
     // 检测是否为 iOS Safari
     const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+    const alreadyBtnText = window.t ? window.t('pwa.already_installed', '已安装，不再提醒') : '已安装，不再提醒';
+    const gotItBtnText = window.t ? window.t('pwa.got_it', '我知道了') : '我知道了';
+
     if (isIos && typeof Swal !== 'undefined') {
       Swal.fire({
-        title: '📲 添加到手机主屏幕',
+        title: window.t ? window.t('pwa.prompt_safari_title', '📲 添加到手机主屏幕') : '📲 添加到手机主屏幕',
         html: '<div style="text-align: left; font-size: 14px; line-height: 1.8; color: var(--ink-soft);">' +
               '1. 点击 Safari 底部中间的 <b>分享按钮</b> <span style="font-size: 18px;">📤</span><br>' +
               '2. 向上滑动菜单找到并点击 <b>「添加到主屏幕」</b> <span style="font-size: 18px;">➕</span><br>' +
               '3. 点击右上角「添加」，即可像原生 App 一样全屏使用！</div>',
         icon: 'info',
-        confirmButtonText: '我知道了'
+        showCancelButton: true,
+        confirmButtonText: gotItBtnText,
+        cancelButtonText: alreadyBtnText
+      }).then((res) => {
+        if (res.dismiss === Swal.DismissReason.cancel) {
+          try {
+            localStorage.setItem('ledger_app_installed', 'true');
+            localStorage.setItem('ledger_pwa_installed', 'true');
+            localStorage.setItem('pwa_banner_dismissed', 'true');
+          } catch (e) {}
+          const banner = document.getElementById('pwaInstallBanner');
+          if (banner) banner.style.display = 'none';
+        }
       });
     } else if (typeof Swal !== 'undefined') {
       Swal.fire({
-        title: '📲 安装为手机应用',
+        title: window.t ? window.t('pwa.prompt_chrome_title', '📲 安装为手机应用') : '📲 安装为手机应用',
         html: '<div style="text-align: left; font-size: 14px; line-height: 1.8; color: var(--ink-soft);">' +
               '1. 点击浏览器右上角或底部的 <b>菜单按钮</b>（通常是三个点 <b>⋮</b> 或图标）<br>' +
               '2. 在弹出的菜单列表中选择 <b>「安装应用」</b> 或 <b>「添加到主屏幕」</b> ➕<br>' +
               '3. 确认后手机桌面即会生成独立 App 图标，无需再开浏览器！</div>',
         icon: 'info',
-        confirmButtonText: '我知道了'
+        showCancelButton: true,
+        confirmButtonText: gotItBtnText,
+        cancelButtonText: alreadyBtnText
+      }).then((res) => {
+        if (res.dismiss === Swal.DismissReason.cancel) {
+          try {
+            localStorage.setItem('ledger_app_installed', 'true');
+            localStorage.setItem('ledger_pwa_installed', 'true');
+            localStorage.setItem('pwa_banner_dismissed', 'true');
+          } catch (e) {}
+          const banner = document.getElementById('pwaInstallBanner');
+          if (banner) banner.style.display = 'none';
+        }
       });
     } else {
       alert('请在手机浏览器菜单中点击「安装应用」或「添加到主屏幕」！');
@@ -3339,7 +3467,10 @@ window.installPwaApp = function () {
 window.dismissPwaBanner = function () {
   const banner = document.getElementById('pwaInstallBanner');
   if (banner) banner.style.display = 'none';
-  sessionStorage.setItem('pwa_banner_closed', 'true');
+  try {
+    sessionStorage.setItem('pwa_banner_closed', 'true');
+    localStorage.setItem('pwa_banner_dismissed', 'true');
+  } catch (e) {}
 };
 
 // 页面加载及 HTMX 切换后主动检查 PWA 入口与 App 下载状态

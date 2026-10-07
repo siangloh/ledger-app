@@ -2,7 +2,7 @@
   "name": "我的记账本",
   "short_name": "记账本",
   "description": "智能记账与资产管理助手，支持自动追踪、小票AA分账与多币种管理",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
