@@ -34,10 +34,17 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.content.pm.PackageManager
+import androidx.lifecycle.lifecycleScope
+import com.siangloh.ledger.driving.DrivingDetectionManager
 import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.AppSelectionActivity
 import com.siangloh.ledger.ui.NotificationLogActivity
 import com.siangloh.ledger.ui.QuickAddActivity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.File
 
@@ -79,12 +86,53 @@ class MainActivity : AppCompatActivity() {
         loadContent()
     }
 
+    override fun onPause() {
+        super.onPause()
+        // 关键省电修复：挂起 WebView 的 JS 定时器、动画与渲染引擎，彻底杜绝退到后台时持续偷跑 CPU 和电量
+        webView.onPause()
+        webView.pauseTimers()
+    }
+
     override fun onResume() {
         super.onResume()
+        // 恢复 WebView 的 JS 定时器与活动状态
+        webView.onResume()
+        webView.resumeTimers()
         tryReconnectNotificationListener()
-        // 回到前台时，如果有网络则触发一次后台同步
-        if (NetworkHelper.isOnline(this)) {
+        // 智能节电同步：避免每次切前台都无脑拉起 WorkManager 唤醒网络
+        checkAndEnqueueSyncIfNeeded()
+    }
+
+    override fun onDestroy() {
+        try {
+            webView.stopLoading()
+            webView.destroy()
+        } catch (_: Exception) {}
+        super.onDestroy()
+    }
+
+    private fun checkAndEnqueueSyncIfNeeded() {
+        if (!NetworkHelper.isOnline(this)) return
+        val sp = getSharedPreferences("ledger_sync_prefs", Context.MODE_PRIVATE)
+        val lastSync = sp.getLong("last_auto_sync_time", 0L)
+        val now = System.currentTimeMillis()
+        // 只有距离上次同步超过 15 分钟才进行定期同步
+        if (now - lastSync > 15 * 60 * 1000L) {
+            sp.edit().putLong("last_auto_sync_time", now).apply()
             SyncWorker.enqueueSync(this)
+        } else {
+            // 短时间反复切入前台：仅当本地确实有待同步离线数据时才拉起后台任务
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val db = com.siangloh.ledger.data.AppDatabase.getInstance(this@MainActivity)
+                    val hasPendingTxs = db.pendingTransactionDao().getPendingTransactions().isNotEmpty()
+                    val hasPendingNotifs = db.pendingNotificationDao().getPendingNotifications().isNotEmpty()
+                    if (hasPendingTxs || hasPendingNotifs) {
+                        sp.edit().putLong("last_auto_sync_time", now).apply()
+                        SyncWorker.enqueueSync(this@MainActivity)
+                    }
+                } catch (_: Exception) {}
+            }
         }
     }
 
@@ -126,7 +174,7 @@ class MainActivity : AppCompatActivity() {
             offlineContainer.visibility = View.GONE
             webView.visibility = View.VISIBLE
             webView.loadUrl(NetworkHelper.getServerUrl(this))
-            SyncWorker.enqueueSync(this)
+            checkAndEnqueueSyncIfNeeded()
         } else {
             offlineContainer.visibility = View.VISIBLE
             webView.visibility = View.GONE

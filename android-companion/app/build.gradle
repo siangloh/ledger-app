@@ -75,4 +75,7 @@ dependencies {
     // 目前只用拉丁文识别器；若日后需要识别中文小票内容，需额外加入
     // com.google.mlkit:text-recognition-chinese 并改用 ChineseTextRecognizerOptions。
     implementation 'com.google.mlkit:text-recognition:16.0.1'
+
+    // Google Play Services 活动模式感知 (微功耗车载/驾驶状态检测，100% 免费离线运行)
+    implementation 'com.google.android.gms:play-services-location:21.2.0'
 }

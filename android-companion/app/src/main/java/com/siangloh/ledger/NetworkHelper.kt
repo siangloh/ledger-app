@@ -23,6 +23,9 @@ object NetworkHelper {
 
     private const val KEY_USERNAME = "custom_username"
 
+    // 线程池复用：避免频繁直接 new Thread 造成系统级线程开销与 CPU 调度消耗
+    private val networkExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
+
     private var cachedContext: Context? = null
 
     fun init(context: Context) {
@@ -108,7 +111,7 @@ object NetworkHelper {
     }
 
     fun postNotificationAsync(text: String, context: Context? = null, callback: ((Boolean, String, String?) -> Unit)? = null) {
-        Thread {
+        networkExecutor.execute {
             try {
                 val key = getApiKey(context)
                 val username = getUsername(context)
@@ -132,8 +135,8 @@ object NetworkHelper {
                     conn.setRequestProperty("X-API-KEY", key)
                 }
                 conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                conn.connectTimeout = 30000
-                conn.readTimeout = 30000
+                conn.connectTimeout = 12000
+                conn.readTimeout = 15000
                 conn.doOutput = true
 
                 val jsonPayload = JSONObject().apply {
@@ -172,11 +175,11 @@ object NetworkHelper {
                 Log.e(TAG, "Failed to send notification to server: ${e.message}", e)
                 callback?.invoke(false, e.message ?: "Unknown network error", null)
             }
-        }.start()
+        }
     }
 
     fun syncPendingTransactions(transactions: List<PendingTransaction>, context: Context? = null, callback: ((Boolean, List<Long>) -> Unit)? = null) {
-        Thread {
+        networkExecutor.execute {
             try {
                 val fullUrl = "${getServerUrl(context)}/api/transactions/sync"
                 val url = URL(fullUrl)
@@ -188,8 +191,8 @@ object NetworkHelper {
                     conn.setRequestProperty("X-API-KEY", key)
                 }
                 conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                conn.connectTimeout = 30000
-                conn.readTimeout = 30000
+                conn.connectTimeout = 12000
+                conn.readTimeout = 15000
                 conn.doOutput = true
 
                 val jsonArray = JSONArray()
@@ -249,11 +252,11 @@ object NetworkHelper {
                 Log.e(TAG, "Failed to sync pending transactions: ${e.message}", e)
                 callback?.invoke(false, emptyList())
             }
-        }.start()
+        }
     }
 
     fun fetchCategories(callback: ((Boolean, List<CachedCategory>) -> Unit)? = null) {
-        Thread {
+        networkExecutor.execute {
             try {
                 val username = getUsername()
                 val encodedUser = try { java.net.URLEncoder.encode(username, "UTF-8") } catch (_: Exception) { "" }
@@ -299,6 +302,6 @@ object NetworkHelper {
                 Log.e(TAG, "Failed to fetch categories: ${e.message}", e)
                 callback?.invoke(false, emptyList())
             }
-        }.start()
+        }
     }
 }

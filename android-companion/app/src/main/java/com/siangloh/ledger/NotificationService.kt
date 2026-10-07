@@ -9,6 +9,7 @@ import com.siangloh.ledger.data.entities.NotificationLog
 import com.siangloh.ledger.data.entities.PendingNotification
 import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.AppSelectionManager
+import com.siangloh.ledger.driving.DrivingDetectionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -61,6 +62,7 @@ class NotificationService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.i(TAG, "NotificationListenerService connected and actively listening.")
+        DrivingDetectionManager.requestActivityTransitionUpdates(this)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -137,7 +139,8 @@ class NotificationService : NotificationListenerService() {
         if (hasPurePromoWord && !hasCompletedTxn) {
             Log.d(TAG, "Phase-1 Filtered: contains pure promo keywords without completed transaction -> $fullContent")
             serviceScope.launch {
-                db.notificationLogDao().insert(
+                insertLogAndPrune(
+                    db,
                     NotificationLog(
                         sourcePackage = pkgName,
                         rawText = fullContent,
@@ -153,16 +156,22 @@ class NotificationService : NotificationListenerService() {
         // 4. Phase-1 交易关键词与金额验证
         if (!hasVerb || !hasAmount) {
             Log.d(TAG, "Phase-1 Filtered: lacks transaction verb or valid RM amount -> $fullContent")
-            serviceScope.launch {
-                db.notificationLogDao().insert(
-                    NotificationLog(
-                        sourcePackage = pkgName,
-                        rawText = fullContent,
-                        matchedPhase1 = false,
-                        sentToBackend = false,
-                        outcome = "ignored_no_keywords"
+            // 省电优化：如果既没有金额也没有动词（例如纯聊天、验证码短信、系统通知），直接过滤跳过，
+            // 严禁对海量无关消息频繁唤醒磁盘执行 Room 事务，大幅保护电池与闪存寿命。
+            val shouldLogForDiagnosis = hasAmount || hasVerb || AppSelectionManager.KNOWN_BANK_KEYWORDS.any { pkgName.lowercase().contains(it) }
+            if (shouldLogForDiagnosis) {
+                serviceScope.launch {
+                    insertLogAndPrune(
+                        db,
+                        NotificationLog(
+                            sourcePackage = pkgName,
+                            rawText = fullContent,
+                            matchedPhase1 = false,
+                            sentToBackend = false,
+                            outcome = "ignored_no_keywords"
+                        )
                     )
-                )
+                }
             }
             return
         }
@@ -181,7 +190,8 @@ class NotificationService : NotificationListenerService() {
                         }
                     }
 
-                    db.notificationLogDao().insert(
+                    insertLogAndPrune(
+                        db,
                         NotificationLog(
                             sourcePackage = pkgName,
                             rawText = fullContent,
@@ -198,7 +208,8 @@ class NotificationService : NotificationListenerService() {
             Log.i(TAG, "Device offline: queuing notification in local database...")
             serviceScope.launch {
                 queueOfflineNotification(pkgName, fullContent)
-                db.notificationLogDao().insert(
+                insertLogAndPrune(
+                    db,
                     NotificationLog(
                         sourcePackage = pkgName,
                         rawText = fullContent,
@@ -209,6 +220,21 @@ class NotificationService : NotificationListenerService() {
                 )
             }
         }
+    }
+
+    private suspend fun insertLogAndPrune(db: AppDatabase, log: NotificationLog) {
+        try {
+            db.notificationLogDao().insert(log)
+            db.notificationLogDao().pruneOldLogs()
+        } catch (_: Exception) {}
+    }
+
+    override fun onDestroy() {
+        try {
+            kotlinx.coroutines.cancel(serviceScope.coroutineContext)
+            DrivingDetectionManager.removeActivityTransitionUpdates(this)
+        } catch (_: Exception) {}
+        super.onDestroy()
     }
 
     private suspend fun queueOfflineNotification(pkgName: String, text: String) {

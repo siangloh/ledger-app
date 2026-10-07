@@ -106,18 +106,25 @@ class SyncWorker(
                 }
             }
 
-            // 3. 拉取并刷新分类列表
-            val catLatch = CountDownLatch(1)
-            NetworkHelper.fetchCategories { success, categories ->
-                if (success && categories.isNotEmpty()) {
-                    kotlinx.coroutines.runBlocking {
-                        db.cachedCategoryDao().clearAll()
-                        db.cachedCategoryDao().insertAll(categories)
+            // 3. 拉取并刷新分类列表（省电优化：若本地已有分类缓存，且距上次刷新不足 24 小时，跳过网络请求）
+            val sp = applicationContext.getSharedPreferences("ledger_sync_prefs", Context.MODE_PRIVATE)
+            val lastCatFetch = sp.getLong("last_cat_fetch_time", 0L)
+            val nowTime = System.currentTimeMillis()
+            val existingCats = db.cachedCategoryDao().getAllCategories()
+            if (existingCats.isEmpty() || (nowTime - lastCatFetch > 24 * 60 * 60 * 1000L)) {
+                val catLatch = CountDownLatch(1)
+                NetworkHelper.fetchCategories { success, categories ->
+                    if (success && categories.isNotEmpty()) {
+                        kotlinx.coroutines.runBlocking {
+                            db.cachedCategoryDao().clearAll()
+                            db.cachedCategoryDao().insertAll(categories)
+                            sp.edit().putLong("last_cat_fetch_time", nowTime).apply()
+                        }
                     }
+                    catLatch.countDown()
                 }
-                catLatch.countDown()
+                catLatch.await(10, TimeUnit.SECONDS)
             }
-            catLatch.await(15, TimeUnit.SECONDS)
 
             Log.i(TAG, "Background sync completed successfully.")
             Result.success()

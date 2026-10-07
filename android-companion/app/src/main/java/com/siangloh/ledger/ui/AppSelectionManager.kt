@@ -41,25 +41,17 @@ object AppSelectionManager {
         "com.android.mms"
     )
 
+    // 内存缓存：避免手机每来一条无关通知都执行磁盘 SharedPreferences 读取
+    @Volatile
+    private var memoryCache: Set<String>? = null
+
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
     fun isAppMonitored(context: Context, pkgName: String): Boolean {
-        val lowerPkg = pkgName.lowercase()
-        val isDefaultBank = KNOWN_BANK_KEYWORDS.any { lowerPkg.contains(it) } || DEFAULT_PACKAGES.contains(pkgName)
-
-        val prefs = getPrefs(context)
-        if (!prefs.getBoolean(KEY_INITIALIZED, false)) {
-            initDefaults(context)
-            if (isDefaultBank) return true
-        }
-        val enabledSet = prefs.getStringSet(KEY_ENABLED_PKGS, emptySet()) ?: emptySet()
-        if (enabledSet.isEmpty()) {
-            initDefaults(context)
-            return isDefaultBank
-        }
-        return enabledSet.contains(pkgName)
+        val monitored = getMonitoredSet(context)
+        return monitored.contains(pkgName)
     }
 
     fun setAppMonitored(context: Context, pkgName: String, enabled: Boolean) {
@@ -70,18 +62,26 @@ object AppSelectionManager {
         } else {
             currentSet.remove(pkgName)
         }
+        val immutableSet = currentSet.toSet()
+        memoryCache = immutableSet
         prefs.edit()
-            .putStringSet(KEY_ENABLED_PKGS, currentSet)
+            .putStringSet(KEY_ENABLED_PKGS, immutableSet)
             .putBoolean(KEY_INITIALIZED, true)
             .apply()
     }
 
     fun getMonitoredSet(context: Context): Set<String> {
+        val cached = memoryCache
+        if (cached != null) return cached
+
         val prefs = getPrefs(context)
         if (!prefs.getBoolean(KEY_INITIALIZED, false)) {
             initDefaults(context)
+            return memoryCache ?: emptySet()
         }
-        return prefs.getStringSet(KEY_ENABLED_PKGS, emptySet()) ?: emptySet()
+        val loaded = prefs.getStringSet(KEY_ENABLED_PKGS, emptySet())?.toSet() ?: emptySet()
+        memoryCache = loaded
+        return loaded
     }
 
     private fun initDefaults(context: Context) {
@@ -98,8 +98,10 @@ object AppSelectionManager {
             }
         } catch (_: Exception) {}
 
+        val finalSet = defaultEnabled.toSet()
+        memoryCache = finalSet
         getPrefs(context).edit()
-            .putStringSet(KEY_ENABLED_PKGS, defaultEnabled)
+            .putStringSet(KEY_ENABLED_PKGS, finalSet)
             .putBoolean(KEY_INITIALIZED, true)
             .apply()
     }
