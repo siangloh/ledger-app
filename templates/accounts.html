@@ -159,7 +159,7 @@
         </div>
         <div class="acc-form-group">
           <label>{{ t('accounts.label_type') }} *</label>
-          <select name="type" id="addType" onchange="onTypeChange('add')">
+          <select name="type" id="addType" onchange="onAccountTypeChange('add')">
             {% for val, label in account_types %}
             <option value="{{ val }}">{{ label }}</option>
             {% endfor %}
@@ -215,7 +215,7 @@
         </div>
         <div class="acc-form-group">
           <label>{{ t('accounts.label_type') }} *</label>
-          <select name="type" id="editType" onchange="onTypeChange('edit')">
+          <select name="type" id="editType" onchange="onAccountTypeChange('edit')">
             {% for val, label in account_types %}
             <option value="{{ val }}">{{ label }}</option>
             {% endfor %}
@@ -272,7 +272,7 @@ window.openAddModal = function () {
   }
   const nameEl = document.getElementById('addName');
   if (nameEl) nameEl.focus();
-  window.onTypeChange('add');
+  window.onAccountTypeChange('add');
 };
 
 window.closeAddModal = function () {
@@ -303,7 +303,7 @@ window.closeEditModal = function () {
   }
 });
 
-window.onTypeChange = function (prefix) {
+window.onAccountTypeChange = function (prefix) {
   const typeEl = document.getElementById(prefix + 'Type');
   const sec = document.getElementById(prefix + 'CcSection');
   if (!typeEl || !sec) return;
@@ -320,7 +320,7 @@ window.openEditModal = function (id, name, type, currency, creditLimit, statemen
   setVal('editCurrency', currency);
   const typeSelect = document.getElementById('editType');
   if (typeSelect) typeSelect.value = type;
-  window.onTypeChange('edit');
+  window.onAccountTypeChange('edit');
   setVal('editCreditLimit', creditLimit || '');
   setVal('editStatementDay', statementDay !== null ? statementDay : '');
   setVal('editDueDay', dueDay !== null ? dueDay : '');
@@ -333,6 +333,7 @@ window.openEditModal = function (id, name, type, currency, creditLimit, statemen
   const nameEl = document.getElementById('editName');
   if (nameEl) nameEl.focus();
 };
+window.openEditAccountModal = window.openEditModal;
 
 window.confirmDelete = function (id, name, subCount, installCount) {
   let extra = '';

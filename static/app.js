@@ -297,6 +297,16 @@ function toggleTypeCol() {
   if (row) row.style.display = (mode && mode.value === 'column') ? 'flex' : 'none';
 }
 
+// 显式挂载核心交互函数至全局 window，避免受作用域或闭包限制
+window.togglePrivacyMode = togglePrivacyMode;
+window.toggleMoreSheet = toggleMoreSheet;
+window.onTypeChange = onTypeChange;
+window.populateCategories = populateCategories;
+window.onExpenseModeChange = onExpenseModeChange;
+window.quickFillForm = quickFillForm;
+window.toggleTypeCol = toggleTypeCol;
+window.syncSegStyles = syncSegStyles;
+
 // 沉稳的珠宝色系配色，避免默认高饱和度调色板
 const CHART_PALETTE = ['#10213b', '#b6902f', '#1e7a5c', '#7a5c8a', '#4d7ea8', '#a0522d', '#5c6b73', '#b04a56'];
 
@@ -1281,6 +1291,10 @@ function applyCustomOverviewFilter() {
   }
   loadOverviewData('custom', start, end);
 }
+
+window.switchDashboardView = switchDashboardView;
+window.selectOverviewRange = selectOverviewRange;
+window.applyCustomOverviewFilter = applyCustomOverviewFilter;
 
 function loadOverviewData(range, start, end) {
   const badge = document.getElementById('overviewRangeBadge');
@@ -3062,6 +3076,31 @@ function initPageLifecycle() {
   if (window.location.hash === '#overview' || window.location.search.indexOf('view=overview') !== -1) {
     if (typeof switchDashboardView === 'function') {
       switchDashboardView('overview');
+    }
+  }
+
+  // 触发各独立模块页面的专有初始化流程（单页应用 InstantNav / HTMX 切换后即刻就绪）
+  if (typeof window.initSplitBill === 'function' && document.querySelector('.split-bill-container')) {
+    window.initSplitBill();
+  }
+  if (typeof window.initSettingsPage === 'function' && document.getElementById('settingsForm')) {
+    window.initSettingsPage();
+  }
+  if (typeof window.setupRecordsObserver === 'function' && document.getElementById('recordsTableBody')) {
+    window.setupRecordsObserver();
+  }
+  if (typeof window.filterSubscriptions === 'function' && document.querySelector('.sub-card')) {
+    const activeFilter = document.querySelector('.sub-filter-btn.active');
+    if (activeFilter && activeFilter.getAttribute('onclick')) {
+      const match = activeFilter.getAttribute('onclick').match(/'([^']+)'/);
+      if (match) window.filterSubscriptions(match[1], activeFilter);
+    }
+  }
+  if (typeof window.filterLiabilities === 'function' && document.querySelector('.liability-card')) {
+    const activeLiab = document.querySelector('.sub-filter-btn.active');
+    if (activeLiab && activeLiab.getAttribute('onclick')) {
+      const match = activeLiab.getAttribute('onclick').match(/'([^']+)'/);
+      if (match) window.filterLiabilities(match[1], activeLiab);
     }
   }
 }

@@ -576,5 +576,15 @@ function resetLlmSamples() {
     }
   });
 }
+
+// 显式挂载至 window 作用域，确保内联 onclick 与动态 SPA 导航 100% 可用
+window.copyText = copyText;
+window.copyWebhookUrl = copyWebhookUrl;
+window.fillTestExample = fillTestExample;
+window.submitTestAutoTrack = submitTestAutoTrack;
+window.openAddSampleModal = openAddSampleModal;
+window.deleteLlmSample = deleteLlmSample;
+window.resetLlmSamples = resetLlmSamples;
+window.addCurrentTestAsSample = addCurrentTestAsSample;
 </script>
 {% endblock %}

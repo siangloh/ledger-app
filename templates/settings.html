@@ -1575,18 +1575,37 @@ function initSettingsTouchSwipe() {
 }
 
 // 页面加载或切换后初始化
-document.addEventListener('DOMContentLoaded', () => {
+function initSettingsPage() {
   restoreInitialSettingsTab();
   trackFormDirtyState();
   initSettingsTouchSwipe();
-});
+}
+window.initSettingsPage = initSettingsPage;
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initSettingsPage);
+} else {
+  initSettingsPage();
+}
 
 document.body.addEventListener('htmx:afterSwap', (evt) => {
   if (document.getElementById('settingsForm')) {
-    restoreInitialSettingsTab();
-    trackFormDirtyState();
-    initSettingsTouchSwipe();
+    initSettingsPage();
   }
 });
+
+// 显式挂载至 window 作用域，确保内联 onclick 与动态 SPA 导航 100% 可用
+window.switchSettingsTab = switchSettingsTab;
+window.restoreInitialSettingsTab = restoreInitialSettingsTab;
+window.trackFormDirtyState = trackFormDirtyState;
+window.markFormCleanState = markFormCleanState;
+window.setCurrencySymbol = setCurrencySymbol;
+window.onCurrencySelectChange = onCurrencySelectChange;
+window.updateNlpConfirmLabel = updateNlpConfirmLabel;
+window.detectUserTimezone = detectUserTimezone;
+window.previewTheme = previewTheme;
+window.previewDensity = previewDensity;
+window.resetToDefaults = resetToDefaults;
+window.initSettingsTouchSwipe = initSettingsTouchSwipe;
 </script>
 {% endblock %}

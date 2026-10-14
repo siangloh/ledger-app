@@ -330,5 +330,11 @@
       window.location.href = url.toString();
     }
   }
+
+  // 显式挂载至 window 作用域，确保内联 onclick 与动态 SPA 导航 100% 可用
+  window.toggleCategoryChart = toggleCategoryChart;
+  window.renderCategoryChart = renderCategoryChart;
+  window.selectInsightsRange = selectInsightsRange;
+  window.applyCustomInsightsFilter = applyCustomInsightsFilter;
 </script>
 {% endblock %}

@@ -196,5 +196,57 @@ def test_app_js_provides_global_modal_controller():
     assert "window.closeModal = function" in js
     assert "function executeContainerScripts(container)" in js
     assert "new Function(s.textContent)" not in js
+    assert "window.initSplitBill = function" in js or "window.initSplitBill()" in js
+    assert "window.initSettingsPage = function" in js or "window.initSettingsPage()" in js
+
+
+def test_accounts_page_does_not_clobber_global_on_type_change(logged_in_client):
+    """Ensure accounts page uses onAccountTypeChange and never overrides global window.onTypeChange."""
+    resp = logged_in_client.get("/accounts", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+    html = resp.data.decode("utf-8")
+
+    assert "onAccountTypeChange('add')" in html
+    assert "onAccountTypeChange('edit')" in html
+    assert "window.onAccountTypeChange = function" in html
+    assert "window.onTypeChange = function" not in html
+
+
+def test_split_bill_page_lifecycle_and_window_bindings(logged_in_client):
+    """Ensure split bill page initializes correctly on SPA navigation and exposes all interactive functions."""
+    resp = logged_in_client.get("/split-bill", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+    html = resp.data.decode("utf-8")
+
+    # Lifecycle initialization must support both DOMContentLoaded and immediate execution
+    assert "function initSplitBill()" in html
+    assert "window.initSplitBill = initSplitBill" in html
+    assert "if (document.readyState === 'loading')" in html
+
+    # Public interactive functions must be attached to window
+    assert "window.openReviewModal = openReviewModal" in html
+    assert "window.closeReviewModal = closeReviewModal" in html
+    assert "window.startReceiptScan = startReceiptScan" in html
+    assert "window.addPerson = addPerson" in html
+    assert "window.addNewItemRow = addNewItemRow" in html
+    assert "window.copyClaimMessage = copyClaimMessage" in html
+
+
+def test_settings_page_lifecycle_and_window_bindings(logged_in_client):
+    """Ensure settings page initializes correctly on SPA navigation and binds tabs & helpers to window."""
+    resp = logged_in_client.get("/settings", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+    html = resp.data.decode("utf-8")
+
+    # Lifecycle initialization must support both DOMContentLoaded and immediate execution
+    assert "function initSettingsPage()" in html
+    assert "window.initSettingsPage = initSettingsPage" in html
+
+    # Public interactive functions must be attached to window
+    assert "window.switchSettingsTab = switchSettingsTab" in html
+    assert "window.detectUserTimezone = detectUserTimezone" in html
+    assert "window.setCurrencySymbol = setCurrencySymbol" in html
+    assert "window.resetToDefaults = resetToDefaults" in html
+
 
 

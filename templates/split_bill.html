@@ -317,12 +317,19 @@ function reopenReviewModalWithCurrentData() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initSplitBill() {
   renderPeople();
   renderItemsTable();
   calculateSplit();
   setupReceiptScanEntry();
-});
+}
+window.initSplitBill = initSplitBill;
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initSplitBill);
+} else {
+  initSplitBill();
+}
 
 // ============================================================
 // 小票拍照识别双端同构分发逻辑：
@@ -2004,5 +2011,41 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+// 显式挂载至 window 作用域，确保内联 onclick 与动态 SPA 导航 100% 可用
+window.initSplitBill = initSplitBill;
+window.renderPeople = renderPeople;
+window.renderItemsTable = renderItemsTable;
+window.calculateSplit = calculateSplit;
+window.setupReceiptScanEntry = setupReceiptScanEntry;
+window.reopenReviewModalWithCurrentData = reopenReviewModalWithCurrentData;
+window.openReviewModal = openReviewModal;
+window.closeReviewModal = closeReviewModal;
+window.openReviewModalWithSample = openReviewModalWithSample;
+window.openReviewModalWithGoodMoodSample = openReviewModalWithGoodMoodSample;
+window.loadSampleReceipt = loadSampleReceipt;
+window.startReceiptScan = startReceiptScan;
+window.startBatchReceiptScan = startBatchReceiptScan;
+window.parseTextReceipt = parseTextReceipt;
+window.loadGlobalPreset = loadGlobalPreset;
+window.addPerson = addPerson;
+window.removePerson = removePerson;
+window.addNewItemRow = addNewItemRow;
+window.removeItemRow = removeItemRow;
+window.updateItemName = updateItemName;
+window.updateItemPrice = updateItemPrice;
+window.togglePersonForItem = togglePersonForItem;
+window.copyClaimMessage = copyClaimMessage;
+window.addReviewItemRow = addReviewItemRow;
+window.removeReviewItem = removeReviewItem;
+window.updateReviewItemName = updateReviewItemName;
+window.updateReviewItemPrice = updateReviewItemPrice;
+window.onReviewAmountChanged = onReviewAmountChanged;
+window.updateReviewBalance = updateReviewBalance;
+window.fixReviewBalanceGap = fixReviewBalanceGap;
+window.reparseFromReviewRawText = reparseFromReviewRawText;
+window.confirmReceiptToStep2 = confirmReceiptToStep2;
+window.renderReviewTable = renderReviewTable;
+window.openImageZoom = openImageZoom;
 </script>
 {% endblock %}
