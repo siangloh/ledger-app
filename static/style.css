@@ -4476,8 +4476,11 @@ html[data-theme="dark"] {
 .acc-empty .empty-icon { font-size: 52px; display: block; margin-bottom: 12px; }
 .acc-empty h3 { font-size: 18px; color: var(--ink); margin-bottom: 6px; }
 .acc-section-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin: 8px 0 4px; grid-column: 1 / -1; }
-.acc-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 1050; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; }
+.modal-overlay.open { display: flex !important; }
+.acc-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 1050; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
 .acc-modal-overlay.open { display: flex !important; }
+.modal { z-index: 1050; }
 .acc-modal { background: var(--surface, #1a2744); border: 1px solid var(--acc-border); border-radius: 20px; padding: 28px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5); }
 .acc-modal h2 { font-size: 18px; font-weight: 700; color: var(--ink); margin: 0 0 20px; display: flex; align-items: center; gap: 8px; }
 .acc-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }

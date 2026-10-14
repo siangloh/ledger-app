@@ -157,3 +157,44 @@ def test_accounts_page_renders_partial_on_htmx(logged_in_client):
     assert b"desktop-nav-links" not in htmx_resp.data
     assert "账户管理" in htmx_resp.data.decode("utf-8")
 
+
+def test_liabilities_page_htmx_renders_modals_and_script_bindings(logged_in_client):
+    """Ensure /liabilities renders properly with HTMX, modal triggers, and global script bindings."""
+    htmx_resp = logged_in_client.get("/liabilities", headers={"HX-Request": "true"})
+    assert htmx_resp.status_code == 200
+    html = htmx_resp.data.decode("utf-8")
+
+    # Partial layout: no duplicate global header
+    assert '<header class="app-header">' not in html
+    assert "desktop-nav-links" not in html
+
+    # Modals must exist
+    assert 'id="modalInstallment"' in html
+    assert 'id="modalLoan"' in html
+    assert 'id="modalAccount"' in html
+
+    # Modals must have elevated z-index above bottom nav
+    assert "z-index: 1050" in html
+
+    # Buttons must have valid onclick handlers
+    assert "openModal('modalInstallment')" in html
+    assert "openModal('modalLoan')" in html
+    assert "openModal('modalAccount')" in html
+
+    # Scripts must explicitly bind to window
+    assert "window.openModal = function" in html
+    assert "window.closeModal = function" in html
+    assert "window.calcInstMonthly = function" in html
+
+
+def test_app_js_provides_global_modal_controller():
+    """Verify that app.js declares global modal handlers and executes container scripts globally."""
+    with open("static/app.js", "r", encoding="utf-8") as f:
+        js = f.read()
+
+    assert "window.openModal = function" in js
+    assert "window.closeModal = function" in js
+    assert "function executeContainerScripts(container)" in js
+    assert "new Function(s.textContent)" not in js
+
+

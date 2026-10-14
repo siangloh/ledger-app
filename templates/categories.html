@@ -170,7 +170,7 @@
 </div>
 
 <script>
-function openEditCategoryModal(catId, currentName, currentColor) {
+window.openEditCategoryModal = function (catId, currentName, currentColor) {
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
   if (typeof Swal === 'undefined') {
     const newName = prompt('修改分类名称:', currentName);

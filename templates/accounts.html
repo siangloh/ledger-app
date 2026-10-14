@@ -264,59 +264,77 @@
 
 {% block scripts %}
 <script>
-function openAddModal() {
+window.openAddModal = function () {
   const el = document.getElementById('addModalOverlay');
-  el.style.display = 'flex';
-  el.classList.add('open');
-  document.getElementById('addName').focus();
-  onTypeChange('add');
-}
-function closeAddModal() {
+  if (el) {
+    el.style.display = 'flex';
+    el.classList.add('open');
+  }
+  const nameEl = document.getElementById('addName');
+  if (nameEl) nameEl.focus();
+  window.onTypeChange('add');
+};
+
+window.closeAddModal = function () {
   const el = document.getElementById('addModalOverlay');
-  el.classList.remove('open');
-  el.style.display = 'none';
-}
-function closeEditModal() {
+  if (el) {
+    el.classList.remove('open');
+    el.style.display = 'none';
+  }
+};
+
+window.closeEditModal = function () {
   const el = document.getElementById('editModalOverlay');
-  el.classList.remove('open');
-  el.style.display = 'none';
-}
+  if (el) {
+    el.classList.remove('open');
+    el.style.display = 'none';
+  }
+};
 
 ['addModalOverlay','editModalOverlay'].forEach(id => {
-  document.getElementById(id).addEventListener('click', function(e){
-    if(e.target === this) {
-      this.classList.remove('open');
-      this.style.display = 'none';
-    }
-  });
+  const overlay = document.getElementById(id);
+  if (overlay) {
+    overlay.addEventListener('click', function(e){
+      if(e.target === this) {
+        this.classList.remove('open');
+        this.style.display = 'none';
+      }
+    });
+  }
 });
 
-function onTypeChange(prefix) {
-  const val = document.getElementById(prefix + 'Type').value;
+window.onTypeChange = function (prefix) {
+  const typeEl = document.getElementById(prefix + 'Type');
   const sec = document.getElementById(prefix + 'CcSection');
+  if (!typeEl || !sec) return;
+  const val = typeEl.value;
   if (val === 'credit_card') sec.classList.remove('hidden');
   else sec.classList.add('hidden');
-}
+};
 
-function openEditModal(id, name, type, currency, creditLimit, statementDay, dueDay, gracePeriod) {
+window.openEditModal = function (id, name, type, currency, creditLimit, statementDay, dueDay, gracePeriod) {
   const form = document.getElementById('editAccountForm');
-  form.action = '/api/accounts/' + id + '/edit';
-  document.getElementById('editName').value = name;
-  document.getElementById('editCurrency').value = currency;
+  if (form) form.action = '/api/accounts/' + id + '/edit';
+  const setVal = (fid, v) => { const el = document.getElementById(fid); if (el) el.value = v; };
+  setVal('editName', name);
+  setVal('editCurrency', currency);
   const typeSelect = document.getElementById('editType');
-  typeSelect.value = type;
-  onTypeChange('edit');
-  document.getElementById('editCreditLimit').value = creditLimit || '';
-  document.getElementById('editStatementDay').value = statementDay !== null ? statementDay : '';
-  document.getElementById('editDueDay').value = dueDay !== null ? dueDay : '';
-  document.getElementById('editGracePeriod').value = gracePeriod || 20;
+  if (typeSelect) typeSelect.value = type;
+  window.onTypeChange('edit');
+  setVal('editCreditLimit', creditLimit || '');
+  setVal('editStatementDay', statementDay !== null ? statementDay : '');
+  setVal('editDueDay', dueDay !== null ? dueDay : '');
+  setVal('editGracePeriod', gracePeriod || 20);
   const el = document.getElementById('editModalOverlay');
-  el.style.display = 'flex';
-  el.classList.add('open');
-  document.getElementById('editName').focus();
-}
+  if (el) {
+    el.style.display = 'flex';
+    el.classList.add('open');
+  }
+  const nameEl = document.getElementById('editName');
+  if (nameEl) nameEl.focus();
+};
 
-function confirmDelete(id, name, subCount, installCount) {
+window.confirmDelete = function (id, name, subCount, installCount) {
   let extra = '';
   if (subCount > 0 || installCount > 0) {
     const boundFmt = window.t ? window.t('accounts.del_warn_bound', '⚠️ 此账户已绑定 {sub} 个订阅、{install} 个分期，删除后绑定将自动解除。', {sub: subCount, install: installCount}) : ('⚠️ 此账户已绑定 ' + subCount + ' 个订阅、' + installCount + ' 个分期，删除后绑定将自动解除。');
@@ -325,23 +343,33 @@ function confirmDelete(id, name, subCount, installCount) {
   const title = window.t ? window.t('accounts.del_confirm_title', '确认删除账户？') : '确认删除账户？';
   const strongName = '<strong style="color:var(--ink)">' + name + '</strong>';
   const msgFmt = window.t ? window.t('accounts.del_confirm_msg', '账户「{name}」将被永久删除。', {name: strongName}) : ('账户「' + strongName + '」将被永久删除。');
-  Swal.fire({
-    title: title,
-    html: '<p style="color:var(--muted);font-size:14px">' + msgFmt + extra + '</p>',
-    icon: 'warning',
-    background: 'var(--surface,#1a2744)',
-    color: 'var(--ink,#e2e8f0)',
-    showCancelButton: true,
-    confirmButtonText: window.t ? window.t('common.delete', '删除') : '删除',
-    cancelButtonText: window.t ? window.t('common.cancel', '取消') : '取消',
-    confirmButtonColor: '#ef4444',
-  }).then(result => {
-    if (result.isConfirmed) {
-      const form = document.getElementById('deleteAccountForm');
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: title,
+      html: '<p style="color:var(--muted);font-size:14px">' + msgFmt + extra + '</p>',
+      icon: 'warning',
+      background: 'var(--surface,#1a2744)',
+      color: 'var(--ink,#e2e8f0)',
+      showCancelButton: true,
+      confirmButtonText: window.t ? window.t('common.delete', '删除') : '删除',
+      cancelButtonText: window.t ? window.t('common.cancel', '取消') : '取消',
+      confirmButtonColor: '#ef4444',
+    }).then(result => {
+      if (result.isConfirmed) {
+        const form = document.getElementById('deleteAccountForm');
+        if (form) {
+          form.action = '/api/accounts/' + id + '/delete';
+          form.submit();
+        }
+      }
+    });
+  } else if (confirm(title)) {
+    const form = document.getElementById('deleteAccountForm');
+    if (form) {
       form.action = '/api/accounts/' + id + '/delete';
       form.submit();
     }
-  });
-}
+  }
+};
 </script>
 {% endblock %}

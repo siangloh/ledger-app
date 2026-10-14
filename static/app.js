@@ -5,6 +5,57 @@ function formatMoney(value, symbol) {
 }
 
 // ===========================================================================
+// 全局通用弹窗控制器 (Global Modal Controller)
+// ===========================================================================
+window.openModal = function (id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.style.display = 'flex';
+    el.classList.add('open');
+  }
+};
+
+window.closeModal = function (id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.remove('open');
+    el.style.display = 'none';
+  }
+};
+
+// 全局遮罩外部点击自动关闭弹窗
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.classList && (
+      e.target.classList.contains('modal-overlay') || 
+      e.target.classList.contains('acc-modal-overlay') ||
+      (e.target.classList.contains('modal') && !e.target.closest('.modal-content'))
+    )) {
+      e.target.classList.remove('open');
+      e.target.style.display = 'none';
+    }
+  });
+}
+
+// 全局执行动态容器中的脚本 (在全局 window 作用域下执行，避免 new Function 导致的局部作用域捕获)
+function executeContainerScripts(container) {
+  if (!container) return;
+  container.querySelectorAll('script').forEach(oldScript => {
+    try {
+      const newScript = document.createElement('script');
+      Array.from(oldScript.attributes).forEach(attr => {
+        newScript.setAttribute(attr.name, attr.value);
+      });
+      newScript.textContent = oldScript.textContent;
+      document.body.appendChild(newScript);
+      newScript.remove();
+    } catch (e) {
+      console.error('Error executing partial script:', e);
+    }
+  });
+}
+
+// ===========================================================================
 // 金额隐私遮罩模式 (Privacy Masking Mode)
 // ===========================================================================
 function updatePrivacyModeUI(isPrivacy) {
@@ -2953,7 +3004,7 @@ function updateActiveNav(urlStr) {
   });
 
   // 同步手机端底部抽屉高亮
-  document.querySelectorAll('.sheet-tile').forEach(tile => {
+  document.querySelectorAll('.sheet-action-btn[data-nav], .sheet-tile, .sheet-list-item[data-nav]').forEach(tile => {
     tile.classList.toggle('active', tile.dataset.nav === navKey);
   });
 }
@@ -3458,15 +3509,8 @@ const InstantNav = {
     }
 
     this.applyHtmlWithTransition(container, html, () => {
-      // 执行内联数据脚本，确保各页面的 window 局部变量生效
-      container.querySelectorAll('script').forEach(s => {
-        try {
-          const fn = new Function(s.textContent);
-          fn();
-        } catch (e) {
-          console.debug('Error executing partial script:', e);
-        }
-      });
+      // 执行内联数据脚本，确保各页面的全局函数与 window 变量在全局作用域生效
+      executeContainerScripts(container);
 
       if (pushState) {
         history.pushState({ instantNav: true, url: url }, '', url);
@@ -3674,14 +3718,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     const container = evt.detail.target;
     if (container && container.id === 'mainContainer') {
-      container.querySelectorAll('script').forEach(s => {
-        try {
-          const fn = new Function(s.textContent);
-          fn();
-        } catch (e) {
-          console.error('Error executing partial script:', e);
-        }
-      });
+      executeContainerScripts(container);
 
       const newPath = (evt.detail.pathInfo && evt.detail.pathInfo.requestPath) || window.location.pathname;
       updateActiveNav(newPath);
@@ -3698,12 +3735,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document.body.addEventListener('htmx:historyRestore', function () {
     const container = document.getElementById('mainContainer');
     if (container) {
-      container.querySelectorAll('script').forEach(s => {
-        try {
-          const fn = new Function(s.textContent);
-          fn();
-        } catch (e) {}
-      });
+      executeContainerScripts(container);
     }
     updateActiveNav(window.location.pathname);
     initPageLifecycle();
