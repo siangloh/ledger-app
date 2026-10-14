@@ -394,6 +394,8 @@
             window.FLASH_ERROR = {{ error_msgs | tojson }};
             window.INITIAL_DATA_VERSION = {{ data_version | tojson }};
         </script>
+        <!-- 待确认转账 / 内部划转暂存横幅 (On Hold Banner) -->
+        <div id="pendingTransactionsBanner" class="pending-banner-container" style="display:none;"></div>
         {% block content %}{% endblock %}
     </main>
     <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}"></script>

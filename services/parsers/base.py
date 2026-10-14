@@ -18,6 +18,8 @@ class ParsedNotification:
     is_friend_repayment: bool = False
     is_internal_transfer: bool = False
     is_promo: bool = False
+    is_on_hold: bool = False
+    on_hold_reason: Optional[str] = None
     channel: str = "generic"
     confidence: float = 1.0
     raw_text: str = ""
@@ -40,6 +42,8 @@ class ParsedNotification:
             'note': self.note or self.merchant,
             'is_refund': self.is_refund,
             'is_friend_repayment': self.is_friend_repayment,
+            'is_on_hold': self.is_on_hold,
+            'on_hold_reason': self.on_hold_reason,
             'channel': self.channel,
             'confidence': self.confidence,
             'raw_text': self.raw_text

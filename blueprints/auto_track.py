@@ -238,6 +238,64 @@ def api_auto_track():
                 'parsed': parsed
             }), 200
 
+    # 2.5 待确认转账与自转门禁 (On Hold - 暂存由用户在前端决定，不计入日常消费支出)
+    if parsed.get('is_on_hold'):
+        if is_owner:
+            with _IN_FLIGHT_LOCK:
+                _IN_FLIGHT_EVENTS.pop(dedup_key, None)
+            evt.set()
+
+        cur_pending = db.execute('''
+            INSERT INTO pending_transactions (
+                user_id, date, type, amount, group_name, category, merchant, note, channel, raw_text, status, on_hold_reason, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'on_hold', ?, ?)
+        ''', (
+            str(target_user_id),
+            parsed.get('date') or date.today().isoformat(),
+            parsed.get('type') or 'expense',
+            parsed['amount'],
+            parsed.get('group_name'),
+            parsed.get('category') or '转账/充值',
+            parsed.get('merchant') or parsed.get('note'),
+            parsed.get('note'),
+            parsed.get('channel') or 'Bank',
+            text,
+            parsed.get('on_hold_reason') or '检测到转账/充值，已暂存待确认',
+            now
+        ))
+        pending_id = cur_pending.lastrowid
+        try:
+            db.execute('''
+                INSERT INTO processed_notifications (user_id, content_hash, raw_text, amount, transaction_id, created_at)
+                VALUES (?, ?, ?, ?, NULL, ?)
+            ''', (str(target_user_id), content_hash, text, parsed['amount'], now))
+        except Exception as e:
+            logger.debug("Failed to record processed_notification on on_hold: %s", e)
+
+        db.commit()
+
+        bump_data_version('pending_transaction', {
+            'action': 'created',
+            'pending_id': pending_id,
+            'amount': parsed['amount'],
+            'note': parsed.get('note'),
+            'user_id': target_user_id
+        })
+
+        notif_title = "待确认转账 ⏸️"
+        notif_body = f"收到转账【{parsed.get('note')} {money_filter(parsed['amount'])}】，已暂存待您决定用途"
+
+        return jsonify({
+            'ok': True,
+            'verdict': 'on_hold',
+            'message': parsed.get('on_hold_reason') or '检测到转账/充值，已暂存待您决定用途',
+            'pending_id': pending_id,
+            'notification_title': notif_title,
+            'notification_body': notif_body,
+            'parsed': parsed,
+            'raw_text': text
+        }), 200
+
     # 3. 智能多渠道与语义防重 (Multi-Channel & Semantic Fuzzy Deduplication)
     candidate_txs = db.execute('''
         SELECT id, note, category, amount, created_at, source FROM transactions

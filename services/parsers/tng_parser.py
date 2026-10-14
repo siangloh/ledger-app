@@ -42,6 +42,8 @@ class TouchNGoParser(NotificationParserStrategy):
 
     def can_handle(self, text: str) -> bool:
         t = text.lower()
+        if any(k in t for k in ['mypb', 'public bank', 'pbb', 'publicbank', 'maybank', 'm2u', 'cimb']):
+            return False
         return any(k in t for k in ['touchngo', 'tng', "touch 'n go", 'ewallet', 'tngd', 'touch n go'])
 
     def parse(self, text: str) -> Optional[ParsedNotification]:

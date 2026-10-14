@@ -121,6 +121,7 @@ from blueprints.subscriptions import subscriptions_bp
 from blueprints.split_bill import split_bill_bp
 from blueprints.analytics import analytics_bp, get_category_insights_data
 from blueprints.settings import settings_bp
+from blueprints.pending_transactions import pending_transactions_bp
 
 __all__ = [
     'app', 'get_db', 'close_db', 'init_db', 'DB_PATH', 'BASE_DIR', 'DATA_DIR', 'UPLOAD_DIR',
@@ -645,6 +646,7 @@ app.register_blueprint(subscriptions_bp)
 app.register_blueprint(split_bill_bp)
 app.register_blueprint(analytics_bp)
 app.register_blueprint(settings_bp)
+app.register_blueprint(pending_transactions_bp)
 
 # 确保启动或导入时数据库初始化
 init_db()

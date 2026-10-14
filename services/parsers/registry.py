@@ -240,6 +240,8 @@ class NotificationParserComposite:
                 is_friend_repayment=parsed.is_friend_repayment,
                 is_internal_transfer=parsed.is_internal_transfer,
                 is_promo=parsed.is_promo,
+                is_on_hold=parsed.is_on_hold,
+                on_hold_reason=parsed.on_hold_reason,
                 channel=parsed.channel,
                 confidence=parsed.confidence,
                 raw_text=parsed.raw_text,

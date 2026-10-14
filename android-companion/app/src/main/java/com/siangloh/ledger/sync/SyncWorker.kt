@@ -69,11 +69,13 @@ class SyncWorker(
                     val latch = CountDownLatch(1)
                     NetworkHelper.postNotificationAsync(notif.rawText, applicationContext) { success, msg, verdict ->
                         kotlinx.coroutines.runBlocking {
-                            if (success || verdict == "rejected_promo" || verdict == "duplicate_ignored") {
+                            if (success || verdict == "rejected_promo" || verdict == "duplicate_ignored" || verdict == "on_hold" || verdict == "ignored_internal_transfer") {
                                 db.pendingNotificationDao().delete(notif.id)
                                 val finalOutcome = when (verdict) {
                                     "rejected_promo" -> "synced_rejected_promo"
                                     "duplicate_ignored" -> "synced_duplicate_ignored"
+                                    "on_hold" -> "synced_on_hold"
+                                    "ignored_internal_transfer" -> "synced_internal_transfer"
                                     else -> "synced_success"
                                 }
                                 val updatedRows = db.notificationLogDao().updateQueuedLog(

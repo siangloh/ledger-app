@@ -757,6 +757,27 @@ def init_db(app_logger=None):
     CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id, is_active);
     CREATE INDEX IF NOT EXISTS idx_user_settings_uid ON user_settings(user_id);
     CREATE INDEX IF NOT EXISTS idx_recurring_user ON recurring_rules(user_id);
+
+    -- 13. 待确认交易表 (On Hold 待用户决定的模糊转账/自转)
+    CREATE TABLE IF NOT EXISTS pending_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'expense',
+        amount REAL NOT NULL,
+        group_name TEXT,
+        category TEXT,
+        merchant TEXT,
+        note TEXT,
+        channel TEXT,
+        raw_text TEXT,
+        status TEXT NOT NULL DEFAULT 'on_hold',
+        on_hold_reason TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pending_tx_user_status ON pending_transactions(user_id, status, created_at DESC);
     ''')
     db.commit()
 

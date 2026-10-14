@@ -184,6 +184,8 @@ class NotificationService : NotificationListenerService() {
                     val finalOutcome = when (verdict) {
                         "rejected_promo" -> "synced_rejected_promo"
                         "duplicate_ignored" -> "synced_duplicate_ignored"
+                        "on_hold" -> "synced_on_hold"
+                        "ignored_internal_transfer" -> "synced_internal_transfer"
                         else -> if (success) "synced_success" else {
                             queueOfflineNotification(pkgName, fullContent)
                             "queued_offline"

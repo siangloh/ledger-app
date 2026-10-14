@@ -376,3 +376,147 @@ def test_self_transfer_via_bank_holder_name(client, admin_user_id, flask_app):
     assert d.get("is_self_transfer") is True
 
 
+def test_public_bank_parser_gxbank_on_hold():
+    """验证从 Public Bank 转出至 GXBank 数字银行触发 on_hold 待确认暂存"""
+    from services.parsers.public_bank_parser import PublicBankParser
+    parser = PublicBankParser()
+    text = "Money Sent PBB. You have made a DuitNow Online Banking/Wallets Payment of RM1,500.00 to GX BANK BERHAD."
+
+    assert parser.can_handle(text) is True
+    res = parser.parse(text)
+    assert res is not None
+    assert res.amount == 1500.00
+    assert res.type == "expense"
+    assert "GX BANK BERHAD" in res.merchant
+    assert res.is_on_hold is True
+    assert "GX BANK BERHAD" in res.on_hold_reason
+
+
+def test_public_bank_parser_tng_digital_on_hold():
+    """验证从 Public Bank 充值 Touch 'n Go 钱包触发 on_hold 待确认暂存"""
+    from services.parsers.public_bank_parser import PublicBankParser
+    parser = PublicBankParser()
+    text = "Money Sent PBB. You have made a DuitNow Online Banking/Wallets Payment of RM50.00 to TNG DIGITAL SDN BHD."
+
+    assert parser.can_handle(text) is True
+    res = parser.parse(text)
+    assert res is not None
+    assert res.amount == 50.00
+    assert res.is_on_hold is True
+
+
+def test_public_bank_parser_qr_expense():
+    """验证 Public Bank DuitNow QR 实体商户消费正常直接入账"""
+    from services.parsers.public_bank_parser import PublicBankParser
+    parser = PublicBankParser()
+    text = "Money Sent PBB. You have made a DuitNow QR Payment of RM15.00 to RESTORAN HUA XING."
+
+    assert parser.can_handle(text) is True
+    res = parser.parse(text)
+    assert res is not None
+    assert res.amount == 15.00
+    assert res.type == "expense"
+    assert res.is_on_hold is False
+    assert "RESTORAN HUA XING" in res.merchant
+
+
+def test_public_bank_parser_received_income():
+    """验证 Public Bank 收到转账入账"""
+    from services.parsers.public_bank_parser import PublicBankParser
+    parser = PublicBankParser()
+    text = "Money Received PBB. You have received RM300.00 from CHONG WEI via DuitNow."
+
+    assert parser.can_handle(text) is True
+    res = parser.parse(text)
+    assert res is not None
+    assert res.amount == 300.00
+    assert res.type == "income"
+    assert res.is_on_hold is False
+    assert "CHONG WEI" in res.merchant
+
+
+def test_auto_track_gxbank_triggers_on_hold_and_confirm_workflow(client, admin_user_id, flask_app):
+    """验证转账至 GXBank 进入待确认暂存队列，不破坏月度支出统计，且支持一键忽略或确认为真实支出"""
+    from core.db import get_db
+
+    headers = {"X-API-KEY": "test-auto-track-key", "Content-Type": "application/json"}
+    raw_pbb = "Money Sent PBB. You have made a DuitNow Online Banking/Wallets Payment of RM1,500.00 to GX BANK BERHAD."
+
+    # 1. 提交通知到 /api/auto-track
+    r = client.post("/api/auto-track", json={"text": raw_pbb, "user_id": admin_user_id}, headers=headers)
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True
+    assert d["verdict"] == "on_hold"
+    pending_id = d.get("pending_id")
+    assert pending_id is not None
+
+    # 2. 验证财务安全门禁：transactions 表中坚决不增加这笔 GX Bank 转账支出
+    with flask_app.app.app_context():
+        db = get_db()
+        tx_row = db.execute(
+            "SELECT COUNT(*) as cnt FROM transactions WHERE user_id = ? AND (note LIKE '%GX BANK%' OR note LIKE '%GXBank%')",
+            (str(admin_user_id),)
+        ).fetchone()
+        assert tx_row["cnt"] == 0
+
+        # 3. 验证 pending_transactions 表中正确暂存
+        pending_row = db.execute(
+            "SELECT * FROM pending_transactions WHERE id = ?",
+            (pending_id,)
+        ).fetchone()
+        assert pending_row is not None
+        assert pending_row["status"] == "on_hold"
+        assert pending_row["amount"] == 1500.0
+
+    # 4. 获取待确认转账列表 API（通过登录 session）
+    with client.session_transaction() as sess:
+        sess['user_id'] = admin_user_id
+        sess['username'] = 'admin'
+        sess['logged_in'] = True
+
+    r_list = client.get("/api/pending-transactions")
+    assert r_list.status_code == 200
+    d_list = r_list.get_json()
+    assert d_list["ok"] is True
+    assert any(item["id"] == pending_id for item in d_list["items"])
+
+    # 5. 测试用户一键忽略 (本人自转/储蓄)
+    r_ignore = client.post(f"/api/pending-transactions/{pending_id}/ignore")
+    assert r_ignore.status_code == 200
+    assert r_ignore.get_json()["ok"] is True
+
+    with flask_app.app.app_context():
+        db = get_db()
+        updated_pending = db.execute("SELECT status FROM pending_transactions WHERE id = ?", (pending_id,)).fetchone()
+        assert updated_pending["status"] == "ignored"
+
+        # 再次确保 transactions 表仍然没有这笔支出
+        tx_cnt = db.execute(
+            "SELECT COUNT(*) as cnt FROM transactions WHERE user_id = ? AND (note LIKE '%GX BANK%' OR note LIKE '%GXBank%')",
+            (str(admin_user_id),)
+        ).fetchone()
+        assert tx_cnt["cnt"] == 0
+
+    # 6. 测试另一笔转账通过 confirm 确认为正式支出
+    raw_pbb_2 = "Money Sent PBB. You have made a DuitNow Online Banking/Wallets Payment of RM88.00 to TNG DIGITAL SDN BHD."
+    r2 = client.post("/api/auto-track", json={"text": raw_pbb_2, "user_id": admin_user_id}, headers=headers)
+    assert r2.status_code == 200
+    p2_id = r2.get_json()["pending_id"]
+
+    r_confirm = client.post(f"/api/pending-transactions/{p2_id}/confirm", json={"category": "交通", "note": "TNG 充值用于过路费"})
+    assert r_confirm.status_code == 200
+    d_conf = r_confirm.get_json()
+    assert d_conf["ok"] is True
+    assert d_conf["transaction_id"] is not None
+
+    with flask_app.app.app_context():
+        db = get_db()
+        new_tx = db.execute("SELECT * FROM transactions WHERE id = ?", (d_conf["transaction_id"],)).fetchone()
+        assert new_tx is not None
+        assert new_tx["amount"] == 88.0
+        assert new_tx["category"] == "交通"
+        assert new_tx["source"] == "auto_track_confirmed"
+
+
+

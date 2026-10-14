@@ -1,4 +1,5 @@
 <meta name="current-username" content="{{ session.get('username', '') }}">
 <title>{% block title %}我的记账本{% endblock %}</title>
+<div id="pendingTransactionsBanner" class="pending-banner-container" style="display:none;"></div>
 {% block content %}{% endblock %}
 {% block scripts %}{% endblock %}

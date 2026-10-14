@@ -2461,6 +2461,341 @@ function handleRealtimeUpdate(event) {
       }
     }
   }
+
+  // 待确认转账 (On Hold) 实时更新与提示
+  if (event && (event.type === 'pending_transaction' || event.type === 'pending_transaction_resolved')) {
+    fetchPendingTransactions();
+    if (event.type === 'pending_transaction' && event.data) {
+      const p = event.data;
+      const sym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
+      const amtStr = p.amount ? ` ${sym} ` + Number(p.amount).toFixed(2) : '';
+      const title = `⏸️ 发现待确认转账${amtStr}`;
+      const bodyStr = `${p.note || '转账'} 已暂存待您决定用途`;
+      sendPhoneNotification(title, bodyStr);
+      if (typeof Swal !== 'undefined') {
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'info',
+          title: title,
+          text: bodyStr,
+          showConfirmButton: false,
+          timer: 4500,
+          background: 'var(--surface)',
+          color: 'var(--navy)'
+        });
+      }
+    }
+  }
+}
+
+// ============================================================================
+// 待确认转账与自转 (On Hold Transactions) 管理逻辑
+// ============================================================================
+
+function getAppCsrfToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  if (meta && meta.content) return meta.content;
+  const input = document.querySelector('input[name="csrf_token"]');
+  if (input && input.value) return input.value;
+  return '';
+}
+
+function escapePendingHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapePendingAttr(str) {
+  if (!str) return '';
+  return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+function getPendingContainer() {
+  let container = document.getElementById('pendingTransactionsBanner');
+  if (!container) {
+    const main = document.getElementById('mainContainer');
+    if (main) {
+      container = document.createElement('div');
+      container.id = 'pendingTransactionsBanner';
+      container.className = 'pending-banner-container';
+      container.style.display = 'none';
+      main.insertBefore(container, main.firstChild);
+    }
+  }
+  return container;
+}
+
+function fetchPendingTransactions() {
+  fetch('/api/pending-transactions', {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+    .then(res => res.ok ? res.json() : null)
+    .then(data => {
+      if (!data || !data.ok) return;
+      renderPendingTransactions(data.items || []);
+    })
+    .catch(err => console.debug('fetchPendingTransactions error:', err));
+}
+
+function renderPendingTransactions(items) {
+  const container = getPendingContainer();
+  if (!container) return;
+
+  if (!items || items.length === 0) {
+    container.innerHTML = '';
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'flex';
+  const sym = window.LEDGER_CURRENCY_SYMBOL || 'RM';
+
+  container.innerHTML = items.map(item => {
+    const amtStr = `${sym} ${Number(item.amount).toFixed(2)}`;
+    const fromChannel = item.channel || '银行';
+    const toTarget = item.merchant || item.note || '目标账户';
+    const reasonStr = item.on_hold_reason || '系统检测到转账/充值，可能为个人储蓄自转';
+    const timeStr = item.created_at ? item.created_at.split('.')[0].replace('T', ' ') : '';
+
+    return `
+      <div class="pending-tx-card" id="pendingCard-${item.id}">
+        <div class="pending-tx-header">
+          <span class="pending-tx-badge">⏸️ 待确认资金用途 (On Hold)</span>
+          <span class="pending-tx-time">${timeStr}</span>
+        </div>
+        <div class="pending-tx-body">
+          <div class="pending-tx-main">
+            <div class="pending-tx-route">${escapePendingHtml(fromChannel)} ➔ ${escapePendingHtml(toTarget)}</div>
+            <div class="pending-tx-reason">${escapePendingHtml(reasonStr)}</div>
+          </div>
+          <div class="pending-tx-amount">${amtStr}</div>
+        </div>
+        <div class="pending-tx-actions">
+          <button type="button" class="btn-pending-action btn-pending-ignore" onclick="ignorePendingTx(${item.id})">
+            <span>🚫</span>
+            <span>本人自转/储蓄 (忽略)</span>
+          </button>
+          <button type="button" class="btn-pending-action btn-pending-confirm" onclick="confirmPendingTx(${item.id}, '${escapePendingAttr(item.category || '其他')}', ${item.amount})">
+            <span>💸</span>
+            <span>确认为日常支出</span>
+          </button>
+          <button type="button" class="btn-pending-action btn-pending-transfer" onclick="transferPendingTx(${item.id})">
+            <span>🔄</span>
+            <span>账户间互转</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function ignorePendingTx(id) {
+  const card = document.getElementById(`pendingCard-${id}`);
+  if (card) card.style.opacity = '0.5';
+
+  fetch(`/api/pending-transactions/${id}/ignore`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getAppCsrfToken(),
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.ok) {
+        if (card) {
+          card.style.transition = 'all 0.3s ease';
+          card.style.transform = 'translateY(-10px)';
+          card.style.opacity = '0';
+          setTimeout(() => {
+            card.remove();
+            const container = document.getElementById('pendingTransactionsBanner');
+            if (container && container.children.length === 0) {
+              container.style.display = 'none';
+            }
+          }, 300);
+        }
+        if (window.Swal) {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'info',
+            title: '已标记为本人自转/充值',
+            text: '未计入日常外部支出，避免了支出虚高！',
+            showConfirmButton: false,
+            timer: 3000,
+            background: 'var(--surface)',
+            color: 'var(--navy)'
+          });
+        }
+      } else {
+        if (card) card.style.opacity = '1';
+        alert(data.message || '操作失败');
+      }
+    })
+    .catch(err => {
+      if (card) card.style.opacity = '1';
+      console.error(err);
+    });
+}
+
+function confirmPendingTx(id, defaultCategory, amount) {
+  if (window.Swal) {
+    Swal.fire({
+      title: '确认为正式支出',
+      html: `
+        <div style="text-align:left; margin-top:10px;">
+          <p style="margin-bottom:8px; font-size:14px; color:var(--muted);">请选择支出归属分类：</p>
+          <select id="swalPendingCat" class="swal2-input" style="width:100%; box-sizing:border-box;">
+            <option value="其他">其他</option>
+            <option value="餐饮">餐饮</option>
+            <option value="购物">购物</option>
+            <option value="交通">交通</option>
+            <option value="人情往来">人情往来</option>
+            <option value="娱乐">娱乐</option>
+            <option value="医疗">医疗</option>
+            <option value="居住">居住</option>
+            <option value="转账支出">转账支出</option>
+          </select>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: '确定入账',
+      cancelButtonText: '取消',
+      didOpen: () => {
+        const sel = document.getElementById('swalPendingCat');
+        if (sel && defaultCategory && defaultCategory !== '转账/充值') {
+          for (let opt of sel.options) {
+            if (opt.value === defaultCategory) {
+              opt.selected = true;
+              break;
+            }
+          }
+        }
+      }
+    }).then(res => {
+      if (res.isConfirmed) {
+        const cat = document.getElementById('swalPendingCat').value;
+        executeConfirmPendingTx(id, cat);
+      }
+    });
+  } else {
+    executeConfirmPendingTx(id, defaultCategory || '其他');
+  }
+}
+
+function executeConfirmPendingTx(id, category) {
+  const card = document.getElementById(`pendingCard-${id}`);
+  if (card) card.style.opacity = '0.5';
+
+  fetch(`/api/pending-transactions/${id}/confirm`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getAppCsrfToken(),
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({ category: category })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.ok) {
+        if (card) {
+          card.style.transition = 'all 0.3s ease';
+          card.style.transform = 'translateY(-10px)';
+          card.style.opacity = '0';
+          setTimeout(() => {
+            card.remove();
+            const container = document.getElementById('pendingTransactionsBanner');
+            if (container && container.children.length === 0) {
+              container.style.display = 'none';
+            }
+          }, 300);
+        }
+        checkRealtimeUpdates();
+        if (window.Swal) {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: '已转入账本',
+            text: data.message || '已成功记入支出！',
+            showConfirmButton: false,
+            timer: 3000,
+            background: 'var(--surface)',
+            color: 'var(--navy)'
+          });
+        }
+      } else {
+        if (card) card.style.opacity = '1';
+        alert(data.message || '操作失败');
+      }
+    })
+    .catch(err => {
+      if (card) card.style.opacity = '1';
+      console.error(err);
+    });
+}
+
+function transferPendingTx(id) {
+  const card = document.getElementById(`pendingCard-${id}`);
+  if (card) card.style.opacity = '0.5';
+
+  fetch(`/api/pending-transactions/${id}/transfer`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getAppCsrfToken(),
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({})
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.ok) {
+        if (card) {
+          card.style.transition = 'all 0.3s ease';
+          card.style.transform = 'translateY(-10px)';
+          card.style.opacity = '0';
+          setTimeout(() => {
+            card.remove();
+            const container = document.getElementById('pendingTransactionsBanner');
+            if (container && container.children.length === 0) {
+              container.style.display = 'none';
+            }
+          }, 300);
+        }
+        if (window.Swal) {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: '账户互转记录成功',
+            text: data.message,
+            showConfirmButton: false,
+            timer: 3000,
+            background: 'var(--surface)',
+            color: 'var(--navy)'
+          });
+        }
+      } else {
+        if (card) card.style.opacity = '1';
+        alert(data.message || '操作失败');
+      }
+    })
+    .catch(err => {
+      if (card) card.style.opacity = '1';
+      console.error(err);
+    });
 }
 
 function checkRealtimeUpdates() {
@@ -2515,6 +2850,7 @@ function checkRealtimeUpdates() {
 }
 
 function initLiveSyncStatus() {
+  fetchPendingTransactions();
   checkRealtimeUpdates();
 
   if (!_syncListenersAttached && typeof window !== 'undefined') {

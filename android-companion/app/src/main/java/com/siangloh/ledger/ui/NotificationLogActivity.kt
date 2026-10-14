@@ -156,6 +156,16 @@ class NotificationLogActivity : AppCompatActivity() {
                     holder.badge.setTextColor(Color.parseColor("#0277BD"))
                     holder.badge.setBackgroundColor(Color.parseColor("#E1F5FE"))
                 }
+                "synced_on_hold" -> {
+                    holder.badge.text = "⏸️ 待确认 (on_hold)"
+                    holder.badge.setTextColor(Color.parseColor("#E65100"))
+                    holder.badge.setBackgroundColor(Color.parseColor("#FFF3E0"))
+                }
+                "synced_internal_transfer" -> {
+                    holder.badge.text = "🔄 内部划转已忽略"
+                    holder.badge.setTextColor(Color.parseColor("#00695C"))
+                    holder.badge.setBackgroundColor(Color.parseColor("#E0F2F1"))
+                }
                 "ignored_promo_keyword" -> {
                     holder.badge.text = "🚫 营销词过滤 (本地 Phase-1)"
                     holder.badge.setTextColor(Color.parseColor("#E65100"))
