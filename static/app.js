@@ -4107,7 +4107,7 @@ window.openSetBudgetModal = function (triggerBtn) {
         ${modalDesc}
       </div>
       <div style="position: relative; margin-bottom: 12px;">
-        <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-weight: 700; color: var(--ink); font-size: 15px;">RM</span>
+        <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-weight: 700; color: var(--ink); font-size: 15px;">${window.LEDGER_CURRENCY_SYMBOL || 'RM'}</span>
         <input id="swalBudgetInput" type="number" step="0.01" min="0" class="swal2-input"
                style="margin: 0; width: 100%; box-sizing: border-box; padding-left: 48px; font-size: 16px; font-weight: 600;"
                placeholder="${phLimit}" value="${currentNum !== '' ? currentNum : ''}">

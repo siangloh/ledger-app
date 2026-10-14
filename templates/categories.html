@@ -1,9 +1,12 @@
 {% extends layout|default('base.html') %}
 {% block title %}{{ t('categories.title') }} - {{ t('nav.brand') }}{% endblock %}
 {% block content %}
-<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-  <h2 style="margin:0;">{{ t('categories.title') }}</h2>
-  <a href="{{ url_for('category_insights_page') }}" class="btn-primary btn-sm" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">{{ t('categories.insights_btn') }}</a>
+<div class="cat-page-header">
+  <h2 class="cat-page-title">{{ t('categories.title') }}</h2>
+  <a href="{{ url_for('category_insights_page') }}" class="btn-primary btn-sm cat-insights-btn" hx-get="{{ url_for('category_insights_page') }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">
+    <span class="cat-insights-icon">📊</span>
+    <span>{{ t('categories.insights_btn') }}</span>
+  </a>
 </div>
 
 <div class="panels">
@@ -12,12 +15,12 @@
     <h3>{{ t('categories.main_income_cats') }}</h3>
     <ul class="cat-list">
       {% for c in income_main %}
-      <li style="display: flex; justify-content: space-between; align-items: center;">
-        <span style="display: inline-flex; align-items: center; gap: 8px;">
+      <li class="cat-item-simple">
+        <span class="cat-name-box">
           <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#34d399' }}; flex-shrink: 0;"></span>
-          <strong>{{ c.name|t_cat }}</strong>
+          <strong class="cat-name-text">{{ c.name|t_cat }}</strong>
         </span>
-        <div style="display: flex; gap: 6px; align-items: center;">
+        <div class="cat-actions-box">
           <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#34d399' }}')">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
                 data-confirm-title="{{ t('categories.del_confirm_title', '删除分类「{name}」？', name=c.name|t_cat) }}"
@@ -29,13 +32,13 @@
       </li>
       {% else %}<li class="hint">{{ t('common.no_data') }}</li>{% endfor %}
     </ul>
-    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
+    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category cat-add-form" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="income">
       <input type="hidden" name="group_name" value="main">
-      <input type="color" name="color" value="#34d399" title="{{ t('categories.cat_color_title', '分类代表颜色') }}" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
-      <input type="text" name="name" placeholder="{{ t('categories.add_cat_placeholder') }}" required style="flex: 1;">
-      <button type="submit" class="btn-primary btn-sm">{{ t('common.add') }}</button>
+      <input type="color" name="color" value="#34d399" title="{{ t('categories.cat_color_title', '分类代表颜色') }}" class="cat-color-input">
+      <input type="text" name="name" placeholder="{{ t('categories.add_cat_placeholder') }}" required class="cat-name-input">
+      <button type="submit" class="btn-primary btn-sm cat-add-btn">{{ t('common.add') }}</button>
     </form>
   </section>
 
@@ -44,12 +47,12 @@
     <h3>{{ t('categories.side_income_cats') }}</h3>
     <ul class="cat-list">
       {% for c in income_side %}
-      <li style="display: flex; justify-content: space-between; align-items: center;">
-        <span style="display: inline-flex; align-items: center; gap: 8px;">
+      <li class="cat-item-simple">
+        <span class="cat-name-box">
           <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#38bdf8' }}; flex-shrink: 0;"></span>
-          <strong>{{ c.name|t_cat }}</strong>
+          <strong class="cat-name-text">{{ c.name|t_cat }}</strong>
         </span>
-        <div style="display: flex; gap: 6px; align-items: center;">
+        <div class="cat-actions-box">
           <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#38bdf8' }}')">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
                 data-confirm-title="{{ t('categories.del_confirm_title', '删除分类「{name}」？', name=c.name|t_cat) }}"
@@ -61,21 +64,21 @@
       </li>
       {% else %}<li class="hint">{{ t('common.no_data') }}</li>{% endfor %}
     </ul>
-    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
+    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category cat-add-form" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="income">
       <input type="hidden" name="group_name" value="side">
-      <input type="color" name="color" value="#38bdf8" title="{{ t('categories.cat_color_title', '分类代表颜色') }}" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
-      <input type="text" name="name" placeholder="{{ t('categories.add_cat_placeholder') }}" required style="flex: 1;">
-      <button type="submit" class="btn-primary btn-sm">{{ t('common.add') }}</button>
+      <input type="color" name="color" value="#38bdf8" title="{{ t('categories.cat_color_title', '分类代表颜色') }}" class="cat-color-input">
+      <input type="text" name="name" placeholder="{{ t('categories.add_cat_placeholder') }}" required class="cat-name-input">
+      <button type="submit" class="btn-primary btn-sm cat-add-btn">{{ t('common.add') }}</button>
     </form>
   </section>
 
   <!-- 3. 支出分类 -->
-  <section class="panel" style="flex: 1.6; min-width: 380px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+  <section class="panel panel-expense-cat">
+    <div class="expense-panel-header">
       <h3 style="margin:0;">{{ t('categories.expense_cats') }}</h3>
-      <span class="hint" style="font-size:12px;">{{ t('categories.budget_hint') }}</span>
+      <span class="hint expense-budget-hint">{{ t('categories.budget_hint') }}</span>
     </div>
     <ul class="cat-list-compact">
       {% for c in expense %}
@@ -125,12 +128,12 @@
       </li>
       {% else %}<li class="hint">{{ t('common.no_data') }}</li>{% endfor %}
     </ul>
-    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
+    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category cat-add-form" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="expense">
-      <input type="color" name="color" value="#fb923c" title="{{ t('categories.cat_color_title', '分类代表颜色') }}" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
-      <input type="text" name="name" placeholder="{{ t('categories.add_cat_placeholder') }}" required style="flex: 1;">
-      <button type="submit" class="btn-primary btn-sm">{{ t('common.add') }}</button>
+      <input type="color" name="color" value="#fb923c" title="{{ t('categories.cat_color_title', '分类代表颜色') }}" class="cat-color-input">
+      <input type="text" name="name" placeholder="{{ t('categories.add_cat_placeholder') }}" required class="cat-name-input">
+      <button type="submit" class="btn-primary btn-sm cat-add-btn">{{ t('common.add') }}</button>
     </form>
   </section>
 
@@ -139,12 +142,12 @@
     <h3>{{ t('categories.savings_cats') }}</h3>
     <ul class="cat-list">
       {% for c in savings %}
-      <li style="display: flex; justify-content: space-between; align-items: center;">
-        <span style="display: inline-flex; align-items: center; gap: 8px;">
+      <li class="cat-item-simple">
+        <span class="cat-name-box">
           <span class="cat-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {{ c.color or '#059669' }}; flex-shrink: 0;"></span>
-          <strong>{{ c.name|t_cat }}</strong>
+          <strong class="cat-name-text">{{ c.name|t_cat }}</strong>
         </span>
-        <div style="display: flex; gap: 6px; align-items: center;">
+        <div class="cat-actions-box">
           <button type="button" class="cat-action-btn" onclick="openEditCategoryModal({{ c.id }}, '{{ c.name|e }}', '{{ c.color or '#059669' }}')">{{ t('common.edit') }}</button>
           <form method="post" action="{{ url_for('delete_category', cat_id=c.id) }}" class="js-delete-confirm"
                 data-confirm-title="{{ t('categories.del_savings_confirm_title', '删除储蓄分类「{name}」？', name=c.name|t_cat) }}"
@@ -156,12 +159,12 @@
       </li>
       {% else %}<li class="hint">{{ t('common.no_data') }}</li>{% endfor %}
     </ul>
-    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category" style="align-items: center;">
+    <form method="post" action="{{ url_for('add_category') }}" class="row js-validate-category cat-add-form" style="align-items: center;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="type" value="savings">
-      <input type="color" name="color" value="#059669" title="{{ t('categories.cat_color_title', '分类代表颜色') }}" style="width: 38px; height: 36px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;">
-      <input type="text" name="name" placeholder="{{ t('categories.savings_placeholder') }}" required style="flex: 1;">
-      <button type="submit" class="btn-primary btn-sm">{{ t('common.add') }}</button>
+      <input type="color" name="color" value="#059669" title="{{ t('categories.cat_color_title', '分类代表颜色') }}" class="cat-color-input">
+      <input type="text" name="name" placeholder="{{ t('categories.savings_placeholder') }}" required class="cat-name-input">
+      <button type="submit" class="btn-primary btn-sm cat-add-btn">{{ t('common.add') }}</button>
     </form>
   </section>
 </div>

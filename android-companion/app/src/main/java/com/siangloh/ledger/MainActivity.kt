@@ -18,7 +18,9 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.webkit.*
 import android.widget.Button
 import android.widget.ImageButton
@@ -162,13 +164,69 @@ class MainActivity : AppCompatActivity() {
             loadContent()
         }
 
-        // FAB 快捷键
+        // FAB 快捷键与平滑防误触随手拖拽
         fabQuickAdd.setOnClickListener {
             startActivity(Intent(this, QuickAddActivity::class.java))
         }
         fabQuickAdd.setOnLongClickListener {
             showQuickMenu()
             true
+        }
+        setupDraggableFab()
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupDraggableFab() {
+        var dX = 0f
+        var dY = 0f
+        var startX = 0f
+        var startY = 0f
+        var isDragging = false
+        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
+
+        fabQuickAdd.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    dX = view.x - event.rawX
+                    dY = view.y - event.rawY
+                    startX = event.rawX
+                    startY = event.rawY
+                    isDragging = false
+                    false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaX = Math.abs(event.rawX - startX)
+                    val deltaY = Math.abs(event.rawY - startY)
+                    if (deltaX > touchSlop || deltaY > touchSlop) {
+                        isDragging = true
+                        val parent = view.parent as? View ?: return@setOnTouchListener false
+                        val newX = (event.rawX + dX).coerceIn(0f, (parent.width - view.width).toFloat())
+                        val newY = (event.rawY + dY).coerceIn(0f, (parent.height - view.height).toFloat())
+                        view.x = newX
+                        view.y = newY
+                        true
+                    } else {
+                        false
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (isDragging) {
+                        val parent = view.parent as? View
+                        if (parent != null) {
+                            val targetX = if (view.x + view.width / 2 > parent.width / 2) {
+                                (parent.width - view.width - 32).toFloat()
+                            } else {
+                                32f
+                            }
+                            view.animate().x(targetX).setDuration(180).start()
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                }
+                else -> false
+            }
         }
     }
 

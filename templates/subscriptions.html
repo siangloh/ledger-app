@@ -95,7 +95,7 @@
   </div>
 
   {% if summary.upcoming_7_days %}
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 14px;">
     {% for item in summary.upcoming_7_days %}
     <div style="border-radius: 12px; padding: 16px; border: 1px solid {{ '#fecdd3' if item.alert_level.value == 'CRITICAL' else '#fef3c7' if item.alert_level.value == 'WARNING' else 'var(--border)' }}; background: {{ '#fff1f2' if item.alert_level.value == 'CRITICAL' else '#fffbeb' if item.alert_level.value == 'WARNING' else 'var(--card-bg)' }}; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; transition: transform 0.2s ease;">
       <div>
@@ -181,7 +181,7 @@
     </div>
 
     <!-- 状态筛选器 -->
-    <div style="display: flex; gap: 6px;">
+    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
       <button type="button" class="btn btn-sm sub-filter-btn active" onclick="filterSubscriptions('ALL', this)">{{ t('subscriptions.tab_all', '全部 ({count})', count=subscriptions|length) }}</button>
       <button type="button" class="btn btn-sm sub-filter-btn" onclick="filterSubscriptions('ACTIVE', this)">{{ t('subscriptions.tab_active', '进行中 ({count})', count=summary.total_active_count) }}</button>
       <button type="button" class="btn btn-sm sub-filter-btn" onclick="filterSubscriptions('PAUSED', this)">{{ t('subscriptions.tab_paused', '已暂停 ({count})', count=summary.total_paused_count) }}</button>

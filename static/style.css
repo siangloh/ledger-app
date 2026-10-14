@@ -1303,10 +1303,14 @@ button { font-family: var(--font-sans); cursor: pointer; }
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.02em;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   box-shadow: 0 6px 16px -6px rgba(16, 33, 59, 0.55);
   transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.15s ease, filter 0.15s ease;
 }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -8px rgba(16, 33, 59, 0.6); filter: brightness(1.06); }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -8px rgba(16, 33, 59, 0.6); filter: brightness(1.06); color: #f4ead0; }
 .btn-primary:active { transform: scale(0.97); }
 
 .btn-secondary {
@@ -1793,17 +1797,78 @@ table.records-table td[data-col="actions"] .btn-danger-ghost:hover {
   padding: 0;
   margin: 0 0 14px 0;
 }
-.cat-list li {
+.cat-list li, .cat-item-simple {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 9px 2px;
   border-bottom: 1px solid var(--border-soft);
   font-size: 14px;
+  gap: 8px;
+  min-width: 0;
 }
-.cat-list li:last-child { border-bottom: none; }
+.cat-list li:last-child, .cat-item-simple:last-child { border-bottom: none; }
 
 /* ---------- 分类管理与精简月度预算 ---------- */
+.cat-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.cat-page-title {
+  margin: 0;
+  font-size: 24px;
+}
+.cat-insights-btn {
+  text-decoration: none !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 14px -3px rgba(16, 33, 59, 0.45);
+}
+.cat-insights-btn:hover {
+  text-decoration: none !important;
+}
+.panel-expense-cat {
+  flex: 1.6;
+  min-width: 0;
+}
+@media (min-width: 900px) {
+  .panel-expense-cat {
+    min-width: 340px;
+  }
+}
+.expense-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 12px;
+}
+.expense-budget-hint {
+  font-size: 12px;
+}
+.cat-color-input {
+  width: 38px;
+  height: 36px;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.cat-name-input {
+  flex: 1;
+  min-width: 0;
+}
+.cat-add-btn {
+  flex-shrink: 0;
+}
+
 .cat-list-compact {
   list-style: none;
   padding: 0;
@@ -1818,6 +1883,7 @@ table.records-table td[data-col="actions"] .btn-danger-ghost:hover {
   gap: 8px;
   font-size: 14px;
   transition: background 0.15s ease;
+  min-width: 0;
 }
 .cat-item-clean:hover {
   background: rgba(0, 0, 0, 0.015);
@@ -2212,6 +2278,39 @@ canvas {
     font-size: 13px;
   }
 }
+
+@media (max-width: 520px) {
+  .cat-item-clean {
+    padding: 9px 2px !important;
+    gap: 6px !important;
+  }
+  .cat-actions-box {
+    gap: 4px !important;
+  }
+  .btn-budget-pill {
+    padding: 2.5px 6px !important;
+    font-size: 11px !important;
+    gap: 3px !important;
+  }
+  .btn-budget-pill .pill-pct {
+    display: none !important;
+  }
+  .cat-action-btn {
+    padding: 3px 6px !important;
+    font-size: 11px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .cat-action-btn {
+    padding: 2px 4px !important;
+    font-size: 10px !important;
+  }
+  .btn-budget-pill {
+    font-size: 10px !important;
+    padding: 2px 4px !important;
+  }
+}
 .app-swal-toast {
   border-radius: var(--radius-md) !important;
   font-family: var(--font-sans) !important;
@@ -2239,7 +2338,7 @@ canvas {
   }
 
   body {
-    padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -2355,6 +2454,31 @@ canvas {
     text-overflow: ellipsis !important;
   }
 
+  /* 分类与标签页面手机端适配 */
+  .cat-page-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  .cat-page-title {
+    font-size: 20px !important;
+  }
+  .cat-insights-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 10px 16px !important;
+    font-size: 14px !important;
+    border-radius: 12px !important;
+  }
+  .expense-panel-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 4px !important;
+  }
+  .cat-item-simple {
+    padding: 10px 2px !important;
+  }
+
   /* 分类添加行在手机端保持单行内联排列 */
   form.js-validate-category {
     flex-direction: row !important;
@@ -2397,7 +2521,7 @@ canvas {
   }
 
   /* 快速录入与常用大按钮，适合手机单手点按 */
-  .btn-primary, .btn-secondary, .btn-ghost, .btn-danger-solid {
+  .btn-primary:not(.btn-sm), .btn-secondary:not(.btn-sm), .btn-ghost:not(.btn-sm), .btn-danger-solid:not(.btn-sm) {
     padding: 12px 20px;
     font-size: 15px;
     border-radius: 12px;
@@ -2405,6 +2529,17 @@ canvas {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .btn-sm, .btn-primary.btn-sm, .btn-secondary.btn-sm, .btn-ghost.btn-sm {
+    padding: 6px 12px !important;
+    font-size: 12.5px !important;
+    border-radius: 8px !important;
+    min-height: 34px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-decoration: none !important;
   }
 
   .chip-btn {
@@ -4295,7 +4430,7 @@ html[data-theme="dark"] {
 .acc-kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .acc-kpi-val { font-size: 22px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .acc-kpi-sub { font-size: 11px; color: var(--muted); white-space: nowrap; }
-.acc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.acc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 16px; }
 .acc-card { background: var(--acc-card-bg); border: 1px solid var(--acc-border); border-radius: var(--acc-radius); padding: 20px; display: flex; flex-direction: column; gap: 12px; position: relative; transition: border-color 0.2s, transform 0.15s; }
 .acc-card:hover { border-color: rgba(99, 102, 241, 0.35); transform: translateY(-2px); }
 .acc-card.inactive { opacity: 0.5; }
