@@ -58,6 +58,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var offlineContainer: LinearLayout
     private lateinit var batteryBanner: LinearLayout
     private lateinit var fabQuickAdd: FloatingActionButton
+    private lateinit var composeView: androidx.compose.ui.platform.ComposeView
 
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var pendingReceiptPhotoUri: Uri? = null
@@ -78,7 +79,9 @@ class MainActivity : AppCompatActivity() {
         offlineContainer = findViewById(R.id.offlineContainer)
         batteryBanner = findViewById(R.id.batteryBanner)
         fabQuickAdd = findViewById(R.id.fabQuickAdd)
+        composeView = findViewById(R.id.composeView)
 
+        initComposeOverview()
         initViews()
         initWebView()
         checkNotificationPermission()
@@ -87,8 +90,35 @@ class MainActivity : AppCompatActivity() {
         setupBackNavigation()
 
         DrivingDetectionManager.requestActivityTransitionUpdates(this)
+    }
 
-        loadContent()
+    private fun initComposeOverview() {
+        composeView.setContent {
+            com.siangloh.ledger.ui.compose.theme.LedgerTheme {
+                com.siangloh.ledger.ui.compose.OverviewScreen(
+                    onNavigateToWeb = { showWebViewMode() },
+                    onQuickAdd = { startActivity(Intent(this, QuickAddActivity::class.java)) },
+                    onScanReceipt = { showReceiptScanChooser() },
+                    onOpenSettings = { startActivity(Intent(this, AppSelectionActivity::class.java)) }
+                )
+            }
+        }
+    }
+
+    fun showWebViewMode() {
+        composeView.visibility = View.GONE
+        swipeRefreshLayout.visibility = View.VISIBLE
+        fabQuickAdd.visibility = View.VISIBLE
+        if (webView.url.isNullOrEmpty()) {
+            loadContent()
+        }
+    }
+
+    fun showNativeComposeMode() {
+        swipeRefreshLayout.visibility = View.GONE
+        fabQuickAdd.visibility = View.GONE
+        offlineContainer.visibility = View.GONE
+        composeView.visibility = View.VISIBLE
     }
 
     override fun onPause() {
@@ -173,6 +203,7 @@ class MainActivity : AppCompatActivity() {
             true
         }
         setupDraggableFab()
+        fabQuickAdd.visibility = View.GONE
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -772,8 +803,12 @@ class MainActivity : AppCompatActivity() {
     private fun setupBackNavigation() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (webView.visibility == View.VISIBLE && webView.canGoBack()) {
-                    webView.goBack()
+                if (composeView.visibility != View.VISIBLE) {
+                    if (webView.visibility == View.VISIBLE && webView.canGoBack()) {
+                        webView.goBack()
+                    } else {
+                        showNativeComposeMode()
+                    }
                 } else {
                     finish()
                 }

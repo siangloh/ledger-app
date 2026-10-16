@@ -1,0 +1,1107 @@
+package com.siangloh.ledger.ui.compose
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import android.widget.Toast
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.siangloh.ledger.NetworkHelper
+import com.siangloh.ledger.data.AppDatabase
+import com.siangloh.ledger.ui.compose.theme.*
+import com.siangloh.ledger.ui.overlay.InstantReviewManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.*
+
+data class TransactionItem(
+    val id: Long,
+    val date: String,
+    val type: String,
+    val category: String,
+    val amount: Double,
+    val note: String,
+    val source: String
+)
+
+data class SparklinePoint(
+    val date: String,
+    val amount: Double
+)
+
+data class OverviewData(
+    val totalSpending: Double = 0.0,
+    val expenseAmount: Double = 0.0,
+    val transferAmount: Double = 0.0,
+    val uncategorizedCount: Int = 0,
+    val uncategorizedAmount: Double = 0.0,
+    val sparkline: List<SparklinePoint> = emptyList(),
+    val recentTransactions: List<TransactionItem> = emptyList(),
+    val lastActiveTime: String = "刚刚",
+    val isListening: Boolean = true
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OverviewScreen(
+    onNavigateToWeb: () -> Unit,
+    onQuickAdd: () -> Unit,
+    onScanReceipt: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var period by remember { mutableStateOf("month") } // "month", "3m", "year"
+    val calendar = remember { Calendar.getInstance() }
+    var currentMonthStr by remember {
+        mutableStateOf(SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time))
+    }
+    var displayMonthLabel by remember {
+        mutableStateOf(SimpleDateFormat("MMMM yyyy", Locale.ENGLISH).format(calendar.time))
+    }
+
+    var overviewData by remember { mutableStateOf(OverviewData()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var hasOverlayPermission by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+
+    // Quick Categorize Dialog State
+    var showCategorizeDialog by remember { mutableStateOf(false) }
+    var selectedTxForCategorize by remember { mutableStateOf<TransactionItem?>(null) }
+
+    fun refreshData() {
+        isLoading = true
+        coroutineScope.launch {
+            try {
+                val serverUrl = NetworkHelper.getServerUrl(context)
+                val apiKey = NetworkHelper.getApiKey(context)
+                val username = NetworkHelper.getUsername(context)
+
+                val queryParams = mutableListOf("period=$period", "month=$currentMonthStr")
+                if (username.isNotEmpty()) queryParams.add("username=$username")
+                val urlStr = "$serverUrl/api/native/overview?" + queryParams.joinToString("&")
+
+                val result = withContext(Dispatchers.IO) {
+                    try {
+                        val url = URL(urlStr)
+                        val conn = url.openConnection() as HttpURLConnection
+                        conn.requestMethod = "GET"
+                        conn.setRequestProperty("User-Agent", "LedgerAppCompanion/1.0 (Android; Dalvik)")
+                        if (apiKey.isNotEmpty()) conn.setRequestProperty("X-API-KEY", apiKey)
+                        conn.connectTimeout = 8000
+                        conn.readTimeout = 8000
+
+                        if (conn.responseCode in 200..299) {
+                            val text = conn.inputStream.bufferedReader().use { it.readText() }
+                            conn.disconnect()
+                            text
+                        } else {
+                            conn.disconnect()
+                            null
+                        }
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+
+                if (result != null) {
+                    val json = JSONObject(result)
+                    val totalSpending = json.optDouble("total_spending", 0.0)
+                    val expenseAmount = json.optDouble("expense_amount", 0.0)
+                    val transferAmount = json.optDouble("transfer_amount", 0.0)
+                    val uncategorizedCount = json.optInt("uncategorized_count", 0)
+                    val uncategorizedAmount = json.optDouble("uncategorized_amount", 0.0)
+
+                    val sparkArray = json.optJSONArray("sparkline")
+                    val sparkList = mutableListOf<SparklinePoint>()
+                    if (sparkArray != null) {
+                        for (i in 0 until sparkArray.length()) {
+                            val item = sparkArray.getJSONObject(i)
+                            sparkList.add(
+                                SparklinePoint(
+                                    date = item.optString("date"),
+                                    amount = item.optDouble("amount")
+                                )
+                            )
+                        }
+                    }
+
+                    val txArray = json.optJSONArray("recent_transactions")
+                    val txList = mutableListOf<TransactionItem>()
+                    if (txArray != null) {
+                        for (i in 0 until txArray.length()) {
+                            val item = txArray.getJSONObject(i)
+                            txList.add(
+                                TransactionItem(
+                                    id = item.optLong("id"),
+                                    date = item.optString("date"),
+                                    type = item.optString("type"),
+                                    category = item.optString("category"),
+                                    amount = item.optDouble("amount"),
+                                    note = item.optString("note"),
+                                    source = item.optString("source")
+                                )
+                            )
+                        }
+                    }
+
+                    val listeningObj = json.optJSONObject("listening_status")
+                    val lastActive = listeningObj?.optString("last_active_time") ?: "今天"
+
+                    overviewData = OverviewData(
+                        totalSpending = totalSpending,
+                        expenseAmount = expenseAmount,
+                        transferAmount = transferAmount,
+                        uncategorizedCount = uncategorizedCount,
+                        uncategorizedAmount = uncategorizedAmount,
+                        sparkline = sparkList,
+                        recentTransactions = txList,
+                        lastActiveTime = lastActive,
+                        isListening = true
+                    )
+                } else {
+                    // Fallback to local Room Database offline transactions
+                    val db = AppDatabase.getInstance(context)
+                    val offlineTxs = withContext(Dispatchers.IO) {
+                        db.pendingTransactionDao().getPendingTransactions()
+                    }
+                    val txList = offlineTxs.map {
+                        TransactionItem(
+                            id = it.id,
+                            date = it.date,
+                            type = it.type,
+                            category = it.category,
+                            amount = it.amount,
+                            note = it.note,
+                            source = it.source
+                        )
+                    }
+                    val total = txList.sumOf { it.amount }
+                    overviewData = OverviewData(
+                        totalSpending = total,
+                        expenseAmount = total,
+                        recentTransactions = txList,
+                        lastActiveTime = "离线本地缓存",
+                        isListening = true
+                    )
+                }
+            } catch (_: Exception) {
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    LaunchedEffect(period, currentMonthStr) {
+        refreshData()
+    }
+
+    Scaffold(
+        containerColor = Slate50,
+        bottomBar = {
+            NativeBottomBar(
+                onHome = { refreshData() },
+                onAdd = onQuickAdd,
+                onScan = onScanReceipt,
+                onWeb = onNavigateToWeb
+            )
+        }
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                // 1. Status Bar Header (● Listening 状态与待分类角标)
+                ListeningStatusHeader(
+                    isListening = overviewData.isListening,
+                    lastActive = overviewData.lastActiveTime,
+                    toReviewCount = overviewData.uncategorizedCount,
+                    hasOverlayPermission = hasOverlayPermission,
+                    onRequestOverlayPermission = {
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:${context.packageName}")
+                        )
+                        context.startActivity(intent)
+                    },
+                    onRefresh = { refreshData() },
+                    onSettings = onOpenSettings
+                )
+            }
+
+            item {
+                // 2. Period Filter Segmented Control & Month Navigation
+                PeriodSelector(
+                    period = period,
+                    displayMonth = displayMonthLabel,
+                    onPeriodChanged = { newPeriod -> period = newPeriod },
+                    onPrevMonth = {
+                        calendar.add(Calendar.MONTH, -1)
+                        currentMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
+                        displayMonthLabel = SimpleDateFormat("MMMM yyyy", Locale.ENGLISH).format(calendar.time)
+                    },
+                    onNextMonth = {
+                        calendar.add(Calendar.MONTH, 1)
+                        currentMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
+                        displayMonthLabel = SimpleDateFormat("MMMM yyyy", Locale.ENGLISH).format(calendar.time)
+                    }
+                )
+            }
+
+            item {
+                // 3. ExpenseMY Style Dark Hero Card
+                SpendingHeroCard(
+                    totalSpending = overviewData.totalSpending,
+                    expenseAmount = overviewData.expenseAmount,
+                    transferAmount = overviewData.transferAmount
+                )
+            }
+
+            if (overviewData.uncategorizedCount > 0) {
+                item {
+                    // 4. Inbox Zero Banner
+                    UncategorizedInboxBanner(
+                        count = overviewData.uncategorizedCount,
+                        amount = overviewData.uncategorizedAmount,
+                        onClick = {
+                            val firstUncategorized = overviewData.recentTransactions.firstOrNull {
+                                it.category in listOf("其他", "未分类", "待分类", "")
+                            }
+                            if (firstUncategorized != null) {
+                                selectedTxForCategorize = firstUncategorized
+                                showCategorizeDialog = true
+                            } else {
+                                Toast.makeText(context, "所有待整理账单均已处于最新状态", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+                }
+            }
+
+            if (overviewData.sparkline.isNotEmpty()) {
+                item {
+                    // 5. Spending Trend Sparkline
+                    SpendingTrendSection(
+                        sparkline = overviewData.sparkline,
+                        total = overviewData.totalSpending
+                    )
+                }
+            }
+
+            item {
+                // 6. Recent Transactions Section Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "近期流水明细",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900
+                    )
+                    Text(
+                        text = "向左滑快捷修改",
+                        fontSize = 12.sp,
+                        color = Slate400
+                    )
+                }
+            }
+
+            // 7. Recent Transactions List Items
+            if (overviewData.recentTransactions.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isLoading) "正在同步最新财务数据..." else "本月暂无记录，付完钱账将自动记入",
+                            color = Slate400,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            } else {
+                items(overviewData.recentTransactions) { tx ->
+                    TransactionCardItem(
+                        tx = tx,
+                        onClick = {
+                            selectedTxForCategorize = tx
+                            showCategorizeDialog = true
+                        }
+                    )
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+
+    // Quick Categorize Dialog
+    if (showCategorizeDialog && selectedTxForCategorize != null) {
+        val tx = selectedTxForCategorize!!
+        QuickCategoryBottomSheet(
+            transaction = tx,
+            onDismiss = {
+                showCategorizeDialog = false
+                selectedTxForCategorize = null
+            },
+            onConfirmCategory = { newCategory, remember ->
+                showCategorizeDialog = false
+                selectedTxForCategorize = null
+                coroutineScope.launch {
+                    val serverUrl = NetworkHelper.getServerUrl(context)
+                    val apiKey = NetworkHelper.getApiKey(context)
+                    val username = NetworkHelper.getUsername(context)
+
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val url = URL("$serverUrl/api/native/quick-categorize")
+                            val conn = url.openConnection() as HttpURLConnection
+                            conn.requestMethod = "POST"
+                            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                            if (apiKey.isNotEmpty()) conn.setRequestProperty("X-API-KEY", apiKey)
+                            conn.doOutput = true
+                            val payload = JSONObject().apply {
+                                put("key", apiKey)
+                                put("transaction_id", tx.id)
+                                put("category", newCategory)
+                                put("remember_merchant", remember)
+                                put("note", tx.note)
+                                if (username.isNotEmpty()) put("username", username)
+                            }.toString()
+                            conn.outputStream.bufferedWriter().use { it.write(payload) }
+                            conn.responseCode
+                            conn.disconnect()
+                        } catch (_: Exception) {}
+                    }
+                    Toast.makeText(context, "已修改为【$newCategory】", Toast.LENGTH_SHORT).show()
+                    refreshData()
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun ListeningStatusHeader(
+    isListening: Boolean,
+    lastActive: String,
+    toReviewCount: Int,
+    hasOverlayPermission: Boolean,
+    onRequestOverlayPermission: () -> Unit,
+    onRefresh: () -> Unit,
+    onSettings: () -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Left: Listening Pulse Badge
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFFE6F4EA))
+                    .clickable { onRefresh() }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(Emerald500.copy(alpha = if (isListening) pulseAlpha else 0.4f))
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isListening) {
+                        if (lastActive.isNotEmpty() && lastActive != "无近期记录") "Listening · $lastActive" else "Listening · 守护中"
+                    } else "未连接",
+                    color = Emerald600,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Right: To Review Count Badge + Settings
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (toReviewCount > 0) Color(0xFFFEF3C7) else Slate100,
+                    modifier = Modifier.padding(end = 8.dp)
+                ) {
+                    Text(
+                        text = if (toReviewCount > 0) "⚠️ $toReviewCount 待整理" else "0 待整理",
+                        color = if (toReviewCount > 0) Amber500 else Slate600,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onSettings,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = Slate600,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+
+        if (!hasOverlayPermission) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFFEFF6FF),
+                border = BorderStroke(1.dp, Color(0xFFBFDBFE)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onRequestOverlayPermission() }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "⚡ 开启付款悬浮识别卡片 (仿 ExpenseMY) >",
+                        color = Color(0xFF1D4ED8),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = Color(0xFF1D4ED8),
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PeriodSelector(
+    period: String,
+    displayMonth: String,
+    onPeriodChanged: (String) -> Unit,
+    onPrevMonth: () -> Unit,
+    onNextMonth: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Segmented Tabs: [ Month ] [ 3 months ] [ Year ]
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Slate100,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                val tabs = listOf("month" to "Month", "3m" to "3 months", "year" to "Year")
+                tabs.forEach { (key, label) ->
+                    val isSelected = period == key
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected) Color.White else Color.Transparent,
+                        shadowElevation = if (isSelected) 2.dp else 0.dp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onPeriodChanged(key) }
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) Slate900 else Slate600,
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Month pagination: < October 2026 >
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onPrevMonth, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    imageVector = Icons.Default.ChevronLeft,
+                    contentDescription = "Previous Month",
+                    tint = Slate600
+                )
+            }
+            Text(
+                text = displayMonth,
+                color = Slate700,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+            IconButton(onClick = onNextMonth, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Next Month",
+                    tint = Slate600
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SpendingHeroCard(
+    totalSpending: Double,
+    expenseAmount: Double,
+    transferAmount: Double
+) {
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Slate900),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color(0xFF0F172A), Color(0xFF1E293B))
+                    )
+                )
+                .padding(20.dp)
+        ) {
+            Text(
+                text = "TOTAL SPENDING",
+                color = Slate400,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "MYR ${String.format("%,.2f", totalSpending)}",
+                color = Color.White,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Sub-metrics pills
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Emerald400)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Expenses: MYR ${String.format("%,.2f", expenseAmount)}",
+                        color = Slate200,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Sky400)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Transfers: MYR ${String.format("%,.2f", transferAmount)}",
+                        color = Slate200,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Self transfers excluded · 自动剔除自转",
+                color = Slate400,
+                fontSize = 11.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun UncategorizedInboxBanner(
+    count: Int,
+    amount: Double,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFFEF3C7),
+        border = BorderStroke(1.dp, Color(0xFFFDE68A)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFBBF24)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "🏷️", fontSize = 18.sp)
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "$count expenses need a category",
+                        color = Color(0xFF92400E),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "MYR ${String.format("%,.2f", amount)} in total",
+                        color = Color(0xFFB45309),
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFFB45309)
+            ) {
+                Text(
+                    text = "Sort out >",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SpendingTrendSection(
+    sparkline: List<SparklinePoint>,
+    total: Double
+) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Spending trend",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900
+                )
+                Text(
+                    text = "MYR ${String.format("%,.2f", total)} total",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Slate600
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Native Canvas Sparkline
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+            ) {
+                if (sparkline.size < 2) return@Canvas
+                val maxAmt = sparkline.maxOfOrNull { it.amount }?.takeIf { it > 0 } ?: 100.0
+                val w = size.width
+                val h = size.height
+
+                val points = sparkline.mapIndexed { idx, pt ->
+                    val x = idx * (w / (sparkline.size - 1))
+                    val y = h - ((pt.amount / maxAmt) * (h * 0.85f)).toFloat()
+                    Offset(x, y)
+                }
+
+                val path = Path().apply {
+                    moveTo(points[0].x, points[0].y)
+                    for (i in 0 until points.size - 1) {
+                        val p0 = points[i]
+                        val p1 = points[i + 1]
+                        val cx = (p0.x + p1.x) / 2
+                        cubicTo(cx, p0.y, cx, p1.y, p1.x, p1.y)
+                    }
+                }
+
+                // Fill gradient underneath curve
+                val fillPath = Path().apply {
+                    addPath(path)
+                    lineTo(points.last().x, h)
+                    lineTo(points.first().x, h)
+                    close()
+                }
+
+                drawPath(
+                    path = fillPath,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Emerald400.copy(alpha = 0.35f), Color.Transparent)
+                    )
+                )
+
+                // Line stroke
+                drawPath(
+                    path = path,
+                    color = Emerald500,
+                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TransactionCardItem(
+    tx: TransactionItem,
+    onClick: () -> Unit
+) {
+    val emoji = when (tx.category) {
+        "餐饮" -> "🍔"
+        "交通" -> "🚗"
+        "杂货" -> "🛒"
+        "账单" -> "💡"
+        "购物" -> "🛍️"
+        "娱乐" -> "🎮"
+        "医疗" -> "💊"
+        "内部划转" -> "🔄"
+        else -> "🏷️"
+    }
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        shadowElevation = 1.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(Slate100),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = emoji, fontSize = 20.sp)
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column {
+                    Text(
+                        text = tx.note.ifBlank { tx.category },
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Slate100
+                        ) {
+                            Text(
+                                text = tx.category,
+                                color = Slate600,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = tx.date,
+                            color = Slate400,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = "${if (tx.type == "income") "+" else "-"}MYR ${String.format("%.2f", tx.amount)}",
+                color = if (tx.type == "income") Emerald600 else Slate900,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+fun NativeBottomBar(
+    onHome: () -> Unit,
+    onAdd: () -> Unit,
+    onScan: () -> Unit,
+    onWeb: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        color = Color.White,
+        shadowElevation = 12.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp, horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onHome) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(imageVector = Icons.Default.Dashboard, contentDescription = "Overview", tint = Emerald600)
+                    Text("概览", fontSize = 10.sp, color = Emerald600, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            IconButton(onClick = onAdd) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(imageVector = Icons.Default.AddCircle, contentDescription = "Quick Add", tint = Slate700)
+                    Text("记一笔", fontSize = 10.sp, color = Slate700)
+                }
+            }
+
+            IconButton(onClick = onScan) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(imageVector = Icons.Default.CameraAlt, contentDescription = "Scan Receipt", tint = Slate700)
+                    Text("拍小票", fontSize = 10.sp, color = Slate700)
+                }
+            }
+
+            IconButton(onClick = onWeb) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(imageVector = Icons.Default.Language, contentDescription = "Web Analytics", tint = Indigo600)
+                    Text("Web后台", fontSize = 10.sp, color = Indigo600, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun QuickCategoryBottomSheet(
+    transaction: TransactionItem,
+    onDismiss: () -> Unit,
+    onConfirmCategory: (String, Boolean) -> Unit
+) {
+    var selectedCat by remember { mutableStateOf(transaction.category) }
+    var rememberRule by remember { mutableStateOf(true) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+        ) {
+            Text(
+                text = "修改交易分类",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Slate900
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${transaction.note.ifBlank { "未知商户" }} · MYR ${String.format("%.2f", transaction.amount)}",
+                fontSize = 13.sp,
+                color = Slate600
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Category Grid
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                InstantReviewManager.COMMON_CATEGORIES.chunked(4).forEach { rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowItems.forEach { (catName, emoji) ->
+                            val isSelected = catName == selectedCat
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) Emerald500 else Slate100,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { selectedCat = catName }
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 10.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(text = emoji, fontSize = 20.sp)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = catName,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else Slate700
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { rememberRule = !rememberRule }
+            ) {
+                Checkbox(
+                    checked = rememberRule,
+                    onCheckedChange = { rememberRule = it },
+                    colors = CheckboxDefaults.colors(checkedColor = Emerald500)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "以后该商户所有消费自动归为此分类 (商户记忆)",
+                    fontSize = 13.sp,
+                    color = Slate700
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = { onConfirmCategory(selectedCat, rememberRule) },
+                colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text("保存分类", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}

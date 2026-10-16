@@ -24,6 +24,10 @@ from services.ai_service import classify_notification_with_llm
 from core.utils import money_filter, check_and_record_budget_alerts
 from core.extensions import csrf
 from core.i18n import t
+from services.native_api_service import (
+    get_native_overview_summary,
+    update_transaction_quick_category
+)
 
 auto_track_bp = Blueprint('auto_track', __name__)
 
@@ -958,3 +962,72 @@ def api_llm_samples_reset():
     db.commit()
     seed_learning_samples(db)
     return jsonify({'ok': True, 'message': t('auto_track.sample_reset_success', '已成功将学习样本库恢复为官方预设语料库！')})
+
+
+@auto_track_bp.route('/api/native/overview', methods=['GET'], endpoint='api_native_overview')
+@csrf.exempt
+def api_native_overview():
+    req_key = request.headers.get('X-API-KEY') or request.args.get('key')
+    user_id = session.get('user_id')
+    db = get_db()
+    if not user_id:
+        if not is_valid_api_key(req_key):
+            return jsonify({'ok': False, 'message': '未授权访问'}), 401
+        target_username = request.args.get('username')
+        if target_username:
+            u_row = db.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (target_username,)).fetchone()
+            if u_row:
+                user_id = u_row['id']
+        if not user_id:
+            user_id = get_current_user_id()
+
+    period = request.args.get('period', 'month')
+    selected_month = request.args.get('month')
+    res = get_native_overview_summary(user_id=user_id, period=period, selected_month=selected_month, db=db)
+    return jsonify(res)
+
+
+@auto_track_bp.route('/api/native/quick-categorize', methods=['POST'], endpoint='api_native_quick_categorize')
+@csrf.exempt
+def api_native_quick_categorize():
+    req_key = request.headers.get('X-API-KEY')
+    user_id = session.get('user_id')
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+    if not user_id:
+        req_key = req_key or data.get('key') or request.args.get('key')
+        if not is_valid_api_key(req_key):
+            return jsonify({'ok': False, 'message': '未授权访问'}), 401
+        target_username = data.get('username') or request.args.get('username')
+        if target_username:
+            u_row = db.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (target_username,)).fetchone()
+            if u_row:
+                user_id = u_row['id']
+        if not user_id:
+            user_id = get_current_user_id()
+
+    tx_id = data.get('transaction_id')
+    category = data.get('category')
+    remember = bool(data.get('remember_merchant', False))
+    note = data.get('note')
+
+    try:
+        tx_id = int(tx_id)
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'message': '无效的交易 ID'}), 400
+
+    res = update_transaction_quick_category(
+        user_id=user_id,
+        transaction_id=tx_id,
+        category=category,
+        remember_merchant=remember,
+        custom_note=note,
+        db=db
+    )
+    if res.get('ok'):
+        bump_data_version('transaction_update', {
+            'id': tx_id,
+            'category': category,
+            'user_id': user_id
+        })
+    return jsonify(res)

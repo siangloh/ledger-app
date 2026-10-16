@@ -13,6 +13,7 @@ import com.siangloh.ledger.driving.DrivingDetectionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class NotificationService : NotificationListenerService() {
@@ -192,6 +193,28 @@ class NotificationService : NotificationListenerService() {
                         }
                     }
 
+                    if (success && (verdict == "accepted" || verdict == null)) {
+                        try {
+                            val json = org.json.JSONObject(msg)
+                            val txId = json.optLong("transaction_id", -1L)
+                            val parsed = json.optJSONObject("parsed")
+                            val merchant = parsed?.optString("merchant")?.ifBlank { parsed.optString("note") } ?: ""
+                            val amount = parsed?.optDouble("amount", 0.0) ?: 0.0
+                            val category = parsed?.optString("category") ?: "餐饮"
+                            val channel = parsed?.optString("channel") ?: ""
+                            com.siangloh.ledger.ui.overlay.InstantReviewManager.showInstantReview(
+                                this@NotificationService,
+                                merchant,
+                                amount,
+                                category,
+                                channel,
+                                txId
+                            )
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to trigger instant review: ${e.message}")
+                        }
+                    }
+
                     insertLogAndPrune(
                         db,
                         NotificationLog(
@@ -228,14 +251,18 @@ class NotificationService : NotificationListenerService() {
         try {
             db.notificationLogDao().insert(log)
             db.notificationLogDao().pruneOldLogs()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.d(TAG, "Failed to insert or prune notification log: ${e.message}")
+        }
     }
 
     override fun onDestroy() {
         try {
-            kotlinx.coroutines.cancel(serviceScope.coroutineContext)
+            serviceScope.cancel()
             DrivingDetectionManager.removeActivityTransitionUpdates(this)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "Error cleaning up NotificationService: ${e.message}")
+        }
         super.onDestroy()
     }
 
