@@ -98,11 +98,43 @@ def is_valid_api_key(req_key, db=None):
         return False
     effective = get_auto_track_key(db)
     req_bytes = str(req_key).strip().encode('utf-8')
+    # 1. 优先校验系统生效的有效 Key
     if effective and hmac.compare_digest(req_bytes, effective.encode('utf-8')):
         return True
-    if DEFAULT_AUTO_TRACK_KEY and hmac.compare_digest(req_bytes, DEFAULT_AUTO_TRACK_KEY.encode('utf-8')):
-        return True
+    # 2. 如果系统未配置自定义 Key（即 effective 为默认值），则允许使用默认 Key
+    # 严禁在用户配置了自定义 Key 后仍放行默认 Key（消除后门）
+    if effective is None or (DEFAULT_AUTO_TRACK_KEY and effective == DEFAULT_AUTO_TRACK_KEY):
+        if DEFAULT_AUTO_TRACK_KEY and hmac.compare_digest(req_bytes, DEFAULT_AUTO_TRACK_KEY.encode('utf-8')):
+            return True
+    # 3. 校验 users 表中用户绑定的专属 API Key
+    if db:
+        try:
+            u_row = db.execute("SELECT id FROM users WHERE api_key = ?", (str(req_key).strip(),)).fetchone()
+            if u_row:
+                return True
+        except Exception as e:
+            logger.debug("Check user api_key skipped: %s", e)
     return False
+
+
+def get_user_id_from_api_key(req_key, db=None):
+    """根据 API Key 获取绑定的用户 ID。"""
+    if not req_key or not db:
+        return None
+    req_clean = str(req_key).strip()
+    try:
+        u_row = db.execute("SELECT id FROM users WHERE api_key = ?", (req_clean,)).fetchone()
+        if u_row:
+            return u_row['id']
+    except Exception as e:
+        logger.debug("Query user by api_key skipped: %s", e)
+    if is_valid_api_key(req_clean, db=db):
+        admin_row = db.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
+        if admin_row:
+            return admin_row['id']
+        first_row = db.execute("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").fetchone()
+        return first_row['id'] if first_row else None
+    return None
 
 
 def get_app_password(db=None):

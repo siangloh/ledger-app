@@ -16,6 +16,7 @@ from core.db import get_db, bump_data_version, get_current_user_id, seed_learnin
 from core.config import (
     is_valid_api_key,
     get_auto_track_key,
+    get_user_id_from_api_key,
     get_active_llm_provider,
     AUTO_TRACK_DEBUG_LOG
 )
@@ -79,34 +80,10 @@ def api_auto_track():
     print(f"[AUTO_TRACK] Request from {request.remote_addr}, Method={request.method}, KeyProvided={'YES' if req_key else 'NO'}, ContentType={request.content_type}")
     print(f"[AUTO_TRACK] Extracted text: {repr(text[:120])}")
 
-    if not is_valid_api_key(req_key):
-        is_legacy_companion = False
-        if not req_key and text:
-            parsed_preview = parse_auto_track_notification(text)
-            if parsed_preview:
-                if parsed_preview.get('is_internal_transfer'):
-                    return jsonify({
-                        'ok': True,
-                        'verdict': 'ignored_internal_transfer',
-                        'message': parsed_preview.get('reason'),
-                        'raw_text': text
-                    }), 200
-                if parsed_preview.get('is_promo'):
-                    return jsonify({
-                        'ok': False,
-                        'verdict': 'rejected_promo',
-                        'message': '通知被识别为营销推广活动或非动账通知，已自动忽略入账',
-                        'raw_text': text
-                    }), 200
-                if parsed_preview.get('amount'):
-                    ua = request.headers.get('User-Agent', '')
-                    if 'Dalvik' in ua or 'Android' in ua or 'Ledger' in ua or not ua:
-                        is_legacy_companion = True
-                        print(f"[AUTO_TRACK] Allowing legacy companion notification without key (Verified transaction: RM {parsed_preview.get('amount')})")
-
-        if not is_legacy_companion:
-            print("[AUTO_TRACK] Rejected: Invalid API Key")
-            return jsonify({'ok': False, 'message': 'API Key 无效或未在服务器配置，拒绝访问'}), 401
+    db = get_db()
+    if not is_valid_api_key(req_key, db=db):
+        logger.warning("[AUTO_TRACK] Rejected: Invalid or missing API Key")
+        return jsonify({'ok': False, 'message': 'API Key 无效或未在服务器配置，拒绝访问'}), 401
 
     if not text or text == "None" or text == "null":
         return jsonify({
@@ -227,8 +204,8 @@ def api_auto_track():
         evt.wait(timeout=60.0)
         try:
             db.rollback()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("[AUTO_TRACK] db.rollback on concurrent wait notice: %s", e)
         existing_after = db.execute('''
             SELECT id, transaction_id, created_at FROM processed_notifications
             WHERE user_id = ? AND content_hash = ?
@@ -240,23 +217,6 @@ def api_auto_track():
                 'verdict': 'duplicate_ignored',
                 'message': '检测到完全相同的通知此前已成功处理，已自动忽略重复入账',
                 'transaction_id': existing_after['transaction_id'],
-                'notification_title': '重复通知已忽略 ℹ️',
-                'notification_body': f"通知【{parsed.get('note') or '交易'}】此前已入账，系统已自动防止重复记账",
-                'raw_text': text,
-                'parsed': parsed
-            }), 200
-
-        recent_dup = db.execute('''
-            SELECT id FROM transactions
-            WHERE user_id = ? AND abs(amount - ?) < 0.005
-            ORDER BY id DESC LIMIT 1
-        ''', (str(target_user_id), parsed['amount'])).fetchone()
-        if recent_dup:
-            return jsonify({
-                'ok': True,
-                'verdict': 'duplicate_ignored',
-                'message': '检测到并发处理的相同交易已成功入账，已自动忽略重复记账',
-                'transaction_id': recent_dup['id'],
                 'notification_title': '重复通知已忽略 ℹ️',
                 'notification_body': f"通知【{parsed.get('note') or '交易'}】此前已入账，系统已自动防止重复记账",
                 'raw_text': text,
@@ -414,8 +374,8 @@ def api_auto_track():
         merchant_note = (parsed.get('note') or '').strip()
         if merchant_note:
             override = db.execute(
-                'SELECT category FROM merchant_category_overrides WHERE merchant_note = ?',
-                (merchant_note,)
+                'SELECT category FROM merchant_category_overrides WHERE user_id = ? AND merchant_note = ?',
+                (str(target_user_id), merchant_note)
             ).fetchone()
             if override and override['category']:
                 parsed['category'] = override['category']
@@ -803,8 +763,9 @@ def api_get_categories():
 @auto_track_bp.route('/api/transactions/sync', methods=['POST'], endpoint='api_sync_transactions')
 @csrf.exempt
 def api_sync_transactions():
+    db = get_db()
     req_key = request.headers.get('X-API-KEY')
-    if not is_valid_api_key(req_key):
+    if not is_valid_api_key(req_key, db=db):
         return jsonify({'ok': False, 'message': 'API Key 无效'}), 401
 
     payload = request.get_json(silent=True) or {}
@@ -812,7 +773,6 @@ def api_sync_transactions():
     if not txs:
         return jsonify({'ok': True, 'synced_count': 0, 'synced_ids': []})
 
-    db = get_db()
     user_id = get_current_user_id()
     target_username = payload.get('username') or request.args.get('username')
     if target_username:
@@ -860,9 +820,14 @@ def api_sync_transactions():
             if local_id is not None:
                 synced_ids.append(local_id)
         except Exception as e:
-            print(f"[SYNC ERROR] Failed to insert offline transaction: {e}")
+            logger.error("[SYNC ERROR] Failed to insert offline transaction: %s", e)
 
     db.commit()
+    if synced_ids:
+        bump_data_version('sync', {
+            'count': len(synced_ids),
+            'user_id': user_id
+        })
     return jsonify({'ok': True, 'synced_count': len(synced_ids), 'synced_ids': synced_ids})
 
 
@@ -971,13 +936,16 @@ def api_native_overview():
     user_id = session.get('user_id')
     db = get_db()
     if not user_id:
-        if not is_valid_api_key(req_key):
+        if not is_valid_api_key(req_key, db=db):
             return jsonify({'ok': False, 'message': '未授权访问'}), 401
         target_username = request.args.get('username')
         if target_username:
             u_row = db.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (target_username,)).fetchone()
-            if u_row:
-                user_id = u_row['id']
+            if not u_row:
+                return jsonify({'ok': False, 'message': f"指定用户 '{target_username}' 不存在"}), 404
+            user_id = u_row['id']
+        else:
+            user_id = get_user_id_from_api_key(req_key, db=db)
         if not user_id:
             user_id = get_current_user_id()
 
@@ -994,17 +962,29 @@ def api_native_quick_categorize():
     user_id = session.get('user_id')
     db = get_db()
     data = request.get_json(silent=True) or request.form
+
     if not user_id:
         req_key = req_key or data.get('key') or request.args.get('key')
-        if not is_valid_api_key(req_key):
+        if not is_valid_api_key(req_key, db=db):
             return jsonify({'ok': False, 'message': '未授权访问'}), 401
         target_username = data.get('username') or request.args.get('username')
         if target_username:
             u_row = db.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (target_username,)).fetchone()
-            if u_row:
-                user_id = u_row['id']
+            if not u_row:
+                return jsonify({'ok': False, 'message': f"指定用户 '{target_username}' 不存在"}), 404
+            user_id = u_row['id']
+        else:
+            user_id = get_user_id_from_api_key(req_key, db=db)
         if not user_id:
             user_id = get_current_user_id()
+    else:
+        # S6: 仅依靠会话认证且未提供有效 API Key 时，校验 Origin/Referer 防止跨源伪造请求
+        has_api_key = req_key and is_valid_api_key(req_key, db=db)
+        if not has_api_key:
+            origin = request.headers.get('Origin') or request.headers.get('Referer')
+            host = request.headers.get('Host')
+            if origin and host and host not in origin:
+                return jsonify({'ok': False, 'message': 'CSRF / 跨源校验失败'}), 403
 
     tx_id = data.get('transaction_id')
     category = data.get('category')

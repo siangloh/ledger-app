@@ -1,5 +1,5 @@
 from datetime import datetime, date, timedelta
-from app import get_db, DEFAULT_AUTO_TRACK_KEY
+from app import get_db, get_auto_track_key
 from core.db import update_user_settings
 
 
@@ -77,7 +77,7 @@ def test_auto_track_automatic_repayment_offset(flask_app, client):
     notif_text = "DuitNow Transfer: You have received RM 30.00 from Ali on 10 Sep 2026. Ref: DN991823."
     resp = client.post(
         '/api/auto-track',
-        headers={'X-API-KEY': DEFAULT_AUTO_TRACK_KEY},
+        headers={'X-API-KEY': get_auto_track_key()},
         json={'text': notif_text}
     )
 
@@ -121,7 +121,7 @@ def test_gasoline_refund_auto_offset(flask_app, client):
     refund_text = "Payment refunded You've been refunded RM29.30 for RON95 on 15 Sep 2026."
     resp = client.post(
         '/api/auto-track',
-        headers={'X-API-KEY': DEFAULT_AUTO_TRACK_KEY},
+        headers={'X-API-KEY': get_auto_track_key()},
         json={'text': refund_text}
     )
 
@@ -150,7 +150,7 @@ def test_go_plus_internal_transfer_ignored(client):
     goplus_text = "Cash In Successful You have successfully cashed in RM29.30 into your GO+ account."
     resp = client.post(
         '/api/auto-track',
-        headers={'X-API-KEY': DEFAULT_AUTO_TRACK_KEY},
+        headers={'X-API-KEY': get_auto_track_key()},
         json={'text': goplus_text}
     )
 
@@ -166,7 +166,7 @@ def test_shopee_voucher_ad_rejected(client):
     voucher_text = "Shopee: You just got a voucher! 100% Cashback, sehingga RM5. Check out in-store now!"
     resp = client.post(
         '/api/auto-track',
-        headers={'X-API-KEY': DEFAULT_AUTO_TRACK_KEY},
+        headers={'X-API-KEY': get_auto_track_key()},
         json={'text': voucher_text}
     )
 
@@ -198,7 +198,7 @@ def test_repayment_offset_outside_time_window_not_offset(flask_app, client):
     notif_text = "DuitNow Transfer: You have received RM 25.00 from Uncle Lim on 10 Sep 2026. Ref: DN180M."
     resp = client.post(
         '/api/auto-track',
-        headers={'X-API-KEY': DEFAULT_AUTO_TRACK_KEY},
+        headers={'X-API-KEY': get_auto_track_key()},
         json={'text': notif_text}
     )
 
@@ -241,7 +241,7 @@ def test_self_transfer_keyword_not_offset(flask_app, client):
     notif_text = "DuitNow Transfer: Received RM 30.00 from own account on 10 Sep 2026. Ref: SELF001."
     resp = client.post(
         '/api/auto-track',
-        headers={'X-API-KEY': DEFAULT_AUTO_TRACK_KEY},
+        headers={'X-API-KEY': get_auto_track_key()},
         json={'text': notif_text}
     )
 
@@ -284,7 +284,7 @@ def test_self_transfer_registered_account_not_offset(flask_app, client):
     notif_text = "Transfer from Maybank RM 40.00 credited to your account on 10 Sep 2026."
     resp = client.post(
         '/api/auto-track',
-        headers={'X-API-KEY': DEFAULT_AUTO_TRACK_KEY},
+        headers={'X-API-KEY': get_auto_track_key()},
         json={'text': notif_text}
     )
 
@@ -318,7 +318,7 @@ def test_repayment_amount_exceeds_bill_not_offset(flask_app, client):
     notif_text = "DuitNow Transfer: You have received RM 200.00 from Ah Seng on 10 Sep 2026. Ref: EXCEED01."
     resp = client.post(
         '/api/auto-track',
-        headers={'X-API-KEY': DEFAULT_AUTO_TRACK_KEY},
+        headers={'X-API-KEY': get_auto_track_key()},
         json={'text': notif_text}
     )
 
@@ -352,7 +352,7 @@ def test_non_splittable_category_not_offset(flask_app, client):
     notif_text = "DuitNow Transfer: You have received RM 500.00 from John on 10 Sep 2026. Ref: RENT01."
     resp = client.post(
         '/api/auto-track',
-        headers={'X-API-KEY': DEFAULT_AUTO_TRACK_KEY},
+        headers={'X-API-KEY': get_auto_track_key()},
         json={'text': notif_text}
     )
 
@@ -388,7 +388,7 @@ def test_repayment_offset_disabled_via_settings(flask_app, client):
     notif_text = "DuitNow Transfer: You have received RM 20.00 from Mary on 10 Sep 2026. Ref: DIS01."
     resp = client.post(
         '/api/auto-track',
-        headers={'X-API-KEY': DEFAULT_AUTO_TRACK_KEY},
+        headers={'X-API-KEY': get_auto_track_key()},
         json={'text': notif_text}
     )
 

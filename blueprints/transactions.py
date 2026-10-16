@@ -83,8 +83,8 @@ def add_transaction():
     if clean_tx_note and clean_tx_cat and tx_type == 'expense':
         try:
             db.execute(
-                'INSERT OR REPLACE INTO merchant_category_overrides (merchant_note, category, updated_at) VALUES (?, ?, ?)',
-                (clean_tx_note, clean_tx_cat, datetime.now().isoformat())
+                'INSERT OR REPLACE INTO merchant_category_overrides (user_id, merchant_note, category, updated_at) VALUES (?, ?, ?, ?)',
+                (str(user_id), clean_tx_note, clean_tx_cat, datetime.now().isoformat())
             )
         except Exception as e:
             logger.debug("Auto-save merchant override in add_transaction skipped: %s", e)
@@ -319,8 +319,8 @@ def edit_record(tx_id):
             if merchant_note:
                 now_str = datetime.now().isoformat()
                 db.execute(
-                    'INSERT OR REPLACE INTO merchant_category_overrides (merchant_note, category, updated_at) VALUES (?, ?, ?)',
-                    (merchant_note, new_category, now_str)
+                    'INSERT OR REPLACE INTO merchant_category_overrides (user_id, merchant_note, category, updated_at) VALUES (?, ?, ?, ?)',
+                    (str(user_id), merchant_note, new_category, now_str)
                 )
 
         from_savings = 1 if (tx_type == 'expense' and f.get('from_savings') in ('1', 'true', 'on')) else 0

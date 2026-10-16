@@ -48,13 +48,13 @@ def get_merchant_suggestions(
                  ORDER BY t3.date DESC, t3.id DESC LIMIT 1) AS last_account_id,
                 MAX(t1.date) AS last_date
             FROM transactions t1
-            LEFT JOIN merchant_category_overrides mco ON mco.merchant_note = TRIM(t1.note)
+            LEFT JOIN merchant_category_overrides mco ON mco.merchant_note = TRIM(t1.note) AND mco.user_id = ?
             WHERE t1.user_id = ? 
               AND t1.note IS NOT NULL 
               AND TRIM(t1.note) != '' 
               AND TRIM(t1.note) NOT LIKE '[%'
         '''
-        params = [user_id, user_id, user_id]
+        params = [user_id, user_id, user_id, user_id]
 
         if clean_query:
             base_sql += ' AND (TRIM(t1.note) LIKE ? OR COALESCE(mco.category, t1.category) LIKE ?)'
@@ -100,12 +100,12 @@ def get_merchant_suggestions(
             override_sql = '''
                 SELECT merchant_note, category, updated_at
                 FROM merchant_category_overrides
-                WHERE merchant_note LIKE ? OR category LIKE ?
+                WHERE user_id = ? AND (merchant_note LIKE ? OR category LIKE ?)
                 ORDER BY updated_at DESC
                 LIMIT ?
             '''
             like_pat = f"%{clean_query}%"
-            override_rows = db.execute(override_sql, (like_pat, like_pat, remaining * 2)).fetchall()
+            override_rows = db.execute(override_sql, (str(user_id), like_pat, like_pat, remaining * 2)).fetchall()
             for orow in override_rows:
                 oname = (orow['merchant_note'] or '').strip()
                 if not oname or oname in seen_names:

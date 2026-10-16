@@ -47,10 +47,19 @@ def ignore_pending_transaction(pending_id: int):
     if not row:
         return jsonify({'ok': False, 'message': '未找到该待确认转账记录'}), 404
 
-    db.execute(
-        "UPDATE pending_transactions SET status = 'ignored', updated_at = ? WHERE id = ? AND user_id = ?",
+    if row['status'] == 'ignored':
+        return jsonify({'ok': True, 'message': '已标记为本人自转/内部充值，已忽略不计入日常支出', 'pending_id': pending_id}), 200
+
+    if row['status'] != 'on_hold':
+        return jsonify({'ok': False, 'message': f"操作冲突：该转账当前状态为【{row['status']}】，无法重复操作"}), 409
+
+    claim = db.execute(
+        "UPDATE pending_transactions SET status = 'ignored', updated_at = ? WHERE id = ? AND user_id = ? AND status = 'on_hold'",
         (now, pending_id, str(user_id))
     )
+    if claim.rowcount == 0:
+        return jsonify({'ok': False, 'message': '操作冲突：该转账状态已被修改'}), 409
+
     db.commit()
 
     bump_data_version('pending_transaction_resolved', {
@@ -68,7 +77,7 @@ def ignore_pending_transaction(pending_id: int):
 
 @pending_transactions_bp.route('/api/pending-transactions/<int:pending_id>/confirm', methods=['POST'], endpoint='confirm_pending_transaction')
 def confirm_pending_transaction(pending_id: int):
-    """用户确认此笔转账为真实外部支出/收入，转入正式账本"""
+    """用户确认此笔转账为真实外部支出/收入，转入正式账本（D2: 原子认领防重入）"""
     user_id = get_current_user_id()
     db = get_db()
     now = datetime.now().isoformat()
@@ -80,6 +89,26 @@ def confirm_pending_transaction(pending_id: int):
 
     if not row:
         return jsonify({'ok': False, 'message': '未找到该待确认转账记录'}), 404
+
+    # 幂等返回：已确认的记录直接返回成功，杜绝网络重试或并发重复入账
+    if row['status'] == 'confirmed':
+        return jsonify({
+            'ok': True,
+            'message': '该转账此前已确认入账，系统已自动防止重复记账',
+            'pending_id': pending_id,
+            'already_confirmed': True
+        }), 200
+
+    if row['status'] != 'on_hold':
+        return jsonify({'ok': False, 'message': f"操作冲突：该转账当前状态为【{row['status']}】，无法重复确认"}), 409
+
+    # 原子更新状态为 'confirmed'，通过 rowcount 判断是否抢占成功（杜绝并发竞争）
+    claim = db.execute(
+        "UPDATE pending_transactions SET status = 'confirmed', updated_at = ? WHERE id = ? AND user_id = ? AND status = 'on_hold'",
+        (now, pending_id, str(user_id))
+    )
+    if claim.rowcount == 0:
+        return jsonify({'ok': False, 'message': '操作冲突：该转账正在被处理或状态已改变'}), 409
 
     data = request.get_json(silent=True) or request.form.to_dict() or {}
 
@@ -109,11 +138,6 @@ def confirm_pending_transaction(pending_id: int):
         account_id
     ))
     new_tx_id = cur.lastrowid
-
-    db.execute(
-        "UPDATE pending_transactions SET status = 'confirmed', updated_at = ? WHERE id = ? AND user_id = ?",
-        (now, pending_id, str(user_id))
-    )
     db.commit()
 
     bump_data_version('add', {
@@ -162,14 +186,23 @@ def transfer_pending_transaction(pending_id: int):
     if not row:
         return jsonify({'ok': False, 'message': '未找到该待确认转账记录'}), 404
 
+    if row['status'] == 'transferred':
+        return jsonify({'ok': True, 'message': '已成功记录为账户互转，不计入外部支出', 'pending_id': pending_id}), 200
+
+    if row['status'] != 'on_hold':
+        return jsonify({'ok': False, 'message': f"操作冲突：该转账当前状态为【{row['status']}】，无法重复操作"}), 409
+
+    claim = db.execute(
+        "UPDATE pending_transactions SET status = 'transferred', updated_at = ? WHERE id = ? AND user_id = ? AND status = 'on_hold'",
+        (now, pending_id, str(user_id))
+    )
+    if claim.rowcount == 0:
+        return jsonify({'ok': False, 'message': '操作冲突：该转账正在被处理或状态已改变'}), 409
+
     data = request.get_json(silent=True) or request.form.to_dict() or {}
     from_acc = data.get('from_account_name') or row['channel'] or '银行账户'
     to_acc = data.get('to_account_name') or row['merchant'] or '目标账户'
 
-    db.execute(
-        "UPDATE pending_transactions SET status = 'transferred', updated_at = ? WHERE id = ? AND user_id = ?",
-        (now, pending_id, str(user_id))
-    )
     db.commit()
 
     bump_data_version('pending_transaction_resolved', {

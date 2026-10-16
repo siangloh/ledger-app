@@ -42,10 +42,9 @@ class QuickCategoryReceiver : BroadcastReceiver() {
             notificationManager.cancel(notifId)
         }
 
-        Toast.makeText(context, "已将【$merchant】分类为【$category】", Toast.LENGTH_SHORT).show()
-
         if (txId <= 0) return
 
+        val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val serverUrl = NetworkHelper.getServerUrl(context)
@@ -60,8 +59,8 @@ class QuickCategoryReceiver : BroadcastReceiver() {
                 if (apiKey.isNotEmpty()) {
                     conn.setRequestProperty("X-API-KEY", apiKey)
                 }
-                conn.connectTimeout = 10000
-                conn.readTimeout = 10000
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
                 conn.doOutput = true
 
                 val payload = JSONObject().apply {
@@ -83,10 +82,32 @@ class QuickCategoryReceiver : BroadcastReceiver() {
                 }
 
                 val code = conn.responseCode
-                Log.i(TAG, "Quick categorize response: $code for txId $txId to category $category")
+                if (code in 200..299) {
+                    val respStr = conn.inputStream.bufferedReader().use { it.readText() }
+                    val respJson = JSONObject(respStr)
+                    if (respJson.optBoolean("ok", false)) {
+                        kotlinx.coroutines.withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "已将【$merchant】分类为【$category】", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        val errMsg = respJson.optString("message", "分类修改失败")
+                        kotlinx.coroutines.withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "修改失败: $errMsg", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                } else {
+                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "分类修改失败 (HTTP $code)", Toast.LENGTH_LONG).show()
+                    }
+                }
                 conn.disconnect()
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to update category on backend: ${e.message}")
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "网络错误，无法更新分类", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                pendingResult.finish()
             }
         }
     }

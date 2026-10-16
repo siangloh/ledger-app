@@ -19,4 +19,7 @@ interface PendingTransactionDao {
 
     @Query("SELECT COUNT(*) FROM pending_transactions WHERE sync_status = 'pending'")
     suspend fun getPendingCount(): Int
+
+    @Query("UPDATE pending_transactions SET category = :category WHERE id = :id")
+    suspend fun updateCategory(id: Long, category: String)
 }

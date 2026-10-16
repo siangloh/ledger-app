@@ -1,3 +1,14 @@
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+window.escapeHtml = escapeHtml;
+
 function formatMoney(value, symbol) {
   const n = Number(value) || 0;
   const sym = symbol || (typeof window !== 'undefined' && window.LEDGER_CURRENCY_SYMBOL) || 'RM';
@@ -1706,10 +1717,11 @@ function drawOverviewDoughnut(canvasId, labels, values) {
         var val = values[i] || 0;
         var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
         var color = palette[i % palette.length];
+        var safeLbl = escapeHtml(lbl);
         return '<div class="chart-legend-item">' +
           '<div class="chart-legend-left">' +
             '<span class="chart-legend-dot" style="background-color:' + color + '"></span>' +
-            '<span class="chart-legend-name" title="' + lbl + '">' + lbl + '</span>' +
+            '<span class="chart-legend-name" title="' + safeLbl + '">' + safeLbl + '</span>' +
           '</div>' +
           '<span class="chart-legend-right">' + formatMoney(val) + ' (' + pct + '%)</span>' +
         '</div>';
@@ -1796,10 +1808,11 @@ function drawMonthlyDoughnut(canvasId, rawLabels, rawValues) {
         var val = Number(values[i]) || 0;
         var pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
         var color = palette[i % palette.length];
+        var safeLbl = escapeHtml(lbl);
         return '<div class="chart-legend-item">' +
           '<div class="chart-legend-left">' +
             '<span class="chart-legend-dot" style="background-color:' + color + '"></span>' +
-            '<span class="chart-legend-name" title="' + lbl + '">' + lbl + '</span>' +
+            '<span class="chart-legend-name" title="' + safeLbl + '">' + safeLbl + '</span>' +
           '</div>' +
           '<span class="chart-legend-right">' + formatMoney(val) + ' (' + pct + '%)</span>' +
         '</div>';
@@ -2625,10 +2638,10 @@ function renderPendingTransactions(items) {
 
   container.innerHTML = items.map(item => {
     const amtStr = `${sym} ${Number(item.amount).toFixed(2)}`;
-    const fromChannel = item.channel || '银行';
-    const toTarget = item.merchant || item.note || '目标账户';
-    const reasonStr = item.on_hold_reason || '系统检测到转账/充值，可能为个人储蓄自转';
-    const timeStr = item.created_at ? item.created_at.split('.')[0].replace('T', ' ') : '';
+    const fromChannel = escapeHtml(item.channel || '银行');
+    const toTarget = escapeHtml(item.merchant || item.note || '目标账户');
+    const reasonStr = escapeHtml(item.on_hold_reason || '系统检测到转账/充值，可能为个人储蓄自转');
+    const timeStr = item.created_at ? escapeHtml(item.created_at.split('.')[0].replace('T', ' ')) : '';
 
     return `
       <div class="pending-tx-card" id="pendingCard-${item.id}">

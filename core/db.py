@@ -513,12 +513,14 @@ def init_db(app_logger=None):
     db.execute("UPDATE recurring_rules SET user_id = ? WHERE user_id IS NULL OR user_id = ''", (admin_id,))
     db.commit()
 
-    # 5. 商户-分类记忆表与系统配置表
+    # 5. 商户-分类记忆表与系统配置表（S5: 严格按 user_id 隔离商户隐私与分类规则）
     db.executescript('''
     CREATE TABLE IF NOT EXISTS merchant_category_overrides (
-        merchant_note TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL DEFAULT '1',
+        merchant_note TEXT NOT NULL,
         category TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (user_id, merchant_note)
     );
 
     CREATE TABLE IF NOT EXISTS system_settings (
@@ -527,6 +529,31 @@ def init_db(app_logger=None):
     );
     ''')
     db.commit()
+
+    # 迁移历史 merchant_category_overrides，添加 user_id 字段保证用户隔离
+    try:
+        cols = [r[1] for r in db.execute("PRAGMA table_info(merchant_category_overrides)").fetchall()]
+        if 'user_id' not in cols:
+            db.execute("ALTER TABLE merchant_category_overrides RENAME TO merchant_category_overrides_old")
+            db.execute('''
+                CREATE TABLE merchant_category_overrides (
+                    user_id TEXT NOT NULL DEFAULT '1',
+                    merchant_note TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (user_id, merchant_note)
+                )
+            ''')
+            admin_row = db.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
+            admin_id = str(admin_row['id']) if admin_row else '1'
+            db.execute('''
+                INSERT OR IGNORE INTO merchant_category_overrides (user_id, merchant_note, category, updated_at)
+                SELECT ?, merchant_note, category, updated_at FROM merchant_category_overrides_old
+            ''', (admin_id,))
+            db.execute("DROP TABLE merchant_category_overrides_old")
+            db.commit()
+    except Exception as e:
+        logger.debug("Migrate merchant_category_overrides user_id notice: %s", e)
 
     try:
         db.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES ('auto_track_key', ?)", (DEFAULT_AUTO_TRACK_KEY,))

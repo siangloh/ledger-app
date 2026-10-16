@@ -6,6 +6,7 @@
 保障本地开发与测试流水线稳定可用。
 """
 
+import os
 import smtplib
 import ssl
 from email.mime.multipart import MIMEMultipart
@@ -40,14 +41,22 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str = "",
     use_ssl = bool(cfg.get('use_ssl', False))
     sender_name = (cfg.get('sender_name') or '我的记账本').strip()
 
-    # 未配置 SMTP 时，优雅转为模拟模式
+    # 未配置 SMTP 时，仅在显式开发/测试模式下转为模拟发信，生产环境安全失败关闭（修复 S2）
     if not smtp_host:
-        logger.info(
-            "[EMAIL SERVICE] SMTP host not configured. Simulated email to <%s> | Subject: '%s'",
+        allow_sim = os.environ.get('ALLOW_SIMULATED_EMAIL') == '1' or os.environ.get('PYTEST_CURRENT_TEST')
+        if allow_sim:
+            logger.info(
+                "[EMAIL SERVICE] (Test Mode) SMTP host not configured. Simulated email to <%s> | Subject: '%s'",
+                to_email,
+                subject
+            )
+            return True, "simulated"
+        logger.warning(
+            "[EMAIL SERVICE] SMTP host not configured. Email delivery to <%s> failed closed | Subject: '%s'",
             to_email,
             subject
         )
-        return True, "simulated"
+        return False, "系统未配置 SMTP 发信服务，无法发送邮件"
 
     sender_email = smtp_user or "no-reply@ledger-app.local"
 

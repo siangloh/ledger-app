@@ -73,8 +73,9 @@ def test_merchant_service_suggestions(flask_app):
 
         # 3. 验证 merchant_category_overrides 优先权
         db.execute(
-            "INSERT OR REPLACE INTO merchant_category_overrides (merchant_note, category, updated_at) "
-            "VALUES ('Starbucks Midvalley', '休闲娱乐', '2026-10-06T12:00:00')"
+            "INSERT OR REPLACE INTO merchant_category_overrides (user_id, merchant_note, category, updated_at) "
+            "VALUES (?, 'Starbucks Midvalley', '休闲娱乐', '2026-10-06T12:00:00')",
+            (str(user_id),)
         )
         db.commit()
 

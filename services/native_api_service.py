@@ -117,8 +117,17 @@ def get_native_overview_summary(
                         'category': cat or '待分类'
                     })
 
-    # 待确认暂存表 (on_hold) 也统计入待整理
+    # 待确认暂存表 (on_hold) 也统计入待整理（D5: 准确计算全部 COUNT 与 SUM，不受 LIMIT 10 截断）
     try:
+        on_hold_stats = db.execute('''
+            SELECT COUNT(*) AS cnt, COALESCE(SUM(amount), 0.0) AS total_amt
+            FROM pending_transactions
+            WHERE user_id = ? AND status = 'on_hold'
+        ''', (str(user_id),)).fetchone()
+        if on_hold_stats:
+            uncategorized_count += int(on_hold_stats['cnt'] or 0)
+            uncategorized_amount += float(on_hold_stats['total_amt'] or 0.0)
+
         on_hold_rows = db.execute('''
             SELECT id, date, type, category, amount, note, merchant, on_hold_reason
             FROM pending_transactions
@@ -127,8 +136,6 @@ def get_native_overview_summary(
         ''', (str(user_id),)).fetchall()
         for p in on_hold_rows:
             p_amt = float(p['amount'] or 0.0)
-            uncategorized_count += 1
-            uncategorized_amount += p_amt
             if len(uncategorized_items) < 10:
                 uncategorized_items.append({
                     'id': p['id'],
@@ -242,10 +249,10 @@ def update_transaction_quick_category(
         try:
             now_iso = datetime.now().isoformat()
             db.execute('''
-                INSERT OR REPLACE INTO merchant_category_overrides (merchant_note, category, updated_at)
-                VALUES (?, ?, ?)
-            ''', (merchant_note, clean_category, now_iso))
-            logger.info("Saved merchant category override: '%s' -> '%s'", merchant_note, clean_category)
+                INSERT OR REPLACE INTO merchant_category_overrides (user_id, merchant_note, category, updated_at)
+                VALUES (?, ?, ?, ?)
+            ''', (str(user_id), merchant_note, clean_category, now_iso))
+            logger.info("Saved merchant category override for user %s: '%s' -> '%s'", user_id, merchant_note, clean_category)
         except Exception as e:
             logger.warning("Failed to save merchant override: %s", e)
 

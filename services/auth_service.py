@@ -8,6 +8,7 @@
   - 密码重置业务执行
 """
 
+import os
 import re
 import uuid
 import secrets
@@ -125,6 +126,10 @@ def request_password_reset_otp(identifier: str, db, is_dev: bool = False) -> tup
         db=db
     )
 
+    if not send_ok:
+        logger.warning("Failed to send OTP to %s: %s", target_email, send_status)
+        return False, f"验证码发送失败: {send_status}", {}
+
     masked = mask_email(target_email)
     msg = f"验证码已成功发送至您的安全邮箱 {masked}，请在 10 分钟内输入。"
 
@@ -134,8 +139,10 @@ def request_password_reset_otp(identifier: str, db, is_dev: bool = False) -> tup
         'username': user['username'],
         'expires_in_seconds': 600
     }
-    # 在非线上或模拟模式下，附带 otp 便于本地无 SMTP 环境极速测试
-    if is_dev or send_status == 'simulated':
+    # 严禁在公开/生产接口回传 OTP 验证码（修复 S2）
+    # 仅限本地单元测试环境下显式传入 is_dev 且环境变量允许时附带
+    allow_test_otp = is_dev and (os.environ.get('ALLOW_SIMULATED_EMAIL') == '1' or os.environ.get('PYTEST_CURRENT_TEST'))
+    if allow_test_otp:
         payload['simulated_otp'] = otp_code
         msg += f" (本地开发测试提示: 验证码为 {otp_code})"
 
