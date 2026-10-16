@@ -220,7 +220,11 @@ def api_auto_track():
 
     if not is_owner:
         logger.info("[AUTO_TRACK] Concurrent identical notification in flight: %s. Waiting...", dedup_key)
-        evt.wait(timeout=12.0)
+        evt.wait(timeout=60.0)
+        try:
+            db.rollback()
+        except Exception:
+            pass
         existing_after = db.execute('''
             SELECT id, transaction_id, created_at FROM processed_notifications
             WHERE user_id = ? AND content_hash = ?
@@ -232,6 +236,23 @@ def api_auto_track():
                 'verdict': 'duplicate_ignored',
                 'message': '检测到完全相同的通知此前已成功处理，已自动忽略重复入账',
                 'transaction_id': existing_after['transaction_id'],
+                'notification_title': '重复通知已忽略 ℹ️',
+                'notification_body': f"通知【{parsed.get('note') or '交易'}】此前已入账，系统已自动防止重复记账",
+                'raw_text': text,
+                'parsed': parsed
+            }), 200
+
+        recent_dup = db.execute('''
+            SELECT id FROM transactions
+            WHERE user_id = ? AND abs(amount - ?) < 0.005
+            ORDER BY id DESC LIMIT 1
+        ''', (str(target_user_id), parsed['amount'])).fetchone()
+        if recent_dup:
+            return jsonify({
+                'ok': True,
+                'verdict': 'duplicate_ignored',
+                'message': '检测到并发处理的相同交易已成功入账，已自动忽略重复记账',
+                'transaction_id': recent_dup['id'],
                 'notification_title': '重复通知已忽略 ℹ️',
                 'notification_body': f"通知【{parsed.get('note') or '交易'}】此前已入账，系统已自动防止重复记账",
                 'raw_text': text,
