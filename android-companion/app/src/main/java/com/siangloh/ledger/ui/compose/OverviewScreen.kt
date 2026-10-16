@@ -5,6 +5,10 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import androidx.core.app.NotificationManagerCompat
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -25,6 +29,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,12 +64,22 @@ data class SparklinePoint(
     val amount: Double
 )
 
+data class UncategorizedItem(
+    val id: Long,
+    val date: String,
+    val amount: Double,
+    val note: String,
+    val category: String,
+    val isPendingOnHold: Boolean = false
+)
+
 data class OverviewData(
     val totalSpending: Double = 0.0,
     val expenseAmount: Double = 0.0,
     val transferAmount: Double = 0.0,
     val uncategorizedCount: Int = 0,
     val uncategorizedAmount: Double = 0.0,
+    val uncategorizedItems: List<UncategorizedItem> = emptyList(),
     val sparkline: List<SparklinePoint> = emptyList(),
     val recentTransactions: List<TransactionItem> = emptyList(),
     val lastActiveTime: String = "刚刚",
@@ -94,10 +109,29 @@ fun OverviewScreen(
     var overviewData by remember { mutableStateOf(OverviewData()) }
     var isLoading by remember { mutableStateOf(false) }
     var hasOverlayPermission by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+    var isListeningActual by remember {
+        mutableStateOf(NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName))
+    }
 
-    // Quick Categorize Dialog State
+    // Quick Categorize & Uncategorized List Sheet States
     var showCategorizeDialog by remember { mutableStateOf(false) }
+    var showUncategorizedSheet by remember { mutableStateOf(false) }
     var selectedTxForCategorize by remember { mutableStateOf<TransactionItem?>(null) }
+
+    // U5: 在 ON_RESUME 生命周期动态感知并实时刷新悬浮窗权限与通知监听权限
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasOverlayPermission = Settings.canDrawOverlays(context)
+                isListeningActual = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     fun refreshData() {
         isLoading = true
@@ -178,16 +212,35 @@ fun OverviewScreen(
                     val listeningObj = json.optJSONObject("listening_status")
                     val lastActive = listeningObj?.optString("last_active_time") ?: "今天"
 
+                    val uncatArray = json.optJSONArray("uncategorized_items")
+                    val uncatList = mutableListOf<UncategorizedItem>()
+                    if (uncatArray != null) {
+                        for (i in 0 until uncatArray.length()) {
+                            val item = uncatArray.getJSONObject(i)
+                            uncatList.add(
+                                UncategorizedItem(
+                                    id = item.optLong("id"),
+                                    date = item.optString("date"),
+                                    amount = item.optDouble("amount"),
+                                    note = item.optString("note"),
+                                    category = item.optString("category"),
+                                    isPendingOnHold = item.optBoolean("is_pending_on_hold", false)
+                                )
+                            )
+                        }
+                    }
+
                     overviewData = OverviewData(
                         totalSpending = totalSpending,
                         expenseAmount = expenseAmount,
                         transferAmount = transferAmount,
                         uncategorizedCount = uncategorizedCount,
                         uncategorizedAmount = uncategorizedAmount,
+                        uncategorizedItems = uncatList,
                         sparkline = sparkList,
                         recentTransactions = txList,
                         lastActiveTime = lastActive,
-                        isListening = true
+                        isListening = isListeningActual
                     )
                 } else {
                     // Fallback to local Room Database offline transactions
@@ -213,7 +266,7 @@ fun OverviewScreen(
                         expenseAmount = total,
                         recentTransactions = txList,
                         lastActiveTime = "离线本地缓存",
-                        isListening = true
+                        isListening = isListeningActual
                     )
                 }
             } catch (_: Exception) {
@@ -295,20 +348,12 @@ fun OverviewScreen(
 
             if (overviewData.uncategorizedCount > 0) {
                 item {
-                    // 4. Inbox Zero Banner
+                    // 4. Inbox Zero Banner (U3: 点击唤出待整理与待确认转账全量面板)
                     UncategorizedInboxBanner(
                         count = overviewData.uncategorizedCount,
                         amount = overviewData.uncategorizedAmount,
                         onClick = {
-                            val firstUncategorized = overviewData.recentTransactions.firstOrNull {
-                                it.category in listOf("其他", "未分类", "待分类", "")
-                            }
-                            if (firstUncategorized != null) {
-                                selectedTxForCategorize = firstUncategorized
-                                showCategorizeDialog = true
-                            } else {
-                                Toast.makeText(context, "所有待整理账单均已处于最新状态", Toast.LENGTH_SHORT).show()
-                            }
+                            showUncategorizedSheet = true
                         }
                     )
                 }
@@ -377,6 +422,81 @@ fun OverviewScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
+    }
+
+    // U3: Uncategorized Items Review Bottom Sheet
+    if (showUncategorizedSheet) {
+        val displayItems = if (overviewData.uncategorizedItems.isNotEmpty()) {
+            overviewData.uncategorizedItems
+        } else {
+            overviewData.recentTransactions.filter {
+                it.category in listOf("其他", "未分类", "待分类", "")
+            }.map {
+                UncategorizedItem(
+                    id = it.id,
+                    date = it.date,
+                    amount = it.amount,
+                    note = it.note,
+                    category = it.category,
+                    isPendingOnHold = false
+                )
+            }
+        }
+
+        UncategorizedReviewBottomSheet(
+            items = displayItems,
+            onDismiss = { showUncategorizedSheet = false },
+            onSelectForCategorize = { tx ->
+                showUncategorizedSheet = false
+                selectedTxForCategorize = tx
+                showCategorizeDialog = true
+            },
+            onResolvePending = { pendingId, action ->
+                coroutineScope.launch {
+                    val serverUrl = NetworkHelper.getServerUrl(context)
+                    val apiKey = NetworkHelper.getApiKey(context)
+                    val username = NetworkHelper.getUsername(context)
+                    var isSuccess = false
+                    var msg = ""
+
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val url = URL("$serverUrl/api/pending-transactions/$pendingId/$action")
+                            val conn = url.openConnection() as HttpURLConnection
+                            conn.connectTimeout = 6000
+                            conn.readTimeout = 6000
+                            conn.requestMethod = "POST"
+                            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                            if (apiKey.isNotEmpty()) conn.setRequestProperty("X-API-KEY", apiKey)
+                            conn.doOutput = true
+                            val payload = JSONObject().apply {
+                                if (apiKey.isNotEmpty()) put("key", apiKey)
+                                if (username.isNotEmpty()) put("username", username)
+                            }.toString()
+                            conn.outputStream.bufferedWriter().use { it.write(payload) }
+                            if (conn.responseCode in 200..299) {
+                                val respStr = conn.inputStream.bufferedReader().use { it.readText() }
+                                val respJson = JSONObject(respStr)
+                                isSuccess = respJson.optBoolean("ok", false)
+                                msg = respJson.optString("message", "操作完成")
+                            } else {
+                                msg = "HTTP ${conn.responseCode}"
+                            }
+                            conn.disconnect()
+                        } catch (e: Exception) {
+                            msg = e.message ?: "网络异常"
+                        }
+                    }
+
+                    if (isSuccess) {
+                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                        refreshData()
+                    } else {
+                        Toast.makeText(context, "操作失败: $msg", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        )
     }
 
     // Quick Categorize Dialog
@@ -1136,6 +1256,166 @@ fun QuickCategoryBottomSheet(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+// =============================================================================
+// U3: 待整理全量列表与待确认转账审查抽屉 (Uncategorized Review Bottom Sheet)
+// =============================================================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun UncategorizedReviewBottomSheet(
+    items: List<UncategorizedItem>,
+    onDismiss: () -> Unit,
+    onSelectForCategorize: (TransactionItem) -> Unit,
+    onResolvePending: (Long, String) -> Unit // pendingId, action ("confirm" | "ignore" | "transfer")
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "待整理账单与转账 (${items.size})",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900
+                    )
+                    Text(
+                        text = "点击下方条目快速归类或核验转账状态",
+                        fontSize = 12.sp,
+                        color = Slate500
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            if (items.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "🎉 所有待整理账单均已处理完毕 (Inbox Zero)", color = Slate400, fontSize = 14.sp)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 440.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(items) { item ->
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Slate50,
+                            border = BorderStroke(1.dp, Slate200),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = item.note.ifBlank { if (item.isPendingOnHold) "待确认银行转账" else "未命名消费" },
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Slate800,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "${item.date} · ${if (item.isPendingOnHold) "待确认转账" else (item.category.ifBlank { "待分类" })}",
+                                            fontSize = 12.sp,
+                                            color = if (item.isPendingOnHold) Amber600 else Slate500
+                                        )
+                                    }
+                                    Text(
+                                        text = "MYR ${String.format("%.2f", item.amount)}",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = if (item.isPendingOnHold) Amber600 else Rose500
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                if (item.isPendingOnHold) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Button(
+                                            onClick = { onResolvePending(item.id, "confirm") },
+                                            modifier = Modifier.weight(1f).height(36.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
+                                            contentPadding = PaddingValues(0.dp)
+                                        ) {
+                                            Text("记为支出", fontSize = 12.sp, color = Color.White)
+                                        }
+                                        OutlinedButton(
+                                            onClick = { onResolvePending(item.id, "ignore") },
+                                            modifier = Modifier.weight(1f).height(36.dp),
+                                            contentPadding = PaddingValues(0.dp)
+                                        ) {
+                                            Text("本人自转", fontSize = 12.sp, color = Slate700)
+                                        }
+                                        OutlinedButton(
+                                            onClick = { onResolvePending(item.id, "transfer") },
+                                            modifier = Modifier.weight(1f).height(36.dp),
+                                            contentPadding = PaddingValues(0.dp)
+                                        ) {
+                                            Text("内部调拨", fontSize = 12.sp, color = Slate700)
+                                        }
+                                    }
+                                } else {
+                                    Button(
+                                        onClick = {
+                                            onSelectForCategorize(
+                                                TransactionItem(
+                                                    id = item.id,
+                                                    date = item.date,
+                                                    type = "expense",
+                                                    category = item.category,
+                                                    amount = item.amount,
+                                                    note = item.note,
+                                                    source = "inbox_review"
+                                                )
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
+                                        contentPadding = PaddingValues(0.dp)
+                                    ) {
+                                        Text("⚡ 选择分类", fontSize = 13.sp, color = Color.White)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }

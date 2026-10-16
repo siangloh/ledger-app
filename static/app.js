@@ -16,13 +16,26 @@ function formatMoney(value, symbol) {
 }
 
 // ===========================================================================
-// 全局通用弹窗控制器 (Global Modal Controller)
+// 全局通用弹窗控制器 (Global Modal Controller & Accessibility Focus Trap)
 // ===========================================================================
+const modalFocusStack = [];
+
 window.openModal = function (id) {
   const el = document.getElementById(id);
   if (el) {
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el._previousActiveElement = document.activeElement;
+    modalFocusStack.push(el);
+
     el.style.display = 'flex';
     el.classList.add('open');
+
+    // 聚焦弹窗内部第一个可聚焦元素
+    const focusable = el.querySelectorAll('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    if (focusable.length > 0) {
+      setTimeout(() => focusable[0].focus(), 50);
+    }
   }
 };
 
@@ -31,6 +44,17 @@ window.closeModal = function (id) {
   if (el) {
     el.classList.remove('open');
     el.style.display = 'none';
+
+    const idx = modalFocusStack.indexOf(el);
+    if (idx !== -1) {
+      modalFocusStack.splice(idx, 1);
+    }
+
+    if (el._previousActiveElement && typeof el._previousActiveElement.focus === 'function') {
+      try {
+        el._previousActiveElement.focus();
+      } catch (_) {}
+    }
   }
 };
 
@@ -44,6 +68,82 @@ if (typeof document !== 'undefined') {
     )) {
       e.target.classList.remove('open');
       e.target.style.display = 'none';
+      if (e.target._previousActiveElement && typeof e.target._previousActiveElement.focus === 'function') {
+        try { e.target._previousActiveElement.focus(); } catch (_) {}
+      }
+      const idx = modalFocusStack.indexOf(e.target);
+      if (idx !== -1) modalFocusStack.splice(idx, 1);
+    }
+  });
+
+  // 全局键盘可访问性支持 (Escape 键退出 + Tab 键焦点闭环 Focus Trap)
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' || e.keyCode === 27) {
+      // 1. 若手机端底部抽屉展开，优先关闭抽屉
+      const moreSheet = document.getElementById('moreSheet');
+      if (moreSheet && moreSheet.classList.contains('show')) {
+        if (typeof window.toggleMoreSheet === 'function') {
+          window.toggleMoreSheet(false);
+          return;
+        }
+      }
+      // 2. 若有顶层打开的 Modal，关闭顶层 Modal
+      if (modalFocusStack.length > 0) {
+        const topModal = modalFocusStack.pop();
+        if (topModal) {
+          topModal.classList.remove('open');
+          topModal.style.display = 'none';
+          if (topModal._previousActiveElement && typeof topModal._previousActiveElement.focus === 'function') {
+            try { topModal._previousActiveElement.focus(); } catch (_) {}
+          }
+          return;
+        }
+      }
+      // 3. 兜底检查所有可见的 modal / reviewModal
+      const openOverlays = document.querySelectorAll('.modal-overlay.open, .modal.open, .acc-modal-overlay[style*="display: block"], .acc-modal-overlay[style*="display: flex"], #receiptReviewModal[style*="display: flex"]');
+      openOverlays.forEach(m => {
+        m.classList.remove('open');
+        m.style.display = 'none';
+        if (m._previousActiveElement && typeof m._previousActiveElement.focus === 'function') {
+          try { m._previousActiveElement.focus(); } catch (_) {}
+        }
+      });
+    } else if (e.key === 'Tab' || e.keyCode === 9) {
+      if (modalFocusStack.length > 0) {
+        const currentModal = modalFocusStack[modalFocusStack.length - 1];
+        if (currentModal && currentModal.classList.contains('open')) {
+          const focusables = Array.from(currentModal.querySelectorAll(
+            'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )).filter(el => el.offsetParent !== null);
+          if (focusables.length > 0) {
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            if (e.shiftKey) {
+              if (document.activeElement === first || !currentModal.contains(document.activeElement)) {
+                e.preventDefault();
+                last.focus();
+              }
+            } else {
+              if (document.activeElement === last || !currentModal.contains(document.activeElement)) {
+                e.preventDefault();
+                first.focus();
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // HTMX 局部页面刷新后同步 document.title
+  document.addEventListener('htmx:afterSwap', function (evt) {
+    if (evt.detail && evt.detail.xhr && evt.detail.xhr.responseText) {
+      const match = evt.detail.xhr.responseText.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      if (match && match[1]) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = match[1];
+        document.title = (tmp.textContent || tmp.innerText || match[1]).trim();
+      }
     }
   });
 }
@@ -3561,6 +3661,16 @@ const InstantNav = {
     }
 
     this.applyHtmlWithTransition(container, html, () => {
+      // 提取并同步网页标题 document.title (U7: InstantNav 秒开渲染标题即时同步)
+      if (html) {
+        const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+        if (titleMatch && titleMatch[1]) {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = titleMatch[1];
+          document.title = (tmp.textContent || tmp.innerText || titleMatch[1]).trim();
+        }
+      }
+
       // 执行内联数据脚本，确保各页面的全局函数与 window 变量在全局作用域生效
       executeContainerScripts(container);
 

@@ -62,6 +62,7 @@ class MainActivity : AppCompatActivity() {
 
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var pendingReceiptPhotoUri: Uri? = null
+    private var pendingScannedReceiptText: String? = null
 
     companion object {
         private const val FILE_CHOOSER_REQUEST_CODE = 1001
@@ -363,6 +364,21 @@ class MainActivity : AppCompatActivity() {
                             Log.i("LedgerNativeBridge", "Auto-synced native user from page: $user (was: $current)")
                         }
                     }
+                }
+
+                // U1: 若有在途未送出的小票识别文本，且当前页面已加载完毕 /split-bill，即刻推送到页面
+                if (pendingScannedReceiptText != null && (url?.contains("/split-bill") == true)) {
+                    val textToSend = pendingScannedReceiptText!!
+                    pendingScannedReceiptText = null
+                    val jsSafeText = JSONObject.quote(textToSend)
+                    val js = "javascript:(function(){ " +
+                        "if (typeof receiveScannedReceiptText === 'function') { " +
+                        "  receiveScannedReceiptText($jsSafeText); " +
+                        "} else { " +
+                        "  window._pendingScannedReceiptText = $jsSafeText; " +
+                        "} " +
+                        "})();"
+                    view?.evaluateJavascript(js, null)
                 }
             }
 
@@ -791,11 +807,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendRecognizedTextToWebView(text: String) {
+        showWebViewMode()
+        val curUrl = webView.url ?: ""
+        val splitBillUrl = NetworkHelper.getServerUrl(this).trimEnd('/') + "/split-bill"
+
+        if (!curUrl.contains("/split-bill")) {
+            pendingScannedReceiptText = text
+            webView.loadUrl(splitBillUrl)
+            return
+        }
+
         // JSONObject.quote() 会把字符串安全地转成带引号、已转义的 JS 字符串字面量，
         // 避免小票文字里如果含有引号/换行导致注入到页面的 JS 语法出错。
         val jsSafeText = JSONObject.quote(text)
         val js = "javascript:(function(){ " +
-            "if (typeof receiveScannedReceiptText === 'function') { receiveScannedReceiptText($jsSafeText); } " +
+            "if (typeof receiveScannedReceiptText === 'function') { " +
+            "  receiveScannedReceiptText($jsSafeText); " +
+            "} else { " +
+            "  window._pendingScannedReceiptText = $jsSafeText; " +
+            "} " +
             "})();"
         webView.evaluateJavascript(js, null)
     }

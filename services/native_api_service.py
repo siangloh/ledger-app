@@ -108,7 +108,7 @@ def get_native_overview_summary(
             if cat.lower() in UNCATEGORIZED_NAMES or not cat:
                 uncategorized_count += 1
                 uncategorized_amount += amt
-                if len(uncategorized_items) < 10:
+                if len(uncategorized_items) < 50:
                     uncategorized_items.append({
                         'id': r['id'],
                         'date': r['date'],
@@ -117,7 +117,7 @@ def get_native_overview_summary(
                         'category': cat or '待分类'
                     })
 
-    # 待确认暂存表 (on_hold) 也统计入待整理（D5: 准确计算全部 COUNT 与 SUM，不受 LIMIT 10 截断）
+    # 待确认暂存表 (on_hold) 也统计入待整理（D5: 准确计算全部 COUNT 与 SUM，不受 LIMIT 截断）
     try:
         on_hold_stats = db.execute('''
             SELECT COUNT(*) AS cnt, COALESCE(SUM(amount), 0.0) AS total_amt
@@ -132,11 +132,11 @@ def get_native_overview_summary(
             SELECT id, date, type, category, amount, note, merchant, on_hold_reason
             FROM pending_transactions
             WHERE user_id = ? AND status = 'on_hold'
-            ORDER BY id DESC LIMIT 10
+            ORDER BY id DESC LIMIT 50
         ''', (str(user_id),)).fetchall()
         for p in on_hold_rows:
             p_amt = float(p['amount'] or 0.0)
-            if len(uncategorized_items) < 10:
+            if len(uncategorized_items) < 50:
                 uncategorized_items.append({
                     'id': p['id'],
                     'date': p['date'],

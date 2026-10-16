@@ -147,7 +147,7 @@
 </div>
 
 <!-- ADD MODAL -->
-<div class="acc-modal-overlay" id="addModalOverlay" style="display:none;">
+<div class="acc-modal-overlay" id="addModalOverlay" role="dialog" aria-modal="true" style="display:none;">
   <div class="acc-modal">
     <h2>🏦 {{ t('accounts.modal_add_title') }}</h2>
     <form method="POST" action="/api/accounts">
@@ -203,7 +203,7 @@
 </div>
 
 <!-- EDIT MODAL -->
-<div class="acc-modal-overlay" id="editModalOverlay" style="display:none;">
+<div class="acc-modal-overlay" id="editModalOverlay" role="dialog" aria-modal="true" style="display:none;">
   <div class="acc-modal">
     <h2>✏️ {{ t('accounts.modal_edit_title') }}</h2>
     <form method="POST" id="editAccountForm">

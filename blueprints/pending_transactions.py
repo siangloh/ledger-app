@@ -1,7 +1,9 @@
 from datetime import datetime, date
 import logging
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 
+from core.extensions import csrf
+from core.config import is_valid_api_key, get_user_id_from_api_key
 from core.db import get_db, get_current_user_id, bump_data_version
 from core.utils import check_and_record_budget_alerts
 
@@ -10,11 +12,34 @@ logger = logging.getLogger(__name__)
 pending_transactions_bp = Blueprint('pending_transactions', __name__)
 
 
+def resolve_pending_request_user(db):
+    user_id = session.get('user_id')
+    if user_id:
+        return user_id
+    req_key = request.headers.get('X-API-KEY')
+    data = request.get_json(silent=True) or request.form
+    if not req_key and data:
+        req_key = data.get('key')
+    if not req_key:
+        req_key = request.args.get('key')
+    if req_key and is_valid_api_key(req_key, db=db):
+        target_username = (data.get('username') if data else None) or request.args.get('username')
+        if target_username:
+            u_row = db.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (target_username,)).fetchone()
+            if u_row:
+                return u_row['id']
+        key_uid = get_user_id_from_api_key(req_key, db=db)
+        if key_uid:
+            return key_uid
+    return get_current_user_id()
+
+
 @pending_transactions_bp.route('/api/pending-transactions', methods=['GET'], endpoint='get_pending_transactions')
+@csrf.exempt
 def get_pending_transactions():
     """获取当前用户所有待确认 (on_hold) 或指定状态的转账暂存列表"""
-    user_id = get_current_user_id()
     db = get_db()
+    user_id = resolve_pending_request_user(db)
     status = request.args.get('status', 'on_hold')
 
     rows = db.execute('''
@@ -33,10 +58,11 @@ def get_pending_transactions():
 
 
 @pending_transactions_bp.route('/api/pending-transactions/<int:pending_id>/ignore', methods=['POST'], endpoint='ignore_pending_transaction')
+@csrf.exempt
 def ignore_pending_transaction(pending_id: int):
     """用户决定将此笔转账判定为本人自转/充值，标记为忽略，不计入日常收支"""
-    user_id = get_current_user_id()
     db = get_db()
+    user_id = resolve_pending_request_user(db)
     now = datetime.now().isoformat()
 
     row = db.execute(
@@ -76,10 +102,11 @@ def ignore_pending_transaction(pending_id: int):
 
 
 @pending_transactions_bp.route('/api/pending-transactions/<int:pending_id>/confirm', methods=['POST'], endpoint='confirm_pending_transaction')
+@csrf.exempt
 def confirm_pending_transaction(pending_id: int):
     """用户确认此笔转账为真实外部支出/收入，转入正式账本（D2: 原子认领防重入）"""
-    user_id = get_current_user_id()
     db = get_db()
+    user_id = resolve_pending_request_user(db)
     now = datetime.now().isoformat()
 
     row = db.execute(
@@ -172,10 +199,11 @@ def confirm_pending_transaction(pending_id: int):
 
 
 @pending_transactions_bp.route('/api/pending-transactions/<int:pending_id>/transfer', methods=['POST'], endpoint='transfer_pending_transaction')
+@csrf.exempt
 def transfer_pending_transaction(pending_id: int):
     """用户将此笔转账记录为多账户之间的内部资金调拨"""
-    user_id = get_current_user_id()
     db = get_db()
+    user_id = resolve_pending_request_user(db)
     now = datetime.now().isoformat()
 
     row = db.execute(

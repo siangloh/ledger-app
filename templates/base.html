@@ -247,7 +247,7 @@
 
     <!-- 手机端“更多”功能底部弹层 (Bottom Sheet) -->
     <div class="mobile-sheet-backdrop" id="sheetBackdrop" onclick="toggleMoreSheet(false)"></div>
-    <div class="mobile-bottom-sheet" id="moreSheet">
+    <div class="mobile-bottom-sheet" id="moreSheet" role="dialog" aria-modal="true" aria-label="{{ t('nav.more_title') }}">
         <div class="sheet-drag-handle" onclick="toggleMoreSheet(false)"></div>
         <div class="sheet-header">
             <div style="display: flex; align-items: center; gap: 8px;">

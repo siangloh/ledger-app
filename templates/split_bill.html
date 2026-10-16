@@ -127,8 +127,8 @@ Total 75.21"></textarea>
       <button type="button" class="btn-ghost btn-sm" onclick="addNewItemRow()">+ {{ t('common.add') }}</button>
     </div>
 
-    <!-- 税费与服务费调整区 -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; background: var(--surface-soft); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 20px;">
+    <!-- 税费、服务费、折扣与抹零调整区 -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; background: var(--surface-soft); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 20px;">
       <div>
         <label style="font-size: 12px; color: var(--muted); display: block;">{{ t('common.subtotal') }}</label>
         <strong id="displaySubtotal" style="font-family: var(--font-mono); font-size: 16px; color: var(--navy);"><span class="dyn-curr">RM</span> 0.00</strong>
@@ -140,6 +140,14 @@ Total 75.21"></textarea>
       <div>
         <label style="font-size: 12px; color: var(--muted); display: block;">{{ t('split_bill.tax') }} (<span class="dyn-curr">RM</span>)</label>
         <input type="number" step="0.01" min="0" id="inputTax" value="0.00" onchange="calculateSplit()" style="width: 100%; font-size: 14px; padding: 6px;">
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--muted); display: block;">折扣 / 优惠 (<span class="dyn-curr">RM</span>)</label>
+        <input type="number" step="0.01" min="0" id="inputDiscount" value="0.00" onchange="calculateSplit()" style="width: 100%; font-size: 14px; padding: 6px;">
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--muted); display: block;">抹零 / 舍入 (<span class="dyn-curr">RM</span>)</label>
+        <input type="number" step="0.01" id="inputRounding" value="0.00" onchange="calculateSplit()" style="width: 100%; font-size: 14px; padding: 6px;">
       </div>
       <div>
         <label style="font-size: 12px; color: var(--muted); display: block;">{{ t('split_bill.grand_total') }}</label>
@@ -188,14 +196,14 @@ Total 75.21"></textarea>
      核心 UI 弹窗：小票识别预填弹窗 + 大字号金额确认与核验 (Receipt Review Modal)
      无论选哪个引擎，务必在 UI 上做“预填弹窗 + 大字号金额确认”，允许用户快速点选或修正
      ============================================================ -->
-<div id="receiptReviewModal" class="receipt-modal-backdrop" style="display: none;" onclick="if (event.target === this) closeReviewModal()">
+<div id="receiptReviewModal" class="receipt-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="receiptReviewModalTitle" style="display: none;" onclick="if (event.target === this) closeReviewModal()">
   <div class="receipt-modal-card">
     <!-- 弹窗顶部 -->
     <div class="receipt-modal-header">
       <div style="display: flex; align-items: center; gap: 10px;">
         <span style="font-size: 24px;">🧾</span>
         <div>
-          <h3 style="margin: 0; font-size: 16px; color: var(--navy);">{{ t('split_bill.audit_title') }}</h3>
+          <h3 id="receiptReviewModalTitle" style="margin: 0; font-size: 16px; color: var(--navy);">{{ t('split_bill.audit_title') }}</h3>
           <span id="modalEngineBadge" style="font-size: 11px; color: var(--green); background: var(--green-soft); padding: 2px 8px; border-radius: 10px; font-weight: 600;">{{ t('split_bill.audit_engine_badge') }}</span>
         </div>
       </div>
@@ -235,6 +243,16 @@ Total 75.21"></textarea>
             <span>税费 (Tax/VAT):</span>
             <span style="font-size: 11px;" class="review-curr-symbol">{{ current_user_currency|default('RM') }}</span>
             <input type="number" step="0.01" min="0" id="reviewTax" oninput="onReviewAmountChanged()" style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.25); color: #fff; width: 68px; padding: 2px 4px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px;">
+          </div>
+          <div class="hero-stat-item">
+            <span>折扣 (Discount):</span>
+            <span style="font-size: 11px;" class="review-curr-symbol">{{ current_user_currency|default('RM') }}</span>
+            <input type="number" step="0.01" min="0" id="reviewDiscount" oninput="onReviewAmountChanged()" style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.25); color: #fff; width: 68px; padding: 2px 4px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px;">
+          </div>
+          <div class="hero-stat-item">
+            <span>舍入 (Rounding):</span>
+            <span style="font-size: 11px;" class="review-curr-symbol">{{ current_user_currency|default('RM') }}</span>
+            <input type="number" step="0.01" id="reviewRounding" oninput="onReviewAmountChanged()" style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.25); color: #fff; width: 68px; padding: 2px 4px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px;">
           </div>
         </div>
       </div>
@@ -322,6 +340,16 @@ function initSplitBill() {
   renderItemsTable();
   calculateSplit();
   setupReceiptScanEntry();
+
+  if (window._pendingScannedReceiptText) {
+    const text = window._pendingScannedReceiptText;
+    delete window._pendingScannedReceiptText;
+    setTimeout(() => {
+      if (typeof receiveScannedReceiptText === 'function') {
+        receiveScannedReceiptText(text);
+      }
+    }, 120);
+  }
 }
 window.initSplitBill = initSplitBill;
 
@@ -1351,6 +1379,12 @@ function openReviewModal(parsed, rawText, imgContext) {
   const taxEl = document.getElementById('reviewTax');
   if (taxEl) taxEl.value = (Number(parsed.tax) || 0).toFixed(2);
 
+  const discEl = document.getElementById('reviewDiscount');
+  if (discEl) discEl.value = (Number(parsed.discount) || 0).toFixed(2);
+
+  const rndEl = document.getElementById('reviewRounding');
+  if (rndEl) rndEl.value = (Number(parsed.rounding) || 0).toFixed(2);
+
   const rawTextEl = document.getElementById('reviewRawTextArea');
   if (rawTextEl) rawTextEl.value = rawText || '';
 
@@ -1588,16 +1622,18 @@ function onReviewAmountChanged() {
   updateReviewBalance();
 }
 
-// 核心核算：单品总和 + 服务费 + 税额 vs 小票实付总额
+// 核心核算：单品总和 - 折扣 + 服务费 + 税额 + 抹零/舍入 vs 小票实付总额
 function updateReviewBalance() {
   const subtotal = reviewItems.reduce((sum, it) => sum + (parseFloat(it.price) || 0), 0);
-  const svc = parseFloat(document.getElementById('reviewServiceCharge').value) || 0;
-  const taxVal = parseFloat(document.getElementById('reviewTax').value) || 0;
+  const svc = parseFloat(document.getElementById('reviewServiceCharge') ? document.getElementById('reviewServiceCharge').value : 0) || 0;
+  const taxVal = parseFloat(document.getElementById('reviewTax') ? document.getElementById('reviewTax').value : 0) || 0;
+  const discountVal = parseFloat(document.getElementById('reviewDiscount') ? document.getElementById('reviewDiscount').value : 0) || 0;
+  const roundingVal = parseFloat(document.getElementById('reviewRounding') ? document.getElementById('reviewRounding').value : 0) || 0;
   const grandTotal = parseFloat(document.getElementById('reviewGrandTotal').value) || 0;
 
   document.getElementById('reviewSubtotalText').textContent = currentCurrency + ' ' + subtotal.toFixed(2);
 
-  const calculatedTotal = subtotal + svc + taxVal;
+  const calculatedTotal = subtotal - discountVal + svc + taxVal + roundingVal;
   const diff = Math.abs(calculatedTotal - grandTotal);
   const alertBox = document.getElementById('reviewBalanceAlert');
 
@@ -1608,7 +1644,7 @@ function updateReviewBalance() {
         <span style="font-size: 16px;">✅</span>
         <div>
           <strong>账目完全平衡 (100% 吻合)</strong>
-          <div style="font-size: 11.5px; opacity: 0.85;">单品合计 (${currentCurrency} ${subtotal.toFixed(2)}) + 服务/小费 (${currentCurrency} ${svc.toFixed(2)}) + 税费 (${currentCurrency} ${taxVal.toFixed(2)}) = 实付总额 (${currentCurrency} ${grandTotal.toFixed(2)})</div>
+          <div style="font-size: 11.5px; opacity: 0.85;">单品合计 (${currentCurrency} ${subtotal.toFixed(2)}) - 折扣 (${currentCurrency} ${discountVal.toFixed(2)}) + 服务费 (${currentCurrency} ${svc.toFixed(2)}) + 税费 (${currentCurrency} ${taxVal.toFixed(2)}) + 舍入 (${currentCurrency} ${roundingVal.toFixed(2)}) = 实付总额 (${currentCurrency} ${grandTotal.toFixed(2)})</div>
         </div>
       </div>
       <span style="font-size: 12px; font-weight: 600; background: rgba(30,122,92,0.15); padding: 3px 8px; border-radius: 4px;">无差额</span>
@@ -1625,8 +1661,8 @@ function updateReviewBalance() {
         <div>
           <strong>检测到账目差额：${currentCurrency} ${diffAbs}</strong>
           <div style="font-size: 11.5px; opacity: 0.85;">
-            各单品+税费之和 (${currentCurrency} ${calculatedTotal.toFixed(2)}) 与 实付总额 (${currentCurrency} ${grandTotal.toFixed(2)}) 相差 ${currentCurrency} ${diffAbs}
-            (${isUnder ? '单品少计或抹零' : '单品多计'})
+            各单品+税费-折扣之和 (${currentCurrency} ${calculatedTotal.toFixed(2)}) 与 实付总额 (${currentCurrency} ${grandTotal.toFixed(2)}) 相差 ${currentCurrency} ${diffAbs}
+            (${isUnder ? '单品少计或有抹零' : '单品多计或有额外优惠'})
           </div>
         </div>
       </div>
@@ -1637,10 +1673,24 @@ function updateReviewBalance() {
   }
 }
 
-// 一键自动消除差额（补齐抹零或舍入）
+// 一键自动消除差额（优先填入舍入/抹零字段）
 function fixReviewBalanceGap(signedDiff) {
   const gap = -signedDiff;
-  if (Math.abs(gap) >= 0.01) {
+  const rndEl = document.getElementById('reviewRounding');
+  if (Math.abs(gap) <= 1.0 && rndEl) {
+    const curRnd = parseFloat(rndEl.value) || 0;
+    rndEl.value = (curRnd + gap).toFixed(2);
+    updateReviewBalance();
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        icon: 'success',
+        title: '已自动修正舍入/抹零',
+        text: `已为你调整舍入项为 ${currentCurrency} ${(curRnd + gap).toFixed(2)}，账目现已完全平衡！`,
+        timer: 1400,
+        showConfirmButton: false
+      });
+    }
+  } else if (Math.abs(gap) >= 0.01) {
     reviewItems.push({
       name: gap > 0 ? '小票抹零/舍入补齐' : '小票折扣/折让',
       price: parseFloat(gap.toFixed(2))
@@ -1685,11 +1735,15 @@ function confirmReceiptToStep2() {
     assignedTo: ['我']
   }));
 
-  serviceCharge = parseFloat(document.getElementById('reviewServiceCharge').value) || 0;
-  tax = parseFloat(document.getElementById('reviewTax').value) || 0;
+  serviceCharge = parseFloat(document.getElementById('reviewServiceCharge') ? document.getElementById('reviewServiceCharge').value : 0) || 0;
+  tax = parseFloat(document.getElementById('reviewTax') ? document.getElementById('reviewTax').value : 0) || 0;
+  const discountVal = parseFloat(document.getElementById('reviewDiscount') ? document.getElementById('reviewDiscount').value : 0) || 0;
+  const roundingVal = parseFloat(document.getElementById('reviewRounding') ? document.getElementById('reviewRounding').value : 0) || 0;
 
   document.getElementById('inputServiceCharge').value = serviceCharge.toFixed(2);
   document.getElementById('inputTax').value = tax.toFixed(2);
+  if (document.getElementById('inputDiscount')) document.getElementById('inputDiscount').value = discountVal.toFixed(2);
+  if (document.getElementById('inputRounding')) document.getElementById('inputRounding').value = roundingVal.toFixed(2);
   document.querySelectorAll('.dyn-curr').forEach(el => el.textContent = currentCurrency);
 
   closeReviewModal();
@@ -1749,6 +1803,8 @@ function loadSampleReceipt() {
   ];
   document.getElementById('inputServiceCharge').value = "8.34";
   document.getElementById('inputTax').value = "5.00";
+  if (document.getElementById('inputDiscount')) document.getElementById('inputDiscount').value = "0.00";
+  if (document.getElementById('inputRounding')) document.getElementById('inputRounding').value = "0.00";
   renderPeople();
   renderItemsTable();
   calculateSplit();
@@ -1907,10 +1963,13 @@ function removeItemRow(idx) {
 }
 
 function calculateSplit() {
-  const subtotal = items.reduce((sum, it) => sum + it.price, 0);
-  serviceCharge = parseFloat(document.getElementById('inputServiceCharge').value) || 0;
-  tax = parseFloat(document.getElementById('inputTax').value) || 0;
-  const grandTotal = subtotal + serviceCharge + tax;
+  const subtotal = items.reduce((sum, it) => sum + (parseFloat(it.price) || 0), 0);
+  serviceCharge = parseFloat(document.getElementById('inputServiceCharge') ? document.getElementById('inputServiceCharge').value : 0) || 0;
+  tax = parseFloat(document.getElementById('inputTax') ? document.getElementById('inputTax').value : 0) || 0;
+  const discount = parseFloat(document.getElementById('inputDiscount') ? document.getElementById('inputDiscount').value : 0) || 0;
+  const rounding = parseFloat(document.getElementById('inputRounding') ? document.getElementById('inputRounding').value : 0) || 0;
+
+  const grandTotal = Math.max(0, subtotal - discount + serviceCharge + tax + rounding);
 
   document.getElementById('displaySubtotal').textContent = `${currentCurrency} ${subtotal.toFixed(2)}`;
   document.getElementById('displayGrandTotal').textContent = `${currentCurrency} ${grandTotal.toFixed(2)}`;
@@ -1921,7 +1980,7 @@ function calculateSplit() {
   items.forEach(item => {
     const shareCount = item.assignedTo.length;
     if (shareCount > 0) {
-      const perPerson = item.price / shareCount;
+      const perPerson = (parseFloat(item.price) || 0) / shareCount;
       item.assignedTo.forEach(p => {
         if (personSubtotals[p] !== undefined) {
           personSubtotals[p] += perPerson;
@@ -1930,13 +1989,37 @@ function calculateSplit() {
     }
   });
 
+  const netExtra = grandTotal - subtotal;
   const personTotals = {};
-  const taxSvcRate = subtotal > 0 ? (serviceCharge + tax) / subtotal : 0;
+  const centsMap = {};
+
+  if (subtotal > 0) {
+    people.forEach(p => {
+      const pSub = personSubtotals[p] || 0;
+      const pRatio = pSub / subtotal;
+      const pTotalRaw = Math.max(0, pSub + pRatio * netExtra);
+      centsMap[p] = Math.round(pTotalRaw * 100);
+    });
+  } else if (people.length > 0) {
+    const perCapitaCents = Math.round((grandTotal * 100) / people.length);
+    people.forEach(p => { centsMap[p] = perCapitaCents; });
+  }
+
+  // 精准尾分平衡 (Penny Balancing)：保证所有人分摊之和与实付总额分毫不差
+  const targetTotalCents = Math.round(grandTotal * 100);
+  let currentSumCents = Object.values(centsMap).reduce((a, b) => a + b, 0);
+  let diffCents = targetTotalCents - currentSumCents;
+
+  if (diffCents !== 0 && people.length > 0) {
+    // 优先由付款人 ('我') 吸收尾分差额；若无 '我' 则由单品消费最高者吸收
+    const absorber = people.includes('我') ? '我' : people.reduce((maxP, p) => ((personSubtotals[p] || 0) > (personSubtotals[maxP] || 0) ? p : maxP), people[0]);
+    if (centsMap[absorber] !== undefined) {
+      centsMap[absorber] += diffCents;
+    }
+  }
 
   people.forEach(p => {
-    const pSub = personSubtotals[p] || 0;
-    const pExtra = pSub * taxSvcRate;
-    personTotals[p] = pSub + pExtra;
+    personTotals[p] = (centsMap[p] || 0) / 100.0;
   });
 
   renderResults(personTotals, personSubtotals, grandTotal);
