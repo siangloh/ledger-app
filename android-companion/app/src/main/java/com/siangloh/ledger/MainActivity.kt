@@ -93,11 +93,11 @@ class MainActivity : AppCompatActivity() {
         DrivingDetectionManager.requestActivityTransitionUpdates(this)
 
         val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
-        val defaultMode = sp.getString("default_view_mode", "web") ?: "web"
-        if (defaultMode == "compose") {
-            showNativeComposeMode()
-        } else {
+        val defaultMode = sp.getString("default_view_mode", "compose") ?: "compose"
+        if (defaultMode == "web") {
             showWebViewMode()
+        } else {
+            showNativeComposeMode()
         }
     }
 
@@ -407,10 +407,18 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
-                super.onReceivedError(view, errorCode, description, failingUrl)
-                if (!NetworkHelper.isOnline(this@MainActivity)) {
-                    offlineContainer.visibility = View.VISIBLE
-                    webView.visibility = View.GONE
+                Log.w("LedgerWebView", "WebView load error: $errorCode - $description on $failingUrl")
+                view?.stopLoading()
+                showNativeComposeMode()
+                Toast.makeText(this@MainActivity, "云端连接较慢，已为你切换至本地原生极速模式", Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                if (request?.isForMainFrame == true) {
+                    Log.w("LedgerWebView", "Main frame load error: ${error?.description}")
+                    view?.stopLoading()
+                    showNativeComposeMode()
+                    Toast.makeText(this@MainActivity, "云端连接较慢，已为你切换至本地原生极速模式", Toast.LENGTH_SHORT).show()
                 }
             }
         }
