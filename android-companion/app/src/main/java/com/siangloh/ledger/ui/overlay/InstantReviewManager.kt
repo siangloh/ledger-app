@@ -61,7 +61,8 @@ object InstantReviewManager {
         "购物" to "🛍️",
         "娱乐" to "🎮",
         "医疗" to "💊",
-        "转账" to "🔄"
+        "转账" to "🔄",
+        "其他" to "🏷️"
     )
 
     fun showInstantReview(
@@ -258,13 +259,21 @@ object InstantReviewManager {
                             )
                             Spacer(modifier = Modifier.height(6.dp))
 
+                            val displayCategories = remember(initialCategory) {
+                                val list = COMMON_CATEGORIES.toMutableList()
+                                if (initialCategory.isNotBlank() && list.none { it.first == initialCategory }) {
+                                    list.add(0, initialCategory to "🏷️")
+                                }
+                                list
+                            }
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                COMMON_CATEGORIES.forEach { (catName, emoji) ->
+                                displayCategories.forEach { (catName, emoji) ->
                                     val isSelected = catName == selectedCategory
                                     Surface(
                                         shape = RoundedCornerShape(12.dp),

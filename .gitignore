@@ -16,3 +16,4 @@ android-companion/local.properties
 .flask_secret_key
 .pytest_cache/
 scratch/
+app-debug.apk

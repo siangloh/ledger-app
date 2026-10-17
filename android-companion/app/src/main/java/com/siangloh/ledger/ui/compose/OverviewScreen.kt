@@ -80,11 +80,130 @@ data class OverviewData(
     val uncategorizedCount: Int = 0,
     val uncategorizedAmount: Double = 0.0,
     val uncategorizedItems: List<UncategorizedItem> = emptyList(),
+    val categories: List<String> = emptyList(),
     val sparkline: List<SparklinePoint> = emptyList(),
     val recentTransactions: List<TransactionItem> = emptyList(),
     val lastActiveTime: String = "刚刚",
-    val isListening: Boolean = true
+    val isListening: Boolean = true,
+    val isOfflineCache: Boolean = false
 )
+
+fun formatFriendlyTime(rawIso: String): String {
+    if (rawIso.isBlank() || rawIso == "无近期记录" || rawIso == "离线本地缓存" || rawIso == "守护中" || rawIso == "刚刚") {
+        return rawIso.ifBlank { "刚刚" }
+    }
+    return try {
+        val cleanStr = rawIso.replace('T', ' ').substringBefore('.')
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val date = sdf.parse(cleanStr) ?: return rawIso
+        val diffMs = System.currentTimeMillis() - date.time
+        val diffMinutes = diffMs / (60 * 1000)
+        when {
+            diffMinutes < 1 -> "刚刚"
+            diffMinutes < 60 -> "${diffMinutes}分钟前"
+            else -> {
+                val cal = Calendar.getInstance().apply { time = date }
+                val nowCal = Calendar.getInstance()
+                val isToday = cal.get(Calendar.YEAR) == nowCal.get(Calendar.YEAR) &&
+                              cal.get(Calendar.DAY_OF_YEAR) == nowCal.get(Calendar.DAY_OF_YEAR)
+                if (isToday) {
+                    SimpleDateFormat("今天 HH:mm", Locale.getDefault()).format(date)
+                } else {
+                    SimpleDateFormat("M月d日 HH:mm", Locale.getDefault()).format(date)
+                }
+            }
+        }
+    } catch (_: Exception) {
+        rawIso
+    }
+}
+
+fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache: Boolean): OverviewData {
+    val json = JSONObject(result)
+    val totalSpending = json.optDouble("total_spending", 0.0)
+    val expenseAmount = json.optDouble("expense_amount", 0.0)
+    val transferAmount = json.optDouble("transfer_amount", 0.0)
+    val uncategorizedCount = json.optInt("uncategorized_count", 0)
+    val uncategorizedAmount = json.optDouble("uncategorized_amount", 0.0)
+
+    val sparkArray = json.optJSONArray("sparkline")
+    val sparkList = mutableListOf<SparklinePoint>()
+    if (sparkArray != null) {
+        for (i in 0 until sparkArray.length()) {
+            val item = sparkArray.getJSONObject(i)
+            sparkList.add(
+                SparklinePoint(
+                    date = item.optString("date"),
+                    amount = item.optDouble("amount")
+                )
+            )
+        }
+    }
+
+    val txArray = json.optJSONArray("recent_transactions")
+    val txList = mutableListOf<TransactionItem>()
+    if (txArray != null) {
+        for (i in 0 until txArray.length()) {
+            val item = txArray.getJSONObject(i)
+            txList.add(
+                TransactionItem(
+                    id = item.optLong("id"),
+                    date = item.optString("date"),
+                    type = item.optString("type"),
+                    category = item.optString("category"),
+                    amount = item.optDouble("amount"),
+                    note = item.optString("note"),
+                    source = item.optString("source")
+                )
+            )
+        }
+    }
+
+    val listeningObj = json.optJSONObject("listening_status")
+    val lastActive = listeningObj?.optString("last_active_time") ?: "今天"
+
+    val uncatArray = json.optJSONArray("uncategorized_items")
+    val uncatList = mutableListOf<UncategorizedItem>()
+    if (uncatArray != null) {
+        for (i in 0 until uncatArray.length()) {
+            val item = uncatArray.getJSONObject(i)
+            uncatList.add(
+                UncategorizedItem(
+                    id = item.optLong("id"),
+                    date = item.optString("date"),
+                    amount = item.optDouble("amount"),
+                    note = item.optString("note"),
+                    category = item.optString("category"),
+                    isPendingOnHold = item.optBoolean("is_pending_on_hold", false)
+                )
+            )
+        }
+    }
+
+    val catArray = json.optJSONArray("categories")
+    val catList = mutableListOf<String>()
+    if (catArray != null) {
+        for (i in 0 until catArray.length()) {
+            val c = catArray.optString(i)
+            if (c.isNotBlank()) catList.add(c)
+        }
+    }
+
+    return OverviewData(
+        totalSpending = totalSpending,
+        expenseAmount = expenseAmount,
+        transferAmount = transferAmount,
+        uncategorizedCount = uncategorizedCount,
+        uncategorizedAmount = uncategorizedAmount,
+        uncategorizedItems = uncatList,
+        categories = catList,
+        sparkline = sparkList,
+        recentTransactions = txList,
+        lastActiveTime = lastActive,
+        isListening = isListeningActual,
+        isOfflineCache = isOfflineCache
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,11 +222,13 @@ fun OverviewScreen(
         mutableStateOf(SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time))
     }
     var displayMonthLabel by remember {
-        mutableStateOf(SimpleDateFormat("MMMM yyyy", Locale.ENGLISH).format(calendar.time))
+        mutableStateOf(SimpleDateFormat("yyyy年M月", Locale.CHINESE).format(calendar.time))
     }
 
     var overviewData by remember { mutableStateOf(OverviewData()) }
     var isLoading by remember { mutableStateOf(false) }
+    var hasNetworkError by remember { mutableStateOf(false) }
+    var networkErrorMessage by remember { mutableStateOf("") }
     var hasOverlayPermission by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     var isListeningActual by remember {
         mutableStateOf(NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName))
@@ -168,108 +289,62 @@ fun OverviewScreen(
                     }
                 }
 
+                val cachePrefs = context.getSharedPreferences("ledger_overview_cache", Context.MODE_PRIVATE)
+                val cacheKey = "cache_${username}_${period}_${currentMonthStr}"
+
                 if (result != null) {
-                    val json = JSONObject(result)
-                    val totalSpending = json.optDouble("total_spending", 0.0)
-                    val expenseAmount = json.optDouble("expense_amount", 0.0)
-                    val transferAmount = json.optDouble("transfer_amount", 0.0)
-                    val uncategorizedCount = json.optInt("uncategorized_count", 0)
-                    val uncategorizedAmount = json.optDouble("uncategorized_amount", 0.0)
-
-                    val sparkArray = json.optJSONArray("sparkline")
-                    val sparkList = mutableListOf<SparklinePoint>()
-                    if (sparkArray != null) {
-                        for (i in 0 until sparkArray.length()) {
-                            val item = sparkArray.getJSONObject(i)
-                            sparkList.add(
-                                SparklinePoint(
-                                    date = item.optString("date"),
-                                    amount = item.optDouble("amount")
-                                )
-                            )
-                        }
-                    }
-
-                    val txArray = json.optJSONArray("recent_transactions")
-                    val txList = mutableListOf<TransactionItem>()
-                    if (txArray != null) {
-                        for (i in 0 until txArray.length()) {
-                            val item = txArray.getJSONObject(i)
-                            txList.add(
-                                TransactionItem(
-                                    id = item.optLong("id"),
-                                    date = item.optString("date"),
-                                    type = item.optString("type"),
-                                    category = item.optString("category"),
-                                    amount = item.optDouble("amount"),
-                                    note = item.optString("note"),
-                                    source = item.optString("source")
-                                )
-                            )
-                        }
-                    }
-
-                    val listeningObj = json.optJSONObject("listening_status")
-                    val lastActive = listeningObj?.optString("last_active_time") ?: "今天"
-
-                    val uncatArray = json.optJSONArray("uncategorized_items")
-                    val uncatList = mutableListOf<UncategorizedItem>()
-                    if (uncatArray != null) {
-                        for (i in 0 until uncatArray.length()) {
-                            val item = uncatArray.getJSONObject(i)
-                            uncatList.add(
-                                UncategorizedItem(
-                                    id = item.optLong("id"),
-                                    date = item.optString("date"),
-                                    amount = item.optDouble("amount"),
-                                    note = item.optString("note"),
-                                    category = item.optString("category"),
-                                    isPendingOnHold = item.optBoolean("is_pending_on_hold", false)
-                                )
-                            )
-                        }
-                    }
-
-                    overviewData = OverviewData(
-                        totalSpending = totalSpending,
-                        expenseAmount = expenseAmount,
-                        transferAmount = transferAmount,
-                        uncategorizedCount = uncategorizedCount,
-                        uncategorizedAmount = uncategorizedAmount,
-                        uncategorizedItems = uncatList,
-                        sparkline = sparkList,
-                        recentTransactions = txList,
-                        lastActiveTime = lastActive,
-                        isListening = isListeningActual
-                    )
+                    try {
+                        cachePrefs.edit().putString(cacheKey, result).apply()
+                    } catch (_: Exception) {}
+                    overviewData = parseOverviewJson(result, isListeningActual, isOfflineCache = false)
+                    hasNetworkError = false
+                    networkErrorMessage = ""
                 } else {
-                    // Fallback to local Room Database offline transactions
-                    val db = AppDatabase.getInstance(context)
-                    val offlineTxs = withContext(Dispatchers.IO) {
-                        db.pendingTransactionDao().getPendingTransactions()
-                    }
-                    val txList = offlineTxs.map {
-                        TransactionItem(
-                            id = it.id,
-                            date = it.date,
-                            type = it.type,
-                            category = it.category,
-                            amount = it.amount,
-                            note = it.note,
-                            source = it.source,
-                            isOfflineLocal = true
+                    hasNetworkError = true
+                    val cachedJson = cachePrefs.getString(cacheKey, null)
+                    if (!cachedJson.isNullOrBlank()) {
+                        overviewData = parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = true)
+                        networkErrorMessage = "网络连接受阻，已呈现最近快照数据"
+                    } else {
+                        // 无网络且无缓存：回退至本地 Room 未同步队列
+                        val db = AppDatabase.getInstance(context)
+                        val offlineTxs = withContext(Dispatchers.IO) {
+                            db.pendingTransactionDao().getPendingTransactions()
+                        }
+                        val txList = offlineTxs.map {
+                            TransactionItem(
+                                id = it.id,
+                                date = it.date,
+                                type = it.type,
+                                category = it.category,
+                                amount = it.amount,
+                                note = it.note,
+                                source = it.source,
+                                isOfflineLocal = true
+                            )
+                        }
+                        val total = txList.sumOf { it.amount }
+                        overviewData = OverviewData(
+                            totalSpending = total,
+                            expenseAmount = total,
+                            recentTransactions = txList,
+                            lastActiveTime = "离线本地缓存",
+                            isListening = isListeningActual,
+                            isOfflineCache = true
                         )
+                        networkErrorMessage = "网络未连接，且尚无历史缓存"
                     }
-                    val total = txList.sumOf { it.amount }
-                    overviewData = OverviewData(
-                        totalSpending = total,
-                        expenseAmount = total,
-                        recentTransactions = txList,
-                        lastActiveTime = "离线本地缓存",
-                        isListening = isListeningActual
-                    )
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                hasNetworkError = true
+                val cachePrefs = context.getSharedPreferences("ledger_overview_cache", Context.MODE_PRIVATE)
+                val username = NetworkHelper.getUsername(context)
+                val cacheKey = "cache_${username}_${period}_${currentMonthStr}"
+                val cachedJson = cachePrefs.getString(cacheKey, null)
+                if (!cachedJson.isNullOrBlank()) {
+                    overviewData = parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = true)
+                    networkErrorMessage = "网络连接异常，已呈现最近快照数据"
+                }
             } finally {
                 isLoading = false
             }
@@ -318,6 +393,38 @@ fun OverviewScreen(
                 )
             }
 
+            if (hasNetworkError) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFFEF3C7),
+                        border = BorderStroke(1.dp, Color(0xFFFDE68A)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { refreshData() }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "⚠️ 网络暂不可用，已呈现最近快照 · 点击重试",
+                                color = Color(0xFF92400E),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Retry",
+                                tint = Color(0xFF92400E),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             item {
                 // 2. Period Filter Segmented Control & Month Navigation
                 PeriodSelector(
@@ -327,12 +434,12 @@ fun OverviewScreen(
                     onPrevMonth = {
                         calendar.add(Calendar.MONTH, -1)
                         currentMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
-                        displayMonthLabel = SimpleDateFormat("MMMM yyyy", Locale.ENGLISH).format(calendar.time)
+                        displayMonthLabel = SimpleDateFormat("yyyy年M月", Locale.CHINESE).format(calendar.time)
                     },
                     onNextMonth = {
                         calendar.add(Calendar.MONTH, 1)
                         currentMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
-                        displayMonthLabel = SimpleDateFormat("MMMM yyyy", Locale.ENGLISH).format(calendar.time)
+                        displayMonthLabel = SimpleDateFormat("yyyy年M月", Locale.CHINESE).format(calendar.time)
                     }
                 )
             }
@@ -504,6 +611,7 @@ fun OverviewScreen(
         val tx = selectedTxForCategorize!!
         QuickCategoryBottomSheet(
             transaction = tx,
+            availableCategories = overviewData.categories,
             onDismiss = {
                 showCategorizeDialog = false
                 selectedTxForCategorize = null
@@ -622,9 +730,9 @@ fun ListeningStatusHeader(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = if (isListening) {
-                        if (lastActive.isNotEmpty() && lastActive != "无近期记录") "Listening · $lastActive" else "Listening · 守护中"
-                    } else "未连接",
-                    color = Emerald600,
+                        "● 实时监听中 · ${formatFriendlyTime(lastActive)}"
+                    } else "● 未连接",
+                    color = if (isListening) Emerald600 else Slate500,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -702,7 +810,7 @@ fun PeriodSelector(
     onNextMonth: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        // Segmented Tabs: [ Month ] [ 3 months ] [ Year ]
+        // Segmented Tabs: [ 按月 ] [ 近3月 ] [ 按年 ]
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = Slate100,
@@ -714,7 +822,7 @@ fun PeriodSelector(
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                val tabs = listOf("month" to "Month", "3m" to "3 months", "year" to "Year")
+                val tabs = listOf("month" to "按月", "3m" to "近3月", "year" to "按年")
                 tabs.forEach { (key, label) ->
                     val isSelected = period == key
                     Surface(
@@ -740,7 +848,7 @@ fun PeriodSelector(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Month pagination: < October 2026 >
+        // Month pagination: < 2026年10月 >
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -794,7 +902,7 @@ fun SpendingHeroCard(
                 .padding(20.dp)
         ) {
             Text(
-                text = "TOTAL SPENDING",
+                text = "当期总支出",
                 color = Slate400,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
@@ -827,7 +935,7 @@ fun SpendingHeroCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Expenses: MYR ${String.format("%,.2f", expenseAmount)}",
+                        text = "日常消费: MYR ${String.format("%,.2f", expenseAmount)}",
                         color = Slate200,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
@@ -843,7 +951,7 @@ fun SpendingHeroCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Transfers: MYR ${String.format("%,.2f", transferAmount)}",
+                        text = "对外转账: MYR ${String.format("%,.2f", transferAmount)}",
                         color = Slate200,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
@@ -854,7 +962,7 @@ fun SpendingHeroCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Self transfers excluded · 自动剔除自转",
+                text = "已自动剔除本人同名账户互转",
                 color = Slate400,
                 fontSize = 11.sp
             )
@@ -1111,46 +1219,90 @@ fun NativeBottomBar(
     onWeb: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         color = Color.White,
-        shadowElevation = 12.dp,
+        shadowElevation = 16.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 10.dp, horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
+                .navigationBarsPadding()
+                .padding(vertical = 6.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onHome) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(imageVector = Icons.Default.Dashboard, contentDescription = "Overview", tint = Emerald600)
-                    Text("概览", fontSize = 10.sp, color = Emerald600, fontWeight = FontWeight.Bold)
-                }
-            }
+            BottomNavItem(
+                icon = Icons.Default.Dashboard,
+                label = "概览",
+                tint = Emerald600,
+                selected = true,
+                onClick = onHome,
+                modifier = Modifier.weight(1f)
+            )
 
-            IconButton(onClick = onAdd) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(imageVector = Icons.Default.AddCircle, contentDescription = "Quick Add", tint = Slate700)
-                    Text("记一笔", fontSize = 10.sp, color = Slate700)
-                }
-            }
+            BottomNavItem(
+                icon = Icons.Default.AddCircle,
+                label = "记一笔",
+                tint = Slate700,
+                selected = false,
+                onClick = onAdd,
+                modifier = Modifier.weight(1f)
+            )
 
-            IconButton(onClick = onScan) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(imageVector = Icons.Default.CameraAlt, contentDescription = "Scan Receipt", tint = Slate700)
-                    Text("拍小票", fontSize = 10.sp, color = Slate700)
-                }
-            }
+            BottomNavItem(
+                icon = Icons.Default.CameraAlt,
+                label = "拍小票",
+                tint = Slate700,
+                selected = false,
+                onClick = onScan,
+                modifier = Modifier.weight(1f)
+            )
 
-            IconButton(onClick = onWeb) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(imageVector = Icons.Default.Language, contentDescription = "Web Analytics", tint = Indigo600)
-                    Text("Web后台", fontSize = 10.sp, color = Indigo600, fontWeight = FontWeight.SemiBold)
-                }
-            }
+            BottomNavItem(
+                icon = Icons.Default.Language,
+                label = "Web后台",
+                tint = Indigo600,
+                selected = false,
+                onClick = onWeb,
+                modifier = Modifier.weight(1f)
+            )
         }
+    }
+}
+
+@Composable
+private fun BottomNavItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    tint: Color,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = tint,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false
+        )
     }
 }
 
@@ -1158,11 +1310,35 @@ fun NativeBottomBar(
 @Composable
 fun QuickCategoryBottomSheet(
     transaction: TransactionItem,
+    availableCategories: List<String> = emptyList(),
     onDismiss: () -> Unit,
     onConfirmCategory: (String, Boolean) -> Unit
 ) {
-    var selectedCat by remember { mutableStateOf(transaction.category) }
+    var selectedCat by remember { mutableStateOf(transaction.category.ifBlank { "餐饮" }) }
     var rememberRule by remember { mutableStateOf(true) }
+
+    val emojiMap = mapOf(
+        "餐饮" to "🍔", "交通" to "🚗", "杂货" to "🛒", "账单" to "💡",
+        "购物" to "🛍️", "娱乐" to "🎮", "医疗" to "💊", "转账" to "🔄",
+        "工资" to "💰", "理财" to "📈", "教育" to "📚", "居家" to "🏠",
+        "旅行" to "✈️", "数码" to "📱", "其他" to "🏷️"
+    )
+
+    val allCategories = remember(availableCategories, transaction.category) {
+        val list = mutableListOf<String>()
+        if (availableCategories.isNotEmpty()) {
+            list.addAll(availableCategories)
+        } else {
+            list.addAll(InstantReviewManager.COMMON_CATEGORIES.map { it.first })
+        }
+        if (transaction.category.isNotBlank() && !list.contains(transaction.category)) {
+            list.add(transaction.category)
+        }
+        if (!list.contains("其他")) {
+            list.add("其他")
+        }
+        list.distinct()
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1190,13 +1366,14 @@ fun QuickCategoryBottomSheet(
 
             // Category Grid
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                InstantReviewManager.COMMON_CATEGORIES.chunked(4).forEach { rowItems ->
+                allCategories.chunked(4).forEach { rowItems ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        rowItems.forEach { (catName, emoji) ->
+                        rowItems.forEach { catName ->
                             val isSelected = catName == selectedCat
+                            val emoji = emojiMap[catName] ?: "🏷️"
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = if (isSelected) Emerald500 else Slate100,
@@ -1214,9 +1391,16 @@ fun QuickCategoryBottomSheet(
                                         text = catName,
                                         fontSize = 12.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.White else Slate700
+                                        color = if (isSelected) Color.White else Slate700,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
+                            }
+                        }
+                        if (rowItems.size < 4) {
+                            repeat(4 - rowItems.size) {
+                                Spacer(modifier = Modifier.weight(1f))
                             }
                         }
                     }

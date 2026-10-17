@@ -701,7 +701,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showReceiptScanChooser() {
         val options = arrayOf("📷 拍照识别小票", "🖼️ 从相册选择小票照片")
-        AlertDialog.Builder(this)
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle("小票拍照识别")
             .setItems(options) { _, which ->
                 when (which) {
@@ -798,12 +798,39 @@ class MainActivity : AppCompatActivity() {
                 if (visionText.text.isBlank()) {
                     Toast.makeText(this, "未识别到文字，请换一张更清晰的照片再试", Toast.LENGTH_LONG).show()
                 } else {
-                    sendRecognizedTextToWebView(visionText.text)
+                    showReceiptResultDialog(visionText.text)
                 }
             }
             .addOnFailureListener { e ->
                 Toast.makeText(this, "识别失败：${e.message}", Toast.LENGTH_LONG).show()
             }
+    }
+
+    private fun showReceiptResultDialog(text: String) {
+        val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val preview = lines.take(6).joinToString("\n")
+
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("🧾 小票识别完成")
+            .setMessage("已识别 ${lines.size} 行小票内容：\n\n$preview\n${if (lines.size > 6) "..." else ""}")
+            .setPositiveButton("✨ 前往 AA 分账") { _, _ ->
+                sendRecognizedTextToWebView(text)
+            }
+            .setNeutralButton("⚡ 快速记一笔") { _, _ ->
+                val amountRegex = Regex("""(?:RM|MYR|TOTAL|AMOUNT|SUBTOTAL)?\s*([0-9]+\.[0-9]{2})""", RegexOption.IGNORE_CASE)
+                val detectedAmount = lines.asReversed().mapNotNull { line ->
+                    amountRegex.find(line)?.groupValues?.get(1)?.toDoubleOrNull()
+                }.firstOrNull() ?: 0.0
+
+                val note = lines.firstOrNull()?.take(30) ?: "小票消费"
+                val intent = Intent(this, QuickAddActivity::class.java).apply {
+                    if (detectedAmount > 0) putExtra("extra_amount", detectedAmount)
+                    putExtra("extra_note", note)
+                }
+                startActivity(intent)
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun sendRecognizedTextToWebView(text: String) {

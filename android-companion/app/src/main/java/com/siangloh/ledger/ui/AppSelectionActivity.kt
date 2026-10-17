@@ -15,9 +15,13 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.widget.Toolbar
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.siangloh.ledger.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class AppSelectionActivity : AppCompatActivity() {
 
@@ -30,6 +34,7 @@ class AppSelectionActivity : AppCompatActivity() {
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var searchEditText: EditText
+    private lateinit var loadingProgressBar: View
     private val allApps = mutableListOf<AppItem>()
     private val displayedApps = mutableListOf<AppItem>()
     private lateinit var adapter: AppAdapter
@@ -43,6 +48,7 @@ class AppSelectionActivity : AppCompatActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         toolbar.setNavigationOnClickListener { finish() }
 
+        loadingProgressBar = findViewById(R.id.loadingProgressBar)
         recyclerView = findViewById(R.id.appsRecyclerView)
         recyclerView.layoutManager = LinearLayoutManager(this)
         adapter = AppAdapter()
@@ -61,28 +67,64 @@ class AppSelectionActivity : AppCompatActivity() {
     }
 
     private fun loadInstalledApps() {
-        val pm = packageManager
-        val monitoredSet = AppSelectionManager.getMonitoredSet(this)
-        val installed = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+        loadingProgressBar.visibility = View.VISIBLE
+        recyclerView.visibility = View.GONE
 
-        allApps.clear()
-        for (app in installed) {
-            // 只保留具有启动图标的应用或属于已知银行关键字的应用，过滤纯底层系统服务
-            val isKnown = AppSelectionManager.KNOWN_BANK_KEYWORDS.any { app.packageName.lowercase().contains(it) }
-            val hasLaunchIntent = pm.getLaunchIntentForPackage(app.packageName) != null
-            if (hasLaunchIntent || isKnown) {
-                val label = pm.getApplicationLabel(app).toString()
-                val icon = try { pm.getApplicationIcon(app) } catch (_: Exception) { null }
-                val isMonitored = monitoredSet.contains(app.packageName)
-                allApps.add(AppItem(label, app.packageName, icon, isMonitored))
+        lifecycleScope.launch {
+            val loadedItems = withContext(Dispatchers.IO) {
+                val pm = packageManager
+                val monitoredSet = AppSelectionManager.getMonitoredSet(this@AppSelectionActivity)
+
+                // 性能优化：优先只查询具有桌面图标的 App，从原本 300+ 底层系统应用中秒级提取 40~60 个常用 App
+                val launcherIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
+                    addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+                }
+                val launcherResolveInfos = pm.queryIntentActivities(launcherIntent, 0)
+                val appMap = mutableMapOf<String, AppItem>()
+
+                for (info in launcherResolveInfos) {
+                    val pkg = info.activityInfo.packageName
+                    if (pkg == packageName) continue // 排除自己
+                    try {
+                        val label = info.loadLabel(pm).toString()
+                        val icon = info.loadIcon(pm)
+                        val isMonitored = monitoredSet.contains(pkg)
+                        appMap[pkg] = AppItem(label, pkg, icon, isMonitored)
+                    } catch (_: Exception) {}
+                }
+
+                // 额外检查已知银行关键字应用（以防某些银行通知仅以 Service 形式存在）
+                try {
+                    val allInstalled = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+                    for (app in allInstalled) {
+                        val pkg = app.packageName
+                        if (appMap.containsKey(pkg) || pkg == packageName) continue
+                        val isKnown = AppSelectionManager.KNOWN_BANK_KEYWORDS.any { pkg.lowercase().contains(it) }
+                        if (isKnown) {
+                            try {
+                                val label = pm.getApplicationLabel(app).toString()
+                                val icon = pm.getApplicationIcon(app)
+                                val isMonitored = monitoredSet.contains(pkg)
+                                appMap[pkg] = AppItem(label, pkg, icon, isMonitored)
+                            } catch (_: Exception) {}
+                        }
+                    }
+                } catch (_: Exception) {}
+
+                appMap.values.sortedWith(
+                    compareByDescending<AppItem> { it.isMonitored }.thenBy { it.name.lowercase() }
+                )
             }
-        }
 
-        // 优先将已开启监控的应用排在前面，其次按名称排序
-        allApps.sortWith(compareByDescending<AppItem> { it.isMonitored }.thenBy { it.name.lowercase() })
-        displayedApps.clear()
-        displayedApps.addAll(allApps)
-        adapter.notifyDataSetChanged()
+            allApps.clear()
+            allApps.addAll(loadedItems)
+            displayedApps.clear()
+            displayedApps.addAll(allApps)
+
+            loadingProgressBar.visibility = View.GONE
+            recyclerView.visibility = View.VISIBLE
+            adapter.notifyDataSetChanged()
+        }
     }
 
     private fun filterApps(query: String) {

@@ -186,6 +186,21 @@ def get_native_overview_summary(
     except Exception as e:
         logger.debug("Failed to query last processed notification: %s", e)
 
+    user_categories = []
+    try:
+        cat_rows = db.execute(
+            'SELECT name FROM categories WHERE user_id = ? AND type = "expense" ORDER BY id',
+            (str(user_id),)
+        ).fetchall()
+        user_categories = [r['name'] for r in cat_rows if r['name']]
+    except Exception as e:
+        logger.debug("Failed to query user categories: %s", e)
+
+    if not user_categories:
+        user_categories = ["餐饮", "交通", "杂货", "账单", "购物", "娱乐", "医疗", "其他"]
+    elif "其他" not in user_categories:
+        user_categories.append("其他")
+
     return {
         'ok': True,
         'period': period,
@@ -198,6 +213,7 @@ def get_native_overview_summary(
         'uncategorized_count': uncategorized_count,
         'uncategorized_amount': round(uncategorized_amount, 2),
         'uncategorized_items': uncategorized_items,
+        'categories': user_categories,
         'sparkline': sparkline_points,
         'recent_transactions': recent_list,
         'listening_status': {

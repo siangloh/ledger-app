@@ -71,6 +71,15 @@ class QuickAddActivity : AppCompatActivity() {
         saveButton.setOnClickListener {
             saveTransaction()
         }
+
+        val extraAmount = intent.getDoubleExtra("extra_amount", 0.0)
+        if (extraAmount > 0) {
+            amountEditText.setText(String.format(java.util.Locale.US, "%.2f", extraAmount))
+        }
+        val extraNote = intent.getStringExtra("extra_note")
+        if (!extraNote.isNullOrBlank()) {
+            noteEditText.setText(extraNote)
+        }
     }
 
     private fun loadCategories() {
@@ -91,9 +100,11 @@ class QuickAddActivity : AppCompatActivity() {
 
             val adapter = ArrayAdapter(
                 this@QuickAddActivity,
-                android.R.layout.simple_spinner_dropdown_item,
+                R.layout.item_spinner_selected,
                 categoryNames
-            )
+            ).apply {
+                setDropDownViewResource(R.layout.item_spinner_dropdown)
+            }
             categorySpinner.adapter = adapter
         }
     }

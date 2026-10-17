@@ -6,4 +6,13 @@
     <color name="background">#F2EFE8</color>
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
+
+    <!-- Semantic UI theme colors (Day) -->
+    <color name="card_bg">#FFFFFF</color>
+    <color name="input_bg">#F1F5F9</color>
+    <color name="text_main">#0F172A</color>
+    <color name="text_muted">#64748B</color>
+    <color name="input_text">#0F172A</color>
+    <color name="input_hint">#94A3B8</color>
+    <color name="border_color">#E2E8F0</color>
 </resources>
