@@ -82,15 +82,23 @@ class MainActivity : AppCompatActivity() {
         fabQuickAdd = findViewById(R.id.fabQuickAdd)
         composeView = findViewById(R.id.composeView)
 
-        initComposeOverview()
         initViews()
         initWebView()
+        initComposeOverview()
         checkNotificationPermission()
         checkBatteryOptimization()
         checkDrivingPermissions()
         setupBackNavigation()
 
         DrivingDetectionManager.requestActivityTransitionUpdates(this)
+
+        val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
+        val defaultMode = sp.getString("default_view_mode", "web") ?: "web"
+        if (defaultMode == "compose") {
+            showNativeComposeMode()
+        } else {
+            showWebViewMode()
+        }
     }
 
     private fun initComposeOverview() {
@@ -110,6 +118,7 @@ class MainActivity : AppCompatActivity() {
         composeView.visibility = View.GONE
         swipeRefreshLayout.visibility = View.VISIBLE
         fabQuickAdd.visibility = View.VISIBLE
+        offlineContainer.visibility = View.GONE
         if (webView.url.isNullOrEmpty()) {
             loadContent()
         }
@@ -191,6 +200,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnOfflineSettings).setOnClickListener {
             startActivity(Intent(this, AppSelectionActivity::class.java))
         }
+        findViewById<Button>(R.id.btnOfflineOverview)?.setOnClickListener {
+            showNativeComposeMode()
+        }
         findViewById<Button>(R.id.btnOfflineRetry).setOnClickListener {
             loadContent()
         }
@@ -204,7 +216,7 @@ class MainActivity : AppCompatActivity() {
             true
         }
         setupDraggableFab()
-        fabQuickAdd.visibility = View.GONE
+        fabQuickAdd.visibility = View.VISIBLE
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -287,6 +299,10 @@ class MainActivity : AppCompatActivity() {
         settings.setSupportZoom(false)
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         settings.userAgentString = "${settings.userAgentString} LedgerAppNative/1.0"
+        settings.cacheMode = WebSettings.LOAD_DEFAULT
+        settings.allowFileAccess = true
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        webView.overScrollMode = View.OVER_SCROLL_NEVER
 
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
@@ -296,7 +312,7 @@ class MainActivity : AppCompatActivity() {
             @JavascriptInterface
             fun isNativeApp(): Boolean = true
             @JavascriptInterface
-            fun getVersion(): String = "1.0.0"
+            fun getVersion(): String = "1.0.2"
             @JavascriptInterface
             fun setCurrentUser(username: String) {
                 if (username.isNotBlank()) {
@@ -316,6 +332,14 @@ class MainActivity : AppCompatActivity() {
             @JavascriptInterface
             fun openSettings() {
                 runOnUiThread { startActivity(Intent(this@MainActivity, AppSelectionActivity::class.java)) }
+            }
+            @JavascriptInterface
+            fun openQuickAdd() {
+                runOnUiThread { startActivity(Intent(this@MainActivity, QuickAddActivity::class.java)) }
+            }
+            @JavascriptInterface
+            fun switchToNativeOverview() {
+                runOnUiThread { showNativeComposeMode() }
             }
             // 小票拍照识别入口：由 split_bill.html 侦测到自己跑在原生 App 内时调用。
             // 识别完全在手机本地用 ML Kit 完成，不会把照片传去任何服务器。
@@ -479,13 +503,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun showQuickMenu() {
         val currentBound = NetworkHelper.getUsername(this).ifEmpty { "未绑定(默认admin)" }
+        val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
+        val defaultMode = sp.getString("default_view_mode", "web") ?: "web"
+        val modeText = if (defaultMode == "web") "1:1 完整账本" else "极简监听概览"
         val options = arrayOf(
             "⚡ 离线快速记账",
+            "📊 切换至极简概览 (Overview)",
+            "🌐 切换至 1:1 完整账本 (Web)",
+            "📱 默认启动视图设置 (当前: $modeText)",
             "⚙️ 监测的应用设置",
             "📋 查看通知与同步日志",
             "🔄 手动同步",
             "👤 绑定记账用户 (当前: $currentBound)",
-            "🌐 服务器地址设置",
+            "🌐 服务器地址切换与设置",
             "🔑 自动记账 API Key 设置",
             "🚗 车载蓝牙与自动驾车检测设置"
         )
@@ -494,18 +524,39 @@ class MainActivity : AppCompatActivity() {
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> startActivity(Intent(this, QuickAddActivity::class.java))
-                    1 -> startActivity(Intent(this, AppSelectionActivity::class.java))
-                    2 -> startActivity(Intent(this, NotificationLogActivity::class.java))
-                    3 -> {
+                    1 -> showNativeComposeMode()
+                    2 -> showWebViewMode()
+                    3 -> showDefaultViewModeDialog()
+                    4 -> startActivity(Intent(this, AppSelectionActivity::class.java))
+                    5 -> startActivity(Intent(this, NotificationLogActivity::class.java))
+                    6 -> {
                         SyncWorker.enqueueSync(this)
                         Toast.makeText(this, "已发起后台同步请求", Toast.LENGTH_SHORT).show()
                     }
-                    4 -> showUsernameDialog()
-                    5 -> showServerUrlDialog()
-                    6 -> showApiKeyDialog()
-                    7 -> showCarDrivingSettingsDialog()
+                    7 -> showUsernameDialog()
+                    8 -> showServerUrlDialog()
+                    9 -> showApiKeyDialog()
+                    10 -> showCarDrivingSettingsDialog()
                 }
             }
+            .show()
+    }
+
+    private fun showDefaultViewModeDialog() {
+        val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
+        val current = sp.getString("default_view_mode", "web") ?: "web"
+        val modes = arrayOf("🌐 1:1 完整账本 (推荐)", "📊 极简监听概览")
+        val currentIdx = if (current == "compose") 1 else 0
+
+        AlertDialog.Builder(this)
+            .setTitle("📱 选择打开应用时的默认视图")
+            .setSingleChoiceItems(modes, currentIdx) { dialog, which ->
+                val chosen = if (which == 1) "compose" else "web"
+                sp.edit().putString("default_view_mode", chosen).apply()
+                Toast.makeText(this, "默认启动视图已设置为：${modes[which]}", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            }
+            .setNegativeButton("取消", null)
             .show()
     }
 
@@ -638,14 +689,47 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showServerUrlDialog() {
+        val currentUrl = NetworkHelper.getServerUrl(this)
+        val presets = arrayOf(
+            "☁️ 云端生产服务器 (Render)\nhttps://ledger-app-l3hc.onrender.com",
+            "🏠 本地局域网 (Wi-Fi 局域网)\nhttp://192.168.100.85:5000",
+            "🔌 USB 反向代理 (端口映射)\nhttp://127.0.0.1:5000",
+            "✏️ 自定义输入服务器地址..."
+        )
+        AlertDialog.Builder(this)
+            .setTitle("🌐 服务器地址切换与设置\n(当前: $currentUrl)")
+            .setItems(presets) { _, which ->
+                when (which) {
+                    0 -> {
+                        NetworkHelper.setServerUrl(this, "https://ledger-app-l3hc.onrender.com")
+                        Toast.makeText(this, "已切换为云端服务器并重新加载", Toast.LENGTH_SHORT).show()
+                        loadContent()
+                    }
+                    1 -> {
+                        NetworkHelper.setServerUrl(this, "http://192.168.100.85:5000")
+                        Toast.makeText(this, "已切换为局域网服务器并重新加载", Toast.LENGTH_SHORT).show()
+                        loadContent()
+                    }
+                    2 -> {
+                        NetworkHelper.setServerUrl(this, "http://127.0.0.1:5000")
+                        Toast.makeText(this, "已切换为 USB 代理服务器并重新加载", Toast.LENGTH_SHORT).show()
+                        loadContent()
+                    }
+                    3 -> showCustomServerUrlInput(currentUrl)
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showCustomServerUrlInput(currentUrl: String) {
         val input = android.widget.EditText(this).apply {
-            setText(NetworkHelper.getServerUrl(this@MainActivity))
+            setText(currentUrl)
             setSelection(text.length)
             hint = NetworkHelper.DEFAULT_BASE_URL
         }
         AlertDialog.Builder(this)
-            .setTitle("🌐 服务器地址设置")
-            .setMessage("如云端服务器域名变更，可在此修改服务器地址：")
+            .setTitle("✏️ 自定义服务器地址")
             .setView(input)
             .setPositiveButton("保存") { _, _ ->
                 val newUrl = input.text.toString().trim()
@@ -857,17 +941,23 @@ class MainActivity : AppCompatActivity() {
         webView.evaluateJavascript(js, null)
     }
 
+    private var lastBackPressedTime = 0L
+
     private fun setupBackNavigation() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (composeView.visibility != View.VISIBLE) {
-                    if (webView.visibility == View.VISIBLE && webView.canGoBack()) {
-                        webView.goBack()
-                    } else {
-                        showNativeComposeMode()
-                    }
+                if (composeView.visibility == View.VISIBLE) {
+                    showWebViewMode()
+                } else if (webView.visibility == View.VISIBLE && webView.canGoBack()) {
+                    webView.goBack()
                 } else {
-                    finish()
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastBackPressedTime < 2000L) {
+                        finish()
+                    } else {
+                        lastBackPressedTime = currentTime
+                        Toast.makeText(this@MainActivity, "再按一次退出应用", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         })

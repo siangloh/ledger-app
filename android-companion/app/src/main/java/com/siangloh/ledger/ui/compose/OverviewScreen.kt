@@ -1261,7 +1261,7 @@ fun NativeBottomBar(
 
             BottomNavItem(
                 icon = Icons.Default.Language,
-                label = "Web后台",
+                label = "1:1完整账本",
                 tint = Indigo600,
                 selected = false,
                 onClick = onWeb,

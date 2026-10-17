@@ -53,7 +53,7 @@
         android:id="@+id/composeView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:visibility="visible"
+        android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/batteryBanner"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -63,7 +63,7 @@
         android:id="@+id/swipeRefreshLayout"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:visibility="gone"
+        android:visibility="visible"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -124,7 +124,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="未检测到网络连接。您仍可使用本地功能快速记账，系统将在网络恢复后自动同步至云端账本。"
+            android:text="未检测到网络连接。您仍可使用本地功能快速记账或查看快照，系统将在网络恢复后自动同步至云端账本。"
             android:textSize="13sp"
             android:textColor="#666666"
             android:gravity="center"
@@ -137,6 +137,15 @@
             android:backgroundTint="@color/navy_primary"
             android:text="⚡ 离线快速记账"
             android:textColor="@color/white"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btnOfflineOverview"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="📊 查看离线账目快照"
+            android:textColor="@color/navy_primary"
             android:layout_marginBottom="12dp" />
 
         <Button
