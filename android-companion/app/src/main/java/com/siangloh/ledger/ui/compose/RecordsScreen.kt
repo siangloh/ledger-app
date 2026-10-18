@@ -42,25 +42,43 @@ fun RecordsScreen(
     }
     var searchQuery by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    var currentPage by remember { mutableStateOf(1) }
+    var hasMore by remember { mutableStateOf(false) }
+    var isLoadingMore by remember { mutableStateOf(false) }
     var transactions by remember { mutableStateOf<List<TransactionRecord>>(emptyList()) }
     var totalCount by remember { mutableStateOf(0) }
     var editingTx by remember { mutableStateOf<TransactionRecord?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<TransactionRecord?>(null) }
 
-    fun loadData() {
-        isLoading = true
+    fun loadData(resetPage: Boolean = true) {
+        if (resetPage) {
+            currentPage = 1
+            isLoading = true
+        } else {
+            isLoadingMore = true
+        }
         scope.launch {
+            val targetPage = if (resetPage) 1 else currentPage
             val res = NativeLedgerApi.getTransactions(
                 context = context,
                 type = selectedType,
                 month = selectedMonth,
                 search = searchQuery,
-                limit = 100
+                page = targetPage,
+                limit = 50
             )
             isLoading = false
+            isLoadingMore = false
             res.onSuccess { page ->
-                transactions = page.items
+                if (resetPage) {
+                    transactions = page.items
+                } else {
+                    val existingIds = transactions.map { it.id }.toSet()
+                    val newItems = page.items.filter { it.id !in existingIds }
+                    transactions = transactions + newItems
+                }
                 totalCount = page.totalCount
+                hasMore = page.hasMore
             }.onFailure { err ->
                 Toast.makeText(context, "加载流水失败：${err.message}", Toast.LENGTH_SHORT).show()
             }
@@ -68,7 +86,7 @@ fun RecordsScreen(
     }
 
     LaunchedEffect(selectedType, selectedMonth, searchQuery) {
-        loadData()
+        loadData(resetPage = true)
     }
 
     Scaffold(
@@ -276,6 +294,48 @@ fun RecordsScreen(
                             onClick = { editingTx = tx }
                         )
                     }
+                    if (hasMore) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isLoadingMore) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Indigo600)
+                                } else {
+                                    OutlinedButton(
+                                        onClick = {
+                                            currentPage += 1
+                                            loadData(resetPage = false)
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.fillMaxWidth().height(42.dp)
+                                    ) {
+                                        Icon(Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("加载更多流水 (已展示 ${transactions.size} / $totalCount 条)", fontSize = 13.sp, color = Indigo600)
+                                    }
+                                }
+                            }
+                        }
+                    } else if (transactions.isNotEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "已展示全部 $totalCount 笔记录",
+                                    fontSize = 12.sp,
+                                    color = Slate400
+                                )
+                            }
+                        }
+                    }
                     item {
                         Spacer(modifier = Modifier.height(60.dp))
                     }
@@ -305,7 +365,10 @@ fun RecordsScreen(
     showDeleteConfirm?.let { tx ->
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = null },
-            title = { Text("确认删除此记录？", fontWeight = FontWeight.Bold, fontSize = 17.sp) },
+            containerColor = Color.White,
+            titleContentColor = Slate900,
+            textContentColor = Slate800,
+            title = { Text("确认删除此记录？", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Slate900) },
             text = { Text("删除后流水将无法找回（金额：MYR ${String.format(Locale.US, "%.2f", tx.amount)}，备注：${tx.note.ifBlank { "无备注" }}）", fontSize = 13.sp, color = Slate600) },
             confirmButton = {
                 Button(

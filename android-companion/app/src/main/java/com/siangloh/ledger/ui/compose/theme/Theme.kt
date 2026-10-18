@@ -29,13 +29,12 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun LedgerTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-
+    // 强制使用明亮、高对比度主题语义色彩，杜绝系统深色模式下与硬编码卡片颜色混用产生的“深底深字”或低对比度问题
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = LightColorScheme,
         content = content
     )
 }

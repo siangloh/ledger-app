@@ -48,17 +48,29 @@ fun AddTransactionScreen(
     var accounts by remember { mutableStateOf<List<AccountRecord>>(emptyList()) }
     var expenseCategories by remember { mutableStateOf<List<CategoryRecord>>(emptyList()) }
     var incomeCategories by remember { mutableStateOf<List<CategoryRecord>>(emptyList()) }
+    var incomeGroup by remember { mutableStateOf("main") }
     var isSaving by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         scope.launch {
             NativeLedgerApi.getAccounts(context).onSuccess {
                 accounts = it.accounts
+                val defId = it.defaultAccountId
                 if (selectedAccountId == null && it.accounts.isNotEmpty()) {
-                    selectedAccountId = it.accounts.first().id
+                    selectedAccountId = if (defId != null && it.accounts.any { a -> a.id == defId }) {
+                        defId
+                    } else {
+                        it.accounts.first().id
+                    }
+                }
+                if (it.defaultGroup != null && incomeGroup == "main") {
+                    incomeGroup = it.defaultGroup
                 }
                 if (selectedToAccountId == null && it.accounts.size > 1) {
-                    selectedToAccountId = it.accounts[1].id
+                    val remaining = it.accounts.filter { a -> a.id != selectedAccountId }
+                    if (remaining.isNotEmpty()) {
+                        selectedToAccountId = remaining.first().id
+                    }
                 }
             }
             NativeLedgerApi.getCategories(context).onSuccess { (exp, inc) ->
@@ -318,6 +330,37 @@ fun AddTransactionScreen(
                                 }
                             }
                         }
+
+                        if (txType == "income") {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("收入分组", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate700)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val groups = listOf("main" to "💼 主业收入", "side" to "📈 副业/理财")
+                                groups.forEach { (grpKey, grpLabel) ->
+                                    val isGrpSelected = incomeGroup == grpKey
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isGrpSelected) Emerald600 else Slate100,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { incomeGroup = grpKey }
+                                    ) {
+                                        Text(
+                                            text = grpLabel,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isGrpSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isGrpSelected) Color.White else Slate700,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                            modifier = Modifier.padding(vertical = 8.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(14.dp))
@@ -488,7 +531,8 @@ fun AddTransactionScreen(
                             note = note,
                             tags = tags,
                             accountId = selectedAccountId,
-                            toAccountId = if (txType == "transfer") selectedToAccountId else null
+                            toAccountId = if (txType == "transfer") selectedToAccountId else null,
+                            groupName = if (txType == "income") incomeGroup else null
                         )
                         isSaving = false
                         res.onSuccess {

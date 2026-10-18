@@ -938,7 +938,6 @@ def api_llm_samples_reset():
 
 
 def _resolve_native_user(db):
-    user_id = session.get('user_id')
     req_key = request.headers.get('X-API-KEY')
     data = (request.get_json(silent=True) or request.form) if (request.is_json or request.form) else {}
     if not req_key and isinstance(data, dict):
@@ -946,19 +945,60 @@ def _resolve_native_user(db):
     if not req_key:
         req_key = request.args.get('key')
 
-    if not user_id:
-        if not is_valid_api_key(req_key, db=db):
-            return None, ('未授权访问', 401)
+    # 1. 优先通过 API Key 认证（原生 Companion App 标准通信方式，免 Cookie 与 CSRF 限制）
+    if req_key and is_valid_api_key(req_key, db=db):
+        req_clean = str(req_key).strip()
+        # 检查是否为专属个人 API Key
+        personal_user_id = None
+        try:
+            u_row = db.execute("SELECT id FROM users WHERE api_key = ?", (req_clean,)).fetchone()
+            if u_row:
+                personal_user_id = u_row['id']
+        except Exception as e:
+            logger.debug("Check personal api key in _resolve_native_user skipped: %s", e)
+
+        if personal_user_id:
+            # 个人 API Key 严格绑定其所属用户，禁止外部通过 username 参数越权访问其他用户
+            return personal_user_id, None
+
+        # 系统全局 API Key：允许指定特定 username 访问，或回退至默认关联用户
         target_username = (data.get('username') if isinstance(data, dict) else None) or request.args.get('username')
         if target_username:
             u_row = db.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (target_username,)).fetchone()
             if not u_row:
                 return None, (f"指定用户 '{target_username}' 不存在", 404)
-            user_id = u_row['id']
-        else:
-            user_id = get_user_id_from_api_key(req_key, db=db)
+            return u_row['id'], None
+
+        user_id = get_user_id_from_api_key(req_clean, db=db)
         if not user_id:
             user_id = get_current_user_id()
+        return user_id, None
+
+    # 2. 如果未提供有效 API Key，检查 Web 会话 (Session Cookie)
+    user_id = session.get('user_id')
+    if not user_id:
+        return None, ('未授权访问', 401)
+
+    # 针对纯 Cookie 会话认证的写操作（POST / PUT / DELETE / PATCH），强制校验 CSRF 与跨源限制
+    if request.method in ('POST', 'PUT', 'DELETE', 'PATCH'):
+        origin = request.headers.get('Origin') or request.headers.get('Referer')
+        host = request.headers.get('Host')
+        if origin and host and host not in origin:
+            return None, ('CSRF / 跨源校验失败：禁止跨域写操作', 403)
+
+        if current_app.config.get('WTF_CSRF_ENABLED', True):
+            csrf_token = (
+                request.headers.get('X-CSRFToken') or
+                request.headers.get('X-CSRF-Token') or
+                (data.get('csrf_token') if isinstance(data, dict) else None)
+            )
+            try:
+                from flask_wtf.csrf import validate_csrf
+                validate_csrf(csrf_token)
+            except Exception as e:
+                logger.warning("Native endpoint session CSRF validation failed: %s", e)
+                return None, ('CSRF 校验失败，请提供有效 CSRF Token 或 API Key', 403)
+
     return user_id, None
 
 
@@ -979,33 +1019,12 @@ def api_native_overview():
 @auto_track_bp.route('/api/native/quick-categorize', methods=['POST'], endpoint='api_native_quick_categorize')
 @csrf.exempt
 def api_native_quick_categorize():
-    req_key = request.headers.get('X-API-KEY')
-    user_id = session.get('user_id')
     db = get_db()
-    data = request.get_json(silent=True) or request.form
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
 
-    if not user_id:
-        req_key = req_key or data.get('key') or request.args.get('key')
-        if not is_valid_api_key(req_key, db=db):
-            return jsonify({'ok': False, 'message': '未授权访问'}), 401
-        target_username = data.get('username') or request.args.get('username')
-        if target_username:
-            u_row = db.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (target_username,)).fetchone()
-            if not u_row:
-                return jsonify({'ok': False, 'message': f"指定用户 '{target_username}' 不存在"}), 404
-            user_id = u_row['id']
-        else:
-            user_id = get_user_id_from_api_key(req_key, db=db)
-        if not user_id:
-            user_id = get_current_user_id()
-    else:
-        # S6: 仅依靠会话认证且未提供有效 API Key 时，校验 Origin/Referer 防止跨源伪造请求
-        has_api_key = req_key and is_valid_api_key(req_key, db=db)
-        if not has_api_key:
-            origin = request.headers.get('Origin') or request.headers.get('Referer')
-            host = request.headers.get('Host')
-            if origin and host and host not in origin:
-                return jsonify({'ok': False, 'message': 'CSRF / 跨源校验失败'}), 403
+    data = request.get_json(silent=True) or request.form
 
     tx_id = data.get('transaction_id')
     category = data.get('category')

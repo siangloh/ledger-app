@@ -346,7 +346,10 @@ fun AddAccountDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("添加新账户", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+        containerColor = Color.White,
+        titleContentColor = Slate900,
+        textContentColor = Slate800,
+        title = { Text("添加新账户", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Slate900) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -454,7 +457,10 @@ fun TransferFundsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("账户互转调拨", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+        containerColor = Color.White,
+        titleContentColor = Slate900,
+        textContentColor = Slate800,
+        title = { Text("账户互转调拨", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Slate900) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),

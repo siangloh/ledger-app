@@ -3,8 +3,10 @@ Native API Service for mobile companion apps (Android Jetpack Compose & heads-up
 Adheres strictly to Thin Controller and Explicit Parameters rules (no implicit Flask context).
 """
 import logging
+import secrets
 from calendar import monthrange
 from datetime import datetime, date
+from decimal import Decimal
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -100,9 +102,12 @@ def get_native_overview_summary(
         d = r['date']
 
         if t_type == 'income':
-            income_amount += amt
+            if cat in ('内部划转', '转账/充值', '自转', '互转'):
+                transfer_amount += amt
+            else:
+                income_amount += amt
         elif t_type == 'expense':
-            # 区分内部划转/转账与常规支出
+            # 区分内部划转/转账与常规外部支出
             if cat in ('内部划转', '转账/充值', '自转', '互转'):
                 transfer_amount += amt
             else:
@@ -111,7 +116,7 @@ def get_native_overview_summary(
                 cat_name = cat or '其他'
                 category_spending[cat_name] = category_spending.get(cat_name, 0.0) + amt
 
-            # 统计待归类交易
+            # 统计待归类交易（仅包含已入账但类别未明确的普通交易）
             if cat.lower() in UNCATEGORIZED_NAMES or not cat:
                 uncategorized_count += 1
                 uncategorized_amount += amt
@@ -120,7 +125,9 @@ def get_native_overview_summary(
                     'date': r['date'],
                     'amount': amt,
                     'note': r['note'] or '未命名支出',
-                    'category': cat or '待分类'
+                    'category': cat or '待分类',
+                    'is_pending_on_hold': False,
+                    'source_type': 'transaction'
                 })
 
     # 待确认暂存表 (on_hold) 具有最高待办优先级，排在最前端
@@ -149,7 +156,8 @@ def get_native_overview_summary(
                 'amount': p_amt,
                 'note': p['note'] or p['merchant'] or '待确认划转',
                 'category': '待确认转账',
-                'is_pending_on_hold': True
+                'is_pending_on_hold': True,
+                'source_type': 'pending'
             })
     except Exception as e:
         logger.debug("Check pending on_hold transactions skipped: %s", e)
@@ -157,7 +165,10 @@ def get_native_overview_summary(
     # 待确认转账置顶，避免被普通未分类挤掉；总容量扩充至 100 条
     uncategorized_items = on_hold_items + regular_uncat_items[:max(0, 100 - len(on_hold_items))]
 
-    total_spending = round(expense_amount + transfer_amount, 2)
+    # 严格对齐口径：自转内部划转不计入日常消费总支出
+    total_spending = round(expense_amount, 2)
+    transfer_amount = round(transfer_amount, 2)
+    income_amount = round(income_amount, 2)
     net_balance = round(income_amount - expense_amount, 2)
 
     # 分类消费占比排行
@@ -329,12 +340,24 @@ def get_native_transactions_list(
         SELECT t.id, t.date, t.type, t.category, t.amount, t.note, t.tags, t.account_id,
                t.source, t.created_at, a.name AS account_name, a.type AS account_type
         FROM transactions t
-        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN accounts a ON t.account_id = a.id AND a.user_id = t.user_id
         WHERE t.user_id = ?
     '''
     params = [str(user_id)]
 
-    if tx_type and tx_type not in ('all', ''):
+    INTERNAL_TRANSFER_CATS = ('内部划转', '转账/充值', '自转', '互转')
+    cats_placeholder = ','.join('?' for _ in INTERNAL_TRANSFER_CATS)
+
+    if tx_type == 'transfer':
+        query += f" AND (t.type = 'transfer' OR t.category IN ({cats_placeholder}))"
+        params.extend(INTERNAL_TRANSFER_CATS)
+    elif tx_type == 'expense':
+        query += f" AND t.type = 'expense' AND (t.category IS NULL OR t.category NOT IN ({cats_placeholder}))"
+        params.extend(INTERNAL_TRANSFER_CATS)
+    elif tx_type == 'income':
+        query += f" AND t.type = 'income' AND (t.category IS NULL OR t.category NOT IN ({cats_placeholder}))"
+        params.extend(INTERNAL_TRANSFER_CATS)
+    elif tx_type and tx_type not in ('all', ''):
         query += " AND t.type = ?"
         params.append(tx_type)
 
@@ -422,6 +445,14 @@ def add_native_transaction(user_id: Any, data: Dict[str, Any], db: Any = None) -
     except (ValueError, TypeError):
         account_id = None
 
+    if account_id:
+        acc = db.execute(
+            "SELECT id FROM accounts WHERE id = ? AND user_id = ? AND is_active = 1",
+            (account_id, str(user_id))
+        ).fetchone()
+        if not acc:
+            return {'ok': False, 'message': '指定的账户不存在或无权访问'}
+
     now_iso = datetime.now().isoformat()
 
     # 如果是账户互转 (transfer)
@@ -432,27 +463,66 @@ def add_native_transaction(user_id: Any, data: Dict[str, Any], db: Any = None) -
         to_account_id = None
 
     if tx_type == 'transfer':
-        # 记录一笔自转支出，一笔自转收入
+        if not account_id or not to_account_id:
+            return {'ok': False, 'message': '账户互转必须同时指定转出账户与转入账户'}
+        if account_id == to_account_id:
+            return {'ok': False, 'message': '转出账户与转入账户不能相同'}
+
+        to_acc = db.execute(
+            "SELECT id FROM accounts WHERE id = ? AND user_id = ? AND is_active = 1",
+            (to_account_id, str(user_id))
+        ).fetchone()
+        if not to_acc:
+            return {'ok': False, 'message': '目标转入账户不存在或无权访问'}
+
+        pair_id = secrets.token_hex(8)
+        pair_tag = f"transfer_pair:{pair_id}"
+        merged_tags = f"{tags} {pair_tag}".strip()
+
+        from_acc_row = db.execute("SELECT name FROM accounts WHERE id = ?", (account_id,)).fetchone()
+        to_acc_row = db.execute("SELECT name FROM accounts WHERE id = ?", (to_account_id,)).fetchone()
+        from_name = from_acc_row['name'] if from_acc_row else '转出账户'
+        to_name = to_acc_row['name'] if to_acc_row else '转入账户'
+
+        out_note = note or f"转账至 {to_name}"
+        in_note = note or f"由 {from_name} 转入"
+
         cur1 = db.execute('''
             INSERT INTO transactions (user_id, date, type, category, amount, note, source, created_at, tags, account_id)
             VALUES (?, ?, 'expense', '内部划转', ?, ?, 'manual', ?, ?, ?)
-        ''', (str(user_id), tx_date, amount, note or '账户互转出账', now_iso, tags, account_id))
+        ''', (str(user_id), tx_date, amount, out_note, now_iso, merged_tags, account_id))
 
-        if to_account_id:
-            db.execute('''
-                INSERT INTO transactions (user_id, date, type, category, amount, note, source, created_at, tags, account_id)
-                VALUES (?, ?, 'income', '内部划转', ?, ?, 'manual', ?, ?, ?)
-            ''', (str(user_id), tx_date, amount, note or '账户互转入账', now_iso, tags, to_account_id))
+        db.execute('''
+            INSERT INTO transactions (user_id, date, type, category, amount, note, source, created_at, tags, account_id)
+            VALUES (?, ?, 'income', '内部划转', ?, ?, 'manual', ?, ?, ?)
+        ''', (str(user_id), tx_date, amount, in_note, now_iso, merged_tags, to_account_id))
 
         db.commit()
         bump_data_version('transfer', {'amount': amount, 'user_id': user_id}, user_id=user_id, db=db)
         return {'ok': True, 'id': cur1.lastrowid, 'message': '账户转账记录已保存'}
 
-    # 常规支出或收入
+    # 常规支出或收入：对齐 Web 端的 group_name 与储蓄语义
+    group_name = data.get('group_name')
+    if tx_type == 'income' and not group_name:
+        cat_row = db.execute(
+            "SELECT group_name FROM categories WHERE user_id = ? AND type = 'income' AND name = ?",
+            (str(user_id), category)
+        ).fetchone()
+        if cat_row and cat_row['group_name']:
+            group_name = cat_row['group_name']
+        else:
+            setting = db.execute("SELECT default_group FROM user_settings WHERE user_id = ?", (str(user_id),)).fetchone()
+            group_name = (setting['default_group'] if setting and setting['default_group'] else 'main')
+    elif tx_type != 'income':
+        group_name = None
+
+    from_savings = 1 if (tx_type == 'expense' and data.get('from_savings') in (1, '1', True, 'true', 'on')) else 0
+    from_savings_category = (data.get('from_savings_category') or '').strip() if from_savings else None
+
     cur = db.execute('''
-        INSERT INTO transactions (user_id, date, type, category, amount, note, source, created_at, tags, account_id)
-        VALUES (?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?)
-    ''', (str(user_id), tx_date, tx_type, category, amount, note, now_iso, tags, account_id))
+        INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at, tags, account_id, from_savings, from_savings_category)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?)
+    ''', (str(user_id), tx_date, tx_type, group_name, category, amount, note, now_iso, tags, account_id, from_savings, from_savings_category))
 
     # 自动记忆商户分类规则
     if note and category and tx_type == 'expense' and not note.startswith('['):
@@ -499,6 +569,14 @@ def update_native_transaction_full(user_id: Any, tx_id: int, data: Dict[str, Any
     except (ValueError, TypeError):
         account_id = None
 
+    if account_id:
+        acc = db.execute(
+            "SELECT id FROM accounts WHERE id = ? AND user_id = ? AND is_active = 1",
+            (account_id, str(user_id))
+        ).fetchone()
+        if not acc:
+            return {'ok': False, 'message': '指定的账户不存在或无权访问'}
+
     db.execute('''
         UPDATE transactions
         SET date = ?, type = ?, category = ?, amount = ?, note = ?, tags = ?, account_id = ?
@@ -516,11 +594,23 @@ def delete_native_transaction(user_id: Any, tx_id: int, db: Any = None) -> Dict[
 
     from core.db import bump_data_version
 
-    tx = db.execute('SELECT id FROM transactions WHERE id = ? AND user_id = ?', (tx_id, str(user_id))).fetchone()
+    tx = db.execute('SELECT id, tags FROM transactions WHERE id = ? AND user_id = ?', (tx_id, str(user_id))).fetchone()
     if not tx:
         return {'ok': False, 'message': '未找到此交易记录'}
 
-    db.execute('DELETE FROM transactions WHERE id = ? AND user_id = ?', (tx_id, str(user_id)))
+    tags = tx['tags'] or ''
+    pair_tag = None
+    for token in tags.split():
+        if token.startswith('transfer_pair:'):
+            pair_tag = token
+            break
+
+    if pair_tag:
+        # 成对转账：原子同步删除出账与入账记录
+        db.execute("DELETE FROM transactions WHERE user_id = ? AND tags LIKE ?", (str(user_id), f"%{pair_tag}%"))
+    else:
+        db.execute('DELETE FROM transactions WHERE id = ? AND user_id = ?', (tx_id, str(user_id)))
+
     db.commit()
     bump_data_version('delete', {'id': tx_id, 'user_id': user_id}, user_id=user_id, db=db)
     return {'ok': True, 'message': '交易记录已删除'}
@@ -586,8 +676,17 @@ def get_native_accounts_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
 
     net_worth = round(total_assets - total_liabilities, 2)
 
+    setting = db.execute(
+        "SELECT default_account_id, default_group FROM user_settings WHERE user_id = ?",
+        (str(user_id),)
+    ).fetchone()
+    default_acc_id = setting['default_account_id'] if setting else None
+    default_grp = (setting['default_group'] if setting and setting['default_group'] else 'main')
+
     return {
         'ok': True,
+        'default_account_id': default_acc_id,
+        'default_group': default_grp,
         'total_assets': round(total_assets, 2),
         'total_liabilities': round(total_liabilities, 2),
         'net_worth': net_worth,
@@ -674,25 +773,44 @@ def get_native_tools_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
     if not db or not user_id:
         return {'ok': False, 'message': '未授权或数据库连接失败'}
 
-    # 1. 订阅列表
+    from subscription_tracker import BillingCycle, default_mock_exchange_rate_provider
+
+    # 1. 订阅列表（复用 Web 端周期月均与汇率折算）
     sub_rows = db.execute('''
-        SELECT id, name, category, cost, currency, next_billing_date, auto_renew
+        SELECT id, name, category, billing_cycle, cost, currency, next_billing_date, auto_renew
         FROM subscriptions
         WHERE user_id = ? AND status = 'ACTIVE'
         ORDER BY next_billing_date ASC
     ''', (str(user_id),)).fetchall()
 
     subscriptions = []
-    total_monthly_sub = 0.0
+    total_monthly_sub = Decimal("0.0")
     for s in sub_rows:
-        cost = float(s['cost'] or 0.0)
-        total_monthly_sub += cost
+        cost_val = Decimal(str(s['cost'] or 0.0))
+        curr = (s['currency'] or 'MYR').upper()
+        rate = default_mock_exchange_rate_provider(curr, 'MYR')
+        cost_target = cost_val * rate
+        cycle = (s['billing_cycle'] or 'monthly').lower()
+
+        if cycle == BillingCycle.MONTHLY.value or cycle == 'monthly':
+            m_cost = cost_target
+        elif cycle == BillingCycle.WEEKLY.value or cycle == 'weekly':
+            m_cost = (cost_target * Decimal("52")) / Decimal("12")
+        elif cycle == BillingCycle.QUARTERLY.value or cycle == 'quarterly':
+            m_cost = cost_target / Decimal("3")
+        elif cycle == BillingCycle.SEMI_ANNUAL.value or cycle == 'semi_annual':
+            m_cost = cost_target / Decimal("6")
+        else:
+            m_cost = cost_target / Decimal("12")
+
+        total_monthly_sub += m_cost
         subscriptions.append({
             'id': s['id'],
             'name': s['name'],
             'category': s['category'],
-            'cost': cost,
-            'currency': s['currency'],
+            'billing_cycle': cycle,
+            'cost': float(cost_val),
+            'currency': curr,
             'next_billing_date': s['next_billing_date'],
             'auto_renew': bool(s['auto_renew'])
         })
@@ -709,9 +827,9 @@ def get_native_tools_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
     total_remaining_inst = 0.0
     for i in inst_rows:
         tot = float(i['total_amount'] or 0.0)
-        tenure = int(i['tenure_months'] or 1)
-        paid = int(i['paid_periods'] or 0)
-        m_amt = float(i['monthly_amount'] or 0.0)
+        tenure = max(1, int(i['tenure_months'] or 1))
+        paid = min(tenure, int(i['paid_periods'] or 0))
+        m_amt = float(i['monthly_amount'] or (tot / tenure))
         remain = max(0.0, tot - (paid * m_amt))
         total_remaining_inst += remain
         installments.append({
@@ -727,7 +845,7 @@ def get_native_tools_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
     return {
         'ok': True,
         'subscriptions': subscriptions,
-        'total_monthly_sub': round(total_monthly_sub, 2),
+        'total_monthly_sub': float(round(total_monthly_sub, 2)),
         'installments': installments,
         'total_remaining_inst': round(total_remaining_inst, 2)
     }

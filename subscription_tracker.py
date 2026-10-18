@@ -22,12 +22,30 @@ class BillingCycle(str, Enum):
     SEMI_ANNUAL = "SEMI_ANNUAL"
     YEARLY = "YEARLY"
 
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            val_upper = value.upper()
+            for member in cls:
+                if member.value == val_upper:
+                    return member
+        return None
+
 
 class SubscriptionStatus(str, Enum):
     """订阅生命周期状态"""
     ACTIVE = "ACTIVE"
     PAUSED = "PAUSED"
     CANCELLED = "CANCELLED"
+
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            val_upper = value.upper()
+            for member in cls:
+                if member.value == val_upper:
+                    return member
+        return None
 
 
 class AlertLevel(str, Enum):

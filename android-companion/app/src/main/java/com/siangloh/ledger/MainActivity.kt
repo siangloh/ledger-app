@@ -112,7 +112,16 @@ class MainActivity : AppCompatActivity() {
             com.siangloh.ledger.ui.compose.theme.LedgerTheme {
                 com.siangloh.ledger.ui.compose.MainAppScreen(
                     onScanReceipt = { showReceiptScanChooser() },
-                    onOpenSettings = { showAppSettingsDialog() }
+                    onOpenSettings = { showAppSettingsDialog() },
+                    onOpenWebUrl = { relativeOrAbsoluteUrl ->
+                        showWebViewMode()
+                        if (relativeOrAbsoluteUrl.startsWith("http")) {
+                            webView.loadUrl(relativeOrAbsoluteUrl)
+                        } else {
+                            val serverUrl = NetworkHelper.getServerUrl(this).trimEnd('/')
+                            webView.loadUrl("$serverUrl$relativeOrAbsoluteUrl")
+                        }
+                    }
                 )
             }
         }
@@ -300,9 +309,11 @@ class MainActivity : AppCompatActivity() {
         settings.databaseEnabled = true
         settings.useWideViewPort = true
         settings.loadWithOverviewMode = true
-        settings.setSupportZoom(false)
+        settings.setSupportZoom(true)
+        settings.builtInZoomControls = true
+        settings.displayZoomControls = false
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-        settings.userAgentString = "${settings.userAgentString} LedgerAppNative/1.0"
+        settings.userAgentString = "${settings.userAgentString} LedgerAppNative/${BuildConfig.VERSION_NAME}"
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.allowFileAccess = true
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
@@ -316,7 +327,7 @@ class MainActivity : AppCompatActivity() {
             @JavascriptInterface
             fun isNativeApp(): Boolean = true
             @JavascriptInterface
-            fun getVersion(): String = "1.0.2"
+            fun getVersion(): String = BuildConfig.VERSION_NAME
             @JavascriptInterface
             fun setCurrentUser(username: String) {
                 if (username.isNotBlank()) {
@@ -861,6 +872,14 @@ class MainActivity : AppCompatActivity() {
     private fun setupBackNavigation() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (composeView.visibility != View.VISIBLE) {
+                    if (webView.canGoBack()) {
+                        webView.goBack()
+                    } else {
+                        showNativeComposeMode()
+                    }
+                    return
+                }
                 val currentTime = System.currentTimeMillis()
                 if (currentTime - lastBackPressedTime < 2000L) {
                     finish()

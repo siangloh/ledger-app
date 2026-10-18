@@ -40,19 +40,25 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoreToolsScreen(
     onScanReceipt: () -> Unit = {},
-    onNavigateToAdd: () -> Unit = {}
+    onNavigateToAdd: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onOpenWebUrl: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     var toolsSummary by remember { mutableStateOf<ToolsSummary?>(null) }
+    var toolsError by remember { mutableStateOf<String?>(null) }
     var pendingItems by remember { mutableStateOf<List<UncategorizedItem>>(emptyList()) }
+    var pendingError by remember { mutableStateOf<String?>(null) }
+    var categorizingItem by remember { mutableStateOf<UncategorizedItem?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var isSyncing by remember { mutableStateOf(false) }
 
@@ -75,11 +81,16 @@ fun MoreToolsScreen(
 
     fun refreshAll() {
         isLoading = true
+        toolsError = null
+        pendingError = null
         scope.launch {
             // 1. Load Tools (Subscriptions & Installments)
             val toolsRes = NativeLedgerApi.getToolsSummary(context)
             toolsRes.onSuccess {
                 toolsSummary = it
+                toolsError = null
+            }.onFailure {
+                toolsError = it.message ?: "加载订阅与分期数据失败"
             }
 
             // 2. Load Pending Transactions from Overview API
@@ -88,7 +99,7 @@ fun MoreToolsScreen(
                 val apiKey = NetworkHelper.getApiKey(context)
                 val username = NetworkHelper.getUsername(context)
                 val urlStr = "$serverUrl/api/native/overview?period=month" +
-                        if (username.isNotEmpty()) "&username=$username" else ""
+                        if (username.isNotEmpty()) "&username=${URLEncoder.encode(username, "UTF-8")}" else ""
 
                 val result = withContext(Dispatchers.IO) {
                     try {
@@ -112,6 +123,8 @@ fun MoreToolsScreen(
                     if (uncatArr != null) {
                         for (i in 0 until uncatArr.length()) {
                             val item = uncatArr.getJSONObject(i)
+                            val isPending = item.optBoolean("is_pending_on_hold", false)
+                            val srcType = item.optString("source_type", if (isPending) "pending" else "transaction")
                             list.add(
                                 UncategorizedItem(
                                     id = item.optLong("id"),
@@ -119,14 +132,20 @@ fun MoreToolsScreen(
                                     amount = item.optDouble("amount"),
                                     note = item.optString("note"),
                                     category = item.optString("category"),
-                                    isPendingOnHold = item.optBoolean("is_pending_on_hold", false)
+                                    isPendingOnHold = isPending,
+                                    sourceType = srcType
                                 )
                             )
                         }
                     }
                     pendingItems = list
+                    pendingError = null
+                } else {
+                    pendingError = "无法连接服务器获取待整理条目"
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                pendingError = e.message ?: "获取待整理条目异常"
+            }
 
             isLoading = false
         }
@@ -193,11 +212,22 @@ fun MoreToolsScreen(
         ) {
             item { Spacer(modifier = Modifier.height(4.dp)) }
 
+            // 0. 完整网页版账本直达与功能矩阵 (1:1 Web Features)
+            item {
+                WebLedgerFeaturesCard(
+                    onOpenFullWeb = { onOpenWebUrl("/") },
+                    onOpenFeature = onOpenWebUrl,
+                    onOpenSettings = onOpenSettings
+                )
+            }
+
             // 1. 待整理收件箱 (Pending Review)
             item {
                 PendingInboxCard(
                     pendingCount = pendingItems.size,
                     pendingItems = pendingItems,
+                    errorMessage = pendingError,
+                    onRetry = { refreshAll() },
                     onItemAction = { id, action ->
                         scope.launch {
                             val res = NativeLedgerApi.handlePendingAction(context, id, action)
@@ -208,6 +238,9 @@ fun MoreToolsScreen(
                                 Toast.makeText(context, "失败: ${it.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
+                    },
+                    onCategorizeItem = { item ->
+                        categorizingItem = item
                     }
                 )
             }
@@ -223,7 +256,10 @@ fun MoreToolsScreen(
             item {
                 SubscriptionsCard(
                     subscriptions = toolsSummary?.subscriptions ?: emptyList(),
-                    totalMonthly = toolsSummary?.totalMonthlySub ?: 0.0
+                    totalMonthly = toolsSummary?.totalMonthlySub ?: 0.0,
+                    errorMessage = toolsError,
+                    onRetry = { refreshAll() },
+                    onOpenManage = { onOpenWebUrl("/subscriptions") }
                 )
             }
 
@@ -231,7 +267,10 @@ fun MoreToolsScreen(
             item {
                 InstallmentsCard(
                     installments = toolsSummary?.installments ?: emptyList(),
-                    totalRemaining = toolsSummary?.totalRemainingInst ?: 0.0
+                    totalRemaining = toolsSummary?.totalRemainingInst ?: 0.0,
+                    errorMessage = toolsError,
+                    onRetry = { refreshAll() },
+                    onOpenManage = { onOpenWebUrl("/debts") }
                 )
             }
 
@@ -284,12 +323,13 @@ fun MoreToolsScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Ledger Mobile 1.0.3 · 100% 纯原生架构",
+                        text = "Ledger Mobile v${com.siangloh.ledger.BuildConfig.VERSION_NAME} (Build ${com.siangloh.ledger.BuildConfig.VERSION_CODE})",
                         fontSize = 12.sp,
-                        color = Slate400
+                        fontWeight = FontWeight.Medium,
+                        color = Slate500
                     )
                     Text(
-                        text = "告别网页延迟与掉线，数据实时双向同步",
+                        text = "原生伴侣架构 · 数据实时双向同步",
                         fontSize = 11.sp,
                         color = Slate400
                     )
@@ -316,6 +356,25 @@ fun MoreToolsScreen(
             }
         )
     }
+
+    categorizingItem?.let { item ->
+        QuickCategorizeDialog(
+            item = item,
+            onDismiss = { categorizingItem = null },
+            onConfirmCategory = { cat ->
+                scope.launch {
+                    val res = NativeLedgerApi.quickCategorize(context, item.id, cat)
+                    res.onSuccess {
+                        Toast.makeText(context, "已归类为【$cat】", Toast.LENGTH_SHORT).show()
+                        categorizingItem = null
+                        refreshAll()
+                    }.onFailure {
+                        Toast.makeText(context, "归类失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        )
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -325,9 +384,13 @@ fun MoreToolsScreen(
 fun PendingInboxCard(
     pendingCount: Int,
     pendingItems: List<UncategorizedItem>,
-    onItemAction: (Long, String) -> Unit
+    errorMessage: String? = null,
+    onRetry: () -> Unit = {},
+    onItemAction: (Long, String) -> Unit,
+    onCategorizeItem: (UncategorizedItem) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var showAll by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -370,14 +433,20 @@ fun PendingInboxCard(
                             color = Slate800
                         )
                         Text(
-                            text = if (pendingCount > 0) "有 $pendingCount 笔自动抓取账单需确认" else "所有账目已整理完毕",
+                            text = if (errorMessage != null) "加载失败：$errorMessage"
+                                   else if (pendingCount > 0) "有 $pendingCount 笔账目需整理确认"
+                                   else "所有账目已整理完毕 (Inbox Zero)",
                             fontSize = 12.sp,
-                            color = if (pendingCount > 0) Color(0xFFD97706) else Slate500
+                            color = if (errorMessage != null) ExpenseRed else if (pendingCount > 0) Color(0xFFD97706) else Slate500
                         )
                     }
                 }
 
-                if (pendingCount > 0) {
+                if (errorMessage != null) {
+                    TextButton(onClick = onRetry) {
+                        Text("重试", fontSize = 13.sp, color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                    }
+                } else if (pendingCount > 0) {
                     TextButton(onClick = { expanded = !expanded }) {
                         Text(
                             text = if (expanded) "收起" else "查看 (${pendingCount})",
@@ -396,7 +465,9 @@ fun PendingInboxCard(
                         .padding(top = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    pendingItems.take(5).forEach { item ->
+                    val displayedList = if (showAll) pendingItems else pendingItems.take(5)
+                    displayedList.forEach { item ->
+                        val isPending = item.sourceType == "pending" || item.isPendingOnHold
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = Color.White,
@@ -409,16 +480,32 @@ fun PendingInboxCard(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = if (isPending) Color(0xFFFEF3C7) else Color(0xFFFFE4E6),
+                                                modifier = Modifier.padding(end = 6.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (isPending) "待确认划转" else "未分类支出",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isPending) Color(0xFFD97706) else ExpenseRed,
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                            Text(
+                                                text = item.note.ifBlank { if (isPending) "待确认转账" else "自动捕获账单" },
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Slate800,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = item.note.ifBlank { "自动捕获账单" },
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Slate800,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = "${item.date} · ${item.category}",
+                                            text = "${item.date} · ${item.category.ifBlank { if (isPending) "转账" else "未分类" }}",
                                             fontSize = 12.sp,
                                             color = Slate500
                                         )
@@ -437,26 +524,63 @@ fun PendingInboxCard(
                                     horizontalArrangement = Arrangement.End,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    OutlinedButton(
-                                        onClick = { onItemAction(item.id, "ignore") },
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.height(32.dp)
-                                    ) {
-                                        Text("忽略", fontSize = 12.sp, color = Slate600)
-                                    }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Button(
-                                        onClick = { onItemAction(item.id, "confirm") },
-                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                                        modifier = Modifier.height(32.dp)
-                                    ) {
-                                        Text("确认入账", fontSize = 12.sp, color = Color.White)
+                                    if (isPending) {
+                                        OutlinedButton(
+                                            onClick = { onItemAction(item.id, "ignore") },
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Text("本人自转", fontSize = 12.sp, color = Slate600)
+                                        }
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        OutlinedButton(
+                                            onClick = { onItemAction(item.id, "transfer") },
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Text("内部调拨", fontSize = 12.sp, color = Slate600)
+                                        }
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Button(
+                                            onClick = { onItemAction(item.id, "confirm") },
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Text("记为支出", fontSize = 12.sp, color = Color.White)
+                                        }
+                                    } else {
+                                        Button(
+                                            onClick = { onCategorizeItem(item) },
+                                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("去分类", fontSize = 12.sp, color = Color.White)
+                                        }
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    if (pendingItems.size > 5) {
+                        TextButton(
+                            onClick = { showAll = !showAll },
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        ) {
+                            Text(
+                                text = if (showAll) "收起仅显示前 5 条" else "展开查看全部待整理条目 (共 ${pendingItems.size} 条)",
+                                fontSize = 12.sp,
+                                color = Slate600,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
                     }
                 }
@@ -537,7 +661,10 @@ fun ReceiptOcrBannerCard(
 @Composable
 fun SubscriptionsCard(
     subscriptions: List<SubscriptionRecord>,
-    totalMonthly: Double
+    totalMonthly: Double,
+    errorMessage: String? = null,
+    onRetry: () -> Unit = {},
+    onOpenManage: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -579,14 +706,19 @@ fun SubscriptionsCard(
                             color = Slate800
                         )
                         Text(
-                            text = "月均支出 RM ${String.format(Locale.getDefault(), "%.2f", totalMonthly)} · ${subscriptions.size} 项生效中",
+                            text = if (errorMessage != null) "加载失败：$errorMessage"
+                                   else "月均支出 RM ${String.format(Locale.getDefault(), "%.2f", totalMonthly)} · ${subscriptions.size} 项生效中",
                             fontSize = 12.sp,
-                            color = Slate500
+                            color = if (errorMessage != null) ExpenseRed else Slate500
                         )
                     }
                 }
 
-                if (subscriptions.isNotEmpty()) {
+                if (errorMessage != null) {
+                    TextButton(onClick = onRetry) {
+                        Text("重试", fontSize = 13.sp, color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                    }
+                } else if (subscriptions.isNotEmpty()) {
                     IconButton(onClick = { expanded = !expanded }) {
                         Icon(
                             imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
@@ -634,6 +766,15 @@ fun SubscriptionsCard(
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = onOpenManage,
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("在网页版中维护订阅与新增周期扣款", fontSize = 12.sp, color = Indigo600)
+                    }
                 }
             }
         }
@@ -646,7 +787,10 @@ fun SubscriptionsCard(
 @Composable
 fun InstallmentsCard(
     installments: List<InstallmentRecord>,
-    totalRemaining: Double
+    totalRemaining: Double,
+    errorMessage: String? = null,
+    onRetry: () -> Unit = {},
+    onOpenManage: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -688,14 +832,19 @@ fun InstallmentsCard(
                             color = Slate800
                         )
                         Text(
-                            text = "剩余待还 RM ${String.format(Locale.getDefault(), "%.2f", totalRemaining)} · ${installments.size} 项进行中",
+                            text = if (errorMessage != null) "加载失败：$errorMessage"
+                                   else "剩余待还 RM ${String.format(Locale.getDefault(), "%.2f", totalRemaining)} · ${installments.size} 项进行中",
                             fontSize = 12.sp,
-                            color = Slate500
+                            color = if (errorMessage != null) ExpenseRed else Slate500
                         )
                     }
                 }
 
-                if (installments.isNotEmpty()) {
+                if (errorMessage != null) {
+                    TextButton(onClick = onRetry) {
+                        Text("重试", fontSize = 13.sp, color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                    }
+                } else if (installments.isNotEmpty()) {
                     IconButton(onClick = { expanded = !expanded }) {
                         Icon(
                             imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
@@ -750,11 +899,23 @@ fun InstallmentsCard(
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = onOpenManage,
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("在网页版中维护负债、车房贷与分期", fontSize = 12.sp, color = Rose500)
+                    }
                 }
             }
         }
     }
 }
+
+
+
 
 // -----------------------------------------------------------------------------
 // Component: 自动化与设备权限卡片
@@ -967,6 +1128,192 @@ fun ServerSettingsCard(
 }
 
 // -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// Component: 1:1 完整网页版账本直达与功能矩阵
+// -----------------------------------------------------------------------------
+@Composable
+fun WebLedgerFeaturesCard(
+    onOpenFullWeb: () -> Unit,
+    onOpenFeature: (String) -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
+        border = BorderStroke(1.dp, Color(0xFFBBF7D0))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Emerald600),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "完整网页版账本 (Web 功能)",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate900
+                        )
+                        Text(
+                            text = "1:1 访问全套高级记账、分类与债务管理",
+                            fontSize = 12.sp,
+                            color = Slate600
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = onOpenFullWeb,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Emerald600)
+            ) {
+                Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("打开 1:1 完整网页版账本", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text("快捷功能直达：", fontSize = 11.sp, color = Slate500, fontWeight = FontWeight.Medium)
+            Spacer(modifier = Modifier.height(6.dp))
+
+            val quickLinks = listOf(
+                Triple("💳 周期订阅", "/subscriptions", Indigo600),
+                Triple("📉 债务管理", "/debts", Rose500),
+                Triple("📊 统计洞察", "/report", Sky500),
+                Triple("🏷️ 分类管理", "/categories", Amber600),
+                Triple("📥 导入导出", "/export", Slate700),
+                Triple("👤 用户绑定", "settings", Emerald600)
+            )
+
+            val chunked = quickLinks.chunked(3)
+            chunked.forEach { rowLinks ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    rowLinks.forEach { (label, route, color) ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, Slate200),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    if (route == "settings") onOpenSettings() else onOpenFeature(route)
+                                }
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = color,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Component: 快速归类弹窗 (Quick Categorize)
+// -----------------------------------------------------------------------------
+@Composable
+fun QuickCategorizeDialog(
+    item: UncategorizedItem,
+    onDismiss: () -> Unit,
+    onConfirmCategory: (String) -> Unit
+) {
+    val commonCategories = listOf(
+        "餐饮" to "🍔", "交通" to "🚗", "杂货" to "🛒", "账单" to "💡",
+        "购物" to "🛍️", "娱乐" to "🎮", "医疗" to "💊", "居家" to "🏠",
+        "数码" to "📱", "理财" to "📈", "教育" to "📚", "其他" to "🏷️"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        titleContentColor = Slate900,
+        textContentColor = Slate800,
+        title = { Text("为交易选择分类", fontWeight = FontWeight.Bold, fontSize = 17.sp) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "${item.note.ifBlank { "未命名消费" }} · RM ${String.format(Locale.getDefault(), "%.2f", item.amount)}",
+                    fontSize = 13.sp,
+                    color = Slate600
+                )
+                val chunked = commonCategories.chunked(3)
+                chunked.forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        row.forEach { (catName, emoji) ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Slate100,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { onConfirmCategory(catName) }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Text(emoji, fontSize = 14.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(catName, fontSize = 12.sp, color = Slate800, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消", color = Slate600)
+            }
+        }
+    )
+}
+
+// -----------------------------------------------------------------------------
 // Dialog: 修改服务器与 API Key
 // -----------------------------------------------------------------------------
 @Composable
@@ -981,8 +1328,11 @@ fun ServerConfigDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        titleContentColor = Slate900,
+        textContentColor = Slate800,
         title = {
-            Text("修改服务器连接", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("修改服务器连接", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1010,12 +1360,12 @@ fun ServerConfigDialog(
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
             ) {
-                Text("保存配置")
+                Text("保存配置", color = Color.White)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text("取消", color = Slate600)
             }
         }
     )

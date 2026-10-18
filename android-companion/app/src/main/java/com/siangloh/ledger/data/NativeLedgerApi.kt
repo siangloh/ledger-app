@@ -48,7 +48,9 @@ data class AccountsSummary(
     val totalAssets: Double,
     val totalLiabilities: Double,
     val netWorth: Double,
-    val accounts: List<AccountRecord>
+    val accounts: List<AccountRecord>,
+    val defaultAccountId: Int? = null,
+    val defaultGroup: String? = null
 )
 
 data class CategoryRecord(
@@ -181,7 +183,8 @@ object NativeLedgerApi {
         note: String,
         tags: String,
         accountId: Int? = null,
-        toAccountId: Int? = null
+        toAccountId: Int? = null,
+        groupName: String? = null
     ): Result<Long> = withContext(Dispatchers.IO) {
         try {
             val conn = openConnection(context, "/api/native/transactions", "POST")
@@ -196,6 +199,7 @@ object NativeLedgerApi {
                 put("tags", tags)
                 accountId?.let { put("account_id", it) }
                 toAccountId?.let { put("to_account_id", it) }
+                groupName?.let { put("group_name", it) }
                 val username = NetworkHelper.getUsername(context)
                 if (username.isNotEmpty()) put("username", username)
             }.toString()
@@ -327,12 +331,17 @@ object NativeLedgerApi {
                 )
             }
 
+            val defaultAccountId = if (json.has("default_account_id") && !json.isNull("default_account_id")) json.optInt("default_account_id") else null
+            val defaultGroup = if (json.has("default_group") && !json.isNull("default_group")) json.optString("default_group") else null
+
             Result.success(
                 AccountsSummary(
                     totalAssets = json.optDouble("total_assets", 0.0),
                     totalLiabilities = json.optDouble("total_liabilities", 0.0),
                     netWorth = json.optDouble("net_worth", 0.0),
-                    accounts = list
+                    accounts = list,
+                    defaultAccountId = defaultAccountId,
+                    defaultGroup = defaultGroup
                 )
             )
         } catch (e: Exception) {
@@ -434,7 +443,14 @@ object NativeLedgerApi {
                            else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
             conn.disconnect()
 
+            if (respCode !in 200..299) {
+                return@withContext Result.failure(Exception("HTTP $respCode: ${if (respBody.isNotBlank()) respBody else "无法加载工具摘要"}"))
+            }
+
             val json = JSONObject(respBody)
+            if (!json.optBoolean("ok", true)) {
+                return@withContext Result.failure(Exception(json.optString("message", "加载工具摘要失败")))
+            }
             val subArr = json.optJSONArray("subscriptions") ?: JSONArray()
             val instArr = json.optJSONArray("installments") ?: JSONArray()
 
@@ -521,6 +537,47 @@ object NativeLedgerApi {
             }
         } catch (e: Exception) {
             Log.e(TAG, "handlePendingAction error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun quickCategorize(
+        context: Context,
+        transactionId: Long,
+        category: String,
+        rememberRule: Boolean = false
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val conn = openConnection(context, "/api/native/quick-categorize", "POST")
+            conn.doOutput = true
+            val apiKey = NetworkHelper.getApiKey(context)
+            val username = NetworkHelper.getUsername(context)
+            val payload = JSONObject().apply {
+                if (apiKey.isNotEmpty()) put("key", apiKey)
+                put("transaction_id", transactionId)
+                put("category", category)
+                put("remember_rule", rememberRule)
+                if (username.isNotEmpty()) put("username", username)
+            }.toString()
+
+            OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                it.write(payload)
+                it.flush()
+            }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(json.optString("message", "分类失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "quickCategorize error: ${e.message}", e)
             Result.failure(e)
         }
     }

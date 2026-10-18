@@ -32,7 +32,8 @@ data class NavItem(
 fun MainAppScreen(
     initialTab: Int = 0,
     onScanReceipt: () -> Unit = {},
-    onOpenSettings: () -> Unit = {}
+    onOpenSettings: () -> Unit = {},
+    onOpenWebUrl: (String) -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf(initialTab) }
 
@@ -146,11 +147,13 @@ fun MainAppScreen(
                         onNavigateToAccounts = { selectedTab = 3 },
                         onNavigateToTools = { selectedTab = 4 },
                         onScanReceipt = onScanReceipt,
-                        onOpenSettings = { selectedTab = 4 }
+                        onOpenSettings = onOpenSettings
                     )
                 }
                 1 -> {
-                    RecordsScreen()
+                    RecordsScreen(
+                        onNavigateToAdd = { selectedTab = 2 }
+                    )
                 }
                 2 -> {
                     AddTransactionScreen(
@@ -165,7 +168,9 @@ fun MainAppScreen(
                 4 -> {
                     MoreToolsScreen(
                         onScanReceipt = onScanReceipt,
-                        onNavigateToAdd = { selectedTab = 2 }
+                        onNavigateToAdd = { selectedTab = 2 },
+                        onOpenSettings = onOpenSettings,
+                        onOpenWebUrl = onOpenWebUrl
                     )
                 }
             }

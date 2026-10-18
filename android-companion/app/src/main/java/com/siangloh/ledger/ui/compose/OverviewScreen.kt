@@ -70,7 +70,8 @@ data class UncategorizedItem(
     val amount: Double,
     val note: String,
     val category: String,
-    val isPendingOnHold: Boolean = false
+    val isPendingOnHold: Boolean = false,
+    val sourceType: String = if (isPendingOnHold) "pending" else "transaction"
 )
 
 data class OverviewData(
@@ -167,6 +168,8 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
     if (uncatArray != null) {
         for (i in 0 until uncatArray.length()) {
             val item = uncatArray.getJSONObject(i)
+            val isPending = item.optBoolean("is_pending_on_hold", false)
+            val srcType = item.optString("source_type", if (isPending) "pending" else "transaction")
             uncatList.add(
                 UncategorizedItem(
                     id = item.optLong("id"),
@@ -174,7 +177,8 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
                     amount = item.optDouble("amount"),
                     note = item.optString("note"),
                     category = item.optString("category"),
-                    isPendingOnHold = item.optBoolean("is_pending_on_hold", false)
+                    isPendingOnHold = isPending,
+                    sourceType = srcType
                 )
             )
         }
@@ -594,7 +598,8 @@ fun OverviewScreen(
                     amount = it.amount,
                     note = it.note,
                     category = it.category,
-                    isPendingOnHold = false
+                    isPendingOnHold = false,
+                    sourceType = "transaction"
                 )
             }
         }

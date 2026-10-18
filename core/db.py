@@ -350,16 +350,20 @@ def init_db(app_logger=None):
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        email TEXT
+        email TEXT,
+        api_key TEXT
     );
     ''')
-    # 确保既有 users 表具备 email 字段
+    # 确保既有 users 表具备 email 与 api_key 字段
     try:
         user_cols = [r[1] for r in db.execute("PRAGMA table_info(users)").fetchall()]
         if 'email' not in user_cols:
             db.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        if 'api_key' not in user_cols:
+            db.execute("ALTER TABLE users ADD COLUMN api_key TEXT")
+            db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_api_key ON users(api_key)")
     except Exception as e:
-        logger.debug("Migrate users email column skipped: %s", e)
+        logger.debug("Migrate users columns skipped: %s", e)
 
     # 密码重置 OTP 记录表
     db.execute('''
