@@ -190,6 +190,13 @@
     <string name="btn_self_transfer">本人自转</string>
     <string name="btn_internal_allocate">内部调拨</string>
     <string name="btn_select_category">⚡ 选择分类</string>
+    <string name="pending_center_title">待确认交易中心</string>
+    <string name="pending_reason_duplicate">⚠️ 疑似重复交易</string>
+    <string name="pending_reason_unclear">❓ 分类待确认</string>
+    <string name="pending_reason_account">🏦 账户待指定</string>
+    <string name="pending_btn_merge">🔄 合并重复</string>
+    <string name="pending_btn_not_duplicate">✅ 标记非重复</string>
+    <string name="pending_ref_tx">参考已有记录 #%1$d：%2$s (MYR %3$s)</string>
 
     <!-- Additional Add & Accounts -->
     <string name="clear_draft">清空草稿</string>

@@ -5477,6 +5477,91 @@ html[data-theme="dark"] {
   border-color: rgba(245, 158, 11, 0.35);
 }
 
+.pending-tx-badge.badge-duplicate {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+[data-theme="dark"] .pending-tx-badge.badge-duplicate {
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+}
+
+.pending-tx-badge.badge-unclear {
+  background: rgba(15, 118, 110, 0.12);
+  color: #0f766e;
+  border: 1px solid rgba(15, 118, 110, 0.3);
+}
+[data-theme="dark"] .pending-tx-badge.badge-unclear {
+  background: rgba(94, 234, 212, 0.18);
+  color: #5eead4;
+}
+
+.pending-tx-badge.badge-account {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+[data-theme="dark"] .pending-tx-badge.badge-account {
+  background: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+.pending-comparison-box {
+  background: rgba(15, 118, 110, 0.04);
+  border: 1px dashed rgba(15, 118, 110, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+[data-theme="dark"] .pending-comparison-box {
+  background: rgba(94, 234, 212, 0.06);
+  border-color: rgba(94, 234, 212, 0.2);
+}
+
+.pending-comparison-title {
+  font-weight: 700;
+  color: var(--teal, #0f766e);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+[data-theme="dark"] .pending-comparison-title {
+  color: #5eead4;
+}
+
+.pending-comparison-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--ink-soft);
+}
+
+.btn-pending-merge {
+  background: #0f766e;
+  color: #ffffff;
+}
+.btn-pending-merge:hover {
+  background: #115e59;
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.3);
+}
+
+.btn-pending-not-dup {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+.btn-pending-not-dup:hover {
+  background: rgba(16, 185, 129, 0.22);
+}
+[data-theme="dark"] .btn-pending-not-dup {
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
 /* 订阅列表状态胶囊筛选器 (与全站胶囊按钮风格统一) */
 .sub-filter-btn {
   border-radius: 9999px !important;

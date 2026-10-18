@@ -2709,6 +2709,9 @@ function getPendingContainer() {
   return container;
 }
 
+window._pendingAccounts = [];
+window._pendingCategories = [];
+
 function fetchPendingTransactions() {
   fetch('/api/pending-transactions', {
     method: 'GET',
@@ -2718,12 +2721,14 @@ function fetchPendingTransactions() {
     .then(res => res.ok ? res.json() : null)
     .then(data => {
       if (!data || !data.ok) return;
-      renderPendingTransactions(data.items || []);
+      window._pendingAccounts = data.accounts || [];
+      window._pendingCategories = (data.categories && data.categories.expense) ? data.categories.expense : [];
+      renderPendingTransactions(data.items || [], data);
     })
     .catch(err => console.debug('fetchPendingTransactions error:', err));
 }
 
-function renderPendingTransactions(items) {
+function renderPendingTransactions(items, meta) {
   const container = getPendingContainer();
   if (!container) return;
 
@@ -2738,37 +2743,104 @@ function renderPendingTransactions(items) {
 
   container.innerHTML = items.map(item => {
     const amtStr = `${sym} ${Number(item.amount).toFixed(2)}`;
-    const fromChannel = escapeHtml(item.channel || '银行');
+    const fromChannel = escapeHtml(item.channel || '银行/钱包');
     const toTarget = escapeHtml(item.merchant || item.note || '目标账户');
-    const reasonStr = escapeHtml(item.on_hold_reason || '系统检测到转账/充值，可能为个人储蓄自转');
     const timeStr = item.created_at ? escapeHtml(item.created_at.split('.')[0].replace('T', ' ')) : '';
+
+    const reasonType = item.effective_reason || item.review_reason || 'unclear_category';
+    let badgeHtml = '';
+    let isDuplicate = false;
+
+    if (reasonType === 'suspected_duplicate' || item.suspected_duplicate_id) {
+      isDuplicate = true;
+      badgeHtml = `<span class="pending-tx-badge badge-duplicate">⚠️ 疑似重复交易待核对</span>`;
+    } else if (reasonType === 'unmatched_account') {
+      badgeHtml = `<span class="pending-tx-badge badge-account">🏦 扣款账户待指定</span>`;
+    } else if (reasonType === 'on_hold_transfer') {
+      badgeHtml = `<span class="pending-tx-badge">⏸️ 资金划转待确认 (On Hold)</span>`;
+    } else {
+      badgeHtml = `<span class="pending-tx-badge badge-unclear">❓ 消费分类待确认</span>`;
+    }
+
+    const reasonDesc = escapeHtml(item.on_hold_reason || '系统已自动暂存此笔变动，请人工确认用途');
+
+    // 若包含疑似重复交易对比信息，渲染并排对比小框
+    let comparisonBoxHtml = '';
+    let targetDupId = item.suspected_duplicate_id || 0;
+    if (item.suspected_duplicate) {
+      targetDupId = item.suspected_duplicate.id;
+      const dupAmtStr = `${sym} ${Number(item.suspected_duplicate.amount).toFixed(2)}`;
+      const dupDate = escapeHtml(item.suspected_duplicate.date || '');
+      const dupCat = escapeHtml(item.suspected_duplicate.category || '未分类');
+      const dupAcc = escapeHtml(item.suspected_duplicate.account_name || '主账户');
+      const dupNote = escapeHtml(item.suspected_duplicate.note || '');
+
+      comparisonBoxHtml = `
+        <div class="pending-comparison-box">
+          <div class="pending-comparison-title">
+            <span>🔍 参考账本已有交易 #${item.suspected_duplicate.id}</span>
+          </div>
+          <div class="pending-comparison-details">
+            <span>📅 ${dupDate}</span>
+            <span>🏷️ ${dupCat}</span>
+            <span>🏦 ${dupAcc}</span>
+            <span>💰 ${dupAmtStr}</span>
+            ${dupNote ? `<span>📝 ${dupNote}</span>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    // 区分操作按钮：若是疑似重复，提供“合并”和“标记非重复”
+    let actionsHtml = '';
+    if (isDuplicate) {
+      actionsHtml = `
+        <button type="button" class="btn-pending-action btn-pending-merge" onclick="mergePendingTx(${item.id}, ${targetDupId})">
+          <span>🔄</span>
+          <span>合并重复记录 (保留追溯)</span>
+        </button>
+        <button type="button" class="btn-pending-action btn-pending-not-dup" onclick="markNotDuplicatePendingTx(${item.id}, '${escapePendingAttr(item.category || '其他')}', ${item.amount}, ${item.account_id || 0})">
+          <span>✅</span>
+          <span>标记非重复 (独立支出入账)</span>
+        </button>
+        <button type="button" class="btn-pending-action btn-pending-ignore" onclick="ignorePendingTx(${item.id})">
+          <span>🚫</span>
+          <span>忽略此记录</span>
+        </button>
+      `;
+    } else {
+      actionsHtml = `
+        <button type="button" class="btn-pending-action btn-pending-confirm" onclick="confirmPendingTx(${item.id}, '${escapePendingAttr(item.category || '其他')}', ${item.amount}, ${item.account_id || 0})">
+          <span>💸</span>
+          <span>确认记入正式账本</span>
+        </button>
+        <button type="button" class="btn-pending-action btn-pending-ignore" onclick="ignorePendingTx(${item.id})">
+          <span>🚫</span>
+          <span>本人自转/充值 (忽略)</span>
+        </button>
+        <button type="button" class="btn-pending-action btn-pending-transfer" onclick="transferPendingTx(${item.id})">
+          <span>🔄</span>
+          <span>账户间互转</span>
+        </button>
+      `;
+    }
 
     return `
       <div class="pending-tx-card" id="pendingCard-${item.id}">
         <div class="pending-tx-header">
-          <span class="pending-tx-badge">⏸️ 待确认资金用途 (On Hold)</span>
+          ${badgeHtml}
           <span class="pending-tx-time">${timeStr}</span>
         </div>
         <div class="pending-tx-body">
           <div class="pending-tx-main">
             <div class="pending-tx-route">${escapePendingHtml(fromChannel)} ➔ ${escapePendingHtml(toTarget)}</div>
-            <div class="pending-tx-reason">${escapePendingHtml(reasonStr)}</div>
+            <div class="pending-tx-reason">${reasonDesc}</div>
+            ${comparisonBoxHtml}
           </div>
           <div class="pending-tx-amount">${amtStr}</div>
         </div>
         <div class="pending-tx-actions">
-          <button type="button" class="btn-pending-action btn-pending-ignore" onclick="ignorePendingTx(${item.id})">
-            <span>🚫</span>
-            <span>本人自转/储蓄 (忽略)</span>
-          </button>
-          <button type="button" class="btn-pending-action btn-pending-confirm" onclick="confirmPendingTx(${item.id}, '${escapePendingAttr(item.category || '其他')}', ${item.amount})">
-            <span>💸</span>
-            <span>确认为日常支出</span>
-          </button>
-          <button type="button" class="btn-pending-action btn-pending-transfer" onclick="transferPendingTx(${item.id})">
-            <span>🔄</span>
-            <span>账户间互转</span>
-          </button>
+          ${actionsHtml}
         </div>
       </div>
     `;
@@ -2826,52 +2898,143 @@ function ignorePendingTx(id) {
     });
 }
 
-function confirmPendingTx(id, defaultCategory, amount) {
+function mergePendingTx(id, targetId) {
+  if (!targetId || targetId <= 0) {
+    if (window.Swal) {
+      Swal.fire('提示', '未找到可合并的目标已有交易，请点击“标记非重复”直接入账或忽略', 'warning');
+    } else {
+      alert('未找到可合并的目标已有交易');
+    }
+    return;
+  }
+
+  const doMerge = () => {
+    const card = document.getElementById(`pendingCard-${id}`);
+    if (card) card.style.opacity = '0.5';
+
+    fetch(`/api/pending-transactions/${id}/merge`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getAppCsrfToken(),
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify({ target_tx_id: targetId })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          if (card) {
+            card.style.transition = 'all 0.3s ease';
+            card.style.transform = 'translateY(-10px)';
+            card.style.opacity = '0';
+            setTimeout(() => {
+              card.remove();
+              const container = document.getElementById('pendingTransactionsBanner');
+              if (container && container.children.length === 0) {
+                container.style.display = 'none';
+              }
+            }, 300);
+          }
+          checkRealtimeUpdates();
+          if (window.Swal) {
+            Swal.fire({
+              toast: true,
+              position: 'top-end',
+              icon: 'success',
+              title: '已合并重复记录',
+              text: data.message || '已成功关联已有交易并保留审计追溯，未重复计入支出！',
+              showConfirmButton: false,
+              timer: 3000,
+              background: 'var(--surface)',
+              color: 'var(--navy)'
+            });
+          }
+        } else {
+          if (card) card.style.opacity = '1';
+          alert(data.message || '合并失败');
+        }
+      })
+      .catch(err => {
+        if (card) card.style.opacity = '1';
+        console.error(err);
+      });
+  };
+
   if (window.Swal) {
     Swal.fire({
-      title: '确认为正式支出',
+      title: '确认合并重复记录？',
+      text: `将把此通知的来源报文与渠道追溯合并到已有交易 #${targetId} 中，绝不会重复产生支出扣款。`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: '确认合并',
+      cancelButtonText: '取消'
+    }).then(res => {
+      if (res.isConfirmed) doMerge();
+    });
+  } else {
+    if (confirm(`确认将此记录合并至已有交易 #${targetId}？`)) doMerge();
+  }
+}
+
+function markNotDuplicatePendingTx(id, defaultCategory, amount, defaultAccountId) {
+  confirmPendingTx(id, defaultCategory, amount, defaultAccountId, true);
+}
+
+function confirmPendingTx(id, defaultCategory, amount, defaultAccountId, isNotDuplicate = false) {
+  const catOptions = (window._pendingCategories && window._pendingCategories.length > 0)
+    ? window._pendingCategories
+    : ['餐饮', '交通', '购物', '娱乐', '医疗', '居住', '通讯', '其他'];
+
+  const accountOptions = window._pendingAccounts || [];
+
+  if (window.Swal) {
+    let catSelectHtml = `<select id="swalPendingCat" class="swal2-input" style="width:100%; box-sizing:border-box;">`;
+    catOptions.forEach(c => {
+      const isSel = (c === defaultCategory) ? 'selected' : '';
+      catSelectHtml += `<option value="${escapePendingAttr(c)}" ${isSel}>${escapePendingHtml(c)}</option>`;
+    });
+    if (!catOptions.includes('其他')) {
+      catSelectHtml += `<option value="其他">其他</option>`;
+    }
+    catSelectHtml += `</select>`;
+
+    let accSelectHtml = `<select id="swalPendingAcc" class="swal2-input" style="width:100%; box-sizing:border-box;">`;
+    accSelectHtml += `<option value="">默认账户 (不指定)</option>`;
+    accountOptions.forEach(a => {
+      const isSel = (Number(a.id) === Number(defaultAccountId)) ? 'selected' : '';
+      accSelectHtml += `<option value="${a.id}" ${isSel}>${escapePendingHtml(a.name)} (${escapePendingHtml(a.currency || 'MYR')})</option>`;
+    });
+    accSelectHtml += `</select>`;
+
+    const titleText = isNotDuplicate ? '标记为独立支出并入账' : '确认为正式支出';
+
+    Swal.fire({
+      title: titleText,
       html: `
         <div style="text-align:left; margin-top:10px;">
-          <p style="margin-bottom:8px; font-size:14px; color:var(--muted);">请选择支出归属分类：</p>
-          <select id="swalPendingCat" class="swal2-input" style="width:100%; box-sizing:border-box;">
-            <option value="其他">其他</option>
-            <option value="餐饮">餐饮</option>
-            <option value="购物">购物</option>
-            <option value="交通">交通</option>
-            <option value="人情往来">人情往来</option>
-            <option value="娱乐">娱乐</option>
-            <option value="医疗">医疗</option>
-            <option value="居住">居住</option>
-            <option value="转账支出">转账支出</option>
-          </select>
+          <p style="margin-bottom:6px; font-size:13px; color:var(--muted); font-weight:600;">1. 支出归属分类：</p>
+          ${catSelectHtml}
+          <p style="margin-top:12px; margin-bottom:6px; font-size:13px; color:var(--muted); font-weight:600;">2. 扣款账户：</p>
+          ${accSelectHtml}
         </div>
       `,
       showCancelButton: true,
       confirmButtonText: '确定入账',
-      cancelButtonText: '取消',
-      didOpen: () => {
-        const sel = document.getElementById('swalPendingCat');
-        if (sel && defaultCategory && defaultCategory !== '转账/充值') {
-          for (let opt of sel.options) {
-            if (opt.value === defaultCategory) {
-              opt.selected = true;
-              break;
-            }
-          }
-        }
-      }
+      cancelButtonText: '取消'
     }).then(res => {
       if (res.isConfirmed) {
         const cat = document.getElementById('swalPendingCat').value;
-        executeConfirmPendingTx(id, cat);
+        const accId = document.getElementById('swalPendingAcc').value;
+        executeConfirmPendingTx(id, cat, accId);
       }
     });
   } else {
-    executeConfirmPendingTx(id, defaultCategory || '其他');
+    executeConfirmPendingTx(id, defaultCategory || '其他', defaultAccountId || null);
   }
 }
 
-function executeConfirmPendingTx(id, category) {
+function executeConfirmPendingTx(id, category, accountId) {
   const card = document.getElementById(`pendingCard-${id}`);
   if (card) card.style.opacity = '0.5';
 
@@ -2882,7 +3045,10 @@ function executeConfirmPendingTx(id, category) {
       'X-CSRFToken': getAppCsrfToken(),
       'X-Requested-With': 'XMLHttpRequest'
     },
-    body: JSON.stringify({ category: category })
+    body: JSON.stringify({
+      category: category,
+      account_id: accountId ? Number(accountId) : null
+    })
   })
     .then(res => res.json())
     .then(data => {

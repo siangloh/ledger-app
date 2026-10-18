@@ -805,6 +805,10 @@ def init_db(app_logger=None):
         raw_text TEXT,
         status TEXT NOT NULL DEFAULT 'on_hold',
         on_hold_reason TEXT,
+        review_reason TEXT DEFAULT 'unclear_category',
+        suspected_duplicate_id INTEGER,
+        merged_into_id INTEGER,
+        account_id INTEGER,
         created_at TEXT NOT NULL,
         updated_at TEXT
     );
@@ -831,6 +835,25 @@ def init_db(app_logger=None):
         db.commit()
     except Exception as e:
         logger.debug("Column migration bank_holder_names notice: %s", e)
+
+    # 待确认交易表扩展迁移：增加审核原因、疑似重复关联 ID、合并目标 ID 与关联账户 ID
+    for col_name, col_sql in [
+        ("review_reason", "TEXT DEFAULT 'unclear_category'"),
+        ("suspected_duplicate_id", "INTEGER"),
+        ("merged_into_id", "INTEGER"),
+        ("account_id", "INTEGER"),
+    ]:
+        try:
+            db.execute(f"ALTER TABLE pending_transactions ADD COLUMN {col_name} {col_sql}")
+            db.commit()
+        except Exception as e:
+            logger.debug("ALTER pending_transactions ADD %s notice: %s", col_name, e)
+
+    try:
+        db.execute("ALTER TABLE transactions ADD COLUMN merged_info TEXT")
+        db.commit()
+    except Exception as e:
+        logger.debug("ALTER transactions ADD merged_info notice: %s", e)
 
     # 核心性能索引轻量幂等迁移（支持已有库热升级）
     core_indices = [

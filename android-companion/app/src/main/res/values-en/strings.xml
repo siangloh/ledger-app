@@ -190,6 +190,13 @@
     <string name="btn_self_transfer">Self Transfer</string>
     <string name="btn_internal_allocate">Internal Transfer</string>
     <string name="btn_select_category">⚡ Select Category</string>
+    <string name="pending_center_title">Pending Review Center</string>
+    <string name="pending_reason_duplicate">⚠️ Suspected Duplicate</string>
+    <string name="pending_reason_unclear">❓ Unclear Category</string>
+    <string name="pending_reason_account">🏦 Unspecified Account</string>
+    <string name="pending_btn_merge">🔄 Merge Duplicate</string>
+    <string name="pending_btn_not_duplicate">✅ Mark Not Duplicate</string>
+    <string name="pending_ref_tx">Ref Existing Tx #%1$d: %2$s (MYR %3$s)</string>
 
     <!-- Additional Add & Accounts -->
     <string name="clear_draft">Clear Draft</string>

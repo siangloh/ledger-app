@@ -147,6 +147,10 @@ fun MoreToolsScreen(
                             val item = uncatArr.getJSONObject(i)
                             val isPending = item.optBoolean("is_pending_on_hold", false)
                             val srcType = item.optString("source_type", if (isPending) "pending" else "transaction")
+                            val reviewReason = item.optString("review_reason", if (isPending) "on_hold_transfer" else "unclear_category")
+                            val onHoldReason = item.optString("on_hold_reason", "")
+                            val dupObj = item.optJSONObject("suspected_duplicate")
+                            val dupId = if (item.has("suspected_duplicate_id") && !item.isNull("suspected_duplicate_id")) item.optLong("suspected_duplicate_id") else null
                             list.add(
                                 UncategorizedItem(
                                     id = item.optLong("id"),
@@ -155,7 +159,14 @@ fun MoreToolsScreen(
                                     note = item.optString("note"),
                                     category = item.optString("category"),
                                     isPendingOnHold = isPending,
-                                    sourceType = srcType
+                                    sourceType = srcType,
+                                    reviewReason = reviewReason,
+                                    onHoldReason = onHoldReason,
+                                    suspectedDuplicateId = dupId,
+                                    suspectedDuplicateNote = dupObj?.optString("note"),
+                                    suspectedDuplicateAmount = if (dupObj != null && dupObj.has("amount")) dupObj.optDouble("amount") else null,
+                                    suspectedDuplicateCategory = dupObj?.optString("category"),
+                                    suspectedDuplicateDate = dupObj?.optString("date")
                                 )
                             )
                         }
@@ -533,16 +544,34 @@ fun PendingInboxCard(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
+                                            val badgeText = when {
+                                                item.reviewReason == "suspected_duplicate" || item.suspectedDuplicateId != null -> "⚠️ 疑似重复"
+                                                item.reviewReason == "unmatched_account" -> "🏦 待指定账户"
+                                                isPending -> "待确认划转"
+                                                else -> "未分类支出"
+                                            }
+                                            val badgeBg = when {
+                                                item.reviewReason == "suspected_duplicate" || item.suspectedDuplicateId != null -> Color(0xFFFEF3C7)
+                                                item.reviewReason == "unmatched_account" -> Color(0xFFF3E8FF)
+                                                isPending -> Color(0xFFFEF3C7)
+                                                else -> Color(0xFFFFE4E6)
+                                            }
+                                            val badgeFg = when {
+                                                item.reviewReason == "suspected_duplicate" || item.suspectedDuplicateId != null -> Color(0xFFD97706)
+                                                item.reviewReason == "unmatched_account" -> Color(0xFF7E22CE)
+                                                isPending -> Color(0xFFD97706)
+                                                else -> ExpenseRed
+                                            }
                                             Surface(
                                                 shape = RoundedCornerShape(4.dp),
-                                                color = if (isPending) Color(0xFFFEF3C7) else Color(0xFFFFE4E6),
+                                                color = badgeBg,
                                                 modifier = Modifier.padding(end = 6.dp)
                                             ) {
                                                 Text(
-                                                    text = if (isPending) "待确认划转" else "未分类支出",
+                                                    text = badgeText,
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = if (isPending) Color(0xFFD97706) else ExpenseRed,
+                                                    color = badgeFg,
                                                     modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                                                 )
                                             }
@@ -570,6 +599,22 @@ fun PendingInboxCard(
                                     )
                                 }
 
+                                if (item.suspectedDuplicateId != null || item.reviewReason == "suspected_duplicate") {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = Slate100,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = "参考已有记录 #${item.suspectedDuplicateId ?: 0}: ${item.suspectedDuplicateNote ?: "交易"}",
+                                            fontSize = 11.sp,
+                                            color = Slate600,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -577,32 +622,53 @@ fun PendingInboxCard(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     if (isPending) {
-                                        OutlinedButton(
-                                            onClick = { onItemAction(item.id, "ignore") },
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.height(32.dp)
-                                        ) {
-                                            Text("本人自转", fontSize = 12.sp, color = Slate600)
-                                        }
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        OutlinedButton(
-                                            onClick = { onItemAction(item.id, "transfer") },
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.height(32.dp)
-                                        ) {
-                                            Text("内部调拨", fontSize = 12.sp, color = Slate600)
-                                        }
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Button(
-                                            onClick = { onItemAction(item.id, "confirm") },
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                            shape = RoundedCornerShape(8.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                                            modifier = Modifier.height(32.dp)
-                                        ) {
-                                            Text("记为支出", fontSize = 12.sp, color = Color.White)
+                                        if (item.reviewReason == "suspected_duplicate" || item.suspectedDuplicateId != null) {
+                                            OutlinedButton(
+                                                onClick = { onItemAction(item.id, "mark-not-duplicate") },
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.height(48.dp)
+                                            ) {
+                                                Text("标记非重复", fontSize = 12.sp, color = Slate600)
+                                            }
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Button(
+                                                onClick = { onItemAction(item.id, "merge") },
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                                shape = RoundedCornerShape(8.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                                                modifier = Modifier.height(48.dp)
+                                            ) {
+                                                Text("合并重复", fontSize = 12.sp, color = Color.White)
+                                            }
+                                        } else {
+                                            OutlinedButton(
+                                                onClick = { onItemAction(item.id, "ignore") },
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.height(48.dp)
+                                            ) {
+                                                Text("本人自转", fontSize = 12.sp, color = Slate600)
+                                            }
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            OutlinedButton(
+                                                onClick = { onItemAction(item.id, "transfer") },
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.height(48.dp)
+                                            ) {
+                                                Text("内部调拨", fontSize = 12.sp, color = Slate600)
+                                            }
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Button(
+                                                onClick = { onItemAction(item.id, "confirm") },
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                                shape = RoundedCornerShape(8.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                                                modifier = Modifier.height(48.dp)
+                                            ) {
+                                                Text("记为支出", fontSize = 12.sp, color = Color.White)
+                                            }
                                         }
                                     } else {
                                         Button(
@@ -610,7 +676,7 @@ fun PendingInboxCard(
                                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
                                             shape = RoundedCornerShape(8.dp),
                                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                                            modifier = Modifier.height(32.dp)
+                                            modifier = Modifier.height(48.dp)
                                         ) {
                                             Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
                                             Spacer(modifier = Modifier.width(4.dp))

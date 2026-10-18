@@ -158,21 +158,45 @@ def get_native_overview_summary(
             uncategorized_amount += float(on_hold_stats['total_amt'] or 0.0)
 
         on_hold_rows = db.execute('''
-            SELECT id, date, type, category, amount, note, merchant, on_hold_reason
+            SELECT id, date, type, category, amount, note, merchant, on_hold_reason, review_reason, suspected_duplicate_id
             FROM pending_transactions
             WHERE user_id = ? AND status = 'on_hold'
             ORDER BY id DESC LIMIT 50
         ''', (str(user_id),)).fetchall()
         for p in on_hold_rows:
             p_amt = float(p['amount'] or 0.0)
+            rr = p['review_reason'] or ''
+            on_hold_r = (p['on_hold_reason'] or '').lower()
+            if rr == 'suspected_duplicate' or p['suspected_duplicate_id'] or '重复' in on_hold_r:
+                eff_reason = 'suspected_duplicate'
+            elif rr == 'unmatched_account' or '账户' in on_hold_r:
+                eff_reason = 'unmatched_account'
+            elif rr == 'on_hold_transfer' or '转账' in on_hold_r or '充值' in on_hold_r:
+                eff_reason = 'on_hold_transfer'
+            else:
+                eff_reason = 'unclear_category'
+
+            dup_info = None
+            if p['suspected_duplicate_id']:
+                dup_row = db.execute(
+                    "SELECT id, date, amount, note, category FROM transactions WHERE id = ? AND user_id = ?",
+                    (p['suspected_duplicate_id'], str(user_id))
+                ).fetchone()
+                if dup_row:
+                    dup_info = dict(dup_row)
+
             on_hold_items.append({
                 'id': p['id'],
                 'date': p['date'],
                 'amount': p_amt,
-                'note': p['note'] or p['merchant'] or '待确认划转',
-                'category': '待确认转账',
+                'note': p['note'] or p['merchant'] or '待确认交易',
+                'category': p['category'] or '待确认',
                 'is_pending_on_hold': True,
-                'source_type': 'pending'
+                'source_type': 'pending',
+                'review_reason': eff_reason,
+                'on_hold_reason': p['on_hold_reason'] or '',
+                'suspected_duplicate_id': p['suspected_duplicate_id'],
+                'suspected_duplicate': dup_info
             })
     except Exception as e:
         logger.debug("Check pending on_hold transactions skipped: %s", e)

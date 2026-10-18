@@ -357,7 +357,28 @@ def api_auto_track():
                 evt.set()
 
             if AUTO_TRACK_DEBUG_LOG:
-                print(f"[AUTO_TRACK DEBUG] Duplicate transaction rejected ({reason}): cand_id={cand_id}, amount={parsed['amount']}")
+                print(f"[AUTO_TRACK DEBUG] Duplicate transaction flagged for review ({reason}): cand_id={cand_id}, amount={parsed['amount']}")
+
+            cur_pending = db.execute('''
+                INSERT INTO pending_transactions (
+                    user_id, date, type, amount, group_name, category, merchant, note, channel, raw_text, status, on_hold_reason, review_reason, suspected_duplicate_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'on_hold', ?, 'suspected_duplicate', ?, ?)
+            ''', (
+                str(target_user_id),
+                parsed.get('date') or date.today().isoformat(),
+                parsed.get('type') or 'expense',
+                parsed['amount'],
+                parsed.get('group_name'),
+                parsed.get('category') or cand['category'] or '其他',
+                parsed.get('merchant') or parsed.get('note'),
+                parsed.get('note'),
+                parsed.get('channel') or 'Bank',
+                text,
+                f"短时间内检测到疑似重复（{reason}，参考交易 #{cand_id}）",
+                cand_id,
+                now
+            ))
+            pending_id = cur_pending.lastrowid
             try:
                 db.execute('''
                     INSERT INTO processed_notifications (user_id, content_hash, raw_text, amount, transaction_id, created_at)
@@ -367,13 +388,17 @@ def api_auto_track():
             except Exception as e:
                 logger.debug("Failed to record processed_notification on dup: %s", e)
 
+            bump_data_version('pending_transaction_added', {'pending_id': pending_id, 'user_id': target_user_id})
+
             return jsonify({
                 'ok': True,
                 'verdict': 'duplicate_ignored',
-                'message': f'检测到短时间内相同交易已入账（{reason}），已自动忽略重复记账',
+                'message': f'检测到短时间内相同交易已入账（{reason}），已转入待确认中心供您核对或合并',
                 'transaction_id': cand_id,
-                'notification_title': '重复通知已忽略 ℹ️',
-                'notification_body': f"短时间内检测到相同的【{parsed['note']} {money_filter(parsed['amount'])}】已入账，系统已自动拦截防重",
+                'pending_id': pending_id,
+                'suspected_duplicate_id': cand_id,
+                'notification_title': '重复通知已转入待确认 ℹ️',
+                'notification_body': f"检测到相同的【{parsed['note']} {money_filter(parsed['amount'])}】已入账，可在待确认中心合并或标记非重复",
                 'raw_text': text,
                 'parsed': parsed
             }), 200

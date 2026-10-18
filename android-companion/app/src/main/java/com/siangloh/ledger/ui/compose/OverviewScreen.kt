@@ -77,7 +77,14 @@ data class UncategorizedItem(
     val note: String,
     val category: String,
     val isPendingOnHold: Boolean = false,
-    val sourceType: String = if (isPendingOnHold) "pending" else "transaction"
+    val sourceType: String = if (isPendingOnHold) "pending" else "transaction",
+    val reviewReason: String = "unclear_category",
+    val onHoldReason: String = "",
+    val suspectedDuplicateId: Long? = null,
+    val suspectedDuplicateNote: String? = null,
+    val suspectedDuplicateAmount: Double? = null,
+    val suspectedDuplicateCategory: String? = null,
+    val suspectedDuplicateDate: String? = null
 )
 
 data class OverviewData(
@@ -185,6 +192,11 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
             val item = uncatArray.getJSONObject(i)
             val isPending = item.optBoolean("is_pending_on_hold", false)
             val srcType = item.optString("source_type", if (isPending) "pending" else "transaction")
+            val reviewReason = item.optString("review_reason", if (isPending) "on_hold_transfer" else "unclear_category")
+            val onHoldReason = item.optString("on_hold_reason", "")
+            val dupObj = item.optJSONObject("suspected_duplicate")
+            val dupId = if (item.has("suspected_duplicate_id") && !item.isNull("suspected_duplicate_id")) item.optLong("suspected_duplicate_id") else null
+
             uncatList.add(
                 UncategorizedItem(
                     id = item.optLong("id"),
@@ -193,7 +205,14 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
                     note = item.optString("note"),
                     category = item.optString("category"),
                     isPendingOnHold = isPending,
-                    sourceType = srcType
+                    sourceType = srcType,
+                    reviewReason = reviewReason,
+                    onHoldReason = onHoldReason,
+                    suspectedDuplicateId = dupId,
+                    suspectedDuplicateNote = dupObj?.optString("note"),
+                    suspectedDuplicateAmount = if (dupObj != null && dupObj.has("amount")) dupObj.optDouble("amount") else null,
+                    suspectedDuplicateCategory = dupObj?.optString("category"),
+                    suspectedDuplicateDate = dupObj?.optString("date")
                 )
             )
         }
@@ -1813,6 +1832,38 @@ fun UncategorizedReviewBottomSheet(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
+                                        if (item.reviewReason == "suspected_duplicate" || item.suspectedDuplicateId != null) {
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = Amber50,
+                                                border = BorderStroke(1.dp, Amber200),
+                                                modifier = Modifier.padding(bottom = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.pending_reason_duplicate),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Amber700,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        } else if (item.reviewReason == "unmatched_account") {
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = Color(0xFFF3E8FF),
+                                                border = BorderStroke(1.dp, Color(0xFFD8B4FE)),
+                                                modifier = Modifier.padding(bottom = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.pending_reason_account),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF7E22CE),
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+
                                         Text(
                                             text = item.note.ifBlank { if (item.isPendingOnHold) stringResource(R.string.pending_hold_title) else stringResource(R.string.unnamed_expense) },
                                             fontSize = 14.sp,
@@ -1837,41 +1888,84 @@ fun UncategorizedReviewBottomSheet(
                                     )
                                 }
 
+                                if (item.suspectedDuplicateId != null || item.reviewReason == "suspected_duplicate") {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = Slate100,
+                                        border = BorderStroke(1.dp, Slate200),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            val dupAmtStr = item.suspectedDuplicateAmount?.let { String.format(Locale.US, "%.2f", it) } ?: String.format(Locale.US, "%.2f", item.amount)
+                                            val dupNoteStr = item.suspectedDuplicateNote?.ifBlank { "交易" } ?: "交易"
+                                            Text(
+                                                text = stringResource(R.string.pending_ref_tx, item.suspectedDuplicateId ?: 0L, dupNoteStr, dupAmtStr),
+                                                fontSize = 11.sp,
+                                                color = Slate600
+                                            )
+                                        }
+                                    }
+                                }
+
                                 Spacer(modifier = Modifier.height(10.dp))
 
-                                if (item.isPendingOnHold) {
-                                    Text(
-                                        text = stringResource(R.string.pending_hold_help),
-                                        fontSize = 11.sp,
-                                        color = Slate500,
-                                        lineHeight = 15.sp,
-                                        modifier = Modifier.padding(bottom = 6.dp)
-                                    )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Button(
-                                            onClick = { onResolvePending(item.id, "confirm") },
-                                            modifier = Modifier.weight(1f).height(36.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
-                                            contentPadding = PaddingValues(0.dp)
+                                if (item.isPendingOnHold || item.sourceType == "pending") {
+                                    if (item.reviewReason == "suspected_duplicate" || item.suspectedDuplicateId != null) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Text(stringResource(R.string.btn_record_expense), fontSize = 12.sp, color = Color.White)
+                                            Button(
+                                                onClick = { onResolvePending(item.id, "merge") },
+                                                modifier = Modifier.weight(1f).height(48.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                                                contentPadding = PaddingValues(horizontal = 4.dp)
+                                            ) {
+                                                Text(stringResource(R.string.pending_btn_merge), fontSize = 12.sp, color = Color.White)
+                                            }
+                                            OutlinedButton(
+                                                onClick = { onResolvePending(item.id, "mark-not-duplicate") },
+                                                modifier = Modifier.weight(1f).height(48.dp),
+                                                contentPadding = PaddingValues(horizontal = 4.dp)
+                                            ) {
+                                                Text(stringResource(R.string.pending_btn_not_duplicate), fontSize = 12.sp, color = Slate700)
+                                            }
                                         }
-                                        OutlinedButton(
-                                            onClick = { onResolvePending(item.id, "ignore") },
-                                            modifier = Modifier.weight(1f).height(36.dp),
-                                            contentPadding = PaddingValues(0.dp)
+                                    } else {
+                                        Text(
+                                            text = stringResource(R.string.pending_hold_help),
+                                            fontSize = 11.sp,
+                                            color = Slate500,
+                                            lineHeight = 15.sp,
+                                            modifier = Modifier.padding(bottom = 6.dp)
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Text(stringResource(R.string.btn_self_transfer), fontSize = 12.sp, color = Slate700)
-                                        }
-                                        OutlinedButton(
-                                            onClick = { onResolvePending(item.id, "transfer") },
-                                            modifier = Modifier.weight(1f).height(36.dp),
-                                            contentPadding = PaddingValues(0.dp)
-                                        ) {
-                                            Text(stringResource(R.string.btn_internal_allocate), fontSize = 12.sp, color = Slate700)
+                                            Button(
+                                                onClick = { onResolvePending(item.id, "confirm") },
+                                                modifier = Modifier.weight(1f).height(48.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                                                contentPadding = PaddingValues(horizontal = 4.dp)
+                                            ) {
+                                                Text(stringResource(R.string.btn_record_expense), fontSize = 12.sp, color = Color.White)
+                                            }
+                                            OutlinedButton(
+                                                onClick = { onResolvePending(item.id, "ignore") },
+                                                modifier = Modifier.weight(1f).height(48.dp),
+                                                contentPadding = PaddingValues(horizontal = 4.dp)
+                                            ) {
+                                                Text(stringResource(R.string.btn_self_transfer), fontSize = 12.sp, color = Slate700)
+                                            }
+                                            OutlinedButton(
+                                                onClick = { onResolvePending(item.id, "transfer") },
+                                                modifier = Modifier.weight(1f).height(48.dp),
+                                                contentPadding = PaddingValues(horizontal = 4.dp)
+                                            ) {
+                                                Text(stringResource(R.string.btn_internal_allocate), fontSize = 12.sp, color = Slate700)
+                                            }
                                         }
                                     }
                                 } else {
@@ -1889,8 +1983,8 @@ fun UncategorizedReviewBottomSheet(
                                                 )
                                             )
                                         },
-                                        modifier = Modifier.fillMaxWidth().height(36.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
+                                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
                                         contentPadding = PaddingValues(0.dp)
                                     ) {
                                         Text(stringResource(R.string.btn_select_category), fontSize = 13.sp, color = Color.White)
