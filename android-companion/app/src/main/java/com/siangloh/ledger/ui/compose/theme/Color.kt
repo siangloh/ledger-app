@@ -23,3 +23,7 @@ val Amber500 = Color(0xFFF59E0B)
 val Amber600 = Color(0xFFD97706)
 val Rose500 = Color(0xFFF43F5E)
 val Indigo600 = Color(0xFF4F46E5)
+
+val PrimaryBlue = Indigo600
+val ExpenseRed = Rose500
+val IncomeGreen = Emerald500

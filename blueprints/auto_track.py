@@ -27,7 +27,15 @@ from core.extensions import csrf
 from core.i18n import t
 from services.native_api_service import (
     get_native_overview_summary,
-    update_transaction_quick_category
+    update_transaction_quick_category,
+    get_native_transactions_list,
+    add_native_transaction,
+    update_native_transaction_full,
+    delete_native_transaction,
+    get_native_accounts_summary,
+    add_or_update_native_account,
+    get_native_categories_list,
+    get_native_tools_summary
 )
 
 auto_track_bp = Blueprint('auto_track', __name__)
@@ -929,25 +937,38 @@ def api_llm_samples_reset():
     return jsonify({'ok': True, 'message': t('auto_track.sample_reset_success', '已成功将学习样本库恢复为官方预设语料库！')})
 
 
-@auto_track_bp.route('/api/native/overview', methods=['GET'], endpoint='api_native_overview')
-@csrf.exempt
-def api_native_overview():
-    req_key = request.headers.get('X-API-KEY') or request.args.get('key')
+def _resolve_native_user(db):
     user_id = session.get('user_id')
-    db = get_db()
+    req_key = request.headers.get('X-API-KEY')
+    data = (request.get_json(silent=True) or request.form) if (request.is_json or request.form) else {}
+    if not req_key and isinstance(data, dict):
+        req_key = data.get('key')
+    if not req_key:
+        req_key = request.args.get('key')
+
     if not user_id:
         if not is_valid_api_key(req_key, db=db):
-            return jsonify({'ok': False, 'message': '未授权访问'}), 401
-        target_username = request.args.get('username')
+            return None, ('未授权访问', 401)
+        target_username = (data.get('username') if isinstance(data, dict) else None) or request.args.get('username')
         if target_username:
             u_row = db.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (target_username,)).fetchone()
             if not u_row:
-                return jsonify({'ok': False, 'message': f"指定用户 '{target_username}' 不存在"}), 404
+                return None, (f"指定用户 '{target_username}' 不存在", 404)
             user_id = u_row['id']
         else:
             user_id = get_user_id_from_api_key(req_key, db=db)
         if not user_id:
             user_id = get_current_user_id()
+    return user_id, None
+
+
+@auto_track_bp.route('/api/native/overview', methods=['GET'], endpoint='api_native_overview')
+@csrf.exempt
+def api_native_overview():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
 
     period = request.args.get('period', 'month')
     selected_month = request.args.get('month')
@@ -1011,3 +1032,113 @@ def api_native_quick_categorize():
             'user_id': user_id
         })
     return jsonify(res)
+
+
+@auto_track_bp.route('/api/native/transactions', methods=['GET', 'POST'], endpoint='api_native_transactions')
+@csrf.exempt
+def api_native_transactions():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    if request.method == 'GET':
+        tx_type = request.args.get('type')
+        month = request.args.get('month')
+        category = request.args.get('category')
+        search = request.args.get('search')
+        account_id = request.args.get('account_id')
+        try:
+            account_id = int(account_id) if account_id else None
+        except (ValueError, TypeError):
+            account_id = None
+        try:
+            page = int(request.args.get('page', 1))
+        except (ValueError, TypeError):
+            page = 1
+        try:
+            limit = int(request.args.get('limit', 50))
+        except (ValueError, TypeError):
+            limit = 50
+
+        res = get_native_transactions_list(
+            user_id=user_id,
+            tx_type=tx_type,
+            month=month,
+            category=category,
+            search=search,
+            account_id=account_id,
+            page=page,
+            limit=limit,
+            db=db
+        )
+        return jsonify(res)
+
+    # POST: 新增交易
+    data = request.get_json(silent=True) or request.form
+    res = add_native_transaction(user_id=user_id, data=data, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/transactions/<int:tx_id>', methods=['PUT', 'POST', 'DELETE'], endpoint='api_native_transaction_item')
+@csrf.exempt
+def api_native_transaction_item(tx_id: int):
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    if request.method == 'DELETE':
+        res = delete_native_transaction(user_id=user_id, tx_id=tx_id, db=db)
+        status_code = 200 if res.get('ok') else 400
+        return jsonify(res), status_code
+
+    # PUT or POST (update)
+    data = request.get_json(silent=True) or request.form
+    res = update_native_transaction_full(user_id=user_id, tx_id=tx_id, data=data, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/accounts', methods=['GET', 'POST'], endpoint='api_native_accounts')
+@csrf.exempt
+def api_native_accounts():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    if request.method == 'GET':
+        res = get_native_accounts_summary(user_id=user_id, db=db)
+        return jsonify(res)
+
+    data = request.get_json(silent=True) or request.form
+    res = add_or_update_native_account(user_id=user_id, data=data, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/categories', methods=['GET'], endpoint='api_native_categories')
+@csrf.exempt
+def api_native_categories():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    res = get_native_categories_list(user_id=user_id, db=db)
+    return jsonify(res)
+
+
+@auto_track_bp.route('/api/native/tools-summary', methods=['GET'], endpoint='api_native_tools_summary')
+@csrf.exempt
+def api_native_tools_summary():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    res = get_native_tools_summary(user_id=user_id, db=db)
+    return jsonify(res)
+

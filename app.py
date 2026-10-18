@@ -368,10 +368,15 @@ def require_login():
         req_key = request.headers.get('X-API-KEY')
         if not req_key and request.is_json:
             req_key = (request.get_json(silent=True) or {}).get('key')
-        if is_valid_api_key(req_key):
+        if not req_key:
+            req_key = request.args.get('key')
+        if is_valid_api_key(req_key, db=get_db()):
             return
-        if request.path.startswith('/api/auto-track'):
+        if request.path.startswith('/api/auto-track') or request.path.startswith('/api/native/'):
             return
+        if not session.get('logged_in') or not session.get('user_id'):
+            return jsonify({'ok': False, 'message': '未授权访问或登录失效'}), 401
+        return
 
     if not session.get('logged_in') or not session.get('user_id'):
         if request.headers.get('X-Requested-With') == 'InstantNav':

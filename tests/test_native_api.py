@@ -71,3 +71,85 @@ def test_native_quick_categorize_api(flask_app, client, admin_user_id):
         rule = db.execute("SELECT category FROM merchant_category_overrides WHERE merchant_note = 'Mixue Bubble Tea'").fetchone()
         assert rule is not None
         assert rule['category'] == '餐饮'
+
+
+def test_native_transactions_crud(flask_app, client, admin_user_id):
+    """测试原生交易流水的增删改查 REST 接口"""
+    headers = {"X-API-KEY": "test-auto-track-key", "Content-Type": "application/json"}
+
+    # 1. 新增支出
+    add_payload = {
+        "type": "expense",
+        "amount": 42.00,
+        "category": "餐饮",
+        "date": "2026-10-18",
+        "note": "KFC Lunch",
+        "tags": "#food #lunch"
+    }
+    res = client.post('/api/native/transactions', json=add_payload, headers=headers)
+    assert res.status_code == 200
+    res_data = res.get_json()
+    assert res_data['ok'] is True
+    tx_id = res_data['id']
+
+    # 2. 查询列表（带筛选）
+    res_list = client.get('/api/native/transactions?type=expense&month=2026-10&search=KFC', headers=headers)
+    assert res_list.status_code == 200
+    list_data = res_list.get_json()
+    assert list_data['ok'] is True
+    assert list_data['total_count'] >= 1
+    assert any(item['id'] == tx_id and item['amount'] == 42.00 for item in list_data['items'])
+
+    # 3. 编辑交易
+    update_payload = {
+        "type": "expense",
+        "amount": 45.50,
+        "category": "餐饮",
+        "date": "2026-10-18",
+        "note": "KFC Dinner",
+        "tags": "#food"
+    }
+    res_update = client.put(f'/api/native/transactions/{tx_id}', json=update_payload, headers=headers)
+    assert res_update.status_code == 200
+    assert res_update.get_json()['ok'] is True
+
+    # 4. 删除交易
+    res_del = client.delete(f'/api/native/transactions/{tx_id}', headers=headers)
+    assert res_del.status_code == 200
+    assert res_del.get_json()['ok'] is True
+
+
+def test_native_accounts_and_categories_api(flask_app, client, admin_user_id):
+    """测试原生资产账户与分类接口"""
+    headers = {"X-API-KEY": "test-auto-track-key", "Content-Type": "application/json"}
+
+    # 1. 创建新账户
+    acc_payload = {
+        "name": "Maybank Savings",
+        "type": "savings",
+        "currency": "MYR"
+    }
+    res_acc = client.post('/api/native/accounts', json=acc_payload, headers=headers)
+    assert res_acc.status_code == 200
+    assert res_acc.get_json()['ok'] is True
+
+    # 2. 查询账户概览
+    res_get = client.get('/api/native/accounts', headers=headers)
+    assert res_get.status_code == 200
+    acc_data = res_get.get_json()
+    assert acc_data['ok'] is True
+    assert any(a['name'] == 'Maybank Savings' for a in acc_data['accounts'])
+
+    # 3. 查询分类列表
+    res_cat = client.get('/api/native/categories', headers=headers)
+    assert res_cat.status_code == 200
+    cat_data = res_cat.get_json()
+    assert cat_data['ok'] is True
+    assert len(cat_data['expense_categories']) >= 1
+    assert len(cat_data['income_categories']) >= 1
+
+    # 4. 查询工具汇总 (Subscriptions, Installments)
+    res_tools = client.get('/api/native/tools-summary', headers=headers)
+    assert res_tools.status_code == 200
+    assert res_tools.get_json()['ok'] is True
+

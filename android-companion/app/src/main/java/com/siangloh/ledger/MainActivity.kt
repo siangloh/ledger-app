@@ -90,15 +90,9 @@ class MainActivity : AppCompatActivity() {
         setupBackNavigation()
 
         val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
-        val defaultMode = sp.getString("default_view_mode", "compose") ?: "compose"
+        sp.edit().putString("default_view_mode", "compose").apply()
+        showNativeComposeMode()
         handleIncomingIntent(intent)
-        if (intent?.getStringExtra("action") != "open_web_add") {
-            if (defaultMode == "web") {
-                showWebViewMode()
-            } else {
-                showNativeComposeMode()
-            }
-        }
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -109,16 +103,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleIncomingIntent(intent: Intent?) {
         if (intent?.getStringExtra("action") == "open_web_add") {
-            showWebViewMode()
+            startActivity(Intent(this, QuickAddActivity::class.java))
         }
     }
 
     private fun initComposeOverview() {
         composeView.setContent {
             com.siangloh.ledger.ui.compose.theme.LedgerTheme {
-                com.siangloh.ledger.ui.compose.OverviewScreen(
-                    onNavigateToWeb = { showWebViewMode() },
-                    onQuickAdd = { startActivity(Intent(this, QuickAddActivity::class.java)) },
+                com.siangloh.ledger.ui.compose.MainAppScreen(
                     onScanReceipt = { showReceiptScanChooser() },
                     onOpenSettings = { showAppSettingsDialog() }
                 )
@@ -869,43 +861,12 @@ class MainActivity : AppCompatActivity() {
     private fun setupBackNavigation() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
-                val defaultMode = sp.getString("default_view_mode", "compose") ?: "compose"
-
-                if (composeView.visibility == View.VISIBLE) {
-                    if (defaultMode == "web") {
-                        showWebViewMode()
-                    } else {
-                        val currentTime = System.currentTimeMillis()
-                        if (currentTime - lastBackPressedTime < 2000L) {
-                            finish()
-                        } else {
-                            lastBackPressedTime = currentTime
-                            Toast.makeText(this@MainActivity, "再按一次退出应用", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                } else if (swipeRefreshLayout.visibility == View.VISIBLE || webView.visibility == View.VISIBLE) {
-                    if (webView.canGoBack()) {
-                        webView.goBack()
-                    } else if (defaultMode == "compose") {
-                        showNativeComposeMode()
-                    } else {
-                        val currentTime = System.currentTimeMillis()
-                        if (currentTime - lastBackPressedTime < 2000L) {
-                            finish()
-                        } else {
-                            lastBackPressedTime = currentTime
-                            Toast.makeText(this@MainActivity, "再按一次退出应用", Toast.LENGTH_SHORT).show()
-                        }
-                    }
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - lastBackPressedTime < 2000L) {
+                    finish()
                 } else {
-                    val currentTime = System.currentTimeMillis()
-                    if (currentTime - lastBackPressedTime < 2000L) {
-                        finish()
-                    } else {
-                        lastBackPressedTime = currentTime
-                        Toast.makeText(this@MainActivity, "再按一次退出应用", Toast.LENGTH_SHORT).show()
-                    }
+                    lastBackPressedTime = currentTime
+                    Toast.makeText(this@MainActivity, "再按一次退出应用", Toast.LENGTH_SHORT).show()
                 }
             }
         })

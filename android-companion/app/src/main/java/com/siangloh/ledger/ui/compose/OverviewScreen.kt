@@ -208,10 +208,15 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OverviewScreen(
-    onNavigateToWeb: () -> Unit,
-    onQuickAdd: () -> Unit,
-    onScanReceipt: () -> Unit,
-    onOpenSettings: () -> Unit
+    showBottomBar: Boolean = false,
+    onNavigateToRecords: () -> Unit = {},
+    onNavigateToAdd: () -> Unit = {},
+    onNavigateToAccounts: () -> Unit = {},
+    onNavigateToTools: () -> Unit = {},
+    onScanReceipt: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onNavigateToWeb: () -> Unit = onNavigateToRecords,
+    onQuickAdd: () -> Unit = onNavigateToAdd
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -358,12 +363,14 @@ fun OverviewScreen(
     Scaffold(
         containerColor = Slate50,
         bottomBar = {
-            NativeBottomBar(
-                onHome = { refreshData() },
-                onAdd = onQuickAdd,
-                onScan = onScanReceipt,
-                onWeb = onNavigateToWeb
-            )
+            if (showBottomBar) {
+                NativeBottomBar(
+                    onHome = { refreshData() },
+                    onAdd = onNavigateToAdd,
+                    onScan = onScanReceipt,
+                    onRecords = onNavigateToRecords
+                )
+            }
         }
     ) { paddingValues ->
         LazyColumn(
@@ -493,11 +500,11 @@ fun OverviewScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable { onNavigateToWeb() }
+                            .clickable { onNavigateToRecords() }
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "查看完整历史",
+                            text = "查看全部流水",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Indigo600
@@ -543,7 +550,7 @@ fun OverviewScreen(
             if (overviewData.recentTransactions.isNotEmpty()) {
                 item {
                     OutlinedButton(
-                        onClick = onNavigateToWeb,
+                        onClick = onNavigateToRecords,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
@@ -551,14 +558,14 @@ fun OverviewScreen(
                         border = BorderStroke(1.dp, Indigo600.copy(alpha = 0.3f))
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Language,
+                            imageVector = Icons.Default.ReceiptLong,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
                             tint = Indigo600
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "进入 1:1 完整账本（历史筛选/编辑/删除）>",
+                            text = "查看全部流水明细（原生筛选 / 搜索 / 编辑 / 删除）>",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Indigo600
@@ -1258,7 +1265,7 @@ fun NativeBottomBar(
     onHome: () -> Unit,
     onAdd: () -> Unit,
     onScan: () -> Unit,
-    onWeb: () -> Unit
+    onRecords: () -> Unit
 ) {
     Surface(
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
@@ -1302,11 +1309,11 @@ fun NativeBottomBar(
             )
 
             BottomNavItem(
-                icon = Icons.Default.Language,
-                label = "1:1完整账本",
+                icon = Icons.Default.ReceiptLong,
+                label = "流水明细",
                 tint = Indigo600,
                 selected = false,
-                onClick = onWeb,
+                onClick = onRecords,
                 modifier = Modifier.weight(1f)
             )
         }
