@@ -90,6 +90,7 @@ def get_native_overview_summary(
 
     UNCATEGORIZED_NAMES = {'其他', '未分类', '待分类', 'other', 'others', 'uncategorized', ''}
 
+    regular_uncat_items = []
     for r in rows:
         amt = float(r['amount'] or 0.0)
         cat = (r['category'] or '').strip()
@@ -108,16 +109,16 @@ def get_native_overview_summary(
             if cat.lower() in UNCATEGORIZED_NAMES or not cat:
                 uncategorized_count += 1
                 uncategorized_amount += amt
-                if len(uncategorized_items) < 50:
-                    uncategorized_items.append({
-                        'id': r['id'],
-                        'date': r['date'],
-                        'amount': amt,
-                        'note': r['note'] or '未命名支出',
-                        'category': cat or '待分类'
-                    })
+                regular_uncat_items.append({
+                    'id': r['id'],
+                    'date': r['date'],
+                    'amount': amt,
+                    'note': r['note'] or '未命名支出',
+                    'category': cat or '待分类'
+                })
 
-    # 待确认暂存表 (on_hold) 也统计入待整理（D5: 准确计算全部 COUNT 与 SUM，不受 LIMIT 截断）
+    # 待确认暂存表 (on_hold) 具有最高待办优先级，排在最前端
+    on_hold_items = []
     try:
         on_hold_stats = db.execute('''
             SELECT COUNT(*) AS cnt, COALESCE(SUM(amount), 0.0) AS total_amt
@@ -136,17 +137,19 @@ def get_native_overview_summary(
         ''', (str(user_id),)).fetchall()
         for p in on_hold_rows:
             p_amt = float(p['amount'] or 0.0)
-            if len(uncategorized_items) < 50:
-                uncategorized_items.append({
-                    'id': p['id'],
-                    'date': p['date'],
-                    'amount': p_amt,
-                    'note': p['note'] or p['merchant'] or '待确认划转',
-                    'category': '待确认转账',
-                    'is_pending_on_hold': True
-                })
+            on_hold_items.append({
+                'id': p['id'],
+                'date': p['date'],
+                'amount': p_amt,
+                'note': p['note'] or p['merchant'] or '待确认划转',
+                'category': '待确认转账',
+                'is_pending_on_hold': True
+            })
     except Exception as e:
         logger.debug("Check pending on_hold transactions skipped: %s", e)
+
+    # 待确认转账置顶，避免被普通未分类挤掉；总容量扩充至 100 条
+    uncategorized_items = on_hold_items + regular_uncat_items[:max(0, 100 - len(on_hold_items))]
 
     total_spending = round(expense_amount + transfer_amount, 2)
 

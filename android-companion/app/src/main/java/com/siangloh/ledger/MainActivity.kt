@@ -34,13 +34,11 @@ import androidx.core.content.FileProvider
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.mlkit.vision.common.InputImage
+import android.app.NotificationManager
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothDevice
 import android.content.pm.PackageManager
 import androidx.lifecycle.lifecycleScope
-import com.siangloh.ledger.driving.DrivingDetectionManager
 import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.AppSelectionActivity
 import com.siangloh.ledger.ui.NotificationLogActivity
@@ -65,6 +63,7 @@ class MainActivity : AppCompatActivity() {
     private var pendingScannedReceiptText: String? = null
 
     companion object {
+        private const val TAG = "LedgerMainActivity"
         private const val FILE_CHOOSER_REQUEST_CODE = 1001
         private const val RECEIPT_CAMERA_REQUEST_CODE = 1002
         private const val RECEIPT_GALLERY_REQUEST_CODE = 1003
@@ -87,17 +86,30 @@ class MainActivity : AppCompatActivity() {
         initComposeOverview()
         checkNotificationPermission()
         checkBatteryOptimization()
-        checkDrivingPermissions()
+        cleanLegacyDrivingState()
         setupBackNavigation()
-
-        DrivingDetectionManager.requestActivityTransitionUpdates(this)
 
         val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
         val defaultMode = sp.getString("default_view_mode", "compose") ?: "compose"
-        if (defaultMode == "web") {
+        handleIncomingIntent(intent)
+        if (intent?.getStringExtra("action") != "open_web_add") {
+            if (defaultMode == "web") {
+                showWebViewMode()
+            } else {
+                showNativeComposeMode()
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(intent: Intent?) {
+        if (intent?.getStringExtra("action") == "open_web_add") {
             showWebViewMode()
-        } else {
-            showNativeComposeMode()
         }
     }
 
@@ -108,7 +120,7 @@ class MainActivity : AppCompatActivity() {
                     onNavigateToWeb = { showWebViewMode() },
                     onQuickAdd = { startActivity(Intent(this, QuickAddActivity::class.java)) },
                     onScanReceipt = { showReceiptScanChooser() },
-                    onOpenSettings = { startActivity(Intent(this, AppSelectionActivity::class.java)) }
+                    onOpenSettings = { showAppSettingsDialog() }
                 )
             }
         }
@@ -347,13 +359,6 @@ class MainActivity : AppCompatActivity() {
             fun scanReceipt() {
                 runOnUiThread { showReceiptScanChooser() }
             }
-            // 驾车状态感知与设置
-            @JavascriptInterface
-            fun isDriving(): Boolean = DrivingDetectionManager.isCurrentlyDriving(this@MainActivity)
-            @JavascriptInterface
-            fun openDrivingSettings() {
-                runOnUiThread { showCarDrivingSettingsDialog() }
-            }
         }, "LedgerNativeBridge")
 
         swipeRefreshLayout.setColorSchemeResources(R.color.gold_accent, R.color.navy_primary)
@@ -509,57 +514,59 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showQuickMenu() {
+    fun showAppSettingsDialog() {
         val currentBound = NetworkHelper.getUsername(this).ifEmpty { "未绑定(默认admin)" }
+        val currentServer = NetworkHelper.getServerUrl(this)
         val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
-        val defaultMode = sp.getString("default_view_mode", "web") ?: "web"
-        val modeText = if (defaultMode == "web") "1:1 完整账本" else "极简监听概览"
+        val defaultMode = sp.getString("default_view_mode", "compose") ?: "compose"
+        val modeText = if (defaultMode == "web") "🌐 1:1 完整账本" else "📊 极简监听概览"
         val options = arrayOf(
-            "⚡ 离线快速记账",
-            "📊 切换至极简概览 (Overview)",
             "🌐 切换至 1:1 完整账本 (Web)",
+            "📊 切换至极简概览 (Overview)",
             "📱 默认启动视图设置 (当前: $modeText)",
+            "⚡ 离线快速记账",
+            "👤 绑定记账用户 (当前: $currentBound)",
+            "🌐 服务器地址设置 (当前: $currentServer)",
+            "🔑 自动记账 API Key 设置",
             "⚙️ 监测的应用设置",
             "📋 查看通知与同步日志",
-            "🔄 手动同步",
-            "👤 绑定记账用户 (当前: $currentBound)",
-            "🌐 服务器地址切换与设置",
-            "🔑 自动记账 API Key 设置",
-            "🚗 车载蓝牙与自动驾车检测设置"
+            "🔄 立即执行后台同步"
         )
         AlertDialog.Builder(this)
-            .setTitle("快捷菜单")
+            .setTitle("⚙️ 应用设置与快捷操作")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> startActivity(Intent(this, QuickAddActivity::class.java))
+                    0 -> showWebViewMode()
                     1 -> showNativeComposeMode()
-                    2 -> showWebViewMode()
-                    3 -> showDefaultViewModeDialog()
-                    4 -> startActivity(Intent(this, AppSelectionActivity::class.java))
-                    5 -> startActivity(Intent(this, NotificationLogActivity::class.java))
-                    6 -> {
+                    2 -> showDefaultViewModeDialog()
+                    3 -> startActivity(Intent(this, QuickAddActivity::class.java))
+                    4 -> showUsernameDialog()
+                    5 -> showServerUrlDialog()
+                    6 -> showApiKeyDialog()
+                    7 -> startActivity(Intent(this, AppSelectionActivity::class.java))
+                    8 -> startActivity(Intent(this, NotificationLogActivity::class.java))
+                    9 -> {
                         SyncWorker.enqueueSync(this)
                         Toast.makeText(this, "已发起后台同步请求", Toast.LENGTH_SHORT).show()
                     }
-                    7 -> showUsernameDialog()
-                    8 -> showServerUrlDialog()
-                    9 -> showApiKeyDialog()
-                    10 -> showCarDrivingSettingsDialog()
                 }
             }
+            .setNegativeButton("关闭", null)
             .show()
     }
 
+    private fun showQuickMenu() = showAppSettingsDialog()
+
     private fun showDefaultViewModeDialog() {
         val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
-        val current = sp.getString("default_view_mode", "web") ?: "web"
-        val modes = arrayOf("🌐 1:1 完整账本 (推荐)", "📊 极简监听概览")
-        val currentIdx = if (current == "compose") 1 else 0
+        val current = sp.getString("default_view_mode", "compose") ?: "compose"
+        val modes = arrayOf("📊 极简监听概览 (推荐)", "🌐 1:1 完整账本 (Web)")
+        val currentIdx = if (current == "web") 1 else 0
 
         AlertDialog.Builder(this)
             .setTitle("📱 选择打开应用时的默认视图")
             .setSingleChoiceItems(modes, currentIdx) { dialog, which ->
-                val chosen = if (which == 1) "compose" else "web"
+                val chosen = if (which == 1) "web" else "compose"
                 sp.edit().putString("default_view_mode", chosen).apply()
                 Toast.makeText(this, "默认启动视图已设置为：${modes[which]}", Toast.LENGTH_SHORT).show()
                 dialog.dismiss()
@@ -568,107 +575,15 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showCarDrivingSettingsDialog() {
-        val isEnabled = DrivingDetectionManager.isTrackingEnabled(this)
-        val isDriving = DrivingDetectionManager.isCurrentlyDriving(this)
-        val boundName = DrivingDetectionManager.getSavedCarBluetoothName(this).ifEmpty { "未绑定 (自动按车载音频识别)" }
-        val source = DrivingDetectionManager.getDrivingSource(this)
-        val stateText = if (isDriving) "🚗 正在驾车中 (来源: $source)" else "⚪ 未在驾车"
-
-        val options = arrayOf(
-            if (isEnabled) "✅ 自动检测功能：已开启 (点击切换)" else "❌ 自动检测功能：已关闭 (点击切换)",
-            "📡 绑定我的车载蓝牙设备 (当前: $boundName)",
-            "ℹ️ 查看检测原理与免费说明"
-        )
-
-        AlertDialog.Builder(this)
-            .setTitle("🚗 自动驾车检测设置")
-            .setMessage("当前状态：$stateText\n绑定车机：$boundName\n\n通过【车载蓝牙】(0%耗电) 与【Google活动识别】双引擎自动感知上下车，下车时自动提醒记录过路费、加油与泊车。")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> {
-                        val newStatus = !isEnabled
-                        DrivingDetectionManager.setTrackingEnabled(this, newStatus)
-                        Toast.makeText(this, if (newStatus) "已开启自动驾车检测" else "已关闭自动驾车检测", Toast.LENGTH_SHORT).show()
-                    }
-                    1 -> showSelectCarBluetoothDialog()
-                    2 -> {
-                        AlertDialog.Builder(this)
-                            .setTitle("驾车检测原理说明")
-                            .setMessage("1. 车载蓝牙感知：连上车机蓝牙即开始驾车，断开蓝牙即结束驾车，系统级 0 延迟且 0 额外耗电。\n\n2. Google 活动识别 (IN_VEHICLE)：采用手机底层低功耗协处理器，不常驻 GPS，上无蓝牙车或借车时每天耗电低于 2%。\n\n3. 100% 本地离线运行，完全免费，不消耗任何费用。")
-                            .setPositiveButton("我知道了", null)
-                            .show()
-                    }
-                }
+    private fun cleanLegacyDrivingState() {
+        try {
+            getSharedPreferences("ledger_driving_prefs", Context.MODE_PRIVATE).edit().clear().apply()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                nm?.deleteNotificationChannel("channel_driving_tracker")
             }
-            .setNegativeButton("关闭", null)
-            .show()
-    }
-
-    private fun showSelectCarBluetoothDialog() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(android.Manifest.permission.BLUETOOTH_CONNECT), 2005)
-            Toast.makeText(this, "需要蓝牙权限以读取已配对设备列表", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val btAdapter = BluetoothAdapter.getDefaultAdapter()
-        if (btAdapter == null) {
-            Toast.makeText(this, "当前设备不支持蓝牙", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val bondedDevices: Set<BluetoothDevice> = try {
-            btAdapter.bondedDevices ?: emptySet()
-        } catch (_: SecurityException) {
-            emptySet()
-        }
-
-        if (bondedDevices.isEmpty()) {
-            Toast.makeText(this, "手机暂无已配对的蓝牙设备，请先在手机设置中配对车机蓝牙", Toast.LENGTH_LONG).show()
-            return
-        }
-
-        val devList = bondedDevices.toList()
-        val devNames = mutableListOf<String>()
-        devList.forEach { dev ->
-            val dName = try { dev.name ?: dev.address } catch (_: SecurityException) { dev.address }
-            devNames.add(dName)
-        }
-        devNames.add("❌ 清除绑定 (恢复全自动识别)")
-
-        AlertDialog.Builder(this)
-            .setTitle("选择你的车载蓝牙设备")
-            .setItems(devNames.toTypedArray()) { _, idx ->
-                if (idx < devList.size) {
-                    val chosen = devList[idx]
-                    val cName = try { chosen.name ?: chosen.address } catch (_: SecurityException) { chosen.address }
-                    DrivingDetectionManager.setSavedCarBluetooth(this, chosen.address, cName)
-                    Toast.makeText(this, "已绑定车机：$cName", Toast.LENGTH_SHORT).show()
-                } else {
-                    DrivingDetectionManager.setSavedCarBluetooth(this, "", "")
-                    Toast.makeText(this, "已清除绑定，将通过硬件类型和名称自动识别", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
-    private fun checkDrivingPermissions() {
-        val permissionsNeeded = mutableListOf<String>()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (checkSelfPermission(android.Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
-                permissionsNeeded.add(android.Manifest.permission.ACTIVITY_RECOGNITION)
-            }
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                permissionsNeeded.add(android.Manifest.permission.BLUETOOTH_CONNECT)
-            }
-        }
-        if (permissionsNeeded.isNotEmpty()) {
-            requestPermissions(permissionsNeeded.toTypedArray(), 2005)
+        } catch (e: Exception) {
+            Log.d(TAG, "Legacy driving state cleanup: ${e.message}")
         }
     }
 
@@ -954,10 +869,35 @@ class MainActivity : AppCompatActivity() {
     private fun setupBackNavigation() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
+                val defaultMode = sp.getString("default_view_mode", "compose") ?: "compose"
+
                 if (composeView.visibility == View.VISIBLE) {
-                    showWebViewMode()
-                } else if (webView.visibility == View.VISIBLE && webView.canGoBack()) {
-                    webView.goBack()
+                    if (defaultMode == "web") {
+                        showWebViewMode()
+                    } else {
+                        val currentTime = System.currentTimeMillis()
+                        if (currentTime - lastBackPressedTime < 2000L) {
+                            finish()
+                        } else {
+                            lastBackPressedTime = currentTime
+                            Toast.makeText(this@MainActivity, "再按一次退出应用", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else if (swipeRefreshLayout.visibility == View.VISIBLE || webView.visibility == View.VISIBLE) {
+                    if (webView.canGoBack()) {
+                        webView.goBack()
+                    } else if (defaultMode == "compose") {
+                        showNativeComposeMode()
+                    } else {
+                        val currentTime = System.currentTimeMillis()
+                        if (currentTime - lastBackPressedTime < 2000L) {
+                            finish()
+                        } else {
+                            lastBackPressedTime = currentTime
+                            Toast.makeText(this@MainActivity, "再按一次退出应用", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 } else {
                     val currentTime = System.currentTimeMillis()
                     if (currentTime - lastBackPressedTime < 2000L) {

@@ -489,11 +489,26 @@ fun OverviewScreen(
                         fontWeight = FontWeight.Bold,
                         color = Slate900
                     )
-                    Text(
-                        text = "向左滑快捷修改",
-                        fontSize = 12.sp,
-                        color = Slate400
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onNavigateToWeb() }
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "查看完整历史",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Indigo600
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = Indigo600
+                        )
+                    }
                 }
             }
 
@@ -522,6 +537,33 @@ fun OverviewScreen(
                             showCategorizeDialog = true
                         }
                     )
+                }
+            }
+
+            if (overviewData.recentTransactions.isNotEmpty()) {
+                item {
+                    OutlinedButton(
+                        onClick = onNavigateToWeb,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Indigo600.copy(alpha = 0.3f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = Indigo600
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "进入 1:1 完整账本（历史筛选/编辑/删除）>",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Indigo600
+                        )
+                    }
                 }
             }
 
@@ -1544,6 +1586,13 @@ fun UncategorizedReviewBottomSheet(
                                 Spacer(modifier = Modifier.height(10.dp))
 
                                 if (item.isPendingOnHold) {
+                                    Text(
+                                        text = "💡 说明：【记为支出】计入当月日常消费；【本人自转/调拨】仅从日常支出统计中排除，不修改外部账户实际余额。",
+                                        fontSize = 11.sp,
+                                        color = Slate500,
+                                        lineHeight = 15.sp,
+                                        modifier = Modifier.padding(bottom = 6.dp)
+                                    )
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)

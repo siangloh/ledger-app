@@ -141,6 +141,28 @@
                 android:textSize="15sp"
                 android:textColor="@color/input_text"
                 android:textColorHint="@color/input_hint"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Custom Tags -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="自定义标签 (Tags)"
+                android:textStyle="bold"
+                android:textColor="@color/text_main"
+                android:textSize="14sp"
+                android:layout_marginBottom="4dp" />
+
+            <EditText
+                android:id="@+id/tagEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="可选，如：#出差 #报销"
+                android:padding="12dp"
+                android:background="@color/input_bg"
+                android:textSize="15sp"
+                android:textColor="@color/input_text"
+                android:textColorHint="@color/input_hint"
                 android:layout_marginBottom="24dp" />
 
             <!-- Save Button -->
@@ -153,6 +175,19 @@
                 android:textColor="@color/white"
                 android:textStyle="bold"
                 android:textSize="16sp" />
+
+            <!-- Link to Full Web Ledger -->
+            <Button
+                android:id="@+id/btnGoToFullLedger"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:padding="12dp"
+                android:text="🌐 需要记储蓄、账户扣减或分期？\n前往 1:1 完整账本"
+                android:textColor="@color/navy_primary"
+                android:textSize="13sp"
+                app:strokeColor="@color/navy_primary" />
 
         </LinearLayout>
     </ScrollView>

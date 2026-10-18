@@ -115,11 +115,9 @@ object NetworkHelper {
             try {
                 val key = getApiKey(context)
                 val username = getUsername(context)
-                val encodedKey = try { java.net.URLEncoder.encode(key, "UTF-8") } catch (_: Exception) { "" }
                 val encodedUser = try { java.net.URLEncoder.encode(username, "UTF-8") } catch (_: Exception) { "" }
 
                 val queryParams = mutableListOf<String>()
-                if (encodedKey.isNotEmpty()) queryParams.add("key=$encodedKey")
                 if (encodedUser.isNotEmpty()) queryParams.add("username=$encodedUser")
 
                 val fullUrl = if (queryParams.isNotEmpty()) {

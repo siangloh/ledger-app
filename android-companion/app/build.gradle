@@ -81,8 +81,6 @@ dependencies {
     // com.google.mlkit:text-recognition-chinese 并改用 ChineseTextRecognizerOptions。
     implementation 'com.google.mlkit:text-recognition:16.0.1'
 
-    // Google Play Services 活动模式感知 (微功耗车载/驾驶状态检测，100% 免费离线运行)
-    implementation 'com.google.android.gms:play-services-location:21.2.0'
 
     // Jetpack Compose & Material 3
     def composeBom = platform('androidx.compose:compose-bom:2024.02.00')

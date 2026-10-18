@@ -15,14 +15,6 @@
     <!-- 系统级即时记账悬浮卡片权限 (仿 ExpenseMY，用于付款后浮现快捷确认与分类修正) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- 车载蓝牙感知权限 (监听车机蓝牙连接与断开，0% 额外功耗) -->
-    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-
-    <!-- Google 官方活动识别权限 (微功耗 Sensor Hub 识别处于载具/驾车模式) -->
-    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
-    <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION" />
-
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <!-- 查询已安装应用 (用于自定义监听应用列表) -->
@@ -94,21 +86,6 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
-
-        <!-- 车载蓝牙连接与断开广播监听器 (0% 额外功耗) -->
-        <receiver
-            android:name=".driving.CarBluetoothReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
-                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Google Play Services 活动识别跳变广播监听器 (低功耗 Sensor Hub 识别处于载具中) -->
-        <receiver
-            android:name=".driving.DrivingTransitionReceiver"
-            android:exported="false" />
 
         <!-- 即时记账通知快捷操作广播接收器 -->
         <receiver

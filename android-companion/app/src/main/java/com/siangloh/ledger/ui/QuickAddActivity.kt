@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.lifecycle.lifecycleScope
 import com.siangloh.ledger.R
+import com.siangloh.ledger.MainActivity
 import com.siangloh.ledger.data.AppDatabase
 import com.siangloh.ledger.data.entities.PendingTransaction
 import com.siangloh.ledger.sync.SyncWorker
@@ -23,7 +24,9 @@ class QuickAddActivity : AppCompatActivity() {
     private lateinit var categorySpinner: Spinner
     private lateinit var dateEditText: EditText
     private lateinit var noteEditText: EditText
+    private lateinit var tagEditText: EditText
     private lateinit var saveButton: Button
+    private lateinit var btnGoToFullLedger: Button
 
     private val calendar = Calendar.getInstance()
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
@@ -45,7 +48,18 @@ class QuickAddActivity : AppCompatActivity() {
         categorySpinner = findViewById(R.id.categorySpinner)
         dateEditText = findViewById(R.id.dateEditText)
         noteEditText = findViewById(R.id.noteEditText)
+        tagEditText = findViewById(R.id.tagEditText)
         saveButton = findViewById(R.id.saveButton)
+        btnGoToFullLedger = findViewById(R.id.btnGoToFullLedger)
+
+        btnGoToFullLedger.setOnClickListener {
+            val intent = android.content.Intent(this, MainActivity::class.java).apply {
+                flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("action", "open_web_add")
+            }
+            startActivity(intent)
+            finish()
+        }
 
         // 初始化日期
         dateEditText.setText(dateFormat.format(calendar.time))
@@ -121,7 +135,14 @@ class QuickAddActivity : AppCompatActivity() {
         val type = if (isExpense) "expense" else "income"
         val category = categorySpinner.selectedItem?.toString() ?: "其他"
         val date = dateEditText.text.toString().trim()
-        val note = noteEditText.text.toString().trim().ifEmpty { category }
+        val baseNote = noteEditText.text.toString().trim()
+        val tags = tagEditText.text.toString().trim()
+        val note = when {
+            baseNote.isNotEmpty() && tags.isNotEmpty() -> "$baseNote $tags"
+            tags.isNotEmpty() -> tags
+            baseNote.isNotEmpty() -> baseNote
+            else -> category
+        }
 
         saveButton.isEnabled = false
 

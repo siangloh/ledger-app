@@ -9,7 +9,6 @@ import com.siangloh.ledger.data.entities.NotificationLog
 import com.siangloh.ledger.data.entities.PendingNotification
 import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.AppSelectionManager
-import com.siangloh.ledger.driving.DrivingDetectionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -63,7 +62,6 @@ class NotificationService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.i(TAG, "NotificationListenerService connected and actively listening.")
-        DrivingDetectionManager.requestActivityTransitionUpdates(this)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -259,7 +257,6 @@ class NotificationService : NotificationListenerService() {
     override fun onDestroy() {
         try {
             serviceScope.cancel()
-            DrivingDetectionManager.removeActivityTransitionUpdates(this)
         } catch (e: Exception) {
             Log.w(TAG, "Error cleaning up NotificationService: ${e.message}")
         }
