@@ -1144,8 +1144,32 @@ h3 {
 .month-nav {
   display: flex;
   align-items: center;
-  gap: 20px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
   margin-bottom: 22px;
+}
+.month-nav-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: nowrap;
+}
+.month-nav-label-box {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.month-nav-subtext {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.month-nav-actions {
+  display: inline-flex;
+  align-items: center;
 }
 .month-nav-arrow {
   text-decoration: none;
@@ -2442,18 +2466,21 @@ canvas {
     gap: 10px !important;
   }
   .cards-four > .card, .kpi-grid > .card {
+  .cards-four .card {
     padding: 13px 12px !important;
-    min-height: 80px !important;
+    min-height: auto !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
   }
   .cards-four .card-label, .kpi-grid .card > div:first-child {
     font-size: 11.5px !important;
-    margin-bottom: 2px !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+    margin-bottom: 4px !important;
+    white-space: normal !important;
+    line-height: 1.25 !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
   }
   .cards-four .amount, .kpi-grid .sensitive-val {
     font-size: clamp(15px, 4.2vw, 20px) !important;
@@ -3113,6 +3140,10 @@ canvas {
   display: flex;
   justify-content: center;
   margin-bottom: 24px;
+  width: 100%;
+  max-width: 100%;
+  padding: 0 4px;
+  box-sizing: border-box;
 }
 
 .dashboard-view {
@@ -3127,6 +3158,8 @@ canvas {
   border: 1px solid var(--border);
   box-shadow: 0 2px 8px rgba(16, 33, 59, 0.05);
   gap: 4px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .tab-btn {
@@ -3140,6 +3173,21 @@ canvas {
   cursor: pointer;
   transition: background-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease, box-shadow 0.18s ease, transform 0.12s cubic-bezier(0.2, 0, 0, 1);
   white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .view-tabs {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+  .tab-btn {
+    flex: 1 1 50%;
+    padding: 7px 10px;
+    font-size: 13px;
+    text-align: center;
+    white-space: nowrap;
+  }
 }
 
 .tab-btn:hover {
@@ -3255,7 +3303,7 @@ canvas {
 .sub-stat-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
   font-size: 13px;
   gap: 8px;
   min-width: 0;
@@ -3266,9 +3314,9 @@ canvas {
   color: var(--muted);
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.25;
+  word-break: break-word;
 }
 
 .sub-stat-val {
@@ -4529,10 +4577,10 @@ html[data-theme="dark"] {
 .btn-add-acc { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: 10px; background: var(--primary, #0F766E); color: #fff; font-size: 14px; font-weight: 600; border: none; cursor: pointer; transition: opacity 0.2s, transform 0.15s; text-decoration: none; }
 .btn-add-acc:hover { background: var(--primary-hover, #115E59); transform: translateY(-1px); }
 .acc-summary-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 12px; margin-bottom: 28px; }
-.acc-kpi { background: var(--acc-card-bg); border: 1px solid var(--acc-border); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow: hidden; }
-.acc-kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.acc-kpi-val { font-size: 22px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.acc-kpi-sub { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.acc-kpi { background: var(--acc-card-bg); border: 1px solid var(--acc-border); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.acc-kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: normal; line-height: 1.25; word-break: break-word; }
+.acc-kpi-val { font-size: 22px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; word-break: break-all; min-width: 0; }
+.acc-kpi-sub { font-size: 11px; color: var(--muted); white-space: normal; line-height: 1.25; word-break: break-word; }
 .acc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 16px; }
 .acc-card { background: var(--acc-card-bg); border: 1px solid var(--acc-border); border-radius: var(--acc-radius); padding: 20px; display: flex; flex-direction: column; gap: 12px; position: relative; transition: border-color 0.2s, transform 0.15s; }
 .acc-card:hover { border-color: rgba(15, 118, 110, 0.35); transform: translateY(-2px); }
@@ -4923,13 +4971,38 @@ html[data-theme="dark"] {
 
 @media (max-width: 600px) {
   .month-nav {
-    flex-wrap: wrap;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .month-nav-group {
+    width: 100%;
+    display: flex;
     justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+  .month-nav-arrow {
+    padding: 7px 12px;
+    font-size: 13px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .month-nav-current {
+    font-size: 16px;
+    white-space: nowrap;
+  }
+  .month-nav-actions {
+    width: 100%;
+    display: flex;
+    justify-content: center;
   }
   .btn-poster-pill {
     width: 100%;
     margin-left: 0;
-    margin-top: 8px;
+    margin-top: 4px;
     justify-content: center;
     padding: 8px 16px;
     font-size: 13.5px;
@@ -5432,6 +5505,47 @@ html[data-theme="dark"] {
 @media (max-width: 768px) {
   body.has-pwa-banner {
     padding-bottom: calc(180px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* 订阅/负债/通用弹窗自适应单列流式网格 */
+.sub-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.sub-modal-grid.form-grid-2-1 {
+  grid-template-columns: 2fr 1fr;
+}
+@media (max-width: 640px) {
+  .sub-modal-grid,
+  .sub-modal-grid.form-grid-2-1 {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+  .sub-modal-grid .form-group {
+    width: 100%;
+  }
+  .sub-modal-grid select,
+  .sub-modal-grid input {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .acc-summary-strip {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  .acc-kpi {
+    padding: 12px !important;
+  }
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
   }
 }
 

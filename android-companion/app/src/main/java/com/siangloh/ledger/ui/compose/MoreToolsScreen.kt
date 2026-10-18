@@ -25,9 +25,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
+import com.siangloh.ledger.R
 import com.siangloh.ledger.NetworkHelper
 import com.siangloh.ledger.data.*
 import com.siangloh.ledger.sync.SyncWorker
@@ -336,6 +338,18 @@ fun MoreToolsScreen(
                     apiKey = currentApiKey,
                     onEditConfig = {
                         showServerConfigDialog = true
+                    }
+                )
+            }
+
+            // 7. 界面语言设置 (Language Settings)
+            item {
+                val currentLang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
+                LanguageSettingsCard(
+                    currentLang = currentLang,
+                    onSelectLanguage = { newLang ->
+                        com.siangloh.ledger.util.AppLanguageManager.setLanguage(context, newLang)
+                        (context as? android.app.Activity)?.recreate()
                     }
                 )
             }
@@ -1240,12 +1254,12 @@ fun FullLedgerFeaturesCard(
             Spacer(modifier = Modifier.height(6.dp))
 
             val quickLinks = listOf(
-                Triple("💳 周期订阅", "/subscriptions", PrimaryTeal),
-                Triple("📉 债务管理", "/liabilities", Rose500),
-                Triple("📊 统计洞察", "/categories/insights", PrimaryTeal),
-                Triple("🏷️ 分类管理", "/categories", Amber600),
-                Triple("📥 导入中心", "/import", Slate700),
-                Triple("👤 用户绑定", "settings", Emerald600)
+                Triple(stringResource(R.string.quick_subscriptions), "/subscriptions", PrimaryTeal),
+                Triple(stringResource(R.string.quick_liabilities), "/liabilities", Rose500),
+                Triple(stringResource(R.string.quick_insights), "/categories/insights", PrimaryTeal),
+                Triple(stringResource(R.string.quick_categories), "/categories", Amber600),
+                Triple(stringResource(R.string.quick_import), "/import", Slate700),
+                Triple(stringResource(R.string.quick_user_binding), "settings", Emerald600)
             )
 
             val chunked = quickLinks.chunked(3)
@@ -1270,11 +1284,12 @@ fun FullLedgerFeaturesCard(
                             Text(
                                 text = label,
                                 fontSize = 11.sp,
+                                lineHeight = 13.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = color,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
@@ -1282,6 +1297,149 @@ fun FullLedgerFeaturesCard(
                 }
             }
         }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Component: 界面语言选择卡片 (Language Settings)
+// -----------------------------------------------------------------------------
+@Composable
+fun LanguageSettingsCard(
+    currentLang: String,
+    onSelectLanguage: (String) -> Unit
+) {
+    var showDialog by remember { mutableStateOf(false) }
+    val langLabel = when (currentLang) {
+        "en" -> "English"
+        "ms" -> "Bahasa Melayu"
+        else -> "中文 (简体)"
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(PrimaryTealSubtle),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = null,
+                            tint = PrimaryTeal,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.language_settings_title),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate900
+                        )
+                        Text(
+                            text = langLabel,
+                            fontSize = 12.sp,
+                            color = Slate500
+                        )
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = { showDialog = true },
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    border = BorderStroke(1.dp, PrimaryTeal)
+                ) {
+                    Text(
+                        text = stringResource(R.string.language_select_dialog_title),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PrimaryTeal
+                    )
+                }
+            }
+        }
+    }
+
+    if (showDialog) {
+        val langs = listOf(
+            "zh" to stringResource(R.string.lang_zh),
+            "en" to stringResource(R.string.lang_en),
+            "ms" to stringResource(R.string.lang_ms)
+        )
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            containerColor = Color.White,
+            title = {
+                Text(
+                    text = stringResource(R.string.language_select_dialog_title),
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    langs.forEach { (code, name) ->
+                        val isSelected = code == currentLang
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) PrimaryTealSubtle else Slate100,
+                            border = if (isSelected) BorderStroke(1.dp, PrimaryTeal) else null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showDialog = false
+                                    onSelectLanguage(code)
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = name,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) PrimaryTeal else Slate800
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = PrimaryTeal,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text(text = stringResource(R.string.common_cancel), color = Slate600)
+                }
+            }
+        )
     }
 }
 

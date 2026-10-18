@@ -18,8 +18,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.siangloh.ledger.R
 import com.siangloh.ledger.data.AccountRecord
 import com.siangloh.ledger.data.AccountsSummary
 import com.siangloh.ledger.data.LocalDataStore
@@ -85,7 +87,7 @@ fun AccountsScreen() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "资产与账户",
+                        text = stringResource(R.string.accounts_title),
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
@@ -130,7 +132,7 @@ fun AccountsScreen() {
                             .padding(18.dp)
                     ) {
                         Text(
-                            text = "净资产 (Net Worth)",
+                            text = stringResource(R.string.net_assets),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = Slate500
@@ -149,7 +151,7 @@ fun AccountsScreen() {
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column {
-                                Text("总资产", fontSize = 11.sp, color = Slate500)
+                                Text(stringResource(R.string.total_assets), fontSize = 11.sp, color = Slate500)
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "MYR ${String.format(Locale.US, "%,.2f", summary?.totalAssets ?: 0.0)}",
@@ -159,7 +161,7 @@ fun AccountsScreen() {
                                 )
                             }
                             Column(horizontalAlignment = Alignment.End) {
-                                Text("总负债 / 账单", fontSize = 11.sp, color = Slate500)
+                                Text(stringResource(R.string.total_liabilities), fontSize = 11.sp, color = Slate500)
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "MYR ${String.format(Locale.US, "%,.2f", summary?.totalLiabilities ?: 0.0)}",
@@ -208,7 +210,7 @@ fun AccountsScreen() {
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            "账户互转",
+                            stringResource(R.string.transfer_btn),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (canTransfer) Color.White else Slate400
@@ -226,7 +228,7 @@ fun AccountsScreen() {
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = Slate800, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("添加账户", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
+                        Text(stringResource(R.string.add_account_btn), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
                     }
                 }
             }
@@ -246,16 +248,16 @@ fun AccountsScreen() {
                         ) {
                             Text("🏦", fontSize = 40.sp)
                             Spacer(modifier = Modifier.height(10.dp))
-                            Text("暂无已配置账户", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
+                            Text(stringResource(R.string.no_accounts_configured), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("点击上方【添加账户】即可创建银行卡、电子钱包或现金账户", fontSize = 12.sp, color = Slate400, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            Text(stringResource(R.string.no_accounts_help), fontSize = 12.sp, color = Slate400, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                         }
                     }
                 }
             } else {
                 item {
                     Text(
-                        text = "我的账户列表 (${accountsList.size})",
+                        text = stringResource(R.string.my_accounts_list, accountsList.size),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900,
@@ -302,8 +304,9 @@ fun AccountsScreen() {
 
 @Composable
 fun AccountCard(account: AccountRecord) {
+    val context = LocalContext.current
     val icon = CategoryUiHelper.getAccountTypeIcon(account.type)
-    val typeName = CategoryUiHelper.getAccountTypeName(account.type)
+    val typeName = CategoryUiHelper.getAccountTypeName(context, account.type)
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -357,7 +360,7 @@ fun AccountCard(account: AccountRecord) {
                 )
                 if (account.type == "credit_card" && account.creditLimit > 0) {
                     Text(
-                        text = "额度: ${String.format(Locale.US, "%.0f", account.creditLimit)}",
+                        text = "${stringResource(R.string.credit_limit_label)}: ${String.format(Locale.US, "%.0f", account.creditLimit)}",
                         fontSize = 10.sp,
                         color = Slate400
                     )
@@ -381,11 +384,11 @@ fun AddAccountDialog(
     var isSaving by remember { mutableStateOf(false) }
 
     val accountTypes = listOf(
-        "savings" to "储蓄银行卡",
-        "e_wallet" to "电子钱包",
-        "cash" to "现金",
-        "credit_card" to "信用卡",
-        "investment" to "投资账户"
+        "savings" to stringResource(R.string.account_type_savings),
+        "e_wallet" to stringResource(R.string.account_type_e_wallet),
+        "cash" to stringResource(R.string.account_type_cash),
+        "credit_card" to stringResource(R.string.account_type_credit_card),
+        "investment" to stringResource(R.string.account_type_investment)
     )
 
     AlertDialog(
@@ -393,7 +396,7 @@ fun AddAccountDialog(
         containerColor = Color.White,
         titleContentColor = Slate900,
         textContentColor = Slate800,
-        title = { Text("添加新账户", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Slate900) },
+        title = { Text(stringResource(R.string.add_account_btn), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Slate900) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -402,13 +405,13 @@ fun AddAccountDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("账户名称") },
-                    placeholder = { Text("如：Maybank、TNG、现金钱包") },
+                    label = { Text(stringResource(R.string.account_name_label)) },
+                    placeholder = { Text("Maybank, TNG, Cash...") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Text("账户类型", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate700)
+                Text(stringResource(R.string.account_type_label), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate700)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -437,7 +440,7 @@ fun AddAccountDialog(
                     OutlinedTextField(
                         value = creditLimitText,
                         onValueChange = { creditLimitText = it },
-                        label = { Text("信用额度 (MYR)") },
+                        label = { Text(stringResource(R.string.credit_limit_label)) },
                         placeholder = { Text("0") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -497,14 +500,14 @@ fun TransferFundsDialog(
         AlertDialog(
             onDismissRequest = onDismiss,
             containerColor = Color.White,
-            title = { Text("无法进行互转", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Slate900) },
-            text = { Text("您当前可用账户不足两个，无法进行内部调拨划转。请先添加账户。", color = Slate700) },
+            title = { Text(stringResource(R.string.transfer_funds_title), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Slate900) },
+            text = { Text(stringResource(R.string.cannot_transfer_msg), color = Slate700) },
             confirmButton = {
                 Button(
                     onClick = onDismiss,
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal)
                 ) {
-                    Text("知道了", color = Color.White)
+                    Text(stringResource(R.string.common_confirm), color = Color.White)
                 }
             }
         )
@@ -522,13 +525,13 @@ fun TransferFundsDialog(
         containerColor = Color.White,
         titleContentColor = Slate900,
         textContentColor = Slate800,
-        title = { Text("账户互转调拨", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Slate900) },
+        title = { Text(stringResource(R.string.transfer_funds_title), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Slate900) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("从转出账户：", fontSize = 12.sp, color = Slate600)
+                Text(stringResource(R.string.from_account_label), fontSize = 12.sp, color = Slate600)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -553,7 +556,7 @@ fun TransferFundsDialog(
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("到转入账户：", fontSize = 12.sp, color = Slate600)
+                Text(stringResource(R.string.to_account_label), fontSize = 12.sp, color = Slate600)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -580,7 +583,7 @@ fun TransferFundsDialog(
                 OutlinedTextField(
                     value = amountStr,
                     onValueChange = { amountStr = it },
-                    label = { Text("转账金额 (MYR)") },
+                    label = { Text(stringResource(R.string.amount_label) + " (MYR)") },
                     placeholder = { Text("0.00") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -589,7 +592,7 @@ fun TransferFundsDialog(
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("备注") },
+                    label = { Text(stringResource(R.string.add_note)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -633,12 +636,12 @@ fun TransferFundsDialog(
                 enabled = !isSaving,
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal)
             ) {
-                Text("确认划转", color = Color.White)
+                Text(stringResource(R.string.add_save_transfer), color = Color.White)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消", color = Slate600)
+                Text(stringResource(R.string.common_cancel), color = Slate500)
             }
         }
     )

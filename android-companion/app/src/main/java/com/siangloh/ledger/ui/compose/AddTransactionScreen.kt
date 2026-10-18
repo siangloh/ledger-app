@@ -14,9 +14,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.siangloh.ledger.R
 import com.siangloh.ledger.NetworkHelper
 import com.siangloh.ledger.data.AccountRecord
 import com.siangloh.ledger.data.AppDatabase
@@ -154,7 +157,7 @@ fun AddTransactionScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "快速记账",
+                        text = stringResource(R.string.add_title),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
@@ -164,7 +167,7 @@ fun AddTransactionScreen(
                             onClick = { draft.clear(context) },
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                         ) {
-                            Text("清空草稿", fontSize = 12.sp, color = Slate500)
+                            Text(stringResource(R.string.clear_draft), fontSize = 12.sp, color = Slate500)
                         }
                     }
                 }
@@ -179,10 +182,10 @@ fun AddTransactionScreen(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val types = listOf(
-                        "expense" to "支出",
-                        "income" to "收入",
-                        "savings" to "储蓄",
-                        "transfer" to "划转"
+                        "expense" to stringResource(R.string.add_expense),
+                        "income" to stringResource(R.string.add_income),
+                        "savings" to stringResource(R.string.add_savings),
+                        "transfer" to stringResource(R.string.add_transfer)
                     )
                     types.forEach { (typeKey, label) ->
                         val isSelected = draft.txType == typeKey
@@ -252,7 +255,7 @@ fun AddTransactionScreen(
                                 )
                                 isSaving = false
                                 res.onSuccess {
-                                    Toast.makeText(context, "🎉 记账成功！", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.add_success), Toast.LENGTH_SHORT).show()
                                     draft.clear(context)
                                     onFinished()
                                 }.onFailure { err ->
@@ -284,7 +287,7 @@ fun AddTransactionScreen(
                                                 )
                                             }
                                             SyncWorker.enqueueSync(context)
-                                            Toast.makeText(context, "✓ 当前网络未连接，已安全存入本地数据库，联网后将自动同步", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(context, context.getString(R.string.add_offline_saved), Toast.LENGTH_LONG).show()
                                             draft.clear(context)
                                             onFinished()
                                         } catch (localDbErr: Exception) {
@@ -317,7 +320,7 @@ fun AddTransactionScreen(
                             Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (draft.txType == "transfer") "确认转账并记录" else "保存这笔账目",
+                                text = if (draft.txType == "transfer") stringResource(R.string.add_save_transfer) else stringResource(R.string.add_save),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -348,7 +351,7 @@ fun AddTransactionScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 14.dp)
                 ) {
-                    Text("记账金额", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Slate500)
+                    Text(stringResource(R.string.amount_label), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Slate500)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -448,7 +451,7 @@ fun AddTransactionScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("选择分类", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                            Text(stringResource(R.string.add_category), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate900)
                             if (currentCats.size > 8) {
                                 Text(
                                     text = if (showAllCategories) "收起 ▴" else "更多分类 (${currentCats.size}) ▾",
@@ -501,11 +504,13 @@ fun AddTransactionScreen(
                                             Text(emoji, fontSize = 18.sp)
                                             Spacer(modifier = Modifier.height(2.dp))
                                             Text(
-                                                text = cat.name,
+                                                text = CategoryUiHelper.getLocalizedCategoryName(context, cat.name),
                                                 fontSize = 11.sp,
+                                                lineHeight = 12.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                 color = if (isSelected) PrimaryTeal else Slate700,
-                                                maxLines = 1
+                                                textAlign = TextAlign.Center,
+                                                maxLines = 2
                                             )
                                         }
                                     }

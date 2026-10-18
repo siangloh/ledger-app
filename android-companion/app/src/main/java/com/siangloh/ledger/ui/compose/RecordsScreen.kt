@@ -1,5 +1,6 @@
 package com.siangloh.ledger.ui.compose
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
@@ -19,8 +20,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.siangloh.ledger.R
 import com.siangloh.ledger.NetworkHelper
 import com.siangloh.ledger.data.AppDatabase
 import com.siangloh.ledger.data.LocalDataStore
@@ -185,21 +188,21 @@ fun RecordsScreen(
                         onClick = {
                             selectedMonth = shiftMonthString(selectedMonth, -1)
                         },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.ChevronLeft,
-                            contentDescription = "上月",
+                            contentDescription = stringResource(R.string.prev_month),
                             tint = Slate600
                         )
                     }
                     Surface(
                         shape = RoundedCornerShape(20.dp),
                         color = Slate100,
-                        modifier = Modifier.padding(horizontal = 8.dp)
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     ) {
                         Text(
-                            text = formatDisplayMonth(selectedMonth),
+                            text = formatDisplayMonth(selectedMonth, context),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Slate800,
@@ -210,11 +213,11 @@ fun RecordsScreen(
                         onClick = {
                             selectedMonth = shiftMonthString(selectedMonth, 1)
                         },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.ChevronRight,
-                            contentDescription = "下月",
+                            contentDescription = stringResource(R.string.next_month),
                             tint = Slate600
                         )
                     }
@@ -498,8 +501,8 @@ fun RecordsScreen(
             containerColor = Color.White,
             titleContentColor = Slate900,
             textContentColor = Slate800,
-            title = { Text("确认删除此记录？", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Slate900) },
-            text = { Text("删除后流水将无法找回（金额：MYR ${String.format(Locale.US, "%.2f", tx.amount)}，备注：${tx.note.ifBlank { "无备注" }}）", fontSize = 13.sp, color = Slate600) },
+            title = { Text(stringResource(R.string.delete_tx_title), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Slate900) },
+            text = { Text(stringResource(R.string.delete_tx_confirm_msg, String.format(Locale.US, "%.2f", tx.amount), tx.note.ifBlank { "-" }), fontSize = 13.sp, color = Slate600) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -508,21 +511,21 @@ fun RecordsScreen(
                             showDeleteConfirm = null
                             editingTx = null
                             res.onSuccess {
-                                Toast.makeText(context, "已删除", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.common_success), Toast.LENGTH_SHORT).show()
                                 loadData()
                             }.onFailure {
-                                Toast.makeText(context, "删除失败：${it.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Rose500)
                 ) {
-                    Text("删除", color = Color.White)
+                    Text(stringResource(R.string.delete_tx_btn), color = Color.White)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = null }) {
-                    Text("取消", color = Slate600)
+                    Text(stringResource(R.string.common_cancel), color = Slate600)
                 }
             }
         )
@@ -698,9 +701,9 @@ fun EditTransactionBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("编辑交易记录", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                Text(stringResource(R.string.edit_tx_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
                 IconButton(onClick = onDeleteClick) {
-                    Icon(Icons.Default.DeleteOutline, contentDescription = "删除", tint = Rose500)
+                    Icon(Icons.Default.DeleteOutline, contentDescription = stringResource(R.string.delete_tx_btn), tint = Rose500)
                 }
             }
 
@@ -819,7 +822,7 @@ fun EditTransactionBottomSheet(
                 if (isSaving) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
                 } else {
-                    Text("保存修改", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.edit_save), fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -847,10 +850,18 @@ fun shiftMonthString(monthStr: String, delta: Int): String {
     }
 }
 
-fun formatDisplayMonth(monthStr: String): String {
+fun formatDisplayMonth(monthStr: String, context: Context? = null): String {
     return try {
         val parts = monthStr.split("-")
-        "${parts[0]}年${parts[1].toInt()}月"
+        val y = parts[0].toInt()
+        val m = parts[1].toInt()
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.YEAR, y)
+            set(Calendar.MONTH, m - 1)
+            set(Calendar.DAY_OF_MONTH, 1)
+        }
+        val lang = if (context != null) com.siangloh.ledger.util.AppLanguageManager.getLanguage(context) else "zh"
+        com.siangloh.ledger.util.AppLanguageManager.formatMonth(cal, lang)
     } catch (_: Exception) {
         monthStr
     }

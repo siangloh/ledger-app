@@ -25,6 +25,10 @@ import kotlinx.coroutines.withContext
 
 class AppSelectionActivity : AppCompatActivity() {
 
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(com.siangloh.ledger.util.AppLanguageManager.wrapContext(newBase))
+    }
+
     data class AppItem(
         val name: String,
         val packageName: String,

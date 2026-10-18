@@ -5,4 +5,203 @@
     <string name="permission_dialog_msg">为了能够在收到 Touch \'n Go 或 Public Bank 扣款/转账通知时自动帮你入账，请在接下来的系统设置中允许「我的账本」读取通知。</string>
     <string name="permission_dialog_ok">去开启</string>
     <string name="permission_dialog_cancel">暂不开启</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_overview">概览</string>
+    <string name="nav_records">流水</string>
+    <string name="nav_add">记一笔</string>
+    <string name="nav_accounts">资产</string>
+    <string name="nav_more">更多</string>
+
+    <!-- Period Selector -->
+    <string name="period_monthly">月度</string>
+    <string name="period_3m">近3个月</string>
+    <string name="period_yearly">年度</string>
+    <string name="prev_month">上个月</string>
+    <string name="next_month">下个月</string>
+    <string name="range_month_fmt">%1$s</string>
+    <string name="range_3m_fmt">%1$s ~ %2$s (近3个月)</string>
+    <string name="range_year_fmt">%1$s年 全年统计</string>
+
+    <!-- Overview Screen -->
+    <string name="spending_title">本期总支出</string>
+    <string name="expense_label">实际支出</string>
+    <string name="transfer_label">内部划转</string>
+    <string name="income_label">实际收入</string>
+    <string name="uncategorized_inbox">待整理收件箱</string>
+    <string name="uncategorized_count_fmt">待整理明细 (%1$d)</string>
+    <string name="quick_categorize">快速归类</string>
+    <string name="ignore_action">忽略</string>
+    <string name="recent_transactions">近期交易明细</string>
+    <string name="view_all_records">查看全部流水</string>
+    <string name="no_transactions_yet">本期暂无交易记录</string>
+    <string name="sync_status_guarding">守护中</string>
+    <string name="sync_status_offline">离线本地缓存</string>
+    <string name="sync_status_just_now">刚刚</string>
+    <string name="sync_status_mins_ago">%1$d分钟前</string>
+    <string name="sync_today_fmt">今天 %1$s</string>
+    <string name="network_error_cached">⚠️ 网络暂不可用，已呈现最近快照 · 点击重试</string>
+    <string name="network_retry">点击重试</string>
+
+    <!-- Add Transaction -->
+    <string name="add_title">记一笔账</string>
+    <string name="add_expense">支出</string>
+    <string name="add_income">收入</string>
+    <string name="add_transfer">转账</string>
+    <string name="add_savings">储蓄</string>
+    <string name="add_amount_hint">0.00</string>
+    <string name="add_category">分类</string>
+    <string name="add_account">结算账户</string>
+    <string name="add_to_account">目标账户</string>
+    <string name="add_date">交易日期</string>
+    <string name="add_note">商户 / 备注</string>
+    <string name="add_tags">标签 (逗号分隔)</string>
+    <string name="add_save">保存这笔账目</string>
+    <string name="add_save_transfer">确认转账并记录</string>
+    <string name="add_saving">提交中...</string>
+    <string name="add_success">🎉 记账成功！</string>
+    <string name="add_offline_saved">✓ 当前网络未连接，已安全存入本地数据库，联网后将自动同步</string>
+    <string name="income_group">收入分组</string>
+    <string name="income_main">💼 主业收入</string>
+    <string name="income_side">📈 副业/理财</string>
+    <string name="show_all_categories">展开全部分类</string>
+    <string name="collapse_categories">收起部分分类</string>
+
+    <!-- Records Screen -->
+    <string name="records_title">交易明细</string>
+    <string name="records_search_hint">搜索商户、分类或备注...</string>
+    <string name="all_types">全部类型</string>
+    <string name="records_total_fmt">已展示全部 %1$d 笔记录</string>
+    <string name="records_empty">暂无符合条件的交易记录</string>
+    <string name="edit_tx_title">编辑交易记录</string>
+    <string name="delete_tx_title">确认删除此记录？</string>
+    <string name="delete_tx_confirm_msg">删除后流水将无法找回（金额：MYR %1$s，备注：%2$s）</string>
+    <string name="delete_tx_btn">删除</string>
+    <string name="edit_save">保存修改</string>
+    <string name="internal_transfer">内部互转</string>
+
+    <!-- Accounts Screen -->
+    <string name="accounts_title">资产与账户</string>
+    <string name="net_assets">净资产</string>
+    <string name="total_assets">资产总额</string>
+    <string name="total_liabilities">负债总额</string>
+    <string name="account_type_savings">储蓄账户</string>
+    <string name="account_type_current">往来账户</string>
+    <string name="account_type_credit_card">信用卡</string>
+    <string name="account_type_e_wallet">电子钱包</string>
+    <string name="account_type_investment">投资理财</string>
+    <string name="account_type_cash">现金钱包</string>
+    <string name="account_type_other">其他账户</string>
+    <string name="add_account_btn">新增账户</string>
+    <string name="transfer_btn">账户间转账</string>
+
+    <!-- More Tools Screen -->
+    <string name="tools_title">更多工具与管理</string>
+    <string name="tools_subtitle">待办收件箱 · 智能OCR · 周期记账 · 自动化</string>
+    <string name="full_ledger_hub">全功能账务大厅 (高级管理)</string>
+    <string name="full_ledger_desc">全景维护订阅大厅、负债车房贷、固定收支与分类报表</string>
+    <string name="enter_full_ledger">进入全功能账务管理大厅</string>
+    <string name="quick_links_title">快捷功能直达：</string>
+    <string name="quick_subscriptions">💳 周期订阅</string>
+    <string name="quick_liabilities">📉 债务管理</string>
+    <string name="quick_insights">📊 统计洞察</string>
+    <string name="quick_categories">🏷️ 分类管理</string>
+    <string name="quick_import">📥 导入中心</string>
+    <string name="quick_user_binding">👤 用户绑定</string>
+    <string name="receipt_ocr_title">拍小票智能记账</string>
+    <string name="receipt_ocr_desc">本地离线 OCR，精准识别商户、日期与金额</string>
+    <string name="scan_receipt_btn">拍照或选图识别小票</string>
+    <string name="subscriptions_card_title">订阅与周期记账</string>
+    <string name="installments_card_title">分期与债务追踪</string>
+    <string name="monthly_total_fmt">每月约 %1$s</string>
+    <string name="remaining_total_fmt">剩余总额 %1$s</string>
+    <string name="automation_settings_title">自动化与权限状态</string>
+    <string name="listener_permission">通知读取监听权限</string>
+    <string name="battery_optimization">忽略电池省电优化</string>
+    <string name="floating_overlay">悬浮窗快速记账权限</string>
+    <string name="server_settings_title">服务器连接与同步</string>
+    <string name="server_url_label">服务器地址</string>
+    <string name="api_key_label">自动记账 API Key</string>
+    <string name="edit_config_btn">修改服务器配置</string>
+    <string name="language_settings_title">🌐 界面语言 (Language)</string>
+    <string name="language_select_dialog_title">切换界面语言</string>
+    <string name="lang_zh">中文 (简体)</string>
+    <string name="lang_en">English</string>
+    <string name="lang_ms">Bahasa Melayu</string>
+
+    <!-- Common -->
+    <string name="common_save">保存</string>
+    <string name="common_cancel">取消</string>
+    <string name="common_delete">删除</string>
+    <string name="common_confirm">确认</string>
+    <string name="common_close">关闭</string>
+    <string name="common_retry">重试</string>
+    <string name="common_refresh">刷新</string>
+    <string name="common_offline">离线模式</string>
+    <string name="common_success">操作成功</string>
+    <string name="common_failed">操作失败</string>
+
+    <!-- Categories -->
+    <string name="category_dining">餐饮</string>
+    <string name="category_transport">交通</string>
+    <string name="category_groceries">杂货</string>
+    <string name="category_bills">账单</string>
+    <string name="category_shopping">购物</string>
+    <string name="category_entertainment">娱乐</string>
+    <string name="category_medical">医疗</string>
+    <string name="category_housing">住房</string>
+    <string name="category_education">教育</string>
+    <string name="category_pets">宠物</string>
+    <string name="category_travel">旅行</string>
+    <string name="category_other">其他</string>
+    <string name="category_salary">工资</string>
+    <string name="category_side_income">兼职/副业</string>
+    <string name="category_bonus">奖金/分红</string>
+    <string name="category_investments">投资理财</string>
+    <string name="category_fixed_deposit">定期存款</string>
+    <string name="category_emergency_fund">应急基金</string>
+    <string name="category_wish_fund">心愿基金</string>
+    <string name="category_transfer">内部划转</string>
+
+    <!-- Additional Overview & Status -->
+    <string name="spending_subtitle_clean">已剔除同名互转</string>
+    <string name="status_listening_active">通知监听中 (服务常驻)</string>
+    <string name="status_listening_paused">通知监听未开启</string>
+    <string name="status_offline_prefix">快照数据 · 上次同步</string>
+    <string name="status_synced_prefix">数据已同步</string>
+    <string name="pending_review_badge">%1$d 待整理</string>
+    <string name="uncategorized_banner_count">%1$d 笔支出待补充分类</string>
+    <string name="uncategorized_total_fmt">共计 %1$s</string>
+    <string name="uncategorized_action_go">去整理 ›</string>
+    <string name="trend_title">支出走势</string>
+    <string name="trend_drag_hint">(长按/拖拽)</string>
+    <string name="trend_total_fmt">当期合计 %1$s</string>
+    <string name="view_all_records_detail">查看全部流水明细（原生筛选 / 搜索 / 编辑 / 删除）›</string>
+    <string name="enable_overlay_banner">⚡ 开启付款悬浮识别卡片 (自动快捷记账) ›</string>
+    <string name="uncategorized_sheet_title">待整理账单与转账 (%1$d)</string>
+    <string name="uncategorized_sheet_desc">点击下方条目快速归类或核验转账状态</string>
+    <string name="uncategorized_inbox_zero">🎉 所有待整理账单均已处理完毕 (Inbox Zero)</string>
+    <string name="pending_hold_title">待确认银行转账</string>
+    <string name="unnamed_expense">未命名消费</string>
+    <string name="pending_transfer_status">待确认转账</string>
+    <string name="uncategorized_status">待分类</string>
+    <string name="pending_hold_help">💡 说明：【记为支出】计入当月日常消费；【本人自转/调拨】仅从日常支出统计中排除，不修改外部账户实际余额。</string>
+    <string name="btn_record_expense">记为支出</string>
+    <string name="btn_self_transfer">本人自转</string>
+    <string name="btn_internal_allocate">内部调拨</string>
+    <string name="btn_select_category">⚡ 选择分类</string>
+
+    <!-- Additional Add & Accounts -->
+    <string name="clear_draft">清空草稿</string>
+    <string name="amount_label">记账金额</string>
+    <string name="no_accounts_configured">暂无已配置账户</string>
+    <string name="no_accounts_help">点击上方【添加账户】即可创建银行卡、电子钱包或现金账户</string>
+    <string name="my_accounts_list">我的账户列表 (%1$d)</string>
+    <string name="account_name_label">账户名称</string>
+    <string name="account_type_label">账户类型</string>
+    <string name="credit_limit_label">信用额度 (MYR)</string>
+    <string name="transfer_funds_title">账户互转调拨</string>
+    <string name="cannot_transfer_msg">您当前可用账户不足两个，无法进行内部调拨划转。请先添加账户。</string>
+    <string name="from_account_label">从转出账户：</string>
+    <string name="to_account_label">到转入账户：</string>
 </resources>

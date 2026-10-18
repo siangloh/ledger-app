@@ -19,6 +19,10 @@ import java.util.*
 
 class QuickAddActivity : AppCompatActivity() {
 
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(com.siangloh.ledger.util.AppLanguageManager.wrapContext(newBase))
+    }
+
     private lateinit var typeRadioGroup: RadioGroup
     private lateinit var amountEditText: EditText
     private lateinit var categorySpinner: Spinner

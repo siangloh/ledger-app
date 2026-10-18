@@ -1,11 +1,11 @@
 {% extends layout|default('base.html') %}
-{% block title %}Auto Track 自动记账 - 我的记账本{% endblock %}
+{% block title %}{{ t('auto_track.title', 'Auto Track 自动记账服务') }} - {{ t('nav.brand') }}{% endblock %}
 {% block content %}
 
 <div class="page-title-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
   <div>
-    <h2>Auto Track 自动记账服务</h2>
-    <p class="hint">通过 Webhook 接收手机银行（Maybank MAE、CIMB）、电子钱包（Touch 'n Go eWallet、GrabPay）的消费通知，自动识别金额并归类入账。</p>
+    <h2>{{ t('auto_track.title', 'Auto Track 自动记账服务') }}</h2>
+    <p class="hint">{{ t('auto_track.desc', '通过 Webhook 接收手机银行（Maybank MAE、CIMB）、电子钱包（Touch \'n Go eWallet、GrabPay）的消费通知，自动识别金额并归类入账。') }}</p>
   </div>
 </div>
 
@@ -13,29 +13,29 @@
   <!-- 左侧：专属 Webhook 配置与在线快速测试 -->
   <section class="panel">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-      <h3 style="margin: 0;">🔗 你的专属接收网关 (Webhook URL)</h3>
+      <h3 style="margin: 0;">{{ t('auto_track.gateway_title', '🔗 你的专属接收网关 (Webhook URL)') }}</h3>
       <span style="font-size: 12px; background: rgba(37, 99, 235, 0.1); color: var(--primary); padding: 4px 10px; border-radius: 999px; font-weight: 600; border: 1px solid rgba(37, 99, 235, 0.25);">
-        👤 专属绑定用户：{{ current_username }}
+        {{ t('auto_track.bound_user', '👤 专属绑定用户：{username}', username=current_username) }}
       </span>
     </div>
     <div style="background: var(--surface-soft); padding: 14px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin: 12px 0 18px;">
       <div style="font-size: 12.5px; color: var(--navy); font-weight: 700; margin-bottom: 6px;">
-        ⭐ 方式一：一体化免 Header 接收地址（强烈推荐给 MacroDroid / 快捷指令用户，复制即用）：
+        {{ t('auto_track.method1_title', '⭐ 方式一：一体化免 Header 接收地址（强烈推荐给 MacroDroid / 快捷指令用户，复制即用）：') }}
       </div>
       <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px;">
         <input type="text" id="webhookWithKeyInput" value="{{ webhook_url_with_key }}" readonly style="font-family: var(--font-mono); font-size: 12px; background: #fff;">
-        <button type="button" class="btn-primary" onclick="copyText('webhookWithKeyInput', '免 Header 一体化 Webhook 地址已复制')" style="white-space: nowrap; font-size: 12px;">复制一体化地址</button>
+        <button type="button" class="btn-primary" onclick="copyText('webhookWithKeyInput', '{{ t('auto_track.copied_msg', '免 Header 一体化 Webhook 地址已复制') }}')" style="white-space: nowrap; font-size: 12px;">{{ t('auto_track.copy_method1', '复制一体化地址') }}</button>
       </div>
       <div style="font-size: 11.5px; color: var(--muted); margin-bottom: 12px;">
-        该网址已自动嵌入专属 API Key 与你的用户账号（<code>username={{ current_username }}</code>），自动记账将<strong>100% 独立记入你的个人账本</strong>，多用户数据严格隔离。
+        {{ t('auto_track.method1_hint', '该网址已自动嵌入专属 API Key 与你的用户账号（username={username}），自动记账将 100% 独立记入你的个人账本，多用户数据严格隔离。', username=current_username)|safe }}
       </div>
 
       <div style="font-size: 12px; color: var(--ink-soft); font-weight: 600; margin-bottom: 4px;">
-        方式二：标准 Webhook 地址（配合 X-API-KEY 请求头使用）：
+        {{ t('auto_track.method2_title', '方式二：标准 Webhook 地址（配合 X-API-KEY 请求头使用）：') }}
       </div>
       <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px;">
         <input type="text" id="webhookInput" value="{{ webhook_url }}" readonly style="font-family: var(--font-mono); font-size: 12px; background: #fff;">
-        <button type="button" class="btn-secondary" onclick="copyText('webhookInput', '标准 Webhook 地址已复制')" style="white-space: nowrap; font-size: 12px;">复制标准地址</button>
+        <button type="button" class="btn-secondary" onclick="copyText('webhookInput', '{{ t('auto_track.copied_msg', '标准 Webhook 地址已复制') }}')" style="white-space: nowrap; font-size: 12px;">{{ t('auto_track.copy_method2', '复制标准地址') }}</button>
       </div>
 
       <div style="display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; margin-top: 10px;">
@@ -47,8 +47,8 @@
       </div>
     </div>
 
-    <h3>⚡ 在线即时测试 (Simulate Notification)</h3>
-    <p class="hint">粘贴一条真实的扣款短信或通知测试，点击测试后如果解析成功将立即入库！</p>
+    <h3>{{ t('auto_track.simulate_title', '⚡ 在线即时测试 (Simulate Notification)') }}</h3>
+    <p class="hint">{{ t('auto_track.simulate_hint', '粘贴一条真实的扣款短信或通知测试，点击测试后如果解析成功将立即入库！') }}</p>
     
     <div class="quick-examples" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
       <button type="button" class="btn-ghost btn-sm" onclick="fillTestExample('tng')">范例 1：TnG 全家便利店</button>
@@ -62,7 +62,7 @@
     <form id="testAutoTrackForm" onsubmit="submitTestAutoTrack(event)">
       <textarea id="testNotificationText" rows="4" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); font-family: var(--font-mono); font-size: 13px;" placeholder="在此粘贴通知内容，例如：You have successfully paid RM 15.50 to FamilyMart on 06/09..." required></textarea>
       <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
-        <button type="submit" class="btn-primary" id="btnTestSubmit">发送测试入库</button>
+        <button type="submit" class="btn-primary" id="btnTestSubmit">{{ t('auto_track.btn_send_test', '发送测试入库') }}</button>
       </div>
     </form>
 
@@ -172,14 +172,14 @@
   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
     <div>
       <h3 style="margin: 0 0 4px; display: flex; align-items: center; gap: 8px;">
-        🧠 AI 语言学习样本库 (Few-Shot Datasheet)
-        <span class="tag" style="background: var(--surface-soft); font-weight: normal; font-size: 11px;">共 {{ samples|length }} 条已学样本</span>
+        {{ t('auto_track.few_shot_title', '🧠 AI 语言学习样本库 (Few-Shot Datasheet)') }}
+        <span class="tag" style="background: var(--surface-soft); font-weight: normal; font-size: 11px;">{{ t('auto_track.samples_count', '共 {count} 条已学样本', count=samples|length) }}</span>
       </h3>
-      <p class="hint" style="margin: 0;">大语言模型每次分析通知时，都会参考下方的标准样本库。你可以直接在下方新增、修改或纠正样本，AI 遇到类似格式将自动照着学习！</p>
+      <p class="hint" style="margin: 0;">{{ t('auto_track.few_shot_hint', '大语言模型每次分析通知时，都会参考下方的标准样本库。你可以直接在下方新增、修改或纠正样本，AI 遇到类似格式将自动照着学习！') }}</p>
     </div>
     <div style="display: flex; gap: 8px;">
-      <button type="button" class="btn-ghost btn-sm" onclick="resetLlmSamples()">恢复官方预设语料</button>
-      <button type="button" class="btn-primary btn-sm" onclick="openAddSampleModal()">+ 添加学习样本</button>
+      <button type="button" class="btn-ghost btn-sm" onclick="resetLlmSamples()">{{ t('auto_track.btn_reset_corpus', '恢复官方预设语料') }}</button>
+      <button type="button" class="btn-primary btn-sm" onclick="openAddSampleModal()">{{ t('auto_track.btn_add_sample', '+ 添加学习样本') }}</button>
     </div>
   </div>
 
@@ -188,11 +188,11 @@
       <thead>
         <tr style="background: var(--surface-soft); position: sticky; top: 0; z-index: 1;">
           <th style="width: 45px; text-align: center;">#</th>
-          <th style="width: 130px;">判定类型 (Label)</th>
-          <th>标准通知原文 (Notification Text)</th>
-          <th style="width: 160px;">示范要素提取</th>
-          <th style="width: 170px;">学习说明 / 逻辑</th>
-          <th style="width: 65px; text-align: center;">操作</th>
+          <th style="width: 130px;">{{ t('auto_track.th_label', '判定类型 (Label)') }}</th>
+          <th>{{ t('auto_track.th_notification', '标准通知原文 (Notification Text)') }}</th>
+          <th style="width: 160px;">{{ t('auto_track.th_extraction', '示范要素提取') }}</th>
+          <th style="width: 170px;">{{ t('auto_track.th_logic', '学习说明 / 逻辑') }}</th>
+          <th style="width: 65px; text-align: center;">{{ t('common.actions', '操作') }}</th>
         </tr>
       </thead>
       <tbody id="llmSamplesTbody">
@@ -201,15 +201,15 @@
           <td style="text-align: center; color: var(--muted); font-size: 12px;">{{ s.id }}</td>
           <td>
             {% if s.label_type == 'promo' %}
-              <span class="tag" style="background: rgba(239, 68, 68, 0.12); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.25); font-weight: 600;">营销推广 ❌</span>
+              <span class="tag" style="background: rgba(239, 68, 68, 0.12); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.25); font-weight: 600;">{{ t('auto_track.tag_promo', '营销推广 ❌') }}</span>
             {% elif s.label_type == 'expense' %}
-              <span class="tag" style="background: rgba(59, 130, 246, 0.12); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.25); font-weight: 600;">消费支出 ✅</span>
+              <span class="tag" style="background: rgba(59, 130, 246, 0.12); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.25); font-weight: 600;">{{ t('auto_track.tag_expense', '消费支出 ✅') }}</span>
             {% elif s.label_type == 'income_transfer' %}
-              <span class="tag" style="background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.25); font-weight: 600;">转账进账 💰</span>
+              <span class="tag" style="background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.25); font-weight: 600;">{{ t('auto_track.tag_income_transfer', '转账进账 💰') }}</span>
             {% elif s.label_type == 'expense_transfer' %}
-              <span class="tag" style="background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.25); font-weight: 600;">转账支出 ↗️</span>
+              <span class="tag" style="background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.25); font-weight: 600;">{{ t('auto_track.tag_expense_transfer', '转账支出 ↗️') }}</span>
             {% elif s.label_type == 'otp_notice' %}
-              <span class="tag" style="background: rgba(107, 114, 128, 0.12); color: #4b5563; border: 1px solid rgba(107, 114, 128, 0.25); font-weight: 600;">验证码/安全 🛡️</span>
+              <span class="tag" style="background: rgba(107, 114, 128, 0.12); color: #4b5563; border: 1px solid rgba(107, 114, 128, 0.25); font-weight: 600;">{{ t('auto_track.tag_otp_notice', '验证码/安全 🛡️') }}</span>
             {% else %}
               <span class="tag">{{ s.label_type }}</span>
             {% endif %}

@@ -28,6 +28,10 @@ import java.util.*
 
 class NotificationLogActivity : AppCompatActivity() {
 
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(com.siangloh.ledger.util.AppLanguageManager.wrapContext(newBase))
+    }
+
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptyView: TextView
     private val logs = mutableListOf<NotificationLog>()

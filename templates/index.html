@@ -13,18 +13,22 @@
 <!-- ==================== 当月视图 ==================== -->
 <div id="monthlySection" class="dashboard-view">
   <div class="month-nav">
-    <a href="{{ url_for('index', month=prev_month) }}" class="month-nav-arrow" hx-get="{{ url_for('index', month=prev_month) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">&larr; {{ t('dashboard.prev_month') }}</a>
-    <div style="display: inline-flex; flex-direction: column; align-items: center; gap: 2px;">
-      <strong class="month-nav-current">{{ month }}</strong>
-      {% if cycle_range_label and budget_start_day and budget_start_day > 1 %}
-        <span style="font-size: 11.5px; color: var(--muted); font-weight: 500;">{{ t('dashboard.billing_cycle') }}: {{ cycle_range_label }}</span>
-      {% endif %}
+    <div class="month-nav-group">
+      <a href="{{ url_for('index', month=prev_month) }}" class="month-nav-arrow" hx-get="{{ url_for('index', month=prev_month) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">&larr; {{ t('dashboard.prev_month') }}</a>
+      <div class="month-nav-label-box">
+        <strong class="month-nav-current">{{ month }}</strong>
+        {% if cycle_range_label and budget_start_day and budget_start_day > 1 %}
+          <span class="month-nav-subtext">{{ t('dashboard.billing_cycle') }}: {{ cycle_range_label }}</span>
+        {% endif %}
+      </div>
+      <a href="{{ url_for('index', month=next_month) }}" class="month-nav-arrow" hx-get="{{ url_for('index', month=next_month) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">{{ t('dashboard.next_month') }} &rarr;</a>
     </div>
-    <a href="{{ url_for('index', month=next_month) }}" class="month-nav-arrow" hx-get="{{ url_for('index', month=next_month) }}" hx-target="#mainContainer" hx-swap="innerHTML show:window:top" hx-push-url="true">{{ t('dashboard.next_month') }} &rarr;</a>
-    <button type="button" class="btn-poster-pill" onclick="openMonthlyPosterModal('{{ month }}')" title="{{ t('poster.btn_title') }}">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="poster-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-      <span>{{ t('poster.generate_btn') }}</span>
-    </button>
+    <div class="month-nav-actions">
+      <button type="button" class="btn-poster-pill" onclick="openMonthlyPosterModal('{{ month }}')" title="{{ t('poster.btn_title') }}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="poster-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        <span>{{ t('poster.generate_btn') }}</span>
+      </button>
+    </div>
   </div>
 
   <div id="dashboardSummaryCardsWrap">

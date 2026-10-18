@@ -1,0 +1,207 @@
+<resources>
+    <string name="app_name">Buku Wang Saya</string>
+    <string name="service_name">Perkhidmatan Rakaman Automatik</string>
+    <string name="permission_dialog_title">Dayakan Akses Pemberitahuan</string>
+    <string name="permission_dialog_msg">Untuk merekod transaksi Touch \'n Go atau Public Bank secara automatik, sila benarkan \"Buku Wang Saya\" membaca pemberitahuan dalam tetapan sistem.</string>
+    <string name="permission_dialog_ok">Dayakan</string>
+    <string name="permission_dialog_cancel">Nanti</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_overview">Gambaran</string>
+    <string name="nav_records">Rekod</string>
+    <string name="nav_add">Tambah</string>
+    <string name="nav_accounts">Akaun</string>
+    <string name="nav_more">Lain-lain</string>
+
+    <!-- Period Selector -->
+    <string name="period_monthly">Bulanan</string>
+    <string name="period_3m">3 bulan terkini</string>
+    <string name="period_yearly">Tahunan</string>
+    <string name="prev_month">Bulan Lalu</string>
+    <string name="next_month">Bulan Seterusnya</string>
+    <string name="range_month_fmt">%1$s</string>
+    <string name="range_3m_fmt">%1$s – %2$s (3 bulan terkini)</string>
+    <string name="range_year_fmt">Tahun %1$s (Sepanjang Tahun)</string>
+
+    <!-- Overview Screen -->
+    <string name="spending_title">Jumlah Perbelanjaan</string>
+    <string name="expense_label">Perbelanjaan Bersih</string>
+    <string name="transfer_label">Pemindahan Dalaman</string>
+    <string name="income_label">Pendapatan Bersih</string>
+    <string name="uncategorized_inbox">Peti Masuk Semakan</string>
+    <string name="uncategorized_count_fmt">Belum Dikategori (%1$d)</string>
+    <string name="quick_categorize">Kategori</string>
+    <string name="ignore_action">Abaikan</string>
+    <string name="recent_transactions">Transaksi Terkini</string>
+    <string name="view_all_records">Lihat Semua Rekod</string>
+    <string name="no_transactions_yet">Tiada rekod transaksi dalam tempoh ini</string>
+    <string name="sync_status_guarding">Aktif</string>
+    <string name="sync_status_offline">Simpanan Luar Talian</string>
+    <string name="sync_status_just_now">Sebentar tadi</string>
+    <string name="sync_status_mins_ago">%1$d minit lalu</string>
+    <string name="sync_today_fmt">Hari ini %1$s</string>
+    <string name="network_error_cached">⚠️ Rangkaian tergendala, memaparkan data simpanan · Ketik untuk cuba lagi</string>
+    <string name="network_retry">Ketik untuk cuba lagi</string>
+
+    <!-- Add Transaction -->
+    <string name="add_title">Rekod Baharu</string>
+    <string name="add_expense">Perbelanjaan</string>
+    <string name="add_income">Pendapatan</string>
+    <string name="add_transfer">Pindahan</string>
+    <string name="add_savings">Simpanan</string>
+    <string name="add_amount_hint">0.00</string>
+    <string name="add_category">Kategori</string>
+    <string name="add_account">Akaun Pembayaran</string>
+    <string name="add_to_account">Akaun Destinasi</string>
+    <string name="add_date">Tarikh</string>
+    <string name="add_note">Peniaga / Catatan</string>
+    <string name="add_tags">Tag (dipisah koma)</string>
+    <string name="add_save">Simpan Rekod</string>
+    <string name="add_save_transfer">Sahkan Pindahan</string>
+    <string name="add_saving">Menyimpan...</string>
+    <string name="add_success">🎉 Rekod berjaya disimpan!</string>
+    <string name="add_offline_saved">✓ Mod luar talian: disimpan secara setempat dan akan disegerakkan secara automatik</string>
+    <string name="income_group">Sumber Pendapatan</string>
+    <string name="income_main">💼 Kerjaya Utama</string>
+    <string name="income_side">📈 Sampingan / Pelaburan</string>
+    <string name="show_all_categories">Papar Semua Kategori</string>
+    <string name="collapse_categories">Papar Ringkas</string>
+
+    <!-- Records Screen -->
+    <string name="records_title">Sejarah Transaksi</string>
+    <string name="records_search_hint">Cari peniaga, kategori, atau catatan...</string>
+    <string name="all_types">Semua Jenis</string>
+    <string name="records_total_fmt">Memaparkan kesemua %1$d rekod</string>
+    <string name="records_empty">Tiada rekod transaksi yang sepadan</string>
+    <string name="edit_tx_title">Edit Rekod Transaksi</string>
+    <string name="delete_tx_title">Padam Rekod Ini?</string>
+    <string name="delete_tx_confirm_msg">Rekod ini akan dipadam secara kekal (Jumlah: MYR %1$s, Catatan: %2$s)</string>
+    <string name="delete_tx_btn">Padam</string>
+    <string name="edit_save">Simpan Perubahan</string>
+    <string name="internal_transfer">Pindahan</string>
+
+    <!-- Accounts Screen -->
+    <string name="accounts_title">Aset &amp; Akaun</string>
+    <string name="net_assets">Nilai Bersih</string>
+    <string name="total_assets">Jumlah Aset</string>
+    <string name="total_liabilities">Jumlah Liabiliti</string>
+    <string name="account_type_savings">Akaun Simpanan</string>
+    <string name="account_type_current">Akaun Semasa</string>
+    <string name="account_type_credit_card">Kad Kredit</string>
+    <string name="account_type_e_wallet">Dompet Elektronik</string>
+    <string name="account_type_investment">Pelaburan</string>
+    <string name="account_type_cash">Dompet Tunai</string>
+    <string name="account_type_other">Akaun Lain</string>
+    <string name="add_account_btn">Tambah Akaun</string>
+    <string name="transfer_btn">Pindahan Antara Akaun</string>
+
+    <!-- More Tools Screen -->
+    <string name="tools_title">Alatan Tambahan</string>
+    <string name="tools_subtitle">Peti Masuk · OCR Pintar · Langganan · Automasi</string>
+    <string name="full_ledger_hub">Hab Pengurusan Penuh</string>
+    <string name="full_ledger_desc">Urus langganan, pinjaman, perbelanjaan berulang dan laporan</string>
+    <string name="enter_full_ledger">Buka Hab Pengurusan Penuh</string>
+    <string name="quick_links_title">Pintasan Pantas:</string>
+    <string name="quick_subscriptions">💳 Langganan</string>
+    <string name="quick_liabilities">📉 Liabiliti</string>
+    <string name="quick_insights">📊 Wawasan</string>
+    <string name="quick_categories">🏷️ Kategori</string>
+    <string name="quick_import">📥 Hab Import</string>
+    <string name="quick_user_binding">👤 Pautan Pengguna</string>
+    <string name="receipt_ocr_title">Pengimbas Resit Pintar</string>
+    <string name="receipt_ocr_desc">OCR luar talian setempat untuk mengesan peniaga, tarikh dan jumlah</string>
+    <string name="scan_receipt_btn">Imbas atau Pilih Foto</string>
+    <string name="subscriptions_card_title">Langganan &amp; Berulang</string>
+    <string name="installments_card_title">Ansuran &amp; Hutang</string>
+    <string name="monthly_total_fmt">Anggaran %1$s / bln</string>
+    <string name="remaining_total_fmt">Baki Jumlah: %1$s</string>
+    <string name="automation_settings_title">Automasi &amp; Status Kebenaran</string>
+    <string name="listener_permission">Akses Pemberitahuan</string>
+    <string name="battery_optimization">Pengoptimuman Bateri</string>
+    <string name="floating_overlay">Akses Tetingkap Terapung</string>
+    <string name="server_settings_title">Sambungan &amp; Segerak Pelayan</string>
+    <string name="server_url_label">Alamat Pelayan</string>
+    <string name="api_key_label">Kunci API Automasi</string>
+    <string name="edit_config_btn">Ubah Tetapan Pelayan</string>
+    <string name="language_settings_title">🌐 Bahasa Antara Muka (Language)</string>
+    <string name="language_select_dialog_title">Pilih Bahasa</string>
+    <string name="lang_zh">中文 (简体)</string>
+    <string name="lang_en">English</string>
+    <string name="lang_ms">Bahasa Melayu</string>
+
+    <!-- Common -->
+    <string name="common_save">Simpan</string>
+    <string name="common_cancel">Batal</string>
+    <string name="common_delete">Padam</string>
+    <string name="common_confirm">Sahkan</string>
+    <string name="common_close">Tutup</string>
+    <string name="common_retry">Cuba Semula</string>
+    <string name="common_refresh">Muat Semula</string>
+    <string name="common_offline">Mod Luar Talian</string>
+    <string name="common_success">Berjaya</string>
+    <string name="common_failed">Gagal</string>
+
+    <!-- Categories -->
+    <string name="category_dining">Makanan</string>
+    <string name="category_transport">Pengangkutan</string>
+    <string name="category_groceries">Barangan Runcit</string>
+    <string name="category_bills">Bil &amp; Utiliti</string>
+    <string name="category_shopping">Membeli-belah</string>
+    <string name="category_entertainment">Hiburan</string>
+    <string name="category_medical">Perubatan &amp; Kesihatan</string>
+    <string name="category_housing">Perumahan</string>
+    <string name="category_education">Pendidikan</string>
+    <string name="category_pets">Haiwan Peliharaan</string>
+    <string name="category_travel">Pelancongan</string>
+    <string name="category_other">Lain-lain</string>
+    <string name="category_salary">Gaji</string>
+    <string name="category_side_income">Pendapatan Sampingan</string>
+    <string name="category_bonus">Bonus</string>
+    <string name="category_investments">Pelaburan Kewangan</string>
+    <string name="category_fixed_deposit">Deposit Tetap</string>
+    <string name="category_emergency_fund">Dana Kecemasan</string>
+    <string name="category_wish_fund">Dana Impian</string>
+    <string name="category_transfer">Pindahan Dalaman</string>
+
+    <!-- Additional Overview & Status -->
+    <string name="spending_subtitle_clean">Kecuali pindahan sendiri</string>
+    <string name="status_listening_active">Mendengar Aktif (Servis Berjalan)</string>
+    <string name="status_listening_paused">Pendengar Notifikasi Dimatikan</string>
+    <string name="status_offline_prefix">Data Snapshot · Terakhir disegerakkan</string>
+    <string name="status_synced_prefix">Data Disegerakkan</string>
+    <string name="pending_review_badge">%1$d Perlu Disemak</string>
+    <string name="uncategorized_banner_count">%1$d perbelanjaan perlu dikategori</string>
+    <string name="uncategorized_total_fmt">Jumlah %1$s</string>
+    <string name="uncategorized_action_go">Semak ›</string>
+    <string name="trend_title">Trend Perbelanjaan</string>
+    <string name="trend_drag_hint">(Tekan lama/seret)</string>
+    <string name="trend_total_fmt">Jumlah Tempoh %1$s</string>
+    <string name="view_all_records_detail">Lihat Semua Rekod (Tapis / Cari / Edit / Padam) ›</string>
+    <string name="enable_overlay_banner">⚡ Aktifkan Kad Tindanan Terapung (Jejak Pantas) ›</string>
+    <string name="uncategorized_sheet_title">Bil &amp; Pindahan Menunggu Semakan (%1$d)</string>
+    <string name="uncategorized_sheet_desc">Ketik item di bawah untuk mengelas pantas atau mengesahkan status</string>
+    <string name="uncategorized_inbox_zero">🎉 Semua transaksi telah selesai disemak (Peti Masuk Kosong)</string>
+    <string name="pending_hold_title">Pindahan Bank Belum Disahkan</string>
+    <string name="unnamed_expense">Perbelanjaan Tanpa Nama</string>
+    <string name="pending_transfer_status">Pindahan Belum Disahkan</string>
+    <string name="uncategorized_status">Belum Dikategori</string>
+    <string name="pending_hold_help">💡 Nota: [Rekod Belanja] dikira dalam belanja bulanan; [Pindahan Sendiri] dikecualikan daripada belanja tanpa mengubah baki akaun luaran.</string>
+    <string name="btn_record_expense">Rekod Belanja</string>
+    <string name="btn_self_transfer">Pindahan Sendiri</string>
+    <string name="btn_internal_allocate">Pindahan Dalaman</string>
+    <string name="btn_select_category">⚡ Pilih Kategori</string>
+
+    <!-- Additional Add & Accounts -->
+    <string name="clear_draft">Kosongkan Draf</string>
+    <string name="amount_label">Jumlah</string>
+    <string name="no_accounts_configured">Tiada Akaun Dikonfigurasi</string>
+    <string name="no_accounts_help">Ketik [Tambah Akaun] di atas untuk mencipta kad bank, e-dompet, atau akaun tunai</string>
+    <string name="my_accounts_list">Senarai Akaun Saya (%1$d)</string>
+    <string name="account_name_label">Nama Akaun</string>
+    <string name="account_type_label">Jenis Akaun</string>
+    <string name="credit_limit_label">Had Kredit (MYR)</string>
+    <string name="transfer_funds_title">Pindahan Antara Akaun</string>
+    <string name="cannot_transfer_msg">Anda memerlukan sekurang-kurangnya dua akaun untuk membuat pindahan dalaman. Sila tambah akaun dahulu.</string>
+    <string name="from_account_label">Daripada Akaun:</string>
+    <string name="to_account_label">Ke Akaun:</string>
+</resources>

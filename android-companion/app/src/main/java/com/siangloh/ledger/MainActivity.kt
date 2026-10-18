@@ -70,6 +70,10 @@ class MainActivity : AppCompatActivity() {
         private const val RECEIPT_GALLERY_REQUEST_CODE = 1003
     }
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(com.siangloh.ledger.util.AppLanguageManager.wrapContext(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -339,6 +343,8 @@ class MainActivity : AppCompatActivity() {
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
+        val currentAppLang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(this)
+        cookieManager.setCookie(NetworkHelper.getServerUrl(this), "lang=$currentAppLang; path=/")
 
         webView.addJavascriptInterface(object {
             @JavascriptInterface
@@ -539,6 +545,12 @@ class MainActivity : AppCompatActivity() {
     fun showAppSettingsDialog() {
         val currentBound = NetworkHelper.getUsername(this).ifEmpty { "未绑定(默认admin)" }
         val currentServer = NetworkHelper.getServerUrl(this)
+        val currentLang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(this)
+        val langLabel = when (currentLang) {
+            "en" -> "English"
+            "ms" -> "Bahasa Melayu"
+            else -> "中文 (简体)"
+        }
         val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
         val defaultMode = sp.getString("default_view_mode", "compose") ?: "compose"
         val modeText = if (defaultMode == "web") "🏛️ 全功能账本大厅" else "📊 极简原生视图"
@@ -546,6 +558,7 @@ class MainActivity : AppCompatActivity() {
             "🏛️ 切换至全功能账本大厅",
             "📊 切换至极简原生视图",
             "📱 默认启动视图设置 (当前: $modeText)",
+            "🌐 界面语言设置 (当前: $langLabel)",
             "⚡ 离线快速记账",
             "👤 绑定记账用户 (当前: $currentBound)",
             "🌐 服务器地址设置 (当前: $currentServer)",
@@ -561,19 +574,38 @@ class MainActivity : AppCompatActivity() {
                     0 -> showWebViewMode()
                     1 -> showNativeComposeMode()
                     2 -> showDefaultViewModeDialog()
-                    3 -> startActivity(Intent(this, QuickAddActivity::class.java))
-                    4 -> showUsernameDialog()
-                    5 -> showServerUrlDialog()
-                    6 -> showApiKeyDialog()
-                    7 -> startActivity(Intent(this, AppSelectionActivity::class.java))
-                    8 -> startActivity(Intent(this, NotificationLogActivity::class.java))
-                    9 -> {
+                    3 -> showLanguageDialog()
+                    4 -> startActivity(Intent(this, QuickAddActivity::class.java))
+                    5 -> showUsernameDialog()
+                    6 -> showServerUrlDialog()
+                    7 -> showApiKeyDialog()
+                    8 -> startActivity(Intent(this, AppSelectionActivity::class.java))
+                    9 -> startActivity(Intent(this, NotificationLogActivity::class.java))
+                    10 -> {
                         SyncWorker.enqueueSync(this)
                         Toast.makeText(this, "已发起后台同步请求", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
             .setNegativeButton("关闭", null)
+            .show()
+    }
+
+    private fun showLanguageDialog() {
+        val currentLang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(this)
+        val langs = arrayOf("🇨🇳 中文 (简体)", "🇬🇧 English", "🇲🇾 Bahasa Melayu")
+        val codes = arrayOf(com.siangloh.ledger.util.AppLanguageManager.LANG_ZH, com.siangloh.ledger.util.AppLanguageManager.LANG_EN, com.siangloh.ledger.util.AppLanguageManager.LANG_MS)
+        val currentIdx = codes.indexOf(currentLang).coerceAtLeast(0)
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.language_select_dialog_title)
+            .setSingleChoiceItems(langs, currentIdx) { dialog, which ->
+                val chosen = codes[which]
+                com.siangloh.ledger.util.AppLanguageManager.setLanguage(this, chosen)
+                dialog.dismiss()
+                recreate()
+            }
+            .setNegativeButton(R.string.common_cancel, null)
             .show()
     }
 

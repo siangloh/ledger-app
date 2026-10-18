@@ -36,8 +36,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.siangloh.ledger.R
 import com.siangloh.ledger.NetworkHelper
 import com.siangloh.ledger.data.AppDatabase
 import com.siangloh.ledger.ui.compose.components.OverviewSkeletonScreen
@@ -93,8 +95,16 @@ data class OverviewData(
     val isOfflineCache: Boolean = false
 )
 
-fun formatFriendlyTime(rawIso: String): String {
+fun formatFriendlyTime(rawIso: String, context: Context? = null): String {
     if (rawIso.isBlank() || rawIso == "无近期记录" || rawIso == "离线本地缓存" || rawIso == "守护中" || rawIso == "刚刚") {
+        if (context != null) {
+            return when (rawIso) {
+                "守护中" -> context.getString(R.string.sync_status_guarding)
+                "离线本地缓存" -> context.getString(R.string.sync_status_offline)
+                "刚刚" -> context.getString(R.string.sync_status_just_now)
+                else -> rawIso.ifBlank { context.getString(R.string.sync_status_just_now) }
+            }
+        }
         return rawIso.ifBlank { "刚刚" }
     }
     return try {
@@ -104,15 +114,16 @@ fun formatFriendlyTime(rawIso: String): String {
         val diffMs = System.currentTimeMillis() - date.time
         val diffMinutes = diffMs / (60 * 1000)
         when {
-            diffMinutes < 1 -> "刚刚"
-            diffMinutes < 60 -> "${diffMinutes}分钟前"
+            diffMinutes < 1 -> context?.getString(R.string.sync_status_just_now) ?: "刚刚"
+            diffMinutes < 60 -> context?.getString(R.string.sync_status_mins_ago, diffMinutes) ?: "${diffMinutes}分钟前"
             else -> {
                 val cal = Calendar.getInstance().apply { time = date }
                 val nowCal = Calendar.getInstance()
                 val isToday = cal.get(Calendar.YEAR) == nowCal.get(Calendar.YEAR) &&
                               cal.get(Calendar.DAY_OF_YEAR) == nowCal.get(Calendar.DAY_OF_YEAR)
                 if (isToday) {
-                    SimpleDateFormat("今天 HH:mm", Locale.getDefault()).format(date)
+                    val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
+                    context?.getString(R.string.sync_today_fmt, timeStr) ?: "今天 $timeStr"
                 } else {
                     SimpleDateFormat("M月d日 HH:mm", Locale.getDefault()).format(date)
                 }
@@ -234,8 +245,14 @@ fun OverviewScreen(
     var currentMonthStr by remember {
         mutableStateOf(SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time))
     }
-    var displayMonthLabel by remember {
-        mutableStateOf(SimpleDateFormat("yyyy年M月", Locale.CHINESE).format(calendar.time))
+    val currentLang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
+    val displayRangeLabel = remember(period, currentMonthStr, currentLang) {
+        when (period) {
+            "month" -> com.siangloh.ledger.util.AppLanguageManager.formatMonth(calendar, currentLang)
+            "3m" -> com.siangloh.ledger.util.AppLanguageManager.format3mRange(calendar, currentLang)
+            "year" -> com.siangloh.ledger.util.AppLanguageManager.formatYearRange(calendar, currentLang)
+            else -> currentMonthStr
+        }
     }
 
     var hasOverlayPermission by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
@@ -449,14 +466,14 @@ fun OverviewScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "⚠️ 网络暂不可用，已呈现最近快照 · 点击重试",
+                                text = stringResource(R.string.network_error_cached),
                                 color = Color(0xFF92400E),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Icon(
                                 imageVector = Icons.Default.Refresh,
-                                contentDescription = "Retry",
+                                contentDescription = stringResource(R.string.network_retry),
                                 tint = Color(0xFF92400E),
                                 modifier = Modifier.size(16.dp)
                             )
@@ -466,20 +483,18 @@ fun OverviewScreen(
             }
 
             item {
-                // 2. Period Filter Segmented Control & Month Navigation
+                // 2. Period Filter Segmented Control & Month Navigation (Two-row responsive design with >=48dp touch targets)
                 PeriodSelector(
                     period = period,
-                    displayMonth = displayMonthLabel,
+                    rangeLabel = displayRangeLabel,
                     onPeriodChanged = { newPeriod -> period = newPeriod },
                     onPrevMonth = {
                         calendar.add(Calendar.MONTH, -1)
                         currentMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
-                        displayMonthLabel = SimpleDateFormat("yyyy年M月", Locale.CHINESE).format(calendar.time)
                     },
                     onNextMonth = {
                         calendar.add(Calendar.MONTH, 1)
                         currentMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
-                        displayMonthLabel = SimpleDateFormat("yyyy年M月", Locale.CHINESE).format(calendar.time)
                     }
                 )
             }
@@ -524,7 +539,7 @@ fun OverviewScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "近期流水明细",
+                        text = stringResource(R.string.recent_transactions),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
@@ -537,7 +552,7 @@ fun OverviewScreen(
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "查看全部流水",
+                            text = stringResource(R.string.view_all_records),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = PrimaryTeal
@@ -562,7 +577,7 @@ fun OverviewScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isLoading) "正在同步最新财务数据..." else "本月暂无记录，付完钱账将自动记入",
+                            text = if (isLoading) "..." else stringResource(R.string.no_transactions_yet),
                             color = Slate400,
                             fontSize = 14.sp
                         )
@@ -598,7 +613,7 @@ fun OverviewScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "查看全部流水明细（原生筛选 / 搜索 / 编辑 / 删除）>",
+                            text = stringResource(R.string.view_all_records_detail),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = PrimaryTeal
@@ -823,13 +838,13 @@ fun ListeningStatusHeader(
                 Spacer(modifier = Modifier.width(6.dp))
                 Column {
                     Text(
-                        text = if (isListening) "通知监听中 (服务常驻)" else "通知监听未开启",
+                        text = if (isListening) stringResource(R.string.status_listening_active) else stringResource(R.string.status_listening_paused),
                         color = if (isListening) PrimaryTeal else Slate600,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = if (isOfflineCache) "快照数据 · 上次同步 ${formatFriendlyTime(lastActive)}" else "数据已同步 · 刚刚",
+                        text = if (isOfflineCache) "${stringResource(R.string.status_offline_prefix)} ${formatFriendlyTime(lastActive, context)}" else "${stringResource(R.string.status_synced_prefix)} · ${stringResource(R.string.sync_status_just_now)}",
                         color = Slate500,
                         fontSize = 10.sp
                     )
@@ -845,7 +860,7 @@ fun ListeningStatusHeader(
                         modifier = Modifier.padding(end = 6.dp)
                     ) {
                         Text(
-                            text = "⚠️ $toReviewCount 待整理",
+                            text = "⚠️ " + stringResource(R.string.pending_review_badge, toReviewCount),
                             color = Amber500,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -888,7 +903,7 @@ fun ListeningStatusHeader(
                             .clickable { onRequestOverlayPermission() }
                     ) {
                         Text(
-                            text = "⚡ 开启付款悬浮识别卡片 (自动快捷记账) >",
+                            text = stringResource(R.string.enable_overlay_banner),
                             color = PrimaryTeal,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold
@@ -904,7 +919,7 @@ fun ListeningStatusHeader(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "关闭",
+                            contentDescription = stringResource(R.string.common_close),
                             tint = Slate400,
                             modifier = Modifier.size(16.dp)
                         )
@@ -918,74 +933,135 @@ fun ListeningStatusHeader(
 @Composable
 fun PeriodSelector(
     period: String,
-    displayMonth: String,
+    rangeLabel: String,
     onPeriodChanged: (String) -> Unit,
     onPrevMonth: () -> Unit,
     onNextMonth: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Segmented Tabs: [ 按月 ] [ 近3月 ] [ 按年 ]
+        // Row 1: 3 equal-width Segmented Tabs [ 月度 / Monthly / Bulanan ] [ 近3个月 / Last 3 months / 3 bulan terkini ] [ 年度 / Yearly / Tahunan ]
         Surface(
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(12.dp),
             color = Slate100,
-            modifier = Modifier.height(34.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
         ) {
             Row(
-                modifier = Modifier.padding(2.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(3.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val tabs = listOf("month" to "按月", "3m" to "近3月", "year" to "按年")
+                val tabs = listOf(
+                    "month" to stringResource(R.string.period_monthly),
+                    "3m" to stringResource(R.string.period_3m),
+                    "year" to stringResource(R.string.period_yearly)
+                )
                 tabs.forEach { (key, label) ->
                     val isSelected = period == key
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(9.dp),
                         color = if (isSelected) Color.White else Color.Transparent,
-                        shadowElevation = if (isSelected) 1.dp else 0.dp,
+                        shadowElevation = if (isSelected) 1.5.dp else 0.dp,
                         modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
                             .clickable { onPeriodChanged(key) }
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Text(
-                            text = label,
-                            color = if (isSelected) Slate900 else Slate600,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 4.dp)
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (isSelected) PrimaryTeal else Slate600,
+                                fontSize = 13.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // Month pagination: < 2026年10月 >
-        if (period == "month") {
+        // Row 2: Independent date range row (min-height 48dp, touch targets >= 48dp)
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, Slate200),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+        ) {
             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                horizontalArrangement = if (period == "month") Arrangement.SpaceBetween else Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onPrevMonth, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronLeft,
-                        contentDescription = "上个月",
-                        tint = Slate600,
-                        modifier = Modifier.size(18.dp)
+                if (period == "month") {
+                    IconButton(
+                        onClick = onPrevMonth,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronLeft,
+                            contentDescription = stringResource(R.string.prev_month),
+                            tint = Slate700,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Text(
+                        text = rangeLabel,
+                        color = Slate900,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
                     )
-                }
-                Text(
-                    text = displayMonth,
-                    color = Slate700,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                IconButton(onClick = onNextMonth, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "下个月",
-                        tint = Slate600,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    IconButton(
+                        onClick = onNextMonth,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = stringResource(R.string.next_month),
+                            tint = Slate700,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (period == "3m") Icons.Default.DateRange else Icons.Default.CalendarToday,
+                            contentDescription = null,
+                            tint = PrimaryTeal,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = rangeLabel,
+                            color = Slate800,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
@@ -1020,14 +1096,14 @@ fun SpendingHeroCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "当期总支出",
+                    text = stringResource(R.string.spending_title),
                     color = Slate400,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.5.sp
                 )
                 Text(
-                    text = "已剔除同名互转",
+                    text = stringResource(R.string.spending_subtitle_clean),
                     color = Slate500,
                     fontSize = 11.sp
                 )
@@ -1036,7 +1112,7 @@ fun SpendingHeroCard(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "MYR ${String.format("%,.2f", totalSpending)}",
+                text = "MYR ${String.format(Locale.US, "%,.2f", totalSpending)}",
                 color = Color.White,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold
@@ -1059,7 +1135,7 @@ fun SpendingHeroCard(
                     )
                     Spacer(modifier = Modifier.width(5.dp))
                     Text(
-                        text = "日常消费: MYR ${String.format("%,.2f", expenseAmount)}",
+                        text = "${stringResource(R.string.expense_label)}: MYR ${String.format(Locale.US, "%,.2f", expenseAmount)}",
                         color = Slate200,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
@@ -1075,7 +1151,7 @@ fun SpendingHeroCard(
                     )
                     Spacer(modifier = Modifier.width(5.dp))
                     Text(
-                        text = "对外转账: MYR ${String.format("%,.2f", transferAmount)}",
+                        text = "${stringResource(R.string.transfer_label)}: MYR ${String.format(Locale.US, "%,.2f", transferAmount)}",
                         color = Slate200,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
@@ -1118,13 +1194,13 @@ fun UncategorizedInboxBanner(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
-                        text = "$count 笔支出待补充分类",
+                        text = stringResource(R.string.uncategorized_banner_count, count),
                         color = Color(0xFF92400E),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "共计 MYR ${String.format("%,.2f", amount)}",
+                        text = stringResource(R.string.uncategorized_total_fmt, "MYR ${String.format(Locale.US, "%,.2f", amount)}"),
                         color = Color(0xFFB45309),
                         fontSize = 11.sp
                     )
@@ -1136,7 +1212,7 @@ fun UncategorizedInboxBanner(
                 color = Color(0xFFB45309)
             ) {
                 Text(
-                    text = "去整理 >",
+                    text = stringResource(R.string.uncategorized_action_go),
                     color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -1173,7 +1249,7 @@ fun SpendingTrendSection(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (activePoint != null) "支出走势 · ${activePoint.date}" else "支出走势",
+                        text = if (activePoint != null) "${stringResource(R.string.trend_title)} · ${activePoint.date}" else stringResource(R.string.trend_title),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
@@ -1181,7 +1257,7 @@ fun SpendingTrendSection(
                     if (activePoint != null) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "(长按/拖拽)",
+                            text = stringResource(R.string.trend_drag_hint),
                             fontSize = 10.sp,
                             color = PrimaryTeal,
                             fontWeight = FontWeight.Medium
@@ -1190,9 +1266,9 @@ fun SpendingTrendSection(
                 }
                 Text(
                     text = if (activePoint != null) {
-                        "MYR ${String.format("%,.2f", activePoint.amount)}"
+                        "MYR ${String.format(Locale.US, "%,.2f", activePoint.amount)}"
                     } else {
-                        "当期合计 MYR ${String.format("%,.2f", total)}"
+                        stringResource(R.string.trend_total_fmt, "MYR ${String.format(Locale.US, "%,.2f", total)}")
                     },
                     fontSize = if (activePoint != null) 14.sp else 12.sp,
                     fontWeight = if (activePoint != null) FontWeight.ExtraBold else FontWeight.SemiBold,
@@ -1353,17 +1429,9 @@ fun TransactionCardItem(
     tx: TransactionItem,
     onClick: () -> Unit
 ) {
-    val emoji = when (tx.category) {
-        "餐饮" -> "🍔"
-        "交通" -> "🚗"
-        "杂货" -> "🛒"
-        "账单" -> "💡"
-        "购物" -> "🛍️"
-        "娱乐" -> "🎮"
-        "医疗" -> "💊"
-        "内部划转" -> "🔄"
-        else -> "🏷️"
-    }
+    val context = LocalContext.current
+    val emoji = CategoryUiHelper.getCategoryEmoji(tx.category, tx.type)
+    val localizedCategory = CategoryUiHelper.getLocalizedCategoryName(context, tx.category)
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -1398,7 +1466,7 @@ fun TransactionCardItem(
 
                 Column {
                     Text(
-                        text = tx.note.ifBlank { tx.category },
+                        text = tx.note.ifBlank { localizedCategory },
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900,
@@ -1412,7 +1480,7 @@ fun TransactionCardItem(
                             color = Slate100
                         ) {
                             Text(
-                                text = tx.category,
+                                text = localizedCategory,
                                 color = Slate600,
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -1429,7 +1497,7 @@ fun TransactionCardItem(
             }
 
             Text(
-                text = "${if (tx.type == "income") "+" else "-"}MYR ${String.format("%.2f", tx.amount)}",
+                text = "${if (tx.type == "income") "+" else "-"}MYR ${String.format(Locale.US, "%,.2f", tx.amount)}",
                 color = if (tx.type == "income") Emerald600 else Slate900,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
@@ -1682,6 +1750,7 @@ fun UncategorizedReviewBottomSheet(
     onSelectForCategorize: (TransactionItem) -> Unit,
     onResolvePending: (Long, String) -> Unit // pendingId, action ("confirm" | "ignore" | "transfer")
 ) {
+    val context = LocalContext.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
@@ -1699,13 +1768,13 @@ fun UncategorizedReviewBottomSheet(
             ) {
                 Column {
                     Text(
-                        text = "待整理账单与转账 (${items.size})",
+                        text = stringResource(R.string.uncategorized_sheet_title, items.size),
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
                     )
                     Text(
-                        text = "点击下方条目快速归类或核验转账状态",
+                        text = stringResource(R.string.uncategorized_sheet_desc),
                         fontSize = 12.sp,
                         color = Slate500
                     )
@@ -1721,7 +1790,7 @@ fun UncategorizedReviewBottomSheet(
                         .padding(vertical = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "🎉 所有待整理账单均已处理完毕 (Inbox Zero)", color = Slate400, fontSize = 14.sp)
+                    Text(text = stringResource(R.string.uncategorized_inbox_zero), color = Slate400, fontSize = 14.sp)
                 }
             } else {
                 LazyColumn(
@@ -1745,7 +1814,7 @@ fun UncategorizedReviewBottomSheet(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = item.note.ifBlank { if (item.isPendingOnHold) "待确认银行转账" else "未命名消费" },
+                                            text = item.note.ifBlank { if (item.isPendingOnHold) stringResource(R.string.pending_hold_title) else stringResource(R.string.unnamed_expense) },
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Slate800,
@@ -1754,13 +1823,13 @@ fun UncategorizedReviewBottomSheet(
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = "${item.date} · ${if (item.isPendingOnHold) "待确认转账" else (item.category.ifBlank { "待分类" })}",
+                                            text = "${item.date} · ${if (item.isPendingOnHold) stringResource(R.string.pending_transfer_status) else CategoryUiHelper.getLocalizedCategoryName(context, item.category)}",
                                             fontSize = 12.sp,
                                             color = if (item.isPendingOnHold) Amber600 else Slate500
                                         )
                                     }
                                     Text(
-                                        text = "MYR ${String.format("%.2f", item.amount)}",
+                                        text = "MYR ${String.format(Locale.US, "%,.2f", item.amount)}",
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = FontFamily.Monospace,
@@ -1772,7 +1841,7 @@ fun UncategorizedReviewBottomSheet(
 
                                 if (item.isPendingOnHold) {
                                     Text(
-                                        text = "💡 说明：【记为支出】计入当月日常消费；【本人自转/调拨】仅从日常支出统计中排除，不修改外部账户实际余额。",
+                                        text = stringResource(R.string.pending_hold_help),
                                         fontSize = 11.sp,
                                         color = Slate500,
                                         lineHeight = 15.sp,
@@ -1788,21 +1857,21 @@ fun UncategorizedReviewBottomSheet(
                                             colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
                                             contentPadding = PaddingValues(0.dp)
                                         ) {
-                                            Text("记为支出", fontSize = 12.sp, color = Color.White)
+                                            Text(stringResource(R.string.btn_record_expense), fontSize = 12.sp, color = Color.White)
                                         }
                                         OutlinedButton(
                                             onClick = { onResolvePending(item.id, "ignore") },
                                             modifier = Modifier.weight(1f).height(36.dp),
                                             contentPadding = PaddingValues(0.dp)
                                         ) {
-                                            Text("本人自转", fontSize = 12.sp, color = Slate700)
+                                            Text(stringResource(R.string.btn_self_transfer), fontSize = 12.sp, color = Slate700)
                                         }
                                         OutlinedButton(
                                             onClick = { onResolvePending(item.id, "transfer") },
                                             modifier = Modifier.weight(1f).height(36.dp),
                                             contentPadding = PaddingValues(0.dp)
                                         ) {
-                                            Text("内部调拨", fontSize = 12.sp, color = Slate700)
+                                            Text(stringResource(R.string.btn_internal_allocate), fontSize = 12.sp, color = Slate700)
                                         }
                                     }
                                 } else {
@@ -1824,7 +1893,7 @@ fun UncategorizedReviewBottomSheet(
                                         colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
                                         contentPadding = PaddingValues(0.dp)
                                     ) {
-                                        Text("⚡ 选择分类", fontSize = 13.sp, color = Color.White)
+                                        Text(stringResource(R.string.btn_select_category), fontSize = 13.sp, color = Color.White)
                                     }
                                 }
                             }

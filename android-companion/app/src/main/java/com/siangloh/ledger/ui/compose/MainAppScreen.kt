@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.siangloh.ledger.R
 import com.siangloh.ledger.ui.compose.theme.*
 
 data class NavItem(
@@ -41,11 +43,11 @@ fun MainAppScreen(
     val saveableStateHolder = rememberSaveableStateHolder()
 
     val navItems = listOf(
-        NavItem("概览", Icons.Default.Dashboard),
-        NavItem("流水", Icons.Default.ReceiptLong),
-        NavItem("记一笔", Icons.Default.AddCircle, isPrimaryAction = true),
-        NavItem("资产", Icons.Default.AccountBalanceWallet),
-        NavItem("更多", Icons.Default.Widgets)
+        NavItem(stringResource(R.string.nav_overview), Icons.Default.Dashboard),
+        NavItem(stringResource(R.string.nav_records), Icons.Default.ReceiptLong),
+        NavItem(stringResource(R.string.nav_add), Icons.Default.AddCircle, isPrimaryAction = true),
+        NavItem(stringResource(R.string.nav_accounts), Icons.Default.AccountBalanceWallet),
+        NavItem(stringResource(R.string.nav_more), Icons.Default.Widgets)
     )
 
     Scaffold(

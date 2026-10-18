@@ -1,0 +1,207 @@
+<resources>
+    <string name="app_name">My Ledger</string>
+    <string name="service_name">Ledger Auto-Tracking Service</string>
+    <string name="permission_dialog_title">Enable Notification Access</string>
+    <string name="permission_dialog_msg">In order to automatically record transactions from Touch \'n Go or Public Bank notifications, please allow \"My Ledger\" to access notifications in settings.</string>
+    <string name="permission_dialog_ok">Enable Now</string>
+    <string name="permission_dialog_cancel">Not Now</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_overview">Overview</string>
+    <string name="nav_records">Records</string>
+    <string name="nav_add">Add</string>
+    <string name="nav_accounts">Accounts</string>
+    <string name="nav_more">More</string>
+
+    <!-- Period Selector -->
+    <string name="period_monthly">Monthly</string>
+    <string name="period_3m">Last 3 months</string>
+    <string name="period_yearly">Yearly</string>
+    <string name="prev_month">Previous Month</string>
+    <string name="next_month">Next Month</string>
+    <string name="range_month_fmt">%1$s</string>
+    <string name="range_3m_fmt">%1$s – %2$s (Last 3 months)</string>
+    <string name="range_year_fmt">Year %1$s (Full Year)</string>
+
+    <!-- Overview Screen -->
+    <string name="spending_title">Total Spending</string>
+    <string name="expense_label">Net Expenses</string>
+    <string name="transfer_label">Internal Transfers</string>
+    <string name="income_label">Net Income</string>
+    <string name="uncategorized_inbox">Review Inbox</string>
+    <string name="uncategorized_count_fmt">Uncategorized (%1$d)</string>
+    <string name="quick_categorize">Categorize</string>
+    <string name="ignore_action">Ignore</string>
+    <string name="recent_transactions">Recent Transactions</string>
+    <string name="view_all_records">View All Records</string>
+    <string name="no_transactions_yet">No transactions in this period</string>
+    <string name="sync_status_guarding">Active</string>
+    <string name="sync_status_offline">Offline Cache</string>
+    <string name="sync_status_just_now">Just now</string>
+    <string name="sync_status_mins_ago">%1$d mins ago</string>
+    <string name="sync_today_fmt">Today %1$s</string>
+    <string name="network_error_cached">⚠️ Network unavailable, showing cached snapshot · Tap to retry</string>
+    <string name="network_retry">Tap to retry</string>
+
+    <!-- Add Transaction -->
+    <string name="add_title">New Transaction</string>
+    <string name="add_expense">Expense</string>
+    <string name="add_income">Income</string>
+    <string name="add_transfer">Transfer</string>
+    <string name="add_savings">Savings</string>
+    <string name="add_amount_hint">0.00</string>
+    <string name="add_category">Category</string>
+    <string name="add_account">Payment Account</string>
+    <string name="add_to_account">Destination Account</string>
+    <string name="add_date">Date</string>
+    <string name="add_note">Merchant / Note</string>
+    <string name="add_tags">Tags (comma separated)</string>
+    <string name="add_save">Save Transaction</string>
+    <string name="add_save_transfer">Confirm Transfer</string>
+    <string name="add_saving">Saving...</string>
+    <string name="add_success">🎉 Transaction saved!</string>
+    <string name="add_offline_saved">✓ Offline mode: saved locally and will auto-sync once online</string>
+    <string name="income_group">Income Source</string>
+    <string name="income_main">💼 Primary Career</string>
+    <string name="income_side">📈 Side Hustle / Investments</string>
+    <string name="show_all_categories">Show All Categories</string>
+    <string name="collapse_categories">Show Less</string>
+
+    <!-- Records Screen -->
+    <string name="records_title">Transaction History</string>
+    <string name="records_search_hint">Search merchant, category, or note...</string>
+    <string name="all_types">All Types</string>
+    <string name="records_total_fmt">Showing all %1$d transactions</string>
+    <string name="records_empty">No matching transactions found</string>
+    <string name="edit_tx_title">Edit Transaction</string>
+    <string name="delete_tx_title">Delete Transaction?</string>
+    <string name="delete_tx_confirm_msg">This transaction will be permanently deleted (Amount: MYR %1$s, Note: %2$s)</string>
+    <string name="delete_tx_btn">Delete</string>
+    <string name="edit_save">Save Changes</string>
+    <string name="internal_transfer">Transfer</string>
+
+    <!-- Accounts Screen -->
+    <string name="accounts_title">Assets &amp; Accounts</string>
+    <string name="net_assets">Net Worth</string>
+    <string name="total_assets">Total Assets</string>
+    <string name="total_liabilities">Total Liabilities</string>
+    <string name="account_type_savings">Savings Account</string>
+    <string name="account_type_current">Current Account</string>
+    <string name="account_type_credit_card">Credit Card</string>
+    <string name="account_type_e_wallet">E-Wallet</string>
+    <string name="account_type_investment">Investment</string>
+    <string name="account_type_cash">Cash Wallet</string>
+    <string name="account_type_other">Other Account</string>
+    <string name="add_account_btn">Add Account</string>
+    <string name="transfer_btn">Transfer Between Accounts</string>
+
+    <!-- More Tools Screen -->
+    <string name="tools_title">More Tools</string>
+    <string name="tools_subtitle">Inbox · Smart OCR · Subscriptions · Automation</string>
+    <string name="full_ledger_hub">Full Ledger Hub</string>
+    <string name="full_ledger_desc">Manage subscriptions, loans, recurring budgets and reports</string>
+    <string name="enter_full_ledger">Open Full Ledger Hub</string>
+    <string name="quick_links_title">Quick Shortcuts:</string>
+    <string name="quick_subscriptions">💳 Subscriptions</string>
+    <string name="quick_liabilities">📉 Liabilities</string>
+    <string name="quick_insights">📊 Insights</string>
+    <string name="quick_categories">🏷️ Categories</string>
+    <string name="quick_import">📥 Import Hub</string>
+    <string name="quick_user_binding">👤 User Account</string>
+    <string name="receipt_ocr_title">Smart Receipt Scanner</string>
+    <string name="receipt_ocr_desc">Local offline OCR to detect merchant, date and amount</string>
+    <string name="scan_receipt_btn">Scan or Choose Photo</string>
+    <string name="subscriptions_card_title">Subscriptions &amp; Recurring</string>
+    <string name="installments_card_title">Installments &amp; Debts</string>
+    <string name="monthly_total_fmt">Approx. %1$s / mo</string>
+    <string name="remaining_total_fmt">Remaining: %1$s</string>
+    <string name="automation_settings_title">Automation &amp; Permissions</string>
+    <string name="listener_permission">Notification Access</string>
+    <string name="battery_optimization">Battery Optimization</string>
+    <string name="floating_overlay">Floating Window Access</string>
+    <string name="server_settings_title">Server Connection &amp; Sync</string>
+    <string name="server_url_label">Server URL</string>
+    <string name="api_key_label">Auto-Track API Key</string>
+    <string name="edit_config_btn">Edit Connection</string>
+    <string name="language_settings_title">🌐 Interface Language</string>
+    <string name="language_select_dialog_title">Select Language</string>
+    <string name="lang_zh">中文 (简体)</string>
+    <string name="lang_en">English</string>
+    <string name="lang_ms">Bahasa Melayu</string>
+
+    <!-- Common -->
+    <string name="common_save">Save</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_confirm">Confirm</string>
+    <string name="common_close">Close</string>
+    <string name="common_retry">Retry</string>
+    <string name="common_refresh">Refresh</string>
+    <string name="common_offline">Offline Mode</string>
+    <string name="common_success">Success</string>
+    <string name="common_failed">Failed</string>
+
+    <!-- Categories -->
+    <string name="category_dining">Dining</string>
+    <string name="category_transport">Transport</string>
+    <string name="category_groceries">Groceries</string>
+    <string name="category_bills">Bills &amp; Utilities</string>
+    <string name="category_shopping">Shopping</string>
+    <string name="category_entertainment">Entertainment</string>
+    <string name="category_medical">Medical &amp; Health</string>
+    <string name="category_housing">Housing</string>
+    <string name="category_education">Education</string>
+    <string name="category_pets">Pets</string>
+    <string name="category_travel">Travel</string>
+    <string name="category_other">Other</string>
+    <string name="category_salary">Salary</string>
+    <string name="category_side_income">Side Income</string>
+    <string name="category_bonus">Bonus</string>
+    <string name="category_investments">Investments</string>
+    <string name="category_fixed_deposit">Fixed Deposit</string>
+    <string name="category_emergency_fund">Emergency Fund</string>
+    <string name="category_wish_fund">Wish Fund</string>
+    <string name="category_transfer">Internal Transfer</string>
+
+    <!-- Additional Overview & Status -->
+    <string name="spending_subtitle_clean">Excluding self-transfers</string>
+    <string name="status_listening_active">Listening Active (Background Service)</string>
+    <string name="status_listening_paused">Notification Listener Disabled</string>
+    <string name="status_offline_prefix">Offline Snapshot · Last synced</string>
+    <string name="status_synced_prefix">Data Synced</string>
+    <string name="pending_review_badge">%1$d to Review</string>
+    <string name="uncategorized_banner_count">%1$d expenses to categorize</string>
+    <string name="uncategorized_total_fmt">Total %1$s</string>
+    <string name="uncategorized_action_go">Review ›</string>
+    <string name="trend_title">Spending Trend</string>
+    <string name="trend_drag_hint">(Press/drag)</string>
+    <string name="trend_total_fmt">Period Total %1$s</string>
+    <string name="view_all_records_detail">View All Records (Filter / Search / Edit / Delete) ›</string>
+    <string name="enable_overlay_banner">⚡ Enable Floating Overlay Card (Quick Auto-Track) ›</string>
+    <string name="uncategorized_sheet_title">Pending Bills &amp; Transfers (%1$d)</string>
+    <string name="uncategorized_sheet_desc">Tap items below to quickly classify or verify transfer status</string>
+    <string name="uncategorized_inbox_zero">🎉 All pending transactions cleared (Inbox Zero)</string>
+    <string name="pending_hold_title">Pending Bank Transfer</string>
+    <string name="unnamed_expense">Unnamed Expense</string>
+    <string name="pending_transfer_status">Pending Transfer</string>
+    <string name="uncategorized_status">Uncategorized</string>
+    <string name="pending_hold_help">💡 Note: [Record Expense] counts towards monthly spending; [Self Transfer] excludes from spending without altering account balances.</string>
+    <string name="btn_record_expense">Record Expense</string>
+    <string name="btn_self_transfer">Self Transfer</string>
+    <string name="btn_internal_allocate">Internal Transfer</string>
+    <string name="btn_select_category">⚡ Select Category</string>
+
+    <!-- Additional Add & Accounts -->
+    <string name="clear_draft">Clear Draft</string>
+    <string name="amount_label">Amount</string>
+    <string name="no_accounts_configured">No Accounts Configured</string>
+    <string name="no_accounts_help">Tap [Add Account] above to create bank cards, e-wallets, or cash accounts</string>
+    <string name="my_accounts_list">My Accounts (%1$d)</string>
+    <string name="account_name_label">Account Name</string>
+    <string name="account_type_label">Account Type</string>
+    <string name="credit_limit_label">Credit Limit (MYR)</string>
+    <string name="transfer_funds_title">Transfer Funds Between Accounts</string>
+    <string name="cannot_transfer_msg">You need at least two accounts to make internal transfers. Please add an account first.</string>
+    <string name="from_account_label">From Account:</string>
+    <string name="to_account_label">To Account:</string>
+</resources>
