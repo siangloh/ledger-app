@@ -21,11 +21,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.siangloh.ledger.NetworkHelper
+import com.siangloh.ledger.data.AppDatabase
+import com.siangloh.ledger.data.LocalDataStore
 import com.siangloh.ledger.data.NativeLedgerApi
 import com.siangloh.ledger.data.TransactionRecord
+import com.siangloh.ledger.data.entities.PendingTransaction
+import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.compose.components.RecordsSkeletonList
 import com.siangloh.ledger.ui.compose.theme.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -46,15 +54,38 @@ fun RecordsScreen(
     var currentPage by remember { mutableStateOf(1) }
     var hasMore by remember { mutableStateOf(false) }
     var isLoadingMore by remember { mutableStateOf(false) }
-    var transactions by remember { mutableStateOf<List<TransactionRecord>>(emptyList()) }
+    var transactions by remember {
+        mutableStateOf<List<TransactionRecord>>(
+            LocalDataStore.getRecords(context, selectedMonth, selectedType, searchQuery, 1)?.let {
+                try {
+                    NativeLedgerApi.parseTransactionsPageJson(JSONObject(it)).items
+                } catch (_: Exception) { emptyList() }
+            } ?: emptyList()
+        )
+    }
+    var pendingTransactions by remember { mutableStateOf<List<PendingTransaction>>(emptyList()) }
+    var isSyncingPending by remember { mutableStateOf(false) }
     var totalCount by remember { mutableStateOf(0) }
     var editingTx by remember { mutableStateOf<TransactionRecord?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<TransactionRecord?>(null) }
 
+    fun loadPending() {
+        scope.launch {
+            try {
+                val db = AppDatabase.getInstance(context)
+                val list = withContext(Dispatchers.IO) {
+                    db.pendingTransactionDao().getPendingTransactions()
+                }
+                pendingTransactions = list
+            } catch (_: Exception) {}
+        }
+    }
+
     fun loadData(resetPage: Boolean = true) {
         if (resetPage) {
             currentPage = 1
-            isLoading = true
+            if (transactions.isEmpty()) isLoading = true
+            loadPending()
         } else {
             isLoadingMore = true
         }
@@ -245,9 +276,9 @@ fun RecordsScreen(
                 .padding(paddingVals)
                 .background(Slate50)
         ) {
-            if (isLoading && transactions.isEmpty()) {
+            if (isLoading && transactions.isEmpty() && pendingTransactions.isEmpty()) {
                 RecordsSkeletonList()
-            } else if (transactions.isEmpty()) {
+            } else if (transactions.isEmpty() && pendingTransactions.isEmpty()) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -287,6 +318,91 @@ fun RecordsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
+                    if (pendingTransactions.isNotEmpty()) {
+                        item(key = "pending_header") {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = Amber50,
+                                border = BorderStroke(1.dp, Amber200),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(text = "💾", fontSize = 16.sp)
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "本地离线待同步 (${pendingTransactions.size} 笔)",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Amber700
+                                            )
+                                        }
+                                        Button(
+                                            onClick = {
+                                                isSyncingPending = true
+                                                SyncWorker.enqueueSync(context)
+                                                NetworkHelper.syncPendingTransactions(pendingTransactions, context) { success, _ ->
+                                                    isSyncingPending = false
+                                                    if (success) {
+                                                        loadPending()
+                                                        loadData(resetPage = true)
+                                                    }
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Amber600),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(30.dp),
+                                            enabled = !isSyncingPending
+                                        ) {
+                                            if (isSyncingPending) {
+                                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(14.dp))
+                                            } else {
+                                                Text("立即同步", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    pendingTransactions.forEach { pt ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "${pt.category} · ${pt.note.ifBlank { "离线记账" }}",
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = Slate800,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = "${pt.date} · 本地存储队列",
+                                                    fontSize = 11.sp,
+                                                    color = Slate500
+                                                )
+                                            }
+                                            Text(
+                                                text = "${if (pt.type == "expense") "-" else "+"}RM ${String.format(Locale.US, "%.2f", pt.amount)}",
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (pt.type == "expense") Slate900 else Emerald600
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     items(transactions, key = { it.id }) { tx ->
                         TransactionCard(
                             tx = tx,

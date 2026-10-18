@@ -55,7 +55,15 @@ fun MoreToolsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var toolsSummary by remember { mutableStateOf<ToolsSummary?>(null) }
+    var toolsSummary by remember {
+        mutableStateOf<ToolsSummary?>(
+            LocalDataStore.getTools(context)?.let {
+                try {
+                    NativeLedgerApi.parseToolsSummaryJson(JSONObject(it))
+                } catch (_: Exception) { null }
+            }
+        )
+    }
     var toolsError by remember { mutableStateOf<String?>(null) }
     var pendingItems by remember { mutableStateOf<List<UncategorizedItem>>(emptyList()) }
     var pendingError by remember { mutableStateOf<String?>(null) }
@@ -81,7 +89,7 @@ fun MoreToolsScreen(
     var currentApiKey by remember { mutableStateOf(NetworkHelper.getApiKey(context)) }
 
     fun refreshAll() {
-        isLoading = true
+        if (toolsSummary == null) isLoading = true
         toolsError = null
         pendingError = null
         scope.launch {

@@ -135,43 +135,59 @@ object NativeLedgerApi {
             conn.disconnect()
 
             val json = JSONObject(respBody)
-            if (!json.optBoolean("ok", false)) {
-                return@withContext Result.failure(Exception(json.optString("message", "获取流水失败")))
+            if (json.optBoolean("ok", false)) {
+                LocalDataStore.saveRecords(context, month, type, search ?: "", page, respBody)
+                Result.success(parseTransactionsPageJson(json, page, limit))
+            } else {
+                val cached = LocalDataStore.getRecords(context, month, type, search ?: "", page)
+                if (!cached.isNullOrBlank()) {
+                    Result.success(parseTransactionsPageJson(JSONObject(cached), page, limit))
+                } else {
+                    Result.failure(Exception(json.optString("message", "获取流水失败")))
+                }
             }
-
-            val itemsArr = json.optJSONArray("items") ?: JSONArray()
-            val list = mutableListOf<TransactionRecord>()
-            for (i in 0 until itemsArr.length()) {
-                val obj = itemsArr.getJSONObject(i)
-                list.add(
-                    TransactionRecord(
-                        id = obj.optLong("id"),
-                        date = obj.optString("date"),
-                        type = obj.optString("type", "expense"),
-                        category = obj.optString("category", "其他"),
-                        amount = obj.optDouble("amount", 0.0),
-                        note = obj.optString("note", ""),
-                        tags = obj.optString("tags", ""),
-                        accountId = if (obj.has("account_id") && !obj.isNull("account_id")) obj.optInt("account_id") else null,
-                        accountName = obj.optString("account_name", "未指定"),
-                        accountType = obj.optString("account_type", "")
-                    )
-                )
-            }
-
-            Result.success(
-                TransactionsPage(
-                    items = list,
-                    totalCount = json.optInt("total_count", list.size),
-                    page = json.optInt("page", page),
-                    limit = json.optInt("limit", limit),
-                    hasMore = json.optBoolean("has_more", false)
-                )
-            )
         } catch (e: Exception) {
             Log.e(TAG, "getTransactions error: ${e.message}", e)
-            Result.failure(e)
+            val cached = LocalDataStore.getRecords(context, month, type, search ?: "", page)
+            if (!cached.isNullOrBlank()) {
+                try {
+                    Result.success(parseTransactionsPageJson(JSONObject(cached), page, limit))
+                } catch (_: Exception) {
+                    Result.failure(e)
+                }
+            } else {
+                Result.failure(e)
+            }
         }
+    }
+
+    fun parseTransactionsPageJson(json: JSONObject, fallbackPage: Int = 1, fallbackLimit: Int = 50): TransactionsPage {
+        val itemsArr = json.optJSONArray("items") ?: JSONArray()
+        val list = mutableListOf<TransactionRecord>()
+        for (i in 0 until itemsArr.length()) {
+            val obj = itemsArr.getJSONObject(i)
+            list.add(
+                TransactionRecord(
+                    id = obj.optLong("id"),
+                    date = obj.optString("date"),
+                    type = obj.optString("type", "expense"),
+                    category = obj.optString("category", "其他"),
+                    amount = obj.optDouble("amount", 0.0),
+                    note = obj.optString("note", ""),
+                    tags = obj.optString("tags", ""),
+                    accountId = if (obj.has("account_id") && !obj.isNull("account_id")) obj.optInt("account_id") else null,
+                    accountName = obj.optString("account_name", "未指定"),
+                    accountType = obj.optString("account_type", "")
+                )
+            )
+        }
+        return TransactionsPage(
+            items = list,
+            totalCount = json.optInt("total_count", list.size),
+            page = json.optInt("page", fallbackPage),
+            limit = json.optInt("limit", fallbackLimit),
+            hasMore = json.optBoolean("has_more", false)
+        )
     }
 
     suspend fun addTransaction(
@@ -309,45 +325,61 @@ object NativeLedgerApi {
             conn.disconnect()
 
             val json = JSONObject(respBody)
-            if (!json.optBoolean("ok", false)) {
-                return@withContext Result.failure(Exception(json.optString("message", "获取账户失败")))
+            if (json.optBoolean("ok", false)) {
+                LocalDataStore.saveAccounts(context, respBody)
+                Result.success(parseAccountsSummaryJson(json))
+            } else {
+                val cached = LocalDataStore.getAccounts(context)
+                if (!cached.isNullOrBlank()) {
+                    Result.success(parseAccountsSummaryJson(JSONObject(cached)))
+                } else {
+                    Result.failure(Exception(json.optString("message", "获取账户失败")))
+                }
             }
-
-            val accArr = json.optJSONArray("accounts") ?: JSONArray()
-            val list = mutableListOf<AccountRecord>()
-            for (i in 0 until accArr.length()) {
-                val obj = accArr.getJSONObject(i)
-                list.add(
-                    AccountRecord(
-                        id = obj.optInt("id"),
-                        name = obj.optString("name"),
-                        type = obj.optString("type", "savings"),
-                        balance = obj.optDouble("balance", 0.0),
-                        creditLimit = obj.optDouble("credit_limit", 0.0),
-                        currency = obj.optString("currency", "MYR"),
-                        statementDay = if (obj.has("statement_day") && !obj.isNull("statement_day")) obj.optInt("statement_day") else null,
-                        dueDay = if (obj.has("due_day") && !obj.isNull("due_day")) obj.optInt("due_day") else null
-                    )
-                )
-            }
-
-            val defaultAccountId = if (json.has("default_account_id") && !json.isNull("default_account_id")) json.optInt("default_account_id") else null
-            val defaultGroup = if (json.has("default_group") && !json.isNull("default_group")) json.optString("default_group") else null
-
-            Result.success(
-                AccountsSummary(
-                    totalAssets = json.optDouble("total_assets", 0.0),
-                    totalLiabilities = json.optDouble("total_liabilities", 0.0),
-                    netWorth = json.optDouble("net_worth", 0.0),
-                    accounts = list,
-                    defaultAccountId = defaultAccountId,
-                    defaultGroup = defaultGroup
-                )
-            )
         } catch (e: Exception) {
             Log.e(TAG, "getAccounts error: ${e.message}", e)
-            Result.failure(e)
+            val cached = LocalDataStore.getAccounts(context)
+            if (!cached.isNullOrBlank()) {
+                try {
+                    Result.success(parseAccountsSummaryJson(JSONObject(cached)))
+                } catch (_: Exception) {
+                    Result.failure(e)
+                }
+            } else {
+                Result.failure(e)
+            }
         }
+    }
+
+    fun parseAccountsSummaryJson(json: JSONObject): AccountsSummary {
+        val accArr = json.optJSONArray("accounts") ?: JSONArray()
+        val list = mutableListOf<AccountRecord>()
+        for (i in 0 until accArr.length()) {
+            val obj = accArr.getJSONObject(i)
+            list.add(
+                AccountRecord(
+                    id = obj.optInt("id"),
+                    name = obj.optString("name"),
+                    type = obj.optString("type", "savings"),
+                    balance = obj.optDouble("balance", 0.0),
+                    creditLimit = obj.optDouble("credit_limit", 0.0),
+                    currency = obj.optString("currency", "MYR"),
+                    statementDay = if (obj.has("statement_day") && !obj.isNull("statement_day")) obj.optInt("statement_day") else null,
+                    dueDay = if (obj.has("due_day") && !obj.isNull("due_day")) obj.optInt("due_day") else null
+                )
+            )
+        }
+        val defaultAccountId = if (json.has("default_account_id") && !json.isNull("default_account_id")) json.optInt("default_account_id") else null
+        val defaultGroup = if (json.has("default_group") && !json.isNull("default_group")) json.optString("default_group") else null
+
+        return AccountsSummary(
+            totalAssets = json.optDouble("total_assets", 0.0),
+            totalLiabilities = json.optDouble("total_liabilities", 0.0),
+            netWorth = json.optDouble("net_worth", 0.0),
+            accounts = list,
+            defaultAccountId = defaultAccountId,
+            defaultGroup = defaultGroup
+        )
     }
 
     suspend fun addOrUpdateAccount(
@@ -443,61 +475,75 @@ object NativeLedgerApi {
                            else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
             conn.disconnect()
 
-            if (respCode !in 200..299) {
-                return@withContext Result.failure(Exception("HTTP $respCode: ${if (respBody.isNotBlank()) respBody else "无法加载工具摘要"}"))
+            val json = if (respBody.isNotBlank()) JSONObject(respBody) else JSONObject()
+            if (json.optBoolean("ok", true)) {
+                LocalDataStore.saveTools(context, respBody)
+                Result.success(parseToolsSummaryJson(json))
+            } else {
+                val cached = LocalDataStore.getTools(context)
+                if (!cached.isNullOrBlank()) {
+                    Result.success(parseToolsSummaryJson(JSONObject(cached)))
+                } else {
+                    Result.failure(Exception(json.optString("message", "加载工具摘要失败")))
+                }
             }
-
-            val json = JSONObject(respBody)
-            if (!json.optBoolean("ok", true)) {
-                return@withContext Result.failure(Exception(json.optString("message", "加载工具摘要失败")))
-            }
-            val subArr = json.optJSONArray("subscriptions") ?: JSONArray()
-            val instArr = json.optJSONArray("installments") ?: JSONArray()
-
-            val subs = mutableListOf<SubscriptionRecord>()
-            for (i in 0 until subArr.length()) {
-                val obj = subArr.getJSONObject(i)
-                subs.add(
-                    SubscriptionRecord(
-                        id = obj.optInt("id"),
-                        name = obj.optString("name"),
-                        category = obj.optString("category"),
-                        cost = obj.optDouble("cost", 0.0),
-                        currency = obj.optString("currency", "MYR"),
-                        nextBillingDate = obj.optString("next_billing_date", ""),
-                        autoRenew = obj.optBoolean("auto_renew", true)
-                    )
-                )
-            }
-
-            val insts = mutableListOf<InstallmentRecord>()
-            for (i in 0 until instArr.length()) {
-                val obj = instArr.getJSONObject(i)
-                insts.add(
-                    InstallmentRecord(
-                        id = obj.optInt("id"),
-                        title = obj.optString("title"),
-                        totalAmount = obj.optDouble("total_amount", 0.0),
-                        tenureMonths = obj.optInt("tenure_months", 1),
-                        paidPeriods = obj.optInt("paid_periods", 0),
-                        monthlyAmount = obj.optDouble("monthly_amount", 0.0),
-                        remainingAmount = obj.optDouble("remaining_amount", 0.0)
-                    )
-                )
-            }
-
-            Result.success(
-                ToolsSummary(
-                    subscriptions = subs,
-                    totalMonthlySub = json.optDouble("total_monthly_sub", 0.0),
-                    installments = insts,
-                    totalRemainingInst = json.optDouble("total_remaining_inst", 0.0)
-                )
-            )
         } catch (e: Exception) {
             Log.e(TAG, "getToolsSummary error: ${e.message}", e)
-            Result.failure(e)
+            val cached = LocalDataStore.getTools(context)
+            if (!cached.isNullOrBlank()) {
+                try {
+                    Result.success(parseToolsSummaryJson(JSONObject(cached)))
+                } catch (_: Exception) {
+                    Result.failure(e)
+                }
+            } else {
+                Result.failure(e)
+            }
         }
+    }
+
+    fun parseToolsSummaryJson(json: JSONObject): ToolsSummary {
+        val subArr = json.optJSONArray("subscriptions") ?: JSONArray()
+        val instArr = json.optJSONArray("installments") ?: JSONArray()
+
+        val subs = mutableListOf<SubscriptionRecord>()
+        for (i in 0 until subArr.length()) {
+            val obj = subArr.getJSONObject(i)
+            subs.add(
+                SubscriptionRecord(
+                    id = obj.optInt("id"),
+                    name = obj.optString("name"),
+                    category = obj.optString("category"),
+                    cost = obj.optDouble("cost", 0.0),
+                    currency = obj.optString("currency", "MYR"),
+                    nextBillingDate = obj.optString("next_billing_date", ""),
+                    autoRenew = obj.optBoolean("auto_renew", true)
+                )
+            )
+        }
+
+        val insts = mutableListOf<InstallmentRecord>()
+        for (i in 0 until instArr.length()) {
+            val obj = instArr.getJSONObject(i)
+            insts.add(
+                InstallmentRecord(
+                    id = obj.optInt("id"),
+                    title = obj.optString("title"),
+                    totalAmount = obj.optDouble("total_amount", 0.0),
+                    tenureMonths = obj.optInt("tenure_months", 1),
+                    paidPeriods = obj.optInt("paid_periods", 0),
+                    monthlyAmount = obj.optDouble("monthly_amount", 0.0),
+                    remainingAmount = obj.optDouble("remaining_amount", 0.0)
+                )
+            )
+        }
+
+        return ToolsSummary(
+            subscriptions = subs,
+            totalMonthlySub = json.optDouble("total_monthly_sub", 0.0),
+            installments = insts,
+            totalRemainingInst = json.optDouble("total_remaining_inst", 0.0)
+        )
     }
 
     suspend fun handlePendingAction(

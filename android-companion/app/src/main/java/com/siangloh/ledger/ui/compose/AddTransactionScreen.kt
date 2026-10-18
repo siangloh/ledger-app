@@ -19,10 +19,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.siangloh.ledger.data.AccountRecord
+import com.siangloh.ledger.data.AppDatabase
 import com.siangloh.ledger.data.CategoryRecord
 import com.siangloh.ledger.data.NativeLedgerApi
+import com.siangloh.ledger.data.entities.PendingTransaction
+import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.compose.theme.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -542,7 +547,38 @@ fun AddTransactionScreen(
                             tags = ""
                             onFinished()
                         }.onFailure { err ->
-                            Toast.makeText(context, "记账失败：${err.message}", Toast.LENGTH_LONG).show()
+                            // 网络不可用或请求失败时，自动存入 Room 本地数据库，触发后台同步队列！
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    val db = AppDatabase.getInstance(context)
+                                    val combinedNote = when {
+                                        note.isNotBlank() && tags.isNotBlank() -> "$note #$tags".trim()
+                                        tags.isNotBlank() -> "#$tags".trim()
+                                        note.isNotBlank() -> note.trim()
+                                        else -> if (txType == "transfer") "内部转账" else selectedCategory
+                                    }
+                                    db.pendingTransactionDao().insert(
+                                        PendingTransaction(
+                                            date = dateStr,
+                                            type = txType,
+                                            group_name = if (txType == "income") incomeGroup else "personal",
+                                            category = selectedCategory,
+                                            amount = amt,
+                                            note = combinedNote,
+                                            source = "offline_manual",
+                                            sync_status = "pending"
+                                        )
+                                    )
+                                }
+                                SyncWorker.enqueueSync(context)
+                                Toast.makeText(context, "✓ 网络不可用，已安全存入本地数据库，联网后将自动同步！", Toast.LENGTH_LONG).show()
+                                amountText = ""
+                                note = ""
+                                tags = ""
+                                onFinished()
+                            } catch (localDbErr: Exception) {
+                                Toast.makeText(context, "保存失败：${localDbErr.message}", Toast.LENGTH_LONG).show()
+                            }
                         }
                     }
                 },

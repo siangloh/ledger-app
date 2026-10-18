@@ -235,14 +235,26 @@ fun OverviewScreen(
         mutableStateOf(SimpleDateFormat("yyyy年M月", Locale.CHINESE).format(calendar.time))
     }
 
-    var overviewData by remember { mutableStateOf(OverviewData()) }
-    var isLoading by remember { mutableStateOf(false) }
-    var hasNetworkError by remember { mutableStateOf(false) }
-    var networkErrorMessage by remember { mutableStateOf("") }
     var hasOverlayPermission by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     var isListeningActual by remember {
         mutableStateOf(NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName))
     }
+
+    val initialCache = remember {
+        val username = NetworkHelper.getUsername(context)
+        val cacheKey = "cache_${username}_${period}_${currentMonthStr}"
+        val sp = context.getSharedPreferences("ledger_overview_cache", Context.MODE_PRIVATE)
+        val cached = sp.getString(cacheKey, null)
+        if (!cached.isNullOrBlank()) {
+            try {
+                parseOverviewJson(cached, isListeningActual, isOfflineCache = true)
+            } catch (_: Exception) { null }
+        } else null
+    }
+    var overviewData by remember { mutableStateOf(initialCache ?: OverviewData()) }
+    var isLoading by remember { mutableStateOf(initialCache == null) }
+    var hasNetworkError by remember { mutableStateOf(false) }
+    var networkErrorMessage by remember { mutableStateOf("") }
 
     // Quick Categorize & Uncategorized List Sheet States
     var showCategorizeDialog by remember { mutableStateOf(false) }

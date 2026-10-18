@@ -22,10 +22,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.siangloh.ledger.data.AccountRecord
 import com.siangloh.ledger.data.AccountsSummary
+import com.siangloh.ledger.data.LocalDataStore
 import com.siangloh.ledger.data.NativeLedgerApi
 import com.siangloh.ledger.ui.compose.components.AccountsSkeletonScreen
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,20 +36,32 @@ fun AccountsScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var summary by remember { mutableStateOf<AccountsSummary?>(null) }
+    var summary by remember {
+        mutableStateOf<AccountsSummary?>(
+            LocalDataStore.getAccounts(context)?.let {
+                try {
+                    NativeLedgerApi.parseAccountsSummaryJson(JSONObject(it))
+                } catch (_: Exception) { null }
+            }
+        )
+    }
     var isLoading by remember { mutableStateOf(false) }
     var showAddAccountDialog by remember { mutableStateOf(false) }
     var showTransferDialog by remember { mutableStateOf(false) }
 
     fun loadAccounts() {
-        isLoading = true
+        if (summary == null) isLoading = true
         scope.launch {
             val res = NativeLedgerApi.getAccounts(context)
             isLoading = false
             res.onSuccess {
                 summary = it
             }.onFailure {
-                Toast.makeText(context, "获取账户失败：${it.message}", Toast.LENGTH_SHORT).show()
+                if (summary == null) {
+                    Toast.makeText(context, "获取账户失败：${it.message}", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "网络受阻，已呈现本地离线快照", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
