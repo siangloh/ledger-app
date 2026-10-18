@@ -40,6 +40,13 @@
     <string name="sync_status_just_now">刚刚</string>
     <string name="sync_status_mins_ago">%1$d分钟前</string>
     <string name="sync_today_fmt">今天 %1$s</string>
+    <string name="sync_status_local_only">仅本机</string>
+    <string name="sync_status_pending">待同步</string>
+    <string name="sync_status_synced">已同步</string>
+    <string name="sync_status_failed">同步失败</string>
+    <string name="sync_retry_btn">安全重试</string>
+    <string name="sync_failed_reason">失败原因：%1$s</string>
+    <string name="sync_pending_banner_title">离线记账队列 (%1$d)</string>
     <string name="network_error_cached">⚠️ 网络暂不可用，已呈现最近快照 · 点击重试</string>
     <string name="network_retry">点击重试</string>
 

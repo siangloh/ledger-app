@@ -90,7 +90,7 @@ fun RecordsScreen(
             try {
                 val db = AppDatabase.getInstance(context)
                 val list = withContext(Dispatchers.IO) {
-                    db.pendingTransactionDao().getPendingTransactions()
+                    db.pendingTransactionDao().getAllLocalTransactions()
                 }
                 pendingTransactions = list
             } catch (_: Exception) {}
@@ -339,10 +339,15 @@ fun RecordsScreen(
                 ) {
                     if (pendingTransactions.isNotEmpty()) {
                         item(key = "pending_header") {
+                            val failedCount = pendingTransactions.count { it.sync_status == "failed" }
+                            val pendingCount = pendingTransactions.count { it.sync_status == "pending" }
+                            val localCount = pendingTransactions.count { it.sync_status == "local_only" }
+                            val hasFailures = failedCount > 0
+
                             Surface(
                                 shape = RoundedCornerShape(14.dp),
-                                color = Amber50,
-                                border = BorderStroke(1.dp, Amber200),
+                                color = if (hasFailures) Rose50 else Amber50,
+                                border = BorderStroke(1.dp, if (hasFailures) Rose200 else Amber200),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(modifier = Modifier.padding(14.dp)) {
@@ -351,71 +356,195 @@ fun RecordsScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(text = "💾", fontSize = 16.sp)
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = "本地离线待同步 (${pendingTransactions.size} 笔)",
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Amber700
-                                            )
-                                        }
-                                        Button(
-                                            onClick = {
-                                                isSyncingPending = true
-                                                SyncWorker.enqueueSync(context)
-                                                NetworkHelper.syncPendingTransactions(pendingTransactions, context) { success, _ ->
-                                                    isSyncingPending = false
-                                                    if (success) {
-                                                        loadPending()
-                                                        loadData(resetPage = true)
-                                                    }
-                                                }
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = Amber600),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                            modifier = Modifier.height(30.dp),
-                                            enabled = !isSyncingPending
-                                        ) {
-                                            if (isSyncingPending) {
-                                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(14.dp))
-                                            } else {
-                                                Text("立即同步", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    pendingTransactions.forEach { pt ->
                                         Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f)
                                         ) {
-                                            Column(modifier = Modifier.weight(1f)) {
+                                            Text(text = if (hasFailures) "⚠️" else "💾", fontSize = 18.sp)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
                                                 Text(
-                                                    text = "${pt.category} · ${pt.note.ifBlank { "离线记账" }}",
+                                                    text = if (hasFailures) {
+                                                        "同步异常 ($failedCount 笔失败 / $pendingCount 笔待同步)"
+                                                    } else {
+                                                        "离线存储队列 ($pendingCount 笔待同步${if (localCount > 0) " · $localCount 笔仅本机" else ""})"
+                                                    },
                                                     fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                    color = Slate800,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (hasFailures) Rose600 else Amber700
                                                 )
                                                 Text(
-                                                    text = "${pt.date} · 本地存储队列",
+                                                    text = if (hasFailures) "检测到网络或校验错误，支持手动安全重试" else "账目已持久保存在本机，连网后将安全同步",
                                                     fontSize = 11.sp,
                                                     color = Slate500
                                                 )
                                             }
-                                            Text(
-                                                text = "${if (pt.type == "expense") "-" else "+"}RM ${String.format(Locale.US, "%.2f", pt.amount)}",
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (pt.type == "expense") Slate900 else Emerald600
-                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Button(
+                                            onClick = {
+                                                isSyncingPending = true
+                                                scope.launch {
+                                                    val db = AppDatabase.getInstance(context)
+                                                    withContext(Dispatchers.IO) {
+                                                        db.pendingTransactionDao().resetAllFailedToPending()
+                                                    }
+                                                    val syncable = withContext(Dispatchers.IO) {
+                                                        db.pendingTransactionDao().getSyncableTransactions()
+                                                    }
+                                                    NetworkHelper.syncPendingTransactionsDetailed(syncable, context) { success, syncedIds, failedErrors ->
+                                                        scope.launch {
+                                                            withContext(Dispatchers.IO) {
+                                                                if (syncedIds.isNotEmpty()) {
+                                                                    db.pendingTransactionDao().markAsSynced(syncedIds)
+                                                                    db.pendingTransactionDao().deleteSynced()
+                                                                }
+                                                                failedErrors.forEach { (fid, ferr) ->
+                                                                    db.pendingTransactionDao().markAsFailed(fid, ferr)
+                                                                }
+                                                            }
+                                                            isSyncingPending = false
+                                                            loadPending()
+                                                            loadData(resetPage = true)
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (hasFailures) Rose500 else Amber600),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                            modifier = Modifier.height(48.dp),
+                                            enabled = !isSyncingPending
+                                        ) {
+                                            if (isSyncingPending) {
+                                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp))
+                                            } else {
+                                                Text(
+                                                    text = if (hasFailures) stringResource(R.string.sync_retry_btn) else "立即同步",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    pendingTransactions.forEach { pt ->
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = Color.White,
+                                            border = BorderStroke(1.dp, if (pt.sync_status == "failed") Rose200 else Slate200),
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                        ) {
+                                            Column(modifier = Modifier.padding(10.dp)) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            val statusBadgeBg = when (pt.sync_status) {
+                                                                "failed" -> Rose100
+                                                                "local_only" -> Slate100
+                                                                else -> Amber100
+                                                            }
+                                                            val statusBadgeFg = when (pt.sync_status) {
+                                                                "failed" -> Rose600
+                                                                "local_only" -> Slate600
+                                                                else -> Amber700
+                                                            }
+                                                            val statusBadgeText = when (pt.sync_status) {
+                                                                "failed" -> stringResource(R.string.sync_status_failed)
+                                                                "local_only" -> stringResource(R.string.sync_status_local_only)
+                                                                else -> stringResource(R.string.sync_status_pending)
+                                                            }
+                                                            Surface(
+                                                                shape = RoundedCornerShape(4.dp),
+                                                                color = statusBadgeBg,
+                                                                modifier = Modifier.padding(end = 6.dp)
+                                                            ) {
+                                                                Text(
+                                                                    text = statusBadgeText,
+                                                                    fontSize = 10.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = statusBadgeFg,
+                                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                                                )
+                                                            }
+                                                            Text(
+                                                                text = "${pt.category} · ${pt.note.ifBlank { "离线记账" }}",
+                                                                fontSize = 13.sp,
+                                                                fontWeight = FontWeight.Medium,
+                                                                color = Slate800,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis
+                                                            )
+                                                        }
+                                                        Spacer(modifier = Modifier.height(2.dp))
+                                                        Text(
+                                                            text = "${pt.date} · 本地队列",
+                                                            fontSize = 11.sp,
+                                                            color = Slate500
+                                                        )
+                                                    }
+                                                    Text(
+                                                        text = "${if (pt.type == "expense") "-" else "+"}RM ${String.format(Locale.US, "%.2f", pt.amount)}",
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (pt.type == "expense") Slate900 else Emerald600
+                                                    )
+                                                }
+
+                                                if (pt.sync_status == "failed") {
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = stringResource(R.string.sync_failed_reason, pt.sync_error ?: "网络通信异常"),
+                                                            fontSize = 11.sp,
+                                                            color = Rose600,
+                                                            modifier = Modifier.weight(1f),
+                                                            maxLines = 2,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        OutlinedButton(
+                                                            onClick = {
+                                                                scope.launch {
+                                                                    val db = AppDatabase.getInstance(context)
+                                                                    withContext(Dispatchers.IO) {
+                                                                        db.pendingTransactionDao().resetToPending(pt.id)
+                                                                    }
+                                                                    NetworkHelper.syncPendingTransactionsDetailed(listOf(pt), context) { success, syncedIds, failedErrors ->
+                                                                        scope.launch {
+                                                                            withContext(Dispatchers.IO) {
+                                                                                if (syncedIds.isNotEmpty()) {
+                                                                                    db.pendingTransactionDao().markAsSynced(syncedIds)
+                                                                                    db.pendingTransactionDao().deleteSynced()
+                                                                                }
+                                                                                failedErrors.forEach { (fid, ferr) ->
+                                                                                    db.pendingTransactionDao().markAsFailed(fid, ferr)
+                                                                                }
+                                                                            }
+                                                                            loadPending()
+                                                                            loadData(resetPage = true)
+                                                                        }
+                                                                    }
+                                                                }
+                                                            },
+                                                            modifier = Modifier.height(48.dp),
+                                                            contentPadding = PaddingValues(horizontal = 8.dp)
+                                                        ) {
+                                                            Text(stringResource(R.string.common_retry), fontSize = 11.sp, color = Rose600)
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -626,6 +755,19 @@ fun TransactionCard(
                             fontSize = 11.sp,
                             color = Slate400
                         )
+                        // 服务器已确认同步徽标
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Emerald50
+                        ) {
+                            Text(
+                                text = "· " + stringResource(R.string.sync_status_synced),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Emerald700,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
                     }
                     if (tx.tags.isNotBlank()) {
                         Spacer(modifier = Modifier.height(2.dp))

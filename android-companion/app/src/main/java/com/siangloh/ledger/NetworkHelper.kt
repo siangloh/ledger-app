@@ -160,8 +160,7 @@ object NetworkHelper {
                 var verdict: String? = null
                 var isSuccess = responseCode in 200..299
                 try {
-                    val jsonObj = JSONObject(responseMsg)
-                    verdict = jsonObj.optString("verdict", null)
+                    verdict = if (jsonObj.has("verdict")) jsonObj.optString("verdict") else null
                     if (jsonObj.has("ok")) {
                         isSuccess = jsonObj.optBoolean("ok")
                     }
@@ -177,7 +176,19 @@ object NetworkHelper {
     }
 
     fun syncPendingTransactions(transactions: List<PendingTransaction>, context: Context? = null, callback: ((Boolean, List<Long>) -> Unit)? = null) {
+        syncPendingTransactionsDetailed(transactions, context) { success, syncedIds, _ ->
+            callback?.invoke(success, syncedIds)
+        }
+    }
+
+    fun syncPendingTransactionsDetailed(
+        transactions: List<PendingTransaction>,
+        context: Context? = null,
+        callback: ((Boolean, List<Long>, Map<Long, String>) -> Unit)? = null
+    ) {
         networkExecutor.execute {
+            val syncedIds = mutableListOf<Long>()
+            val failedErrors = mutableMapOf<Long, String>()
             try {
                 val fullUrl = "${getServerUrl(context)}/api/transactions/sync"
                 val url = URL(fullUrl)
@@ -233,7 +244,6 @@ object NetworkHelper {
                 }
 
                 var isSuccess = responseCode in 200..299
-                val syncedIds = mutableListOf<Long>()
                 try {
                     val jsonObj = JSONObject(responseMsg)
                     if (jsonObj.has("ok")) {
@@ -245,13 +255,40 @@ object NetworkHelper {
                             syncedIds.add(idsArr.getLong(i))
                         }
                     }
+                    val failedArr = jsonObj.optJSONArray("failed_items")
+                    if (failedArr != null) {
+                        for (i in 0 until failedArr.length()) {
+                            val f = failedArr.getJSONObject(i)
+                            val fid = f.optLong("local_id")
+                            val freason = f.optString("reason", "服务器校验拒绝")
+                            failedErrors[fid] = freason
+                        }
+                    }
                 } catch (_: Exception) {}
 
-                callback?.invoke(isSuccess, syncedIds)
+                if (!isSuccess || responseCode !in 200..299) {
+                    val errMsg = if (responseCode == 401) "API Key 无效或未授权" else "HTTP $responseCode: ${responseMsg.take(50)}"
+                    transactions.forEach { tx ->
+                        if (!syncedIds.contains(tx.id)) {
+                            failedErrors[tx.id] = failedErrors[tx.id] ?: errMsg
+                        }
+                    }
+                }
+
+                callback?.invoke(isSuccess, syncedIds, failedErrors)
                 conn.disconnect()
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to sync pending transactions: ${e.message}", e)
-                callback?.invoke(false, emptyList())
+                val errMsg = when (e) {
+                    is java.net.SocketTimeoutException -> "网络请求超时 (15s)"
+                    is java.net.UnknownHostException -> "无法解析服务器地址，请检查配置"
+                    is java.net.ConnectException -> "连接服务器失败，服务未启动或网络阻断"
+                    else -> e.message ?: "网络通信异常"
+                }
+                transactions.forEach { tx ->
+                    failedErrors[tx.id] = errMsg
+                }
+                callback?.invoke(false, emptyList(), failedErrors)
             }
         }
     }

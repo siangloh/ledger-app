@@ -43,16 +43,19 @@ class SyncWorker(
         val db = AppDatabase.getInstance(applicationContext)
 
         try {
-            // 1. 同步离线记账交易记录
-            val pendingTxs = db.pendingTransactionDao().getPendingTransactions()
+            // 1. 同步离线记账交易记录（待同步与失败重试）
+            val pendingTxs = db.pendingTransactionDao().getSyncableTransactions()
             if (pendingTxs.isNotEmpty()) {
-                Log.i(TAG, "Syncing ${pendingTxs.size} pending transactions...")
+                Log.i(TAG, "Syncing ${pendingTxs.size} pending/failed transactions...")
                 val latch = CountDownLatch(1)
-                NetworkHelper.syncPendingTransactions(pendingTxs, applicationContext) { success, syncedIds ->
-                    if (success && syncedIds.isNotEmpty()) {
-                        kotlinx.coroutines.runBlocking {
+                NetworkHelper.syncPendingTransactionsDetailed(pendingTxs, applicationContext) { success, syncedIds, failedMap ->
+                    kotlinx.coroutines.runBlocking {
+                        if (syncedIds.isNotEmpty()) {
                             db.pendingTransactionDao().markAsSynced(syncedIds)
                             db.pendingTransactionDao().deleteSynced()
+                        }
+                        failedMap.forEach { (fid, ferr) ->
+                            db.pendingTransactionDao().markAsFailed(fid, ferr)
                         }
                     }
                     latch.countDown()

@@ -14,7 +14,8 @@ data class PendingTransaction(
     val amount: Double,
     val note: String,
     val source: String = "offline_manual",
-    val sync_status: String = "pending", // "pending", "synced", "failed"
+    val sync_status: String = "pending", // "local_only", "pending", "synced", "failed"
+    val sync_error: String? = null,
     val created_at: Long = System.currentTimeMillis(),
     val account_id: Long? = null,
     val to_account_id: Long? = null,

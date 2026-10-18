@@ -814,7 +814,9 @@ def api_sync_transactions():
             user_id = u_row['id']
 
     synced_ids = []
+    failed_items = []
     for item in txs:
+        local_id = item.get('local_id') or item.get('id')
         try:
             amt = float(item.get('amount') or 0.0)
             t_date = item.get('date') or date.today().isoformat()
@@ -828,7 +830,6 @@ def api_sync_transactions():
                 LIMIT 1
             ''', (str(user_id), t_date, t_type, t_type, amt, t_note)).fetchone()
 
-            local_id = item.get('local_id') or item.get('id')
             if existing:
                 if local_id is not None:
                     synced_ids.append(local_id)
@@ -853,8 +854,12 @@ def api_sync_transactions():
                 fallback_res = add_native_transaction(user_id=user_id, data=fallback_item, db=db)
                 if fallback_res.get('ok') and local_id is not None:
                     synced_ids.append(local_id)
+                elif local_id is not None:
+                    failed_items.append({'local_id': local_id, 'reason': res.get('message') or '记账校验失败'})
         except Exception as e:
             logger.error("[SYNC ERROR] Failed to insert offline transaction: %s", e)
+            if local_id is not None:
+                failed_items.append({'local_id': local_id, 'reason': str(e)})
 
     db.commit()
     if synced_ids:
@@ -862,7 +867,12 @@ def api_sync_transactions():
             'count': len(synced_ids),
             'user_id': user_id
         })
-    return jsonify({'ok': True, 'synced_count': len(synced_ids), 'synced_ids': synced_ids})
+    return jsonify({
+        'ok': True,
+        'synced_count': len(synced_ids),
+        'synced_ids': synced_ids,
+        'failed_items': failed_items
+    })
 
 
 @auto_track_bp.route('/download/apk', endpoint='download_apk')

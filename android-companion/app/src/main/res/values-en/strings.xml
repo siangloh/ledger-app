@@ -40,6 +40,13 @@
     <string name="sync_status_just_now">Just now</string>
     <string name="sync_status_mins_ago">%1$d mins ago</string>
     <string name="sync_today_fmt">Today %1$s</string>
+    <string name="sync_status_local_only">Local Only</string>
+    <string name="sync_status_pending">Pending Sync</string>
+    <string name="sync_status_synced">Synced</string>
+    <string name="sync_status_failed">Sync Failed</string>
+    <string name="sync_retry_btn">Retry Sync</string>
+    <string name="sync_failed_reason">Reason: %1$s</string>
+    <string name="sync_pending_banner_title">Offline Queue (%1$d)</string>
     <string name="network_error_cached">⚠️ Network unavailable, showing cached snapshot · Tap to retry</string>
     <string name="network_retry">Tap to retry</string>
 
