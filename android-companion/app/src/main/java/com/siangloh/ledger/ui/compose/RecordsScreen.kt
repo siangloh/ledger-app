@@ -677,15 +677,19 @@ fun EditTransactionBottomSheet(
     var tags by remember { mutableStateOf(tx.tags) }
     var txType by remember { mutableStateOf(tx.type) }
     var isSaving by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = Color.White,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .fillMaxHeight(0.85f)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp)
                 .navigationBarsPadding()
         ) {
