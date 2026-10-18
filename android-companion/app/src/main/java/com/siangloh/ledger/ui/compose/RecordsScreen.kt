@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.siangloh.ledger.data.NativeLedgerApi
 import com.siangloh.ledger.data.TransactionRecord
+import com.siangloh.ledger.ui.compose.components.RecordsSkeletonList
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -245,9 +246,7 @@ fun RecordsScreen(
                 .background(Slate50)
         ) {
             if (isLoading && transactions.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Indigo600)
-                }
+                RecordsSkeletonList()
             } else if (transactions.isEmpty()) {
                 Column(
                     modifier = Modifier

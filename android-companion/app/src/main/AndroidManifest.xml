@@ -50,7 +50,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- 专属 Deep Link: 网页可通过 ledgerapp://open 唤醒或检测已安装应用 -->
+            <!-- 专属 Deep Link: 可通过 ledgerapp://open 唤醒或检测已安装应用 -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.siangloh.ledger.NetworkHelper
 import com.siangloh.ledger.data.AppDatabase
+import com.siangloh.ledger.ui.compose.components.OverviewSkeletonScreen
 import com.siangloh.ledger.ui.compose.theme.*
 import com.siangloh.ledger.ui.overlay.InstantReviewManager
 import kotlinx.coroutines.Dispatchers
@@ -377,13 +378,16 @@ fun OverviewScreen(
             }
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+        if (isLoading && overviewData.recentTransactions.isEmpty() && overviewData.totalSpending == 0.0) {
+            OverviewSkeletonScreen(modifier = Modifier.padding(paddingValues))
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 // 1. Status Bar Header (● Listening 状态与待分类角标)
@@ -583,6 +587,7 @@ fun OverviewScreen(
             }
         }
     }
+}
 
     // U3: Uncategorized Items Review Bottom Sheet
     if (showUncategorizedSheet) {

@@ -176,7 +176,7 @@
                 android:textStyle="bold"
                 android:textSize="16sp" />
 
-            <!-- Link to Full Web Ledger -->
+            <!-- Link to Full Features Ledger -->
             <Button
                 android:id="@+id/btnGoToFullLedger"
                 style="?attr/materialButtonOutlinedStyle"
@@ -184,7 +184,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:padding="12dp"
-                android:text="🌐 需要记储蓄、账户扣减或分期？\n前往 1:1 完整账本"
+                android:text="✨ 需要记储蓄、账户扣减或分期？\n前往高级记账大厅"
                 android:textColor="@color/navy_primary"
                 android:textSize="13sp"
                 app:strokeColor="@color/navy_primary" />

@@ -522,10 +522,10 @@ class MainActivity : AppCompatActivity() {
         val currentServer = NetworkHelper.getServerUrl(this)
         val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
         val defaultMode = sp.getString("default_view_mode", "compose") ?: "compose"
-        val modeText = if (defaultMode == "web") "🌐 1:1 完整账本" else "📊 极简监听概览"
+        val modeText = if (defaultMode == "web") "🏛️ 全功能账本大厅" else "📊 极简原生视图"
         val options = arrayOf(
-            "🌐 切换至 1:1 完整账本 (Web)",
-            "📊 切换至极简概览 (Overview)",
+            "🏛️ 切换至全功能账本大厅",
+            "📊 切换至极简原生视图",
             "📱 默认启动视图设置 (当前: $modeText)",
             "⚡ 离线快速记账",
             "👤 绑定记账用户 (当前: $currentBound)",
@@ -563,7 +563,7 @@ class MainActivity : AppCompatActivity() {
     private fun showDefaultViewModeDialog() {
         val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
         val current = sp.getString("default_view_mode", "compose") ?: "compose"
-        val modes = arrayOf("📊 极简监听概览 (推荐)", "🌐 1:1 完整账本 (Web)")
+        val modes = arrayOf("📊 极简原生视图 (推荐)", "🏛️ 全功能账本大厅")
         val currentIdx = if (current == "web") 1 else 0
 
         AlertDialog.Builder(this)
@@ -680,7 +680,7 @@ class MainActivity : AppCompatActivity() {
         }
         AlertDialog.Builder(this)
             .setTitle("🔑 自动记账 API Key 设置")
-            .setMessage("请确保与 Web 网页端「Auto Track 自动记账」页面显示的 API Key 一致：")
+            .setMessage("请确保与账本后台「Auto Track 自动记账」页面显示的 API Key 一致：")
             .setView(input)
             .setPositiveButton("保存") { _, _ ->
                 val newKey = input.text.toString().trim()

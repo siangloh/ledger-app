@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.siangloh.ledger.data.AccountRecord
 import com.siangloh.ledger.data.AccountsSummary
 import com.siangloh.ledger.data.NativeLedgerApi
+import com.siangloh.ledger.ui.compose.components.AccountsSkeletonScreen
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -89,14 +90,17 @@ fun AccountsScreen() {
             }
         }
     ) { paddingVals ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingVals)
-                .background(Slate50),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
+        if (isLoading && summary == null) {
+            AccountsSkeletonScreen(modifier = Modifier.padding(paddingVals))
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingVals)
+                    .background(Slate50),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
             // 净资产全景卡片
             item {
                 Surface(
@@ -230,6 +234,7 @@ fun AccountsScreen() {
             }
         }
     }
+}
 
     // 新增账户弹窗
     if (showAddAccountDialog) {

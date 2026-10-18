@@ -33,6 +33,7 @@ import com.siangloh.ledger.data.*
 import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.AppSelectionActivity
 import com.siangloh.ledger.ui.NotificationLogActivity
+import com.siangloh.ledger.ui.compose.components.MoreToolsSkeletonScreen
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -203,23 +204,26 @@ fun MoreToolsScreen(
         },
         containerColor = Slate50
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item { Spacer(modifier = Modifier.height(4.dp)) }
+        if (isLoading && toolsSummary == null && pendingItems.isEmpty()) {
+            MoreToolsSkeletonScreen(modifier = Modifier.padding(paddingValues))
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item { Spacer(modifier = Modifier.height(4.dp)) }
 
-            // 0. 完整网页版账本直达与功能矩阵 (1:1 Web Features)
-            item {
-                WebLedgerFeaturesCard(
-                    onOpenFullWeb = { onOpenWebUrl("/") },
-                    onOpenFeature = onOpenWebUrl,
-                    onOpenSettings = onOpenSettings
-                )
-            }
+                // 0. 全功能账本大厅直达与功能矩阵
+                item {
+                    FullLedgerFeaturesCard(
+                        onOpenFullLedger = { onOpenWebUrl("/") },
+                        onOpenFeature = onOpenWebUrl,
+                        onOpenSettings = onOpenSettings
+                    )
+                }
 
             // 1. 待整理收件箱 (Pending Review)
             item {
@@ -339,6 +343,8 @@ fun MoreToolsScreen(
             item { Spacer(modifier = Modifier.height(24.dp)) }
         }
     }
+}
+
 
     if (showServerConfigDialog) {
         ServerConfigDialog(
@@ -773,7 +779,7 @@ fun SubscriptionsCard(
                         modifier = Modifier.fillMaxWidth().height(36.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("在网页版中维护订阅与新增周期扣款", fontSize = 12.sp, color = Indigo600)
+                        Text("前往订阅中心维护与新增周期扣款", fontSize = 12.sp, color = Indigo600)
                     }
                 }
             }
@@ -906,7 +912,7 @@ fun InstallmentsCard(
                         modifier = Modifier.fillMaxWidth().height(36.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("在网页版中维护负债、车房贷与分期", fontSize = 12.sp, color = Rose500)
+                        Text("前往债务中心维护负债、车房贷与分期", fontSize = 12.sp, color = Rose500)
                     }
                 }
             }
@@ -1129,11 +1135,11 @@ fun ServerSettingsCard(
 
 // -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
-// Component: 1:1 完整网页版账本直达与功能矩阵
+// Component: 全功能账本大厅直达与高级功能矩阵
 // -----------------------------------------------------------------------------
 @Composable
-fun WebLedgerFeaturesCard(
-    onOpenFullWeb: () -> Unit,
+fun FullLedgerFeaturesCard(
+    onOpenFullLedger: () -> Unit,
     onOpenFeature: (String) -> Unit,
     onOpenSettings: () -> Unit
 ) {
@@ -1158,7 +1164,7 @@ fun WebLedgerFeaturesCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Language,
+                            imageVector = Icons.Default.Dashboard,
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)
@@ -1167,13 +1173,13 @@ fun WebLedgerFeaturesCard(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "完整网页版账本 (Web 功能)",
+                            text = "全功能账务大厅 (高级管理)",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate900
                         )
                         Text(
-                            text = "1:1 访问全套高级记账、分类与债务管理",
+                            text = "全景维护订阅大厅、负债车房贷、固定收支与分类报表",
                             fontSize = 12.sp,
                             color = Slate600
                         )
@@ -1184,16 +1190,16 @@ fun WebLedgerFeaturesCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             Button(
-                onClick = onOpenFullWeb,
+                onClick = onOpenFullLedger,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(42.dp),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Emerald600)
             ) {
-                Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("打开 1:1 完整网页版账本", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("进入全功能账务管理大厅", fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
 
             Spacer(modifier = Modifier.height(10.dp))
