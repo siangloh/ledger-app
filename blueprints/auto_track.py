@@ -47,8 +47,18 @@ from services.reconciliation_service import (
     reconcile_account,
     toggle_transaction_reconciled
 )
+from services.category_rules_service import (
+    get_category_rules,
+    create_or_update_rule,
+    delete_rule,
+    toggle_rule_status,
+    match_category_for_note,
+    apply_rule_to_history,
+    apply_all_rules_to_history
+)
 
 auto_track_bp = Blueprint('auto_track', __name__)
+
 
 
 @auto_track_bp.route('/api/auto-track', methods=['GET', 'POST'], endpoint='api_auto_track')
@@ -416,14 +426,11 @@ def api_auto_track():
     try:
         merchant_note = (parsed.get('note') or '').strip()
         if merchant_note:
-            override = db.execute(
-                'SELECT category FROM merchant_category_overrides WHERE user_id = ? AND merchant_note = ?',
-                (str(target_user_id), merchant_note)
-            ).fetchone()
-            if override and override['category']:
-                parsed['category'] = override['category']
+            matched_cat = match_category_for_note(merchant_note, target_user_id, db)
+            if matched_cat:
+                parsed['category'] = matched_cat
                 if AUTO_TRACK_DEBUG_LOG:
-                    print(f"[AUTO_TRACK DEBUG] Applied remembered merchant override: '{merchant_note}' -> '{override['category']}'")
+                    print(f"[AUTO_TRACK DEBUG] Applied remembered merchant rule: '{merchant_note}' -> '{matched_cat}'")
 
         is_real, llm_data = classify_notification_with_llm(text)
 
@@ -1327,6 +1334,133 @@ def api_native_toggle_reconciled(tx_id: int):
     res = toggle_transaction_reconciled(tx_id=tx_id, user_id=user_id, db=db, is_reconciled=is_rec)
     status_code = 200 if res.get('ok') else 400
     return jsonify(res), status_code
+
+
+# ---------------------------------------------------------------------------
+# 原生伴侣端商户分类规则与纠正记忆 API (Native Category Rules API)
+# ---------------------------------------------------------------------------
+
+@auto_track_bp.route('/api/native/category-rules', methods=['GET'], endpoint='api_native_category_rules_list')
+@csrf.exempt
+def api_native_category_rules_list():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    search = request.args.get('search')
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 50, type=int)
+
+    res = get_category_rules(user_id=user_id, db=db, search=search, page=page, limit=limit)
+    return jsonify(res), 200
+
+
+@auto_track_bp.route('/api/native/category-rules', methods=['POST'], endpoint='api_native_category_rules_save')
+@csrf.exempt
+def api_native_category_rules_save():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    data = request.get_json(silent=True) or request.form
+    merchant_pattern = (data.get('merchant_pattern') or data.get('pattern') or '').strip()
+    category = (data.get('category') or '').strip()
+    match_type = (data.get('match_type') or 'contains').strip()
+    is_active = data.get('is_active', 1)
+    if isinstance(is_active, str):
+        is_active = 1 if is_active in ('1', 'true', 'True') else 0
+
+    res = create_or_update_rule(
+        user_id=user_id,
+        merchant_pattern=merchant_pattern,
+        category=category,
+        match_type=match_type,
+        is_active=is_active,
+        db=db
+    )
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/category-rules/delete', methods=['POST', 'DELETE'], endpoint='api_native_category_rules_delete')
+@csrf.exempt
+def api_native_category_rules_delete():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    data = request.get_json(silent=True) or request.form
+    merchant_pattern = (data.get('merchant_pattern') or data.get('pattern') or request.args.get('merchant_pattern') or '').strip()
+
+    res = delete_rule(user_id=user_id, merchant_pattern=merchant_pattern, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/category-rules/toggle', methods=['POST'], endpoint='api_native_category_rules_toggle')
+@csrf.exempt
+def api_native_category_rules_toggle():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    data = request.get_json(silent=True) or request.form
+    merchant_pattern = (data.get('merchant_pattern') or data.get('pattern') or '').strip()
+
+    res = toggle_rule_status(user_id=user_id, merchant_pattern=merchant_pattern, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/category-rules/apply-history', methods=['POST'], endpoint='api_native_category_rules_apply_history')
+@csrf.exempt
+def api_native_category_rules_apply_history():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    data = request.get_json(silent=True) or request.form
+    merchant_pattern = (data.get('merchant_pattern') or data.get('pattern') or '').strip()
+    category = (data.get('category') or '').strip()
+    match_type = (data.get('match_type') or 'contains').strip()
+    only_uncat = data.get('only_uncategorized') in (True, 'true', '1', 1)
+
+    res = apply_rule_to_history(
+        user_id=user_id,
+        merchant_pattern=merchant_pattern,
+        category=category,
+        match_type=match_type,
+        only_uncategorized=only_uncat,
+        db=db
+    )
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/category-rules/apply-all', methods=['POST'], endpoint='api_native_category_rules_apply_all')
+@csrf.exempt
+def api_native_category_rules_apply_all():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    data = request.get_json(silent=True) or request.form
+    only_uncat = data.get('only_uncategorized') in (True, 'true', '1', 1, None)  # 默认 True
+
+    res = apply_all_rules_to_history(
+        user_id=user_id,
+        only_uncategorized=only_uncat,
+        db=db
+    )
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
 
 
 

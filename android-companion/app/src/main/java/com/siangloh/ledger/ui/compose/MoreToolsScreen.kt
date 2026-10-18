@@ -92,6 +92,8 @@ fun MoreToolsScreen(
     var currentServerUrl by remember { mutableStateOf(NetworkHelper.getServerUrl(context)) }
     var currentApiKey by remember { mutableStateOf(NetworkHelper.getApiKey(context)) }
     var showRecycleBinDialog by remember { mutableStateOf(false) }
+    var showCategoryRulesDialog by remember { mutableStateOf(false) }
+
 
     fun refreshAll() {
         if (toolsSummary == null) isLoading = true
@@ -361,6 +363,14 @@ fun MoreToolsScreen(
                 )
             }
 
+            // 6.6 商户分类规则与纠正记忆 (Category Rules & Memory)
+            item {
+                CategoryRulesCard(
+                    onOpenCategoryRules = { showCategoryRulesDialog = true }
+                )
+            }
+
+
             // 7. 界面语言设置 (Language Settings)
             item {
                 val currentLang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
@@ -422,6 +432,13 @@ fun MoreToolsScreen(
             onDismiss = { showRecycleBinDialog = false }
         )
     }
+
+    if (showCategoryRulesDialog) {
+        CategoryRulesDialog(
+            onDismiss = { showCategoryRulesDialog = false }
+        )
+    }
+
 
     categorizingItem?.let { item ->
         QuickCategorizeDialog(
@@ -2182,4 +2199,504 @@ fun RecycleBinDialog(
         )
     }
 }
+
+@Composable
+fun CategoryRulesCard(
+    onOpenCategoryRules: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onOpenCategoryRules() }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFCCFBF1)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Category,
+                        contentDescription = stringResource(R.string.tools_category_rules),
+                        tint = Color(0xFF0F766E),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = stringResource(R.string.tools_category_rules),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate800
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = stringResource(R.string.tools_category_rules_desc),
+                        fontSize = 12.sp,
+                        color = Slate500
+                    )
+                }
+            }
+            IconButton(
+                onClick = onOpenCategoryRules,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    tint = Slate400,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CategoryRulesDialog(
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var rules by remember { mutableStateOf<List<CategoryRuleRecord>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var ruleToDelete by remember { mutableStateOf<CategoryRuleRecord?>(null) }
+    var showApplyAllConfirm by remember { mutableStateOf(false) }
+    var isOperating by remember { mutableStateOf(false) }
+
+    fun loadRules() {
+        isLoading = true
+        errorMessage = null
+        scope.launch {
+            val res = NativeLedgerApi.getCategoryRules(context, search = searchQuery.ifBlank { null })
+            isLoading = false
+            res.onSuccess {
+                rules = it
+            }.onFailure {
+                errorMessage = it.message ?: "加载规则失败"
+            }
+        }
+    }
+
+    LaunchedEffect(searchQuery) {
+        loadRules()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        titleContentColor = Slate900,
+        textContentColor = Slate800,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Category,
+                        contentDescription = null,
+                        tint = Color(0xFF0F766E),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.tools_category_rules),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900
+                    )
+                }
+                IconButton(
+                    onClick = { showAddDialog = true },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = stringResource(R.string.category_rules_add_btn),
+                        tint = Color(0xFF0F766E)
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 280.dp, max = 520.dp)
+            ) {
+                // 搜索输入框
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("搜索商户或分类...", fontSize = 13.sp, color = Slate400) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF0F766E),
+                        unfocusedBorderColor = Slate200
+                    )
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "共 ${rules.size} 项规则",
+                        fontSize = 12.sp,
+                        color = Slate500,
+                        fontWeight = FontWeight.Medium
+                    )
+                    TextButton(
+                        onClick = { showApplyAllConfirm = true },
+                        enabled = !isOperating && rules.isNotEmpty(),
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                    ) {
+                        Text(
+                            text = "⚡ " + stringResource(R.string.category_rules_apply_all_btn),
+                            fontSize = 12.sp,
+                            color = Color(0xFF0F766E),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+
+                if (isLoading) {
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color(0xFF0F766E))
+                    }
+                } else if (errorMessage != null) {
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Text(text = errorMessage ?: "", color = Rose500, fontSize = 13.sp)
+                    }
+                } else if (rules.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = stringResource(R.string.category_rules_empty_title), fontWeight = FontWeight.Bold, color = Slate700)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(text = stringResource(R.string.category_rules_empty_desc), fontSize = 12.sp, color = Slate400)
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(rules) { r ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(containerColor = Slate50),
+                                border = BorderStroke(1.dp, Slate200)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = r.merchantPattern,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Slate900
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            val typeLabel = when (r.matchType) {
+                                                "exact" -> "完全"
+                                                "regex" -> "正则"
+                                                else -> "包含"
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(Color(0xFFE0E7FF), RoundedCornerShape(4.dp))
+                                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                                            ) {
+                                                Text(text = typeLabel, fontSize = 10.sp, color = Color(0xFF3730A3), fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = "→ ${r.category}",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color(0xFF0F766E)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "已命中 ${r.applyCount} 次",
+                                                fontSize = 11.sp,
+                                                color = Slate400
+                                            )
+                                        }
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        // 追溯历史按钮
+                                        IconButton(
+                                            onClick = {
+                                                scope.launch {
+                                                    isOperating = true
+                                                    val res = NativeLedgerApi.applyCategoryRuleHistory(
+                                                        context = context,
+                                                        pattern = r.merchantPattern,
+                                                        category = r.category,
+                                                        matchType = r.matchType,
+                                                        onlyUncategorized = true
+                                                    )
+                                                    isOperating = false
+                                                    res.onSuccess { json ->
+                                                        val count = json.optInt("count", 0)
+                                                        Toast.makeText(context, "追溯完成，更新了 $count 笔记录", Toast.LENGTH_SHORT).show()
+                                                        loadRules()
+                                                    }.onFailure {
+                                                        Toast.makeText(context, "追溯失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier.size(48.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.FlashOn,
+                                                contentDescription = "追溯此规则",
+                                                tint = Color(0xFF0F766E),
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+
+                                        // 删除按钮
+                                        IconButton(
+                                            onClick = { ruleToDelete = r },
+                                            modifier = Modifier.size(48.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.DeleteOutline,
+                                                contentDescription = "删除规则",
+                                                tint = Rose500,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+            ) {
+                Text(text = stringResource(R.string.common_close), color = Slate600)
+            }
+        }
+    )
+
+    // 新增规则弹窗
+    if (showAddDialog) {
+        var patternInput by remember { mutableStateOf("") }
+        var categoryInput by remember { mutableStateOf("") }
+        var matchTypeInput by remember { mutableStateOf("contains") }
+
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            containerColor = Color.White,
+            title = { Text(text = "添加商户分类规则", fontWeight = FontWeight.Bold, color = Slate900) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = patternInput,
+                        onValueChange = { patternInput = it },
+                        label = { Text("商户匹配模式") },
+                        placeholder = { Text("例如：GrabFood、Starbucks") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = categoryInput,
+                        onValueChange = { categoryInput = it },
+                        label = { Text("目标分类") },
+                        placeholder = { Text("例如：餐饮、交通") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("contains" to "包含关键字", "exact" to "完全匹配").forEach { (type, label) ->
+                            val selected = matchTypeInput == type
+                            Box(
+                                modifier = Modifier
+                                    .defaultMinSize(minHeight = 48.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (selected) Color(0xFFCCFBF1) else Slate100)
+                                    .border(1.dp, if (selected) Color(0xFF0F766E) else Slate200, RoundedCornerShape(8.dp))
+                                    .clickable { matchTypeInput = type }
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 13.sp,
+                                    color = if (selected) Color(0xFF0F766E) else Slate700,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val p = patternInput.trim()
+                        val c = categoryInput.trim()
+                        if (p.isNotEmpty() && c.isNotEmpty()) {
+                            scope.launch {
+                                val res = NativeLedgerApi.saveCategoryRule(
+                                    context = context,
+                                    pattern = p,
+                                    category = c,
+                                    matchType = matchTypeInput,
+                                    isActive = true
+                                )
+                                res.onSuccess {
+                                    Toast.makeText(context, "规则已保存", Toast.LENGTH_SHORT).show()
+                                    showAddDialog = false
+                                    loadRules()
+                                }.onFailure {
+                                    Toast.makeText(context, "保存失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text("保存", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showAddDialog = false },
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text(stringResource(R.string.common_cancel), color = Slate600)
+                }
+            }
+        )
+    }
+
+    // 删除确认弹窗
+    ruleToDelete?.let { r ->
+        AlertDialog(
+            onDismissRequest = { ruleToDelete = null },
+            containerColor = Color.White,
+            title = { Text(text = "删除规则", fontWeight = FontWeight.Bold, color = Slate900) },
+            text = { Text("确定删除商户规则「${r.merchantPattern}」吗？", color = Slate700) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            val res = NativeLedgerApi.deleteCategoryRule(context, r.merchantPattern)
+                            ruleToDelete = null
+                            res.onSuccess {
+                                Toast.makeText(context, "规则已删除", Toast.LENGTH_SHORT).show()
+                                loadRules()
+                            }.onFailure {
+                                Toast.makeText(context, "删除失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Rose500),
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text("删除", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { ruleToDelete = null },
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text(stringResource(R.string.common_cancel), color = Slate600)
+                }
+            }
+        )
+    }
+
+    // 全量重筛确认弹窗
+    if (showApplyAllConfirm) {
+        AlertDialog(
+            onDismissRequest = { showApplyAllConfirm = false },
+            containerColor = Color.White,
+            title = { Text(text = "⚡ 全量重筛历史", fontWeight = FontWeight.Bold, color = Slate900) },
+            text = { Text("将根据所有启用的分类规则，自动将历史“未分类/其他”的交易匹配并更新到对应分类。确认执行？", color = Slate700) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showApplyAllConfirm = false
+                        scope.launch {
+                            isOperating = true
+                            val res = NativeLedgerApi.applyAllCategoryRulesHistory(context, onlyUncategorized = true)
+                            isOperating = false
+                            res.onSuccess { json ->
+                                val count = json.optInt("count", 0)
+                                Toast.makeText(context, "全量重筛完成，共更新 $count 笔记录", Toast.LENGTH_SHORT).show()
+                                loadRules()
+                            }.onFailure {
+                                Toast.makeText(context, "重筛失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text("确认执行", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showApplyAllConfirm = false },
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text(stringResource(R.string.common_cancel), color = Slate600)
+                }
+            }
+        )
+    }
+}
+
 

@@ -100,6 +100,17 @@ data class CategoriesResult(
     val savings: List<CategoryRecord>
 )
 
+data class CategoryRuleRecord(
+    val merchantPattern: String,
+    val category: String,
+    val matchType: String, // 'contains', 'exact', 'regex'
+    val applyCount: Int,
+    val isActive: Boolean,
+    val createdAt: String? = null,
+    val updatedAt: String? = null
+)
+
+
 data class SubscriptionRecord(
     val id: Int,
     val name: String,
@@ -881,4 +892,243 @@ object NativeLedgerApi {
             Result.failure(e)
         }
     }
+
+    suspend fun getCategoryRules(
+        context: Context,
+        search: String? = null,
+        page: Int = 1,
+        limit: Int = 50
+    ): Result<List<CategoryRuleRecord>> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val queryParams = mutableListOf<String>()
+            if (username.isNotEmpty()) queryParams.add("username=${URLEncoder.encode(username, "UTF-8")}")
+            if (!search.isNullOrBlank()) queryParams.add("search=${URLEncoder.encode(search.trim(), "UTF-8")}")
+            queryParams.add("page=$page")
+            queryParams.add("limit=$limit")
+
+            val endpoint = "/api/native/category-rules?" + queryParams.joinToString("&")
+            val conn = openConnection(context, endpoint, "GET")
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                val rulesArray = json.optJSONArray("rules") ?: JSONArray()
+                val list = ArrayList<CategoryRuleRecord>()
+                for (i in 0 until rulesArray.length()) {
+                    val item = rulesArray.getJSONObject(i)
+                    list.add(
+                        CategoryRuleRecord(
+                            merchantPattern = item.optString("merchant_pattern", ""),
+                            category = item.optString("category", ""),
+                            matchType = item.optString("match_type", "contains"),
+                            applyCount = item.optInt("apply_count", 0),
+                            isActive = item.optInt("is_active", 1) == 1,
+                            createdAt = if (item.isNull("created_at")) null else item.optString("created_at"),
+                            updatedAt = if (item.isNull("updated_at")) null else item.optString("updated_at")
+                        )
+                    )
+                }
+                Result.success(list)
+            } else {
+                Result.failure(Exception(json.optString("message", "获取分类规则失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getCategoryRules error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun saveCategoryRule(
+        context: Context,
+        pattern: String,
+        category: String,
+        matchType: String = "contains",
+        isActive: Boolean = true
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/category-rules" +
+                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "POST")
+            val payload = JSONObject().apply {
+                put("merchant_pattern", pattern)
+                put("category", category)
+                put("match_type", matchType)
+                put("is_active", if (isActive) 1 else 0)
+            }.toString()
+
+            OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                it.write(payload)
+                it.flush()
+            }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                Result.success(json)
+            } else {
+                Result.failure(Exception(json.optString("message", "保存分类规则失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "saveCategoryRule error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteCategoryRule(
+        context: Context,
+        pattern: String
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/category-rules/delete" +
+                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "POST")
+            val payload = JSONObject().apply {
+                put("merchant_pattern", pattern)
+            }.toString()
+
+            OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                it.write(payload)
+                it.flush()
+            }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                Result.success(json)
+            } else {
+                Result.failure(Exception(json.optString("message", "删除分类规则失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "deleteCategoryRule error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun toggleCategoryRule(
+        context: Context,
+        pattern: String
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/category-rules/toggle" +
+                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "POST")
+            val payload = JSONObject().apply {
+                put("merchant_pattern", pattern)
+            }.toString()
+
+            OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                it.write(payload)
+                it.flush()
+            }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                Result.success(json)
+            } else {
+                Result.failure(Exception(json.optString("message", "切换状态失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "toggleCategoryRule error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun applyCategoryRuleHistory(
+        context: Context,
+        pattern: String,
+        category: String,
+        matchType: String = "contains",
+        onlyUncategorized: Boolean = true
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/category-rules/apply-history" +
+                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "POST")
+            val payload = JSONObject().apply {
+                put("merchant_pattern", pattern)
+                put("category", category)
+                put("match_type", matchType)
+                put("only_uncategorized", onlyUncategorized)
+            }.toString()
+
+            OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                it.write(payload)
+                it.flush()
+            }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                recordsCache.clear()
+                Result.success(json)
+            } else {
+                Result.failure(Exception(json.optString("message", "追溯历史失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "applyCategoryRuleHistory error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun applyAllCategoryRulesHistory(
+        context: Context,
+        onlyUncategorized: Boolean = true
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/category-rules/apply-all" +
+                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "POST")
+            val payload = JSONObject().apply {
+                put("only_uncategorized", onlyUncategorized)
+            }.toString()
+
+            OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                it.write(payload)
+                it.flush()
+            }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                recordsCache.clear()
+                Result.success(json)
+            } else {
+                Result.failure(Exception(json.optString("message", "全量重筛历史失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "applyAllCategoryRulesHistory error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }
+

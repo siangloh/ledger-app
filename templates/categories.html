@@ -169,9 +169,480 @@
   </section>
 </div>
 
+<!-- 5. 商户分类规则与纠正记忆 -->
+<section class="panel" style="margin-top: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--card-bg, #fff); box-shadow: 0 2px 10px rgba(0,0,0,0.03); overflow: hidden;">
+  <div style="padding: 18px 22px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+    <div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 20px;">🧠</span>
+        <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--ink);">{{ t('categories.rules_title') }}</h3>
+        <span id="rulesCountBadge" style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 20px; background: rgba(15, 118, 110, 0.1); color: #0F766E;">{{ category_rules|length }} {{ t('categories.rules_count', '条规则') }}</span>
+      </div>
+      <p style="margin: 4px 0 0; font-size: 13px; color: var(--muted);">{{ t('categories.rules_subtitle') }}</p>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <div style="position: relative;">
+        <input type="text" id="ruleSearchInput" placeholder="{{ t('common.search', '搜索规则...') }}" oninput="filterCategoryRules()" style="padding: 7px 12px 7px 30px; border-radius: 8px; border: 1px solid var(--border); font-size: 13px; width: 160px; outline: none; background: var(--bg);">
+        <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 13px; color: var(--muted); pointer-events: none;">🔍</span>
+      </div>
+      <button type="button" class="btn-primary btn-sm" onclick="openAddCategoryRuleModal()" style="display: inline-flex; align-items: center; gap: 5px; background: #0F766E; border-color: #0F766E;">
+        <span>➕</span>
+        <span>{{ t('categories.rule_add_btn') }}</span>
+      </button>
+      <button type="button" class="cat-action-btn" onclick="applyAllCategoryRulesHistory()" style="display: inline-flex; align-items: center; gap: 5px; font-size: 13px; padding: 6px 12px; border-radius: 8px; border: 1px solid #5EEAD4; color: #0F766E; background: rgba(94, 234, 212, 0.12); font-weight: 600; cursor: pointer;" title="{{ t('categories.rule_apply_all') }}">
+        <span>⚡</span>
+        <span>{{ t('categories.rule_apply_all') }}</span>
+      </button>
+    </div>
+  </div>
+
+  <div style="overflow-x: auto;">
+    <table id="categoryRulesTable" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+      <thead>
+        <tr style="background: var(--bg); border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px;">
+          <th style="padding: 10px 18px; font-weight: 600;">{{ t('categories.rule_merchant_pattern') }}</th>
+          <th style="padding: 10px 14px; font-weight: 600;">{{ t('categories.rule_match_type') }}</th>
+          <th style="padding: 10px 14px; font-weight: 600;">{{ t('categories.rule_target_category') }}</th>
+          <th style="padding: 10px 14px; font-weight: 600; text-align: center;">{{ t('categories.rule_apply_count') }}</th>
+          <th style="padding: 10px 14px; font-weight: 600; text-align: center;">{{ t('categories.rule_status') }}</th>
+          <th style="padding: 10px 18px; font-weight: 600; text-align: right;">{{ t('common.actions', '操作') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in category_rules %}
+        <tr class="rule-row" data-pattern="{{ r.merchant_pattern|lower }}" data-category="{{ r.category|lower }}" style="border-bottom: 1px solid var(--border); transition: background 0.15s ease;">
+          <td style="padding: 12px 18px;">
+            <strong style="color: var(--ink); font-size: 13.5px;">{{ r.merchant_pattern }}</strong>
+          </td>
+          <td style="padding: 12px 14px;">
+            {% if r.match_type == 'exact' %}
+              <span style="display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: #E0E7FF; color: #3730A3;">完全匹配</span>
+            {% elif r.match_type == 'regex' %}
+              <span style="display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: #FEF3C7; color: #92400E;">正则表达式</span>
+            {% else %}
+              <span style="display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: #CCFBF1; color: #0F766E;">包含关键字</span>
+            {% endif %}
+          </td>
+          <td style="padding: 12px 14px;">
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink);">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: #0F766E;"></span>
+              {{ r.category }}
+            </span>
+          </td>
+          <td style="padding: 12px 14px; text-align: center;">
+            <span style="display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; background: var(--bg); color: var(--muted); border: 1px solid var(--border);">
+              {{ r.apply_count }} 次
+            </span>
+          </td>
+          <td style="padding: 12px 14px; text-align: center;">
+            <button type="button" data-pattern="{{ r.merchant_pattern|e }}" onclick="toggleCategoryRuleStatus(this)" style="background: none; border: none; cursor: pointer; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; transition: all 0.2s;">
+              {% if r.is_active %}
+                <span style="color: #059669; background: #D1FAE5; padding: 3px 8px; border-radius: 10px;">{{ t('categories.rule_active') }}</span>
+              {% else %}
+                <span style="color: #6B7280; background: #F3F4F6; padding: 3px 8px; border-radius: 10px;">{{ t('categories.rule_inactive') }}</span>
+              {% endif %}
+            </button>
+          </td>
+          <td style="padding: 12px 18px; text-align: right;">
+            <div style="display: inline-flex; align-items: center; gap: 6px;">
+              <button type="button" class="cat-action-btn" data-pattern="{{ r.merchant_pattern|e }}" data-category="{{ r.category|e }}" data-match-type="{{ r.match_type }}" onclick="applyCategoryRuleHistory(this)" title="{{ t('categories.rule_apply_history') }}" style="font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); color: #0F766E; background: rgba(94,234,212,0.1); cursor: pointer;">
+                ⚡ {{ t('categories.rule_apply_history') }}
+              </button>
+              <button type="button" class="cat-action-btn" data-pattern="{{ r.merchant_pattern|e }}" data-category="{{ r.category|e }}" data-match-type="{{ r.match_type }}" data-is-active="{{ r.is_active }}" onclick="openEditCategoryRuleModal(this)" style="font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer;">
+                {{ t('common.edit') }}
+              </button>
+              <button type="button" class="cat-action-btn danger" data-pattern="{{ r.merchant_pattern|e }}" onclick="deleteCategoryRule(this)" style="font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.3); color: #EF4444; cursor: pointer;">
+                {{ t('common.delete') }}
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr id="emptyRulesRow">
+          <td colspan="6" style="padding: 36px 18px; text-align: center; color: var(--muted); font-size: 13.5px;">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+              <span style="font-size: 28px;">🏷️</span>
+              <span>{{ t('categories.rule_empty') }}</span>
+              <button type="button" class="btn-primary btn-sm" onclick="openAddCategoryRuleModal()" style="margin-top: 6px; background: #0F766E; border-color: #0F766E;">
+                ➕ {{ t('categories.rule_add_btn') }}
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
 <script>
+window.ALL_USER_CATEGORIES = {{ (all_categories or [])|tojson }};
+
+function getCsrfToken() {
+  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+}
+
+window.filterCategoryRules = function() {
+  const query = (document.getElementById('ruleSearchInput')?.value || '').trim().toLowerCase();
+  const rows = document.querySelectorAll('#categoryRulesTable tbody tr.rule-row');
+  let visibleCount = 0;
+  rows.forEach(r => {
+    const pat = r.getAttribute('data-pattern') || '';
+    const cat = r.getAttribute('data-category') || '';
+    if (!query || pat.includes(query) || cat.includes(query)) {
+      r.style.display = '';
+      visibleCount++;
+    } else {
+      r.style.display = 'none';
+    }
+  });
+  const countBadge = document.getElementById('rulesCountBadge');
+  if (countBadge && query) {
+    countBadge.textContent = `${visibleCount} 条匹配`;
+  }
+};
+
+window.openAddCategoryRuleModal = function () {
+  const categories = window.ALL_USER_CATEGORIES || [];
+  const catOptions = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+
+  Swal.fire({
+    title: window.t ? window.t('categories.rule_add_btn', '添加商户分类规则') : '添加商户分类规则',
+    html: `
+      <div style="text-align: left; display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+        <div>
+          <label style="font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: block;">${window.t ? window.t('categories.rule_merchant_pattern', '商户匹配模式') : '商户匹配模式'}</label>
+          <input type="text" id="swalAddPattern" class="swal2-input" placeholder="例如：GrabFood、FamilyMart、Starbucks" style="margin: 0; width: 100%; box-sizing: border-box;" required>
+          <span style="font-size: 11.5px; color: var(--muted); margin-top: 4px; display: block;">输入交易备注中会出现的商户名称或关键字</span>
+        </div>
+        <div>
+          <label style="font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: block;">${window.t ? window.t('categories.rule_target_category', '目标分类') : '目标分类'}</label>
+          <select id="swalAddCat" class="swal2-select" style="margin: 0; width: 100%; box-sizing: border-box; display: block;">
+            ${catOptions}
+          </select>
+        </div>
+        <div>
+          <label style="font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: block;">${window.t ? window.t('categories.rule_match_type', '匹配方式') : '匹配方式'}</label>
+          <select id="swalAddType" class="swal2-select" style="margin: 0; width: 100%; box-sizing: border-box; display: block;">
+            <option value="contains" selected>${window.t ? window.t('categories.rule_match_contains', '包含关键字 (推荐)') : '包含关键字 (推荐)'}</option>
+            <option value="exact">${window.t ? window.t('categories.rule_match_exact', '完全匹配') : '完全匹配'}</option>
+            <option value="regex">${window.t ? window.t('categories.rule_match_regex', '正则表达式') : '正则表达式'}</option>
+          </select>
+        </div>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: window.t ? window.t('common.save', '保存规则') : '保存规则',
+    confirmButtonColor: '#0F766E',
+    cancelButtonText: window.t ? window.t('common.cancel', '取消') : '取消',
+    preConfirm: () => {
+      const pattern = document.getElementById('swalAddPattern').value.trim();
+      const category = document.getElementById('swalAddCat').value;
+      const matchType = document.getElementById('swalAddType').value;
+      if (!pattern) {
+        Swal.showValidationMessage('商户匹配模式不能为空');
+        return false;
+      }
+      if (!category) {
+        Swal.showValidationMessage('请选择目标分类');
+        return false;
+      }
+      return { pattern, category, matchType };
+    }
+  }).then(async (result) => {
+    if (result.isConfirmed && result.value) {
+      try {
+        const res = await fetch('/api/category-rules', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+          },
+          body: JSON.stringify({
+            merchant_pattern: result.value.pattern,
+            category: result.value.category,
+            match_type: result.value.matchType,
+            is_active: 1
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          Swal.fire({
+            icon: 'success',
+            title: '规则已成功保存',
+            timer: 1000,
+            showConfirmButton: false
+          }).then(() => window.location.reload());
+        } else {
+          Swal.fire('保存失败', data.message || '未知错误', 'error');
+        }
+      } catch (err) {
+        Swal.fire('请求失败', '网络请求超时或服务错误', 'error');
+      }
+    }
+  });
+};
+
+window.openEditCategoryRuleModal = function (btn) {
+  const pattern = btn.getAttribute('data-pattern');
+  const currentCategory = btn.getAttribute('data-category');
+  const currentType = btn.getAttribute('data-match-type') || 'contains';
+  const isActive = btn.getAttribute('data-is-active') !== '0';
+
+  const categories = window.ALL_USER_CATEGORIES || [];
+  const catOptions = categories.map(c =>
+    `<option value="${c}" ${c === currentCategory ? 'selected' : ''}>${c}</option>`
+  ).join('');
+
+  Swal.fire({
+    title: '编辑商户分类规则',
+    html: `
+      <div style="text-align: left; display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+        <div>
+          <label style="font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: block;">商户匹配模式</label>
+          <input type="text" id="swalEditPattern" class="swal2-input" value="${pattern}" disabled style="margin: 0; width: 100%; box-sizing: border-box; background: var(--bg); cursor: not-allowed;">
+        </div>
+        <div>
+          <label style="font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: block;">目标分类</label>
+          <select id="swalEditCat" class="swal2-select" style="margin: 0; width: 100%; box-sizing: border-box; display: block;">
+            ${catOptions}
+          </select>
+        </div>
+        <div>
+          <label style="font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: block;">匹配方式</label>
+          <select id="swalEditType" class="swal2-select" style="margin: 0; width: 100%; box-sizing: border-box; display: block;">
+            <option value="contains" ${currentType === 'contains' ? 'selected' : ''}>包含关键字 (推荐)</option>
+            <option value="exact" ${currentType === 'exact' ? 'selected' : ''}>完全匹配</option>
+            <option value="regex" ${currentType === 'regex' ? 'selected' : ''}>正则表达式</option>
+          </select>
+        </div>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: '保存更新',
+    confirmButtonColor: '#0F766E',
+    cancelButtonText: '取消',
+    preConfirm: () => {
+      const category = document.getElementById('swalEditCat').value;
+      const matchType = document.getElementById('swalEditType').value;
+      if (!category) {
+        Swal.showValidationMessage('请选择目标分类');
+        return false;
+      }
+      return { category, matchType };
+    }
+  }).then(async (result) => {
+    if (result.isConfirmed && result.value) {
+      try {
+        const res = await fetch('/api/category-rules', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+          },
+          body: JSON.stringify({
+            merchant_pattern: pattern,
+            category: result.value.category,
+            match_type: result.value.matchType,
+            is_active: isActive ? 1 : 0
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          Swal.fire({
+            icon: 'success',
+            title: '规则已成功更新',
+            timer: 1000,
+            showConfirmButton: false
+          }).then(() => window.location.reload());
+        } else {
+          Swal.fire('更新失败', data.message || '未知错误', 'error');
+        }
+      } catch (err) {
+        Swal.fire('请求失败', '网络请求超时或服务错误', 'error');
+      }
+    }
+  });
+};
+
+window.toggleCategoryRuleStatus = async function (btn) {
+  const pattern = btn.getAttribute('data-pattern');
+  try {
+    const res = await fetch('/api/category-rules/toggle', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken()
+      },
+      body: JSON.stringify({ merchant_pattern: pattern })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      window.location.reload();
+    } else {
+      Swal.fire('操作失败', data.message || '未知错误', 'error');
+    }
+  } catch (err) {
+    Swal.fire('请求失败', '网络错误', 'error');
+  }
+};
+
+window.deleteCategoryRule = function (btn) {
+  const pattern = btn.getAttribute('data-pattern');
+  Swal.fire({
+    title: `删除规则「${pattern}」？`,
+    text: '删除后，今后匹配此商户将不再自动分类。此操作不可撤销。',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#EF4444',
+    confirmButtonText: '确定删除',
+    cancelButtonText: '取消'
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      try {
+        const res = await fetch('/api/category-rules/delete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+          },
+          body: JSON.stringify({ merchant_pattern: pattern })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          Swal.fire({
+            icon: 'success',
+            title: '规则已删除',
+            timer: 1000,
+            showConfirmButton: false
+          }).then(() => window.location.reload());
+        } else {
+          Swal.fire('删除失败', data.message || '未知错误', 'error');
+        }
+      } catch (err) {
+        Swal.fire('请求失败', '网络错误', 'error');
+      }
+    }
+  });
+};
+
+window.applyCategoryRuleHistory = function (btn) {
+  const pattern = btn.getAttribute('data-pattern');
+  const category = btn.getAttribute('data-category');
+  const matchType = btn.getAttribute('data-match-type') || 'contains';
+
+  Swal.fire({
+    title: `⚡ 追溯规则到历史`,
+    html: `
+      <div style="text-align: left; font-size: 13.5px; color: var(--ink);">
+        <p>即将按规则将匹配商户「<strong>${pattern}</strong>」的历史流水批量重分类为「<strong>${category}</strong>」。</p>
+        <div style="margin-top: 14px; padding: 10px 14px; background: var(--bg); border-radius: 8px; border: 1px solid var(--border);">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
+            <input type="checkbox" id="swalOnlyUncat" checked style="width: 16px; height: 16px;">
+            <span>仅更新“未分类/其他”的交易记录 (保留已人工指定的特定分类)</span>
+          </label>
+        </div>
+      </div>
+    `,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#0F766E',
+    confirmButtonText: '立即执行追溯',
+    cancelButtonText: '取消',
+    showLoaderOnConfirm: true,
+    preConfirm: async () => {
+      const onlyUncat = document.getElementById('swalOnlyUncat')?.checked ?? true;
+      try {
+        const res = await fetch('/api/category-rules/apply-history', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+          },
+          body: JSON.stringify({
+            merchant_pattern: pattern,
+            category: category,
+            match_type: matchType,
+            only_uncategorized: onlyUncat
+          })
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          throw new Error(data.message || '执行失败');
+        }
+        return data;
+      } catch (err) {
+        Swal.showValidationMessage(`追溯失败: ${err.message}`);
+      }
+    }
+  }).then((result) => {
+    if (result.isConfirmed && result.value) {
+      Swal.fire({
+        icon: 'success',
+        title: '追溯应用完成',
+        text: result.value.message || `已成功更新 ${result.value.count} 笔记录`,
+        confirmButtonColor: '#0F766E'
+      }).then(() => window.location.reload());
+    }
+  });
+};
+
+window.applyAllCategoryRulesHistory = function () {
+  Swal.fire({
+    title: '⚡ 全量规则历史重筛',
+    html: `
+      <div style="text-align: left; font-size: 13.5px; color: var(--ink);">
+        <p>系统将按照规则库中所有启用的商户分类规则（长词优先、匹配频次优先），全量重筛历史流水。</p>
+        <div style="margin-top: 14px; padding: 10px 14px; background: var(--bg); border-radius: 8px; border: 1px solid var(--border);">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
+            <input type="checkbox" id="swalAllOnlyUncat" checked style="width: 16px; height: 16px;">
+            <span>仅处理“未分类/其他”交易 (安全模式，不覆盖既有人工分类)</span>
+          </label>
+        </div>
+      </div>
+    `,
+    icon: 'info',
+    showCancelButton: true,
+    confirmButtonColor: '#0F766E',
+    confirmButtonText: '开始全量重筛',
+    cancelButtonText: '取消',
+    showLoaderOnConfirm: true,
+    preConfirm: async () => {
+      const onlyUncat = document.getElementById('swalAllOnlyUncat')?.checked ?? true;
+      try {
+        const res = await fetch('/api/category-rules/apply-all', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+          },
+          body: JSON.stringify({
+            only_uncategorized: onlyUncat
+          })
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          throw new Error(data.message || '执行失败');
+        }
+        return data;
+      } catch (err) {
+        Swal.showValidationMessage(`重筛失败: ${err.message}`);
+      }
+    }
+  }).then((result) => {
+    if (result.isConfirmed && result.value) {
+      Swal.fire({
+        icon: 'success',
+        title: '全量重筛完成',
+        text: result.value.message || `共更新 ${result.value.count} 笔记录`,
+        confirmButtonColor: '#0F766E'
+      }).then(() => window.location.reload());
+    }
+  });
+};
+
 window.openEditCategoryModal = function (catId, currentName, currentColor) {
-  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  const csrfToken = getCsrfToken();
   if (typeof Swal === 'undefined') {
     const newName = prompt('修改分类名称:', currentName);
     if (!newName) return;
@@ -247,6 +718,6 @@ window.openEditCategoryModal = function (catId, currentName, currentColor) {
       }
     }
   });
-}
+};
 </script>
 {% endblock %}

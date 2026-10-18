@@ -527,6 +527,10 @@ def init_db(app_logger=None):
         user_id TEXT NOT NULL DEFAULT '1',
         merchant_note TEXT NOT NULL,
         category TEXT NOT NULL,
+        match_type TEXT NOT NULL DEFAULT 'contains',
+        apply_count INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL,
         PRIMARY KEY (user_id, merchant_note)
     );
@@ -910,6 +914,19 @@ def init_db(app_logger=None):
     db.execute('CREATE INDEX IF NOT EXISTS idx_acc_reconciliations_user_acc ON account_reconciliations(user_id, account_id, reconciled_at DESC)')
     db.commit()
 
+    # 分类规则与商户纠正记忆轻量幂等迁移
+    for col_sql in [
+        "ALTER TABLE merchant_category_overrides ADD COLUMN match_type TEXT NOT NULL DEFAULT 'contains'",
+        "ALTER TABLE merchant_category_overrides ADD COLUMN apply_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE merchant_category_overrides ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1",
+        "ALTER TABLE merchant_category_overrides ADD COLUMN created_at TEXT",
+    ]:
+        try:
+            db.execute(col_sql)
+            db.commit()
+        except Exception as e:
+            logger.debug("Category rule column migration notice: %s", e)
+
     # 核心性能索引轻量幂等迁移（支持已有库热升级）
     core_indices = [
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_deleted ON transactions(user_id, deleted_at, date DESC)",
@@ -926,6 +943,7 @@ def init_db(app_logger=None):
         "CREATE INDEX IF NOT EXISTS idx_recurring_user ON recurring_rules(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_password_resets_lookup ON password_resets(user_id, is_used, expires_at)",
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_acc_reconciled ON transactions(user_id, account_id, is_reconciled, deleted_at)",
+        "CREATE INDEX IF NOT EXISTS idx_mco_user_active ON merchant_category_overrides(user_id, is_active, updated_at DESC)",
     ]
     for idx_sql in core_indices:
         try:

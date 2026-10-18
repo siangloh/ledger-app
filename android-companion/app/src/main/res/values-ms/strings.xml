@@ -243,4 +243,21 @@
     <string name="reconcile_note_hint">Nota penyesuaian (pilihan)</string>
     <string name="confirm_reconcile">Sahkan &amp; Selaraskan</string>
     <string name="reconcile_success">Akaun berjaya diselaraskan! Baki semasa: %1$s</string>
+
+    <!-- Category Rules & Memory -->
+    <string name="tools_category_rules">Peraturan Kategori &amp; Memori</string>
+    <string name="tools_category_rules_desc">Pengkategorian peniaga automatik dan padanan pintar</string>
+    <string name="category_rules_add_btn">Tambah Peraturan</string>
+    <string name="category_rules_empty_title">Tiada Peraturan Kategori</string>
+    <string name="category_rules_empty_desc">Tambah kata kunci peniaga dan kategori sasaran untuk klasifikasi automatik</string>
+    <string name="category_rules_pattern_label">Corak Peniaga</string>
+    <string name="category_rules_target_cat_label">Kategori Sasaran</string>
+    <string name="category_rules_match_type_label">Jenis Padanan</string>
+    <string name="category_rules_match_contains">Mengandungi Kata Kunci (Disyorkan)</string>
+    <string name="category_rules_match_exact">Padanan Tepat</string>
+    <string name="category_rules_match_regex">Ungkapan Nalar</string>
+    <string name="category_rules_apply_history_btn">Guna ke Sejarah</string>
+    <string name="category_rules_apply_all_btn">Klasifikasi Semula Semua</string>
+    <string name="category_rules_confirm_delete">Padam peraturan kategori peniaga ini?</string>
+    <string name="category_rules_confirm_apply_all">Gunakan semua peraturan aktif pada transaksi belum dikategorikan?</string>
 </resources>

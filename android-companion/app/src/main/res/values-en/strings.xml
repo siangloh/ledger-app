@@ -243,4 +243,21 @@
     <string name="reconcile_note_hint">Reconciliation note (optional)</string>
     <string name="confirm_reconcile">Confirm &amp; Reconcile</string>
     <string name="reconcile_success">Account reconciled successfully! Current balance: %1$s</string>
+
+    <!-- Category Rules & Memory -->
+    <string name="tools_category_rules">Category Rules &amp; Memory</string>
+    <string name="tools_category_rules_desc">Automatic merchant categorization and smart matching</string>
+    <string name="category_rules_add_btn">Add Rule</string>
+    <string name="category_rules_empty_title">No Category Rules</string>
+    <string name="category_rules_empty_desc">Add merchant keywords and target categories for auto classification</string>
+    <string name="category_rules_pattern_label">Merchant Pattern</string>
+    <string name="category_rules_target_cat_label">Target Category</string>
+    <string name="category_rules_match_type_label">Match Type</string>
+    <string name="category_rules_match_contains">Contains Keyword (Recommended)</string>
+    <string name="category_rules_match_exact">Exact Match</string>
+    <string name="category_rules_match_regex">Regular Expression</string>
+    <string name="category_rules_apply_history_btn">Apply to History</string>
+    <string name="category_rules_apply_all_btn">Re-classify All History</string>
+    <string name="category_rules_confirm_delete">Delete this merchant category rule?</string>
+    <string name="category_rules_confirm_apply_all">Apply all active rules to historical uncategorized transactions?</string>
 </resources>

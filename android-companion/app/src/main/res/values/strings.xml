@@ -243,4 +243,21 @@
     <string name="reconcile_note_hint">对账备注（可选）</string>
     <string name="confirm_reconcile">确认并完成对账</string>
     <string name="reconcile_success">账户对账成功！当前余额：%1$s</string>
+
+    <!-- Category Rules & Memory -->
+    <string name="tools_category_rules">商户分类规则与纠正记忆</string>
+    <string name="tools_category_rules_desc">通知商户自动分类记忆与智能模糊匹配</string>
+    <string name="category_rules_add_btn">添加规则</string>
+    <string name="category_rules_empty_title">暂无分类规则</string>
+    <string name="category_rules_empty_desc">添加商户关键字与目标分类，记账与通知将自动匹配</string>
+    <string name="category_rules_pattern_label">商户匹配模式</string>
+    <string name="category_rules_target_cat_label">目标分类</string>
+    <string name="category_rules_match_type_label">匹配方式</string>
+    <string name="category_rules_match_contains">包含关键字 (推荐)</string>
+    <string name="category_rules_match_exact">完全匹配</string>
+    <string name="category_rules_match_regex">正则表达式</string>
+    <string name="category_rules_apply_history_btn">追溯此规则</string>
+    <string name="category_rules_apply_all_btn">全量重筛历史</string>
+    <string name="category_rules_confirm_delete">确定删除该商户规则吗？</string>
+    <string name="category_rules_confirm_apply_all">确定要将所有规则追溯应用到历史未分类交易吗？</string>
 </resources>

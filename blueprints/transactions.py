@@ -30,9 +30,18 @@ from core.utils import (
 from services.ai_service import parse_nlp_with_llm
 from services.notification_service import parse_nlp_text
 from services.merchant_service import get_merchant_suggestions
+from services.category_rules_service import (
+    get_category_rules,
+    create_or_update_rule,
+    delete_rule,
+    toggle_rule_status,
+    apply_rule_to_history,
+    apply_all_rules_to_history
+)
 from core.i18n import t
 
 transactions_bp = Blueprint('transactions', __name__)
+
 
 
 # ---------------------------------------------------------------------------
@@ -761,10 +770,19 @@ def categories_page():
     savings = db.execute("SELECT * FROM categories WHERE user_id = ? AND type='savings' ORDER BY id", (user_id,)).fetchall()
     budget_status = get_category_budget_status(db, user_id)
     budget_map = {b['category']: b for b in budget_status}
+    rules_res = get_category_rules(user_id=user_id, db=db, limit=200)
+    category_rules = rules_res.get('rules', [])
+    all_categories = sorted(list(set(
+        [c['name'] for c in expense] +
+        [c['name'] for c in income_main] +
+        [c['name'] for c in income_side] +
+        [c['name'] for c in savings]
+    )))
     return render_template(
         'categories.html', income_main=income_main, income_side=income_side, expense=expense, savings=savings,
-        budget_map=budget_map,
+        budget_map=budget_map, category_rules=category_rules, all_categories=all_categories
     )
+
 
 
 @transactions_bp.route('/categories/add', methods=['POST'], endpoint='add_category')
@@ -910,6 +928,106 @@ def set_category_budget(cat_id):
         return jsonify({'ok': True, 'message': msg})
     flash(msg, 'success')
     return redirect(url_for('categories_page'))
+
+
+# ---------------------------------------------------------------------------
+# 商户分类规则与纠正记忆 Web 端 API
+# ---------------------------------------------------------------------------
+
+@transactions_bp.route('/api/category-rules', methods=['GET'], endpoint='api_category_rules_list')
+def api_category_rules_list():
+    user_id = get_current_user_id()
+    db = get_db()
+    search = request.args.get('search')
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 100, type=int)
+    res = get_category_rules(user_id=user_id, db=db, search=search, page=page, limit=limit)
+    return jsonify(res)
+
+
+@transactions_bp.route('/api/category-rules', methods=['POST'], endpoint='api_category_rules_save')
+def api_category_rules_save():
+    user_id = get_current_user_id()
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+    merchant_pattern = (data.get('merchant_pattern') or data.get('pattern') or '').strip()
+    category = (data.get('category') or '').strip()
+    match_type = (data.get('match_type') or 'contains').strip()
+    is_active = data.get('is_active', 1)
+    if isinstance(is_active, str):
+        is_active = 1 if is_active in ('1', 'true', 'True') else 0
+
+    res = create_or_update_rule(
+        user_id=user_id,
+        merchant_pattern=merchant_pattern,
+        category=category,
+        match_type=match_type,
+        is_active=is_active,
+        db=db
+    )
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@transactions_bp.route('/api/category-rules/delete', methods=['POST'], endpoint='api_category_rules_delete')
+def api_category_rules_delete():
+    user_id = get_current_user_id()
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+    merchant_pattern = (data.get('merchant_pattern') or data.get('pattern') or '').strip()
+    res = delete_rule(user_id=user_id, merchant_pattern=merchant_pattern, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@transactions_bp.route('/api/category-rules/toggle', methods=['POST'], endpoint='api_category_rules_toggle')
+def api_category_rules_toggle():
+    user_id = get_current_user_id()
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+    merchant_pattern = (data.get('merchant_pattern') or data.get('pattern') or '').strip()
+    res = toggle_rule_status(user_id=user_id, merchant_pattern=merchant_pattern, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@transactions_bp.route('/api/category-rules/apply-history', methods=['POST'], endpoint='api_category_rules_apply_history')
+def api_category_rules_apply_history():
+    user_id = get_current_user_id()
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+    merchant_pattern = (data.get('merchant_pattern') or data.get('pattern') or '').strip()
+    category = (data.get('category') or '').strip()
+    match_type = (data.get('match_type') or 'contains').strip()
+    only_uncat = data.get('only_uncategorized') in (True, 'true', '1', 1)
+
+    res = apply_rule_to_history(
+        user_id=user_id,
+        merchant_pattern=merchant_pattern,
+        category=category,
+        match_type=match_type,
+        only_uncategorized=only_uncat,
+        db=db
+    )
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@transactions_bp.route('/api/category-rules/apply-all', methods=['POST'], endpoint='api_category_rules_apply_all')
+def api_category_rules_apply_all():
+    user_id = get_current_user_id()
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+    only_uncat = data.get('only_uncategorized') in (True, 'true', '1', 1, None)  # 默认 True
+
+    res = apply_all_rules_to_history(
+        user_id=user_id,
+        only_uncategorized=only_uncat,
+        db=db
+    )
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
 
 
 # ---------------------------------------------------------------------------
