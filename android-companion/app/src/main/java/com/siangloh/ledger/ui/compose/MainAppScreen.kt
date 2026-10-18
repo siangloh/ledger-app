@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +38,7 @@ fun MainAppScreen(
     onOpenWebUrl: (String) -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf(initialTab) }
+    val saveableStateHolder = rememberSaveableStateHolder()
 
     val navItems = listOf(
         NavItem("概览", Icons.Default.Dashboard),
@@ -98,40 +100,42 @@ fun MainAppScreen(
                 .fillMaxSize()
                 .padding(bottom = paddingValues.calculateBottomPadding())
         ) {
-            when (selectedTab) {
-                0 -> {
-                    OverviewScreen(
-                        showBottomBar = false,
-                        onNavigateToRecords = { selectedTab = 1 },
-                        onNavigateToAdd = { selectedTab = 2 },
-                        onNavigateToAccounts = { selectedTab = 3 },
-                        onNavigateToTools = { selectedTab = 4 },
-                        onScanReceipt = onScanReceipt,
-                        onOpenSettings = onOpenSettings
-                    )
-                }
-                1 -> {
-                    RecordsScreen(
-                        onNavigateToAdd = { selectedTab = 2 }
-                    )
-                }
-                2 -> {
-                    AddTransactionScreen(
-                        onFinished = {
-                            selectedTab = 1
-                        }
-                    )
-                }
-                3 -> {
-                    AccountsScreen()
-                }
-                4 -> {
-                    MoreToolsScreen(
-                        onScanReceipt = onScanReceipt,
-                        onNavigateToAdd = { selectedTab = 2 },
-                        onOpenSettings = onOpenSettings,
-                        onOpenWebUrl = onOpenWebUrl
-                    )
+            saveableStateHolder.SaveableStateProvider(selectedTab) {
+                when (selectedTab) {
+                    0 -> {
+                        OverviewScreen(
+                            showBottomBar = false,
+                            onNavigateToRecords = { selectedTab = 1 },
+                            onNavigateToAdd = { selectedTab = 2 },
+                            onNavigateToAccounts = { selectedTab = 3 },
+                            onNavigateToTools = { selectedTab = 4 },
+                            onScanReceipt = onScanReceipt,
+                            onOpenSettings = onOpenSettings
+                        )
+                    }
+                    1 -> {
+                        RecordsScreen(
+                            onNavigateToAdd = { selectedTab = 2 }
+                        )
+                    }
+                    2 -> {
+                        AddTransactionScreen(
+                            onFinished = {
+                                selectedTab = 1
+                            }
+                        )
+                    }
+                    3 -> {
+                        AccountsScreen()
+                    }
+                    4 -> {
+                        MoreToolsScreen(
+                            onScanReceipt = onScanReceipt,
+                            onNavigateToAdd = { selectedTab = 2 },
+                            onOpenSettings = onOpenSettings,
+                            onOpenWebUrl = onOpenWebUrl
+                        )
+                    }
                 }
             }
         }

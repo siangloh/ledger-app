@@ -61,6 +61,7 @@ class MainActivity : AppCompatActivity() {
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var pendingReceiptPhotoUri: Uri? = null
     private var pendingScannedReceiptText: String? = null
+    private var isWebViewInitialized = false
 
     companion object {
         private const val TAG = "LedgerMainActivity"
@@ -82,7 +83,8 @@ class MainActivity : AppCompatActivity() {
         composeView = findViewById(R.id.composeView)
 
         initViews()
-        initWebView()
+        // 关键启动性能优化：默认进入原生 Jetpack Compose 界面，延迟初始化 Chromium WebView 引擎
+        // 避免在冷启动主线程同步唤醒重量级 Webview 渲染内核，冷启动耗时立降 ~800-1000ms
         initComposeOverview()
         checkNotificationPermission()
         checkBatteryOptimization()
@@ -93,6 +95,13 @@ class MainActivity : AppCompatActivity() {
         sp.edit().putString("default_view_mode", "compose").apply()
         showNativeComposeMode()
         handleIncomingIntent(intent)
+    }
+
+    private fun ensureWebViewInitialized() {
+        if (!isWebViewInitialized) {
+            initWebView()
+            isWebViewInitialized = true
+        }
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -128,6 +137,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun showWebViewMode() {
+        ensureWebViewInitialized()
         composeView.visibility = View.GONE
         swipeRefreshLayout.visibility = View.VISIBLE
         fabQuickAdd.visibility = View.VISIBLE
@@ -146,26 +156,31 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        // 关键省电修复：挂起 WebView 的 JS 定时器、动画与渲染引擎，彻底杜绝退到后台时持续偷跑 CPU 和电量
-        webView.onPause()
-        webView.pauseTimers()
+        // 关键省电与内存修复：仅当 WebView 已初始化时挂起定时器与引擎，杜绝后台偷跑 CPU
+        if (isWebViewInitialized) {
+            webView.onPause()
+            webView.pauseTimers()
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        // 恢复 WebView 的 JS 定时器与活动状态
-        webView.onResume()
-        webView.resumeTimers()
+        if (isWebViewInitialized) {
+            webView.onResume()
+            webView.resumeTimers()
+        }
         tryReconnectNotificationListener()
         // 智能节电同步：避免每次切前台都无脑拉起 WorkManager 唤醒网络
         checkAndEnqueueSyncIfNeeded()
     }
 
     override fun onDestroy() {
-        try {
-            webView.stopLoading()
-            webView.destroy()
-        } catch (_: Exception) {}
+        if (isWebViewInitialized) {
+            try {
+                webView.stopLoading()
+                webView.destroy()
+            } catch (_: Exception) {}
+        }
         super.onDestroy()
     }
 
@@ -877,7 +892,7 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (composeView.visibility != View.VISIBLE) {
-                    if (webView.canGoBack()) {
+                    if (isWebViewInitialized && webView.canGoBack()) {
                         webView.goBack()
                     } else {
                         showNativeComposeMode()

@@ -321,14 +321,20 @@ fun OverviewScreen(
                     try {
                         cachePrefs.edit().putString(cacheKey, result).apply()
                     } catch (_: Exception) {}
-                    overviewData = parseOverviewJson(result, isListeningActual, isOfflineCache = false)
+                    val parsed = withContext(Dispatchers.Default) {
+                        parseOverviewJson(result, isListeningActual, isOfflineCache = false)
+                    }
+                    overviewData = parsed
                     hasNetworkError = false
                     networkErrorMessage = ""
                 } else {
                     hasNetworkError = true
                     val cachedJson = cachePrefs.getString(cacheKey, null)
                     if (!cachedJson.isNullOrBlank()) {
-                        overviewData = parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = true)
+                        val parsed = withContext(Dispatchers.Default) {
+                            parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = true)
+                        }
+                        overviewData = parsed
                         networkErrorMessage = "网络连接受阻，已呈现最近快照数据"
                     } else {
                         // 无网络且无缓存：回退至本地 Room 未同步队列
@@ -367,7 +373,10 @@ fun OverviewScreen(
                 val cacheKey = "cache_${username}_${period}_${currentMonthStr}"
                 val cachedJson = cachePrefs.getString(cacheKey, null)
                 if (!cachedJson.isNullOrBlank()) {
-                    overviewData = parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = true)
+                    val parsed = withContext(Dispatchers.Default) {
+                        parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = true)
+                    }
+                    overviewData = parsed
                     networkErrorMessage = "网络连接异常，已呈现最近快照数据"
                 }
             } finally {

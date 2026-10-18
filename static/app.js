@@ -3050,12 +3050,12 @@ function initLiveSyncStatus() {
   if (_healthCheckTimer) {
     clearInterval(_healthCheckTimer);
   }
-  // 活跃状态下每 2.5 秒进行一次轻量级版本检查
+  // 活跃状态下每 6.0 秒进行一次轻量级版本检查（大幅降低耗电与网络请求，切回页面/网络恢复时仍即时触发）
   _healthCheckTimer = setInterval(function () {
     if (document.visibilityState === 'visible') {
       checkRealtimeUpdates();
     }
-  }, 2500);
+  }, 6000);
 }
 
 // 进度条控制

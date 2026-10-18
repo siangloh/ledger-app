@@ -200,7 +200,7 @@ app.config['SESSION_COOKIE_SECURE'] = bool(is_production)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
 
 
 # ---------------------------------------------------------------------------
@@ -257,6 +257,8 @@ def add_cache_control_headers(response):
             response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
         else:
             response.headers['Cache-Control'] = 'public, max-age=86400'
+    elif response.mimetype == 'application/json' and not response.headers.get('Cache-Control'):
+        response.headers['Cache-Control'] = 'no-cache, must-revalidate'
 
     # 基础 HTTP 安全响应头防护 (OWASP 推荐安全规范)
     response.headers.setdefault('X-Content-Type-Options', 'nosniff')

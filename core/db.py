@@ -784,6 +784,7 @@ def init_db(app_logger=None):
     -- 12. 核心性能复合索引（大幅加速总览月度聚合、明细分页与分类查询，消除全表扫描）
     CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC, id DESC);
     CREATE INDEX IF NOT EXISTS idx_transactions_user_type ON transactions(user_id, type);
+    CREATE INDEX IF NOT EXISTS idx_transactions_user_type_cat_amt ON transactions(user_id, type, category, amount);
     CREATE INDEX IF NOT EXISTS idx_categories_user_type ON categories(user_id, type, group_name);
     CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id, is_active);
     CREATE INDEX IF NOT EXISTS idx_user_settings_uid ON user_settings(user_id);
@@ -835,9 +836,13 @@ def init_db(app_logger=None):
     core_indices = [
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC, id DESC)",
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_type ON transactions(user_id, type)",
-        "CREATE INDEX IF NOT EXISTS idx_transactions_user_cat ON transactions(user_id, category_id)",
+        "CREATE INDEX IF NOT EXISTS idx_transactions_user_type_cat_amt ON transactions(user_id, type, category, amount)",
+        "CREATE INDEX IF NOT EXISTS idx_transactions_user_cat ON transactions(user_id, category)",
+        "CREATE INDEX IF NOT EXISTS idx_transactions_user_account ON transactions(user_id, account_id, type, amount)",
+        "CREATE INDEX IF NOT EXISTS idx_transactions_user_type_date ON transactions(user_id, type, date DESC)",
         "CREATE INDEX IF NOT EXISTS idx_categories_user_type ON categories(user_id, type, group_name)",
         "CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id, is_active)",
+        "CREATE INDEX IF NOT EXISTS idx_accounts_user_active ON accounts(user_id, is_active, type, id)",
         "CREATE INDEX IF NOT EXISTS idx_user_settings_uid ON user_settings(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_recurring_user ON recurring_rules(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_password_resets_lookup ON password_resets(user_id, is_used, expires_at)",

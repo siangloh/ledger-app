@@ -336,5 +336,21 @@
   window.renderCategoryChart = renderCategoryChart;
   window.selectInsightsRange = selectInsightsRange;
   window.applyCustomInsightsFilter = applyCustomInsightsFilter;
+
+  // SPA / HTMX 切页清理图表实例，杜绝 Canvas 内存与动画帧泄漏
+  function _destroyCatCharts() {
+    if (window._catChartInstances) {
+      Object.keys(window._catChartInstances).forEach(function (k) {
+        try {
+          if (window._catChartInstances[k] && typeof window._catChartInstances[k].destroy === 'function') {
+            window._catChartInstances[k].destroy();
+          }
+        } catch (_) {}
+      });
+      window._catChartInstances = {};
+    }
+  }
+  document.addEventListener('htmx:beforeSwap', _destroyCatCharts, { once: true });
+  window.addEventListener('beforeunload', _destroyCatCharts, { once: true });
 </script>
 {% endblock %}

@@ -25,6 +25,13 @@ def shift_month(m_str: str, delta: int) -> str:
         return m_str
 
 
+# -----------------------------------------------------------------------------
+# 进程级带数据版本 (data_version) 安全失效的计算缓存 (符合多 Worker 安全规则)
+# -----------------------------------------------------------------------------
+_OVERVIEW_CACHE: Dict[tuple, Dict[str, Any]] = {}
+_ACCOUNTS_CACHE: Dict[tuple, Dict[str, Any]] = {}
+
+
 def get_native_overview_summary(
     user_id: Any,
     period: str = "month",  # "month", "3m", "year"
@@ -48,6 +55,14 @@ def get_native_overview_summary(
     today = date.today()
     if not selected_month or len(selected_month.split('-')) != 2:
         selected_month = today.strftime('%Y-%m')
+
+    # 多 Worker 安全的数据版本缓存感知：版本未变时秒级直接命中缓存，无需重复全表扫描
+    from core.db import get_data_version
+    current_version = get_data_version(user_id=str(user_id), db=db)
+    cache_key = (str(user_id), current_version, period, selected_month)
+    if cache_key in _OVERVIEW_CACHE:
+        cached_res = dict(_OVERVIEW_CACHE[cache_key])
+        return cached_res
 
     # Determine date range
     if period == "3m":
@@ -233,7 +248,7 @@ def get_native_overview_summary(
     elif "其他" not in user_categories:
         user_categories.append("其他")
 
-    return {
+    res = {
         'ok': True,
         'period': period,
         'selected_month': selected_month,
@@ -256,6 +271,10 @@ def get_native_overview_summary(
             'last_active_time': last_active_time or today.isoformat()
         }
     }
+    if len(_OVERVIEW_CACHE) > 200:
+        _OVERVIEW_CACHE.clear()
+    _OVERVIEW_CACHE[cache_key] = res
+    return res
 
 
 def update_transaction_quick_category(
@@ -336,60 +355,63 @@ def get_native_transactions_list(
     if not db or not user_id:
         return {'ok': False, 'message': 'Invalid user or database connection'}
 
-    query = '''
-        SELECT t.id, t.date, t.type, t.category, t.amount, t.note, t.tags, t.account_id,
-               t.source, t.created_at, a.name AS account_name, a.type AS account_type
-        FROM transactions t
-        LEFT JOIN accounts a ON t.account_id = a.id AND a.user_id = t.user_id
-        WHERE t.user_id = ?
-    '''
+    where_clauses = ["t.user_id = ?"]
     params = [str(user_id)]
 
     INTERNAL_TRANSFER_CATS = ('内部划转', '转账/充值', '自转', '互转')
     cats_placeholder = ','.join('?' for _ in INTERNAL_TRANSFER_CATS)
 
     if tx_type == 'transfer':
-        query += f" AND (t.type = 'transfer' OR t.category IN ({cats_placeholder}))"
+        where_clauses.append(f"(t.type = 'transfer' OR t.category IN ({cats_placeholder}))")
         params.extend(INTERNAL_TRANSFER_CATS)
     elif tx_type == 'expense':
-        query += f" AND t.type = 'expense' AND (t.category IS NULL OR t.category NOT IN ({cats_placeholder}))"
+        where_clauses.append(f"t.type = 'expense' AND (t.category IS NULL OR t.category NOT IN ({cats_placeholder}))")
         params.extend(INTERNAL_TRANSFER_CATS)
     elif tx_type == 'income':
-        query += f" AND t.type = 'income' AND (t.category IS NULL OR t.category NOT IN ({cats_placeholder}))"
+        where_clauses.append(f"t.type = 'income' AND (t.category IS NULL OR t.category NOT IN ({cats_placeholder}))")
         params.extend(INTERNAL_TRANSFER_CATS)
     elif tx_type and tx_type not in ('all', ''):
-        query += " AND t.type = ?"
+        where_clauses.append("t.type = ?")
         params.append(tx_type)
 
     if month and len(month.split('-')) == 2:
-        query += " AND t.date LIKE ?"
+        where_clauses.append("t.date LIKE ?")
         params.append(f"{month}%")
 
     if category and category not in ('全部', 'all', ''):
-        query += " AND t.category = ?"
+        where_clauses.append("t.category = ?")
         params.append(category)
 
     if account_id:
-        query += " AND t.account_id = ?"
+        where_clauses.append("t.account_id = ?")
         params.append(account_id)
 
     if search and search.strip():
         term = f"%{search.strip()}%"
-        query += " AND (t.note LIKE ? OR t.tags LIKE ? OR t.category LIKE ?)"
+        where_clauses.append("(t.note LIKE ? OR t.tags LIKE ? OR t.category LIKE ?)")
         params.extend([term, term, term])
 
-    # Count total
-    count_query = f"SELECT COUNT(*) AS total FROM ({query}) sub"
+    where_sql = " AND ".join(where_clauses)
+
+    # 优化总数统计：避免在计数时执行昂贵的 LEFT JOIN accounts 与整行投影子查询
+    count_query = f"SELECT COUNT(*) AS total FROM transactions t WHERE {where_sql}"
     total_count = db.execute(count_query, params).fetchone()['total']
 
     # Order and paginate
     page = max(1, page)
     limit = max(1, min(limit, 100))
     offset = (page - 1) * limit
-    query += " ORDER BY t.date DESC, t.id DESC LIMIT ? OFFSET ?"
-    params.extend([limit, offset])
 
-    rows = db.execute(query, params).fetchall()
+    data_query = f'''
+        SELECT t.id, t.date, t.type, t.category, t.amount, t.note, t.tags, t.account_id,
+               t.source, t.created_at, a.name AS account_name, a.type AS account_type
+        FROM transactions t
+        LEFT JOIN accounts a ON t.account_id = a.id AND a.user_id = t.user_id
+        WHERE {where_sql}
+        ORDER BY t.date DESC, t.id DESC LIMIT ? OFFSET ?
+    '''
+    data_params = list(params) + [limit, offset]
+    rows = db.execute(data_query, data_params).fetchall()
     items = []
     for r in rows:
         items.append({
@@ -454,6 +476,30 @@ def add_native_transaction(user_id: Any, data: Dict[str, Any], db: Any = None) -
             return {'ok': False, 'message': '指定的账户不存在或无权访问'}
 
     now_iso = datetime.now().isoformat()
+
+    # 接口级幂等与极速重复点击防抖保障
+    client_tx_id = (data.get('client_tx_id') or '').strip()
+    if client_tx_id:
+        existing_tx = db.execute(
+            "SELECT id FROM transactions WHERE user_id = ? AND tags LIKE ?",
+            (str(user_id), f"%client_id:{client_tx_id}%")
+        ).fetchone()
+        if existing_tx:
+            logger.info("Idempotent hit for client_tx_id %s -> tx %s", client_tx_id, existing_tx['id'])
+            return {'ok': True, 'id': existing_tx['id'], 'message': '账目已存在 (幂等保护)'}
+        tags = f"{tags} client_id:{client_tx_id}".strip()
+    else:
+        # 兜底轻量级防重复重放：15秒内同用户、同金额、同日期、同类型、同备注、同账户如果刚写入过，避免网络抖动重发造成双重记账
+        recent_dup = db.execute('''
+            SELECT id FROM transactions
+            WHERE user_id = ? AND date = ? AND type = ? AND abs(amount - ?) < 0.005
+              AND note = ? AND COALESCE(account_id, 0) = COALESCE(?, 0)
+              AND created_at >= datetime('now', '-15 seconds')
+            ORDER BY id DESC LIMIT 1
+        ''', (str(user_id), tx_date, tx_type, amount, note, account_id)).fetchone()
+        if recent_dup:
+            logger.info("Debounce hit for duplicate transaction within 15s: id %s", recent_dup['id'])
+            return {'ok': True, 'id': recent_dup['id'], 'message': '账目已保存 (防止重复提交)'}
 
     # 如果是账户互转 (transfer)
     to_account_id = data.get('to_account_id')
@@ -624,6 +670,13 @@ def get_native_accounts_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
     if not db or not user_id:
         return {'ok': False, 'message': '未授权或数据库连接失败'}
 
+    # 多 Worker 安全的数据版本缓存感知
+    from core.db import get_data_version
+    current_version = get_data_version(user_id=str(user_id), db=db)
+    cache_key = (str(user_id), current_version)
+    if cache_key in _ACCOUNTS_CACHE:
+        return dict(_ACCOUNTS_CACHE[cache_key])
+
     acc_rows = db.execute('''
         SELECT id, name, type, credit_limit, currency, statement_day, due_day, is_active, created_at
         FROM accounts
@@ -635,20 +688,25 @@ def get_native_accounts_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
     total_assets = 0.0
     total_liabilities = 0.0
 
+    # 性能优化：单次 GROUP BY 查询合并计算所有账户资金流，彻底消除 N+1 循环全表扫描
+    flow_rows = db.execute('''
+        SELECT
+            account_id,
+            COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0.0 END), 0.0) AS income_sum,
+            COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0.0 END), 0.0) AS expense_sum
+        FROM transactions
+        WHERE user_id = ? AND account_id IS NOT NULL
+        GROUP BY account_id
+    ''', (str(user_id),)).fetchall()
+    flow_map = {r['account_id']: r for r in flow_rows}
+
     for a in acc_rows:
         a_id = a['id']
         a_type = a['type']
-        # 计算该账户的净流入流出流水差额
-        flow = db.execute('''
-            SELECT
-                COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0.0 END), 0.0) AS income_sum,
-                COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0.0 END), 0.0) AS expense_sum
-            FROM transactions
-            WHERE user_id = ? AND account_id = ?
-        ''', (str(user_id), a_id)).fetchone()
+        flow = flow_map.get(a_id)
 
-        income_sum = float(flow['income_sum'] or 0.0)
-        expense_sum = float(flow['expense_sum'] or 0.0)
+        income_sum = float(flow['income_sum']) if flow else 0.0
+        expense_sum = float(flow['expense_sum']) if flow else 0.0
         balance = income_sum - expense_sum
 
         credit_limit = float(a['credit_limit'] or 0.0)
@@ -683,7 +741,7 @@ def get_native_accounts_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
     default_acc_id = setting['default_account_id'] if setting else None
     default_grp = (setting['default_group'] if setting and setting['default_group'] else 'main')
 
-    return {
+    res = {
         'ok': True,
         'default_account_id': default_acc_id,
         'default_group': default_grp,
@@ -692,6 +750,10 @@ def get_native_accounts_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
         'net_worth': net_worth,
         'accounts': accounts
     }
+    if len(_ACCOUNTS_CACHE) > 200:
+        _ACCOUNTS_CACHE.clear()
+    _ACCOUNTS_CACHE[cache_key] = res
+    return res
 
 
 def add_or_update_native_account(user_id: Any, data: Dict[str, Any], db: Any = None) -> Dict[str, Any]:

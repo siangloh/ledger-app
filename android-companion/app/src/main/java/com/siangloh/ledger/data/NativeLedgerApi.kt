@@ -97,6 +97,28 @@ data class ToolsSummary(
 object NativeLedgerApi {
     private const val TAG = "NativeLedgerApi"
 
+    // 内存级快速缓存（In-Memory Cache）：支持秒切 Tab 瞬间渲染，消除重复网络请求
+    private var cachedAccounts: AccountsSummary? = null
+    private var cachedAccountsTimestamp: Long = 0L
+
+    private var cachedCategories: CategoriesResult? = null
+    private var cachedCategoriesTimestamp: Long = 0L
+
+    private var cachedTools: ToolsSummary? = null
+    private var cachedToolsTimestamp: Long = 0L
+
+    private val recordsCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, TransactionsPage>>()
+
+    fun invalidateCache() {
+        cachedAccounts = null
+        cachedAccountsTimestamp = 0L
+        cachedCategories = null
+        cachedCategoriesTimestamp = 0L
+        cachedTools = null
+        cachedToolsTimestamp = 0L
+        recordsCache.clear()
+    }
+
     private fun openConnection(context: Context, endpoint: String, method: String = "GET"): HttpURLConnection {
         val serverUrl = NetworkHelper.getServerUrl(context).trimEnd('/')
         val url = URL("$serverUrl$endpoint")
@@ -121,8 +143,18 @@ object NativeLedgerApi {
         search: String? = null,
         accountId: Int? = null,
         page: Int = 1,
-        limit: Int = 50
+        limit: Int = 50,
+        forceRefresh: Boolean = false
     ): Result<TransactionsPage> = withContext(Dispatchers.IO) {
+        val cacheKey = "${month.orEmpty()}_${type.orEmpty()}_${category.orEmpty()}_${search.orEmpty().trim()}_a${accountId ?: 0}_p${page}_l${limit}"
+        val now = System.currentTimeMillis()
+        if (!forceRefresh) {
+            val mem = recordsCache[cacheKey]
+            if (mem != null && (now - mem.first < 20_000L)) {
+                return@withContext Result.success(mem.second)
+            }
+        }
+
         try {
             val params = mutableListOf<String>()
             val username = NetworkHelper.getUsername(context)
@@ -145,7 +177,9 @@ object NativeLedgerApi {
             val json = JSONObject(respBody)
             if (json.optBoolean("ok", false)) {
                 LocalDataStore.saveRecords(context, month, type, search ?: "", page, respBody)
-                Result.success(parseTransactionsPageJson(json, page, limit))
+                val pageResult = parseTransactionsPageJson(json, page, limit)
+                recordsCache[cacheKey] = Pair(now, pageResult)
+                Result.success(pageResult)
             } else {
                 val cached = LocalDataStore.getRecords(context, month, type, search ?: "", page)
                 if (!cached.isNullOrBlank()) {
@@ -208,7 +242,8 @@ object NativeLedgerApi {
         tags: String,
         accountId: Int? = null,
         toAccountId: Int? = null,
-        groupName: String? = null
+        groupName: String? = null,
+        clientTxId: String? = null
     ): Result<Long> = withContext(Dispatchers.IO) {
         try {
             val conn = openConnection(context, "/api/native/transactions", "POST")
@@ -221,6 +256,7 @@ object NativeLedgerApi {
                 put("date", date)
                 put("note", note)
                 put("tags", tags)
+                put("client_tx_id", clientTxId ?: java.util.UUID.randomUUID().toString())
                 accountId?.let { put("account_id", it) }
                 toAccountId?.let { put("to_account_id", it) }
                 groupName?.let { put("group_name", it) }
@@ -240,6 +276,7 @@ object NativeLedgerApi {
 
             val json = try { JSONObject(respBody) } catch (_: Exception) { JSONObject() }
             if (respCode in 200..299 && json.optBoolean("ok", false)) {
+                invalidateCache()
                 Result.success(json.optLong("id", 0L))
             } else {
                 val msg = json.optString("message", if (respCode >= 400) "服务端校验未通过 (HTTP $respCode)" else "记账失败")
@@ -290,6 +327,7 @@ object NativeLedgerApi {
 
             val json = JSONObject(respBody)
             if (json.optBoolean("ok", false)) {
+                invalidateCache()
                 Result.success(Unit)
             } else {
                 Result.failure(Exception(json.optString("message", "更新失败")))
@@ -310,6 +348,7 @@ object NativeLedgerApi {
 
             val json = JSONObject(respBody)
             if (json.optBoolean("ok", false)) {
+                invalidateCache()
                 Result.success(Unit)
             } else {
                 Result.failure(Exception(json.optString("message", "删除失败")))
@@ -320,7 +359,12 @@ object NativeLedgerApi {
         }
     }
 
-    suspend fun getAccounts(context: Context): Result<AccountsSummary> = withContext(Dispatchers.IO) {
+    suspend fun getAccounts(context: Context, forceRefresh: Boolean = false): Result<AccountsSummary> = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh && cachedAccounts != null && (now - cachedAccountsTimestamp < 60_000L)) {
+            return@withContext Result.success(cachedAccounts!!)
+        }
+
         try {
             val params = mutableListOf<String>()
             val username = NetworkHelper.getUsername(context)
@@ -336,7 +380,10 @@ object NativeLedgerApi {
             val json = JSONObject(respBody)
             if (json.optBoolean("ok", false)) {
                 LocalDataStore.saveAccounts(context, respBody)
-                Result.success(parseAccountsSummaryJson(json))
+                val summary = parseAccountsSummaryJson(json)
+                cachedAccounts = summary
+                cachedAccountsTimestamp = now
+                Result.success(summary)
             } else {
                 val cached = LocalDataStore.getAccounts(context)
                 if (!cached.isNullOrBlank()) {
@@ -425,6 +472,7 @@ object NativeLedgerApi {
 
             val json = JSONObject(respBody)
             if (json.optBoolean("ok", false)) {
+                invalidateCache()
                 Result.success(Unit)
             } else {
                 Result.failure(Exception(json.optString("message", "保存账户失败")))
@@ -435,7 +483,12 @@ object NativeLedgerApi {
         }
     }
 
-    suspend fun getCategories(context: Context): Result<CategoriesResult> = withContext(Dispatchers.IO) {
+    suspend fun getCategories(context: Context, forceRefresh: Boolean = false): Result<CategoriesResult> = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh && cachedCategories != null && (now - cachedCategoriesTimestamp < 300_000L)) {
+            return@withContext Result.success(cachedCategories!!)
+        }
+
         try {
             val params = mutableListOf<String>()
             val username = NetworkHelper.getUsername(context)
@@ -471,14 +524,22 @@ object NativeLedgerApi {
                 savings.add(CategoryRecord(obj.optInt("id"), obj.optString("name"), "savings"))
             }
 
-            Result.success(CategoriesResult(expenses, incomes, savings))
+            val catRes = CategoriesResult(expenses, incomes, savings)
+            cachedCategories = catRes
+            cachedCategoriesTimestamp = now
+            Result.success(catRes)
         } catch (e: Exception) {
             Log.e(TAG, "getCategories error: ${e.message}", e)
             Result.failure(e)
         }
     }
 
-    suspend fun getToolsSummary(context: Context): Result<ToolsSummary> = withContext(Dispatchers.IO) {
+    suspend fun getToolsSummary(context: Context, forceRefresh: Boolean = false): Result<ToolsSummary> = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh && cachedTools != null && (now - cachedToolsTimestamp < 60_000L)) {
+            return@withContext Result.success(cachedTools!!)
+        }
+
         try {
             val params = mutableListOf<String>()
             val username = NetworkHelper.getUsername(context)
@@ -494,7 +555,10 @@ object NativeLedgerApi {
             val json = if (respBody.isNotBlank()) JSONObject(respBody) else JSONObject()
             if (json.optBoolean("ok", true)) {
                 LocalDataStore.saveTools(context, respBody)
-                Result.success(parseToolsSummaryJson(json))
+                val toolsRes = parseToolsSummaryJson(json)
+                cachedTools = toolsRes
+                cachedToolsTimestamp = now
+                Result.success(toolsRes)
             } else {
                 val cached = LocalDataStore.getTools(context)
                 if (!cached.isNullOrBlank()) {

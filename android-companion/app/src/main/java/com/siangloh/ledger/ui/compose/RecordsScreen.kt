@@ -51,6 +51,7 @@ fun RecordsScreen(
         mutableStateOf(SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date()))
     }
     var searchQuery by remember { mutableStateOf("") }
+    var debouncedSearchQuery by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var currentPage by remember { mutableStateOf(1) }
     var hasMore by remember { mutableStateOf(false) }
@@ -70,6 +71,16 @@ fun RecordsScreen(
     var editingTx by remember { mutableStateOf<TransactionRecord?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<TransactionRecord?>(null) }
     var loadJob by remember { mutableStateOf<Job?>(null) }
+
+    // 搜索 300ms 防抖，空内容即时响应，避免每次击键都向服务器发起高频无效请求
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isBlank()) {
+            debouncedSearchQuery = ""
+        } else {
+            kotlinx.coroutines.delay(300)
+            debouncedSearchQuery = searchQuery
+        }
+    }
 
     fun loadPending() {
         scope.launch {
@@ -97,7 +108,7 @@ fun RecordsScreen(
                 context = context,
                 type = selectedType,
                 month = selectedMonth,
-                search = searchQuery,
+                search = debouncedSearchQuery,
                 page = targetPage,
                 limit = 50
             )
@@ -122,7 +133,7 @@ fun RecordsScreen(
         }
     }
 
-    LaunchedEffect(selectedType, selectedMonth, searchQuery) {
+    LaunchedEffect(selectedType, selectedMonth, debouncedSearchQuery) {
         loadData(resetPage = true)
     }
 
