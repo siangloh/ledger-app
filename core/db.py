@@ -468,7 +468,9 @@ def init_db(app_logger=None):
         tags TEXT,
         account_id INTEGER,
         merged_info TEXT,
-        deleted_at TEXT
+        deleted_at TEXT,
+        is_reconciled INTEGER DEFAULT 0,
+        reconciled_at TEXT
     );
     ''')
     db.commit()
@@ -679,6 +681,8 @@ def init_db(app_logger=None):
         grace_period_days INTEGER DEFAULT 20,
         currency TEXT DEFAULT 'RM',
         is_active INTEGER DEFAULT 1,
+        last_reconciled_at TEXT,
+        reconciled_balance REAL,
         created_at TEXT NOT NULL
     );
 
@@ -877,6 +881,35 @@ def init_db(app_logger=None):
     db.execute('CREATE INDEX IF NOT EXISTS idx_operation_snapshots_user ON operation_snapshots(user_id, created_at DESC)')
     db.commit()
 
+    # 账户对账与余额校准轻量幂等迁移
+    for col_sql in [
+        "ALTER TABLE accounts ADD COLUMN last_reconciled_at TEXT",
+        "ALTER TABLE accounts ADD COLUMN reconciled_balance REAL",
+        "ALTER TABLE transactions ADD COLUMN is_reconciled INTEGER DEFAULT 0",
+        "ALTER TABLE transactions ADD COLUMN reconciled_at TEXT",
+    ]:
+        try:
+            db.execute(col_sql)
+            db.commit()
+        except Exception as e:
+            logger.debug("Reconciliation column migration notice: %s", e)
+
+    db.execute('''
+    CREATE TABLE IF NOT EXISTS account_reconciliations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        account_id INTEGER NOT NULL,
+        statement_balance REAL NOT NULL,
+        system_balance REAL NOT NULL,
+        discrepancy REAL NOT NULL,
+        adjustment_tx_id INTEGER,
+        reconciled_at TEXT NOT NULL,
+        note TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )''')
+    db.execute('CREATE INDEX IF NOT EXISTS idx_acc_reconciliations_user_acc ON account_reconciliations(user_id, account_id, reconciled_at DESC)')
+    db.commit()
+
     # 核心性能索引轻量幂等迁移（支持已有库热升级）
     core_indices = [
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_deleted ON transactions(user_id, deleted_at, date DESC)",
@@ -892,6 +925,7 @@ def init_db(app_logger=None):
         "CREATE INDEX IF NOT EXISTS idx_user_settings_uid ON user_settings(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_recurring_user ON recurring_rules(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_password_resets_lookup ON password_resets(user_id, is_used, expires_at)",
+        "CREATE INDEX IF NOT EXISTS idx_transactions_user_acc_reconciled ON transactions(user_id, account_id, is_reconciled, deleted_at)",
     ]
     for idx_sql in core_indices:
         try:

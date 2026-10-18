@@ -229,4 +229,18 @@
     <string name="recycle_bin_empty_desc">No deleted transactions found</string>
     <string name="recycle_bin_confirm_empty">Are you sure you want to empty the recycle bin? This cannot be undone!</string>
     <string name="recycle_bin_confirm_delete">Are you sure you want to permanently delete this? This cannot be undone!</string>
+
+    <!-- Account Balance Calibration & Reconciliation -->
+    <string name="reconcile_title">Account Reconciliation</string>
+    <string name="reconcile_btn">Reconcile</string>
+    <string name="reconciled_badge">Reconciled</string>
+    <string name="unreconciled_badge">Unreconciled (%1$d)</string>
+    <string name="statement_balance_label">Statement / Actual Balance</string>
+    <string name="statement_balance_hint">Enter actual balance</string>
+    <string name="discrepancy_label">Discrepancy</string>
+    <string name="balanced_status">✅ Balanced (No Difference)</string>
+    <string name="auto_adjust_label">Auto-create adjustment transaction for discrepancy</string>
+    <string name="reconcile_note_hint">Reconciliation note (optional)</string>
+    <string name="confirm_reconcile">Confirm &amp; Reconcile</string>
+    <string name="reconcile_success">Account reconciled successfully! Current balance: %1$s</string>
 </resources>

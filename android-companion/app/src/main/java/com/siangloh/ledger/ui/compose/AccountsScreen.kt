@@ -50,6 +50,7 @@ fun AccountsScreen() {
     var isLoading by remember { mutableStateOf(false) }
     var showAddAccountDialog by remember { mutableStateOf(false) }
     var showTransferDialog by remember { mutableStateOf(false) }
+    var reconcilingAccount by remember { mutableStateOf<AccountRecord?>(null) }
 
     fun loadAccounts() {
         if (summary == null) isLoading = true
@@ -266,7 +267,7 @@ fun AccountsScreen() {
                 }
 
                 items(accountsList, key = { it.id }) { acc ->
-                    AccountCard(account = acc)
+                    AccountCard(account = acc, onReconcile = { reconcilingAccount = it })
                 }
             }
 
@@ -300,10 +301,25 @@ fun AccountsScreen() {
             }
         )
     }
+
+    // 账户对账与余额校准弹窗
+    if (reconcilingAccount != null) {
+        AccountReconcileDialog(
+            account = reconcilingAccount!!,
+            onDismiss = { reconcilingAccount = null },
+            onSuccess = {
+                reconcilingAccount = null
+                loadAccounts()
+            }
+        )
+    }
 }
 
 @Composable
-fun AccountCard(account: AccountRecord) {
+fun AccountCard(
+    account: AccountRecord,
+    onReconcile: (AccountRecord) -> Unit = {}
+) {
     val context = LocalContext.current
     val icon = CategoryUiHelper.getAccountTypeIcon(account.type)
     val typeName = CategoryUiHelper.getAccountTypeName(context, account.type)
@@ -343,11 +359,43 @@ fun AccountCard(account: AccountRecord) {
                         color = Slate900
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = typeName,
-                        fontSize = 11.sp,
-                        color = Slate400
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = typeName,
+                            fontSize = 11.sp,
+                            color = Slate400
+                        )
+                        if (account.lastReconciledAt != null) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = IncomeGreen.copy(alpha = 0.1f)
+                            ) {
+                                Text(
+                                    text = "✓ " + stringResource(R.string.reconciled_badge),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = IncomeGreen,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                )
+                            }
+                        } else {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Amber500.copy(alpha = 0.12f)
+                            ) {
+                                Text(
+                                    text = "⚖️ " + stringResource(R.string.unreconciled_badge, account.unreconciledCount),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Amber700,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -363,6 +411,21 @@ fun AccountCard(account: AccountRecord) {
                         text = "${stringResource(R.string.credit_limit_label)}: ${String.format(Locale.US, "%.0f", account.creditLimit)}",
                         fontSize = 10.sp,
                         color = Slate400
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedButton(
+                    onClick = { onReconcile(account) },
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.heightIn(min = 32.dp),
+                    border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "⚖️ " + stringResource(R.string.reconcile_btn),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PrimaryTeal
                     )
                 }
             }
@@ -641,6 +704,308 @@ fun TransferFundsDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_cancel), color = Slate500)
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AccountReconcileDialog(
+    account: AccountRecord,
+    onDismiss: () -> Unit,
+    onSuccess: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var statementBalanceStr by remember { mutableStateOf(String.format(Locale.US, "%.2f", account.balance)) }
+    var autoAdjust by remember { mutableStateOf(true) }
+    var note by remember { mutableStateOf("") }
+    var isSubmitting by remember { mutableStateOf(false) }
+
+    var reconciliationData by remember { mutableStateOf<com.siangloh.ledger.data.AccountReconciliationData?>(null) }
+    var isLoadingData by remember { mutableStateOf(true) }
+
+    fun loadData() {
+        scope.launch {
+            val res = NativeLedgerApi.getAccountReconciliation(context, account.id)
+            isLoadingData = false
+            res.onSuccess {
+                reconciliationData = it
+            }
+        }
+    }
+
+    LaunchedEffect(account.id) {
+        loadData()
+    }
+
+    val systemBal = account.balance
+    val targetVal = statementBalanceStr.toDoubleOrNull() ?: systemBal
+    val diff = kotlin.math.round((targetVal - systemBal) * 100.0) / 100.0
+    val isBalanced = kotlin.math.abs(diff) < 0.005
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text(
+                    text = "⚖️ " + stringResource(R.string.reconcile_title),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${account.name} (${CategoryUiHelper.getAccountTypeName(context, account.type)})",
+                    fontSize = 13.sp,
+                    color = Slate500
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Balance comparison card
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Slate50,
+                    border = BorderStroke(1.dp, Slate200),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = stringResource(R.string.accounts_title) + " " + (if (account.type == "credit_card") "欠款" else "结余"),
+                                fontSize = 11.sp,
+                                color = Slate500
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "${account.currency} ${String.format(Locale.US, "%,.2f", systemBal)}",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PrimaryTeal
+                            )
+                        }
+                        Text("⟷", fontSize = 18.sp, color = Slate400)
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = stringResource(R.string.statement_balance_label),
+                                fontSize = 11.sp,
+                                color = Slate500
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "${account.currency} ${String.format(Locale.US, "%,.2f", targetVal)}",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Slate900
+                            )
+                        }
+                    }
+                }
+
+                // Statement Balance Input
+                OutlinedTextField(
+                    value = statementBalanceStr,
+                    onValueChange = { statementBalanceStr = it },
+                    label = { Text(stringResource(R.string.statement_balance_label)) },
+                    placeholder = { Text(stringResource(R.string.statement_balance_hint)) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PrimaryTeal,
+                        focusedLabelColor = PrimaryTeal
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Discrepancy indicator card
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (isBalanced) IncomeGreen.copy(alpha = 0.08f) else Amber500.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, if (isBalanced) IncomeGreen.copy(alpha = 0.3f) else Amber500.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.discrepancy_label),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isBalanced) IncomeGreen else Amber700
+                            )
+                            Text(
+                                text = (if (diff > 0) "+" else "") + String.format(Locale.US, "%.2f", diff) + " " + account.currency,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isBalanced) IncomeGreen else Amber700
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (isBalanced) stringResource(R.string.balanced_status)
+                                   else "差额将被自动核算为平账校准交易",
+                            fontSize = 11.sp,
+                            color = if (isBalanced) IncomeGreen else Amber700
+                        )
+                    }
+                }
+
+                // Auto-adjust toggle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { autoAdjust = !autoAdjust }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = autoAdjust,
+                        onCheckedChange = { autoAdjust = it },
+                        colors = CheckboxDefaults.colors(checkedColor = PrimaryTeal)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.auto_adjust_label),
+                        fontSize = 12.sp,
+                        color = Slate800
+                    )
+                }
+
+                // Note input
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text(stringResource(R.string.reconcile_note_hint)) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PrimaryTeal,
+                        focusedLabelColor = PrimaryTeal
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Unreconciled transactions preview
+                if (isLoadingData) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = PrimaryTeal, strokeWidth = 2.dp)
+                    }
+                } else if (reconciliationData != null && reconciliationData!!.transactions.isNotEmpty()) {
+                    Text(
+                        text = "📋 交易明细核对 (${reconciliationData!!.transactions.size})",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate800,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                    reconciliationData!!.transactions.take(15).forEach { tx ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.White)
+                                .border(1.dp, Slate100, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Checkbox(
+                                    checked = tx.isReconciled,
+                                    onCheckedChange = { isChecked ->
+                                        scope.launch {
+                                            NativeLedgerApi.toggleTransactionReconciled(context, tx.id, isChecked)
+                                            loadData()
+                                        }
+                                    },
+                                    colors = CheckboxDefaults.colors(checkedColor = PrimaryTeal),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "${tx.category} ${if (tx.note.isNotBlank()) "- " + tx.note else ""}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Slate800,
+                                        maxLines = 1
+                                    )
+                                    Text(text = tx.date, fontSize = 10.sp, color = Slate400)
+                                }
+                            }
+                            Text(
+                                text = (if (tx.type == "expense") "-" else "+") + String.format(Locale.US, "%.2f", tx.amount),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (tx.type == "expense") ExpenseRed else IncomeGreen
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val targetBal = statementBalanceStr.toDoubleOrNull()
+                    if (targetBal == null) {
+                        Toast.makeText(context, "请输入有效的对账单金额", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    isSubmitting = true
+                    scope.launch {
+                        val res = NativeLedgerApi.reconcileAccount(
+                            context = context,
+                            accountId = account.id,
+                            statementBalance = targetBal,
+                            autoAdjust = autoAdjust,
+                            note = note
+                        )
+                        isSubmitting = false
+                        res.onSuccess {
+                            val finalBal = it.optDouble("final_balance", targetBal)
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.reconcile_success, "${account.currency} ${String.format(Locale.US, "%.2f", finalBal)}"),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            onSuccess()
+                        }.onFailure {
+                            Toast.makeText(context, "对账失败：${it.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                enabled = !isSubmitting,
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
+                Text(stringResource(R.string.confirm_reconcile), fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
                 Text(stringResource(R.string.common_cancel), color = Slate500)
             }
         }

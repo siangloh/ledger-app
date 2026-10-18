@@ -718,7 +718,8 @@ def get_native_accounts_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
         return dict(_ACCOUNTS_CACHE[cache_key])
 
     acc_rows = db.execute('''
-        SELECT id, name, type, credit_limit, currency, statement_day, due_day, is_active, created_at
+        SELECT id, name, type, credit_limit, currency, statement_day, due_day, is_active, created_at,
+               last_reconciled_at, reconciled_balance
         FROM accounts
         WHERE user_id = ? AND is_active = 1
         ORDER BY type ASC, id ASC
@@ -733,7 +734,8 @@ def get_native_accounts_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
         SELECT
             account_id,
             COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0.0 END), 0.0) AS income_sum,
-            COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0.0 END), 0.0) AS expense_sum
+            COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0.0 END), 0.0) AS expense_sum,
+            COALESCE(SUM(CASE WHEN is_reconciled = 0 OR is_reconciled IS NULL THEN 1 ELSE 0 END), 0) AS unreconciled_count
         FROM transactions
         WHERE user_id = ? AND account_id IS NOT NULL AND deleted_at IS NULL
         GROUP BY account_id
@@ -769,7 +771,10 @@ def get_native_accounts_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
             'credit_limit': credit_limit,
             'currency': a['currency'] or 'MYR',
             'statement_day': a['statement_day'],
-            'due_day': a['due_day']
+            'due_day': a['due_day'],
+            'last_reconciled_at': a['last_reconciled_at'],
+            'reconciled_balance': a['reconciled_balance'],
+            'unreconciled_count': int(flow['unreconciled_count']) if flow else 0
         })
 
     net_worth = round(total_assets - total_liabilities, 2)

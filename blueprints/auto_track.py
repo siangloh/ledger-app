@@ -42,6 +42,11 @@ from services.native_api_service import (
     empty_native_recycle_bin,
     undo_native_operation
 )
+from services.reconciliation_service import (
+    get_account_reconciliation_details,
+    reconcile_account,
+    toggle_transaction_reconciled
+)
 
 auto_track_bp = Blueprint('auto_track', __name__)
 
@@ -1262,5 +1267,66 @@ def api_native_records_undo(snapshot_id: int):
     res = undo_native_operation(user_id=user_id, snapshot_id=snapshot_id, db=db)
     status_code = 200 if res.get('ok') else 400
     return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/accounts/<int:acc_id>/reconciliation', methods=['GET'], endpoint='api_native_account_reconciliation')
+@csrf.exempt
+def api_native_account_reconciliation(acc_id: int):
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+    limit = request.args.get('limit', 50, type=int)
+    res = get_account_reconciliation_details(account_id=acc_id, user_id=user_id, db=db, limit=limit)
+    status_code = 200 if res.get('ok') else 404
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/accounts/<int:acc_id>/reconcile', methods=['POST'], endpoint='api_native_account_reconcile')
+@csrf.exempt
+def api_native_account_reconcile(acc_id: int):
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    data = request.get_json(silent=True) or request.form
+    try:
+        statement_balance = float(data.get('statement_balance', 0.0))
+    except (ValueError, TypeError):
+        return jsonify({'ok': False, 'message': '对账单余额格式不正确'}), 400
+
+    auto_adjust = data.get('auto_adjust') in (True, 'true', '1', 1)
+    note = (data.get('note') or '').strip()
+
+    res = reconcile_account(
+        account_id=acc_id,
+        user_id=user_id,
+        statement_balance=statement_balance,
+        auto_adjust=auto_adjust,
+        note=note,
+        db=db
+    )
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/transactions/<int:tx_id>/toggle-reconciled', methods=['POST'], endpoint='api_native_toggle_reconciled')
+@csrf.exempt
+def api_native_toggle_reconciled(tx_id: int):
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    data = request.get_json(silent=True) or request.form
+    is_rec = data.get('is_reconciled')
+    if is_rec is not None:
+        is_rec = is_rec in (True, 'true', '1', 1)
+
+    res = toggle_transaction_reconciled(tx_id=tx_id, user_id=user_id, db=db, is_reconciled=is_rec)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
 
 

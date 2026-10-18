@@ -12,6 +12,12 @@ from liabilities_tracker import (
     add_months_clamped,
     generate_amortization_schedule
 )
+from services.reconciliation_service import (
+    get_account_reconciliation_details,
+    toggle_transaction_reconciled,
+    batch_set_transactions_reconciled,
+    reconcile_account
+)
 
 logger = logging.getLogger(__name__)
 
@@ -284,6 +290,29 @@ def accounts_page():
         (user_id,)
     ).fetchall()
     accounts = [dict(r) for r in rows]
+
+    flow_rows = db.execute('''
+        SELECT
+            account_id,
+            COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0.0 END), 0.0) AS income_sum,
+            COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0.0 END), 0.0) AS expense_sum,
+            COALESCE(SUM(CASE WHEN is_reconciled = 0 OR is_reconciled IS NULL THEN 1 ELSE 0 END), 0) AS unreconciled_count
+        FROM transactions
+        WHERE user_id = ? AND account_id IS NOT NULL AND deleted_at IS NULL
+        GROUP BY account_id
+    ''', (str(user_id),)).fetchall()
+    flow_map = {r['account_id']: r for r in flow_rows}
+
+    for a in accounts:
+        flow = flow_map.get(a['id'])
+        inc = float(flow['income_sum']) if flow else 0.0
+        exp = float(flow['expense_sum']) if flow else 0.0
+        if a['type'] == 'credit_card':
+            a['system_balance'] = round(max(0.0, exp - inc), 2)
+        else:
+            a['system_balance'] = round(inc - exp, 2)
+        a['unreconciled_count'] = int(flow['unreconciled_count']) if flow else 0
+
     return render_template(
         'accounts.html',
         accounts=accounts,
@@ -396,4 +425,83 @@ def manage_delete_account(acc_id):
     db.commit()
     flash(t('accounts.account_deleted_fmt', '账户「{name}」已删除', name=row["name"]), 'success')
     return redirect(url_for('accounts_page'))
+
+
+# -----------------------------------------------------------------------------
+# 账户对账与余额校准路由 (Account Reconciliation Routes)
+# -----------------------------------------------------------------------------
+
+@liabilities_bp.route('/api/accounts/<int:acc_id>/reconciliation', methods=['GET'], endpoint='api_account_reconciliation')
+def api_account_reconciliation(acc_id):
+    user_id = get_current_user_id()
+    db = get_db()
+    limit = request.args.get('limit', 50, type=int)
+    res = get_account_reconciliation_details(account_id=acc_id, user_id=user_id, db=db, limit=limit)
+    status_code = 200 if res.get('ok') else 404
+    return jsonify(res), status_code
+
+
+@liabilities_bp.route('/api/accounts/<int:acc_id>/reconcile', methods=['POST'], endpoint='api_account_reconcile')
+def api_account_reconcile(acc_id):
+    user_id = get_current_user_id()
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+
+    try:
+        statement_balance = float(data.get('statement_balance', 0.0))
+    except (ValueError, TypeError):
+        return jsonify({'ok': False, 'message': t('reconciliation.invalid_balance', '对账单余额格式不正确')}), 400
+
+    auto_adjust = data.get('auto_adjust') in (True, 'true', '1', 1)
+    note = (data.get('note') or '').strip()
+
+    res = reconcile_account(
+        account_id=acc_id,
+        user_id=user_id,
+        statement_balance=statement_balance,
+        auto_adjust=auto_adjust,
+        note=note,
+        db=db
+    )
+    if is_ajax_request() or request.is_json:
+        status_code = 200 if res.get('ok') else 400
+        return jsonify(res), status_code
+
+    if res.get('ok'):
+        flash(t('reconciliation.success_fmt', '账户对账成功！当前账面余额: {balance}', balance=res.get('final_balance')), 'success')
+    else:
+        flash(res.get('message', t('common.error', '操作失败')), 'error')
+    return redirect(url_for('accounts_page'))
+
+
+@liabilities_bp.route('/api/transactions/<int:tx_id>/toggle-reconciled', methods=['POST'], endpoint='api_toggle_reconciled')
+def api_toggle_reconciled(tx_id):
+    user_id = get_current_user_id()
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+    is_rec = data.get('is_reconciled')
+    if is_rec is not None:
+        is_rec = is_rec in (True, 'true', '1', 1)
+
+    res = toggle_transaction_reconciled(tx_id=tx_id, user_id=user_id, db=db, is_reconciled=is_rec)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@liabilities_bp.route('/api/accounts/<int:acc_id>/batch-reconcile-transactions', methods=['POST'], endpoint='api_batch_reconcile_transactions')
+def api_batch_reconcile_transactions(acc_id):
+    user_id = get_current_user_id()
+    db = get_db()
+    data = request.get_json(silent=True) or {}
+    tx_ids = data.get('tx_ids', [])
+    if not isinstance(tx_ids, list):
+        return jsonify({'ok': False, 'message': 'tx_ids 必须是列表'}), 400
+
+    is_rec = data.get('is_reconciled', True)
+    is_rec = is_rec in (True, 'true', '1', 1)
+
+    res = batch_set_transactions_reconciled(tx_ids=tx_ids, user_id=user_id, db=db, is_reconciled=is_rec)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
 

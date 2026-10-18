@@ -41,7 +41,40 @@ data class AccountRecord(
     val creditLimit: Double,
     val currency: String,
     val statementDay: Int?,
-    val dueDay: Int?
+    val dueDay: Int?,
+    val lastReconciledAt: String? = null,
+    val reconciledBalance: Double? = null,
+    val unreconciledCount: Int = 0
+)
+
+data class ReconcileTxItem(
+    val id: Int,
+    val date: String,
+    val type: String,
+    val category: String,
+    val amount: Double,
+    val note: String,
+    val isReconciled: Boolean
+)
+
+data class ReconcileHistoryItem(
+    val id: Int,
+    val statementBalance: Double,
+    val systemBalance: Double,
+    val discrepancy: Double,
+    val reconciledAt: String,
+    val note: String
+)
+
+data class AccountReconciliationData(
+    val accountId: Int,
+    val accountName: String,
+    val accountType: String,
+    val currency: String,
+    val systemBalance: Double,
+    val unreconciledCount: Int,
+    val transactions: List<ReconcileTxItem>,
+    val history: List<ReconcileHistoryItem>
 )
 
 data class AccountsSummary(
@@ -421,7 +454,10 @@ object NativeLedgerApi {
                     creditLimit = obj.optDouble("credit_limit", 0.0),
                     currency = obj.optString("currency", "MYR"),
                     statementDay = if (obj.has("statement_day") && !obj.isNull("statement_day")) obj.optInt("statement_day") else null,
-                    dueDay = if (obj.has("due_day") && !obj.isNull("due_day")) obj.optInt("due_day") else null
+                    dueDay = if (obj.has("due_day") && !obj.isNull("due_day")) obj.optInt("due_day") else null,
+                    lastReconciledAt = if (obj.has("last_reconciled_at") && !obj.isNull("last_reconciled_at")) obj.optString("last_reconciled_at") else null,
+                    reconciledBalance = if (obj.has("reconciled_balance") && !obj.isNull("reconciled_balance")) obj.optDouble("reconciled_balance") else null,
+                    unreconciledCount = obj.optInt("unreconciled_count", 0)
                 )
             )
         }
@@ -704,6 +740,144 @@ object NativeLedgerApi {
             }
         } catch (e: Exception) {
             Log.e(TAG, "quickCategorize error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getAccountReconciliation(context: Context, accountId: Int): Result<AccountReconciliationData> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/accounts/$accountId/reconciliation" +
+                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "GET")
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                val accObj = json.optJSONObject("account") ?: JSONObject()
+                val txArr = json.optJSONArray("transactions") ?: JSONArray()
+                val txList = mutableListOf<ReconcileTxItem>()
+                for (i in 0 until txArr.length()) {
+                    val t = txArr.getJSONObject(i)
+                    txList.add(ReconcileTxItem(
+                        id = t.optInt("id"),
+                        date = t.optString("date"),
+                        type = t.optString("type"),
+                        category = t.optString("category"),
+                        amount = t.optDouble("amount", 0.0),
+                        note = t.optString("note"),
+                        isReconciled = t.optInt("is_reconciled", 0) == 1
+                    ))
+                }
+                val histArr = json.optJSONArray("history") ?: JSONArray()
+                val histList = mutableListOf<ReconcileHistoryItem>()
+                for (i in 0 until histArr.length()) {
+                    val h = histArr.getJSONObject(i)
+                    histList.add(ReconcileHistoryItem(
+                        id = h.optInt("id"),
+                        statementBalance = h.optDouble("statement_balance", 0.0),
+                        systemBalance = h.optDouble("system_balance", 0.0),
+                        discrepancy = h.optDouble("discrepancy", 0.0),
+                        reconciledAt = h.optString("reconciled_at"),
+                        note = h.optString("note")
+                    ))
+                }
+
+                Result.success(AccountReconciliationData(
+                    accountId = accObj.optInt("account_id", accountId),
+                    accountName = accObj.optString("account_name"),
+                    accountType = accObj.optString("account_type", "savings"),
+                    currency = accObj.optString("currency", "MYR"),
+                    systemBalance = accObj.optDouble("system_balance", 0.0),
+                    unreconciledCount = json.optInt("unreconciled_count", 0),
+                    transactions = txList,
+                    history = histList
+                ))
+            } else {
+                Result.failure(Exception(json.optString("message", "获取对账数据失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getAccountReconciliation error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun reconcileAccount(
+        context: Context,
+        accountId: Int,
+        statementBalance: Double,
+        autoAdjust: Boolean,
+        note: String
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/accounts/$accountId/reconcile" +
+                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "POST")
+            val payload = JSONObject().apply {
+                put("statement_balance", statementBalance)
+                put("auto_adjust", autoAdjust)
+                put("note", note)
+            }.toString()
+
+            OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                it.write(payload)
+                it.flush()
+            }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                cachedAccounts = null // Invalidate cached accounts
+                Result.success(json)
+            } else {
+                Result.failure(Exception(json.optString("message", "对账操作失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "reconcileAccount error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun toggleTransactionReconciled(
+        context: Context,
+        txId: Int,
+        isReconciled: Boolean
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/transactions/$txId/toggle-reconciled" +
+                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "POST")
+            val payload = JSONObject().apply {
+                put("is_reconciled", isReconciled)
+            }.toString()
+
+            OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                it.write(payload)
+                it.flush()
+            }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                Result.success(json)
+            } else {
+                Result.failure(Exception(json.optString("message", "更新对账状态失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "toggleTransactionReconciled error: ${e.message}", e)
             Result.failure(e)
         }
     }

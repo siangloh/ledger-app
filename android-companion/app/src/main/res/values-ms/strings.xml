@@ -229,4 +229,18 @@
     <string name="recycle_bin_empty_desc">Tiada rekod transaksi dipadam ditemui</string>
     <string name="recycle_bin_confirm_empty">Adakah anda pasti mahu mengosongkan tong kitar semula? Ini tidak boleh dibatalkan!</string>
     <string name="recycle_bin_confirm_delete">Adakah anda pasti mahu memadam kekal rekod ini? Ini tidak boleh dibatalkan!</string>
+
+    <!-- Penyesuaian Baki & Akaun -->
+    <string name="reconcile_title">Penyesuaian Baki Akaun</string>
+    <string name="reconcile_btn">Selaras</string>
+    <string name="reconciled_badge">Diselaraskan</string>
+    <string name="unreconciled_badge">Belum Diselaras (%1$d)</string>
+    <string name="statement_balance_label">Baki Sebenar Penyata / Bank</string>
+    <string name="statement_balance_hint">Masukkan baki sebenar</string>
+    <string name="discrepancy_label">Perbezaan Kiraan</string>
+    <string name="balanced_status">✅ Imbang (Tiada Perbezaan)</string>
+    <string name="auto_adjust_label">Cipta transaksi pelarasan baki automatik</string>
+    <string name="reconcile_note_hint">Nota penyesuaian (pilihan)</string>
+    <string name="confirm_reconcile">Sahkan &amp; Selaraskan</string>
+    <string name="reconcile_success">Akaun berjaya diselaraskan! Baki semasa: %1$s</string>
 </resources>

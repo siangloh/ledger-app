@@ -64,7 +64,18 @@
       <div class="acc-icon {{ a.type }}">{{ type_icons.get(a.type, '📂') }}</div>
       <div class="acc-meta">
         <div class="acc-name" title="{{ a.name }}">{{ a.name }}</div>
-        <span class="acc-type-badge badge-{{ a.type }}">{{ type_labels.get(a.type, a.type) }}</span>
+        <div class="acc-badge-row">
+          <span class="acc-type-badge badge-{{ a.type }}">{{ type_labels.get(a.type, a.type) }}</span>
+          {% if a.last_reconciled_at %}
+          <span class="acc-rec-badge rec-done" title="{{ t('accounts.last_reconciled', time=a.last_reconciled_at) }}">
+            ✓ {{ t('accounts.reconciled_badge') }}
+          </span>
+          {% else %}
+          <span class="acc-rec-badge rec-pending">
+            ⚖️ {{ t('accounts.unreconciled_badge', count=a.unreconciled_count|default(0)) }}
+          </span>
+          {% endif %}
+        </div>
       </div>
     </div>
     <div class="acc-details">
@@ -91,12 +102,22 @@
         <span class="acc-detail-val">{{ type_labels.get(a.type, a.type) }}</span>
       </div>
       {% endif %}
+      <div class="acc-detail-item acc-balance-highlight">
+        <span class="acc-detail-label">{% if a.type == 'credit_card' %}{{ t('accounts.credit_card_balance') }}{% else %}{{ t('accounts.system_balance') }}{% endif %}</span>
+        <span class="acc-detail-val acc-balance-val {% if a.type != 'credit_card' and a.system_balance < 0 %}negative{% endif %}">
+          {{ "%.2f" | format(a.system_balance|default(0.0)) }} {{ a.currency or current_user_currency_code|default('MYR') }}
+        </span>
+      </div>
     </div>
     <div class="acc-links-row">
       <span class="acc-link-chip {% if a.sub_count %}has-links{% endif %}">🔄 {{ a.sub_count or 0 }} {{ t('nav.subscriptions') }}</span>
       <span class="acc-link-chip {% if a.install_count %}has-links{% endif %}">📦 {{ a.install_count or 0 }} {{ t('nav.liabilities') }}</span>
     </div>
     <div class="acc-actions">
+      <button class="btn-acc-action btn-acc-reconcile"
+        onclick="openReconcileModal({{ a.id }}, '{{ a.name|e }}', '{{ a.type }}', '{{ a.currency or current_user_currency_code|default('MYR') }}', {{ a.system_balance|default(0.0) }})">
+        ⚖️ {{ t('accounts.reconcile') }}
+      </button>
       <button class="btn-acc-action btn-acc-edit"
         onclick="openEditModal({{ a.id }}, '{{ a.name|e }}', '{{ a.type }}', '{{ a.currency or current_user_currency_code|default('MYR') }}', {{ a.credit_limit or 0 }}, {{ a.statement_day if a.statement_day else 'null' }}, {{ a.due_day if a.due_day else 'null' }}, {{ a.grace_period_days or 20 }})">
         ✏️ {{ t('common.edit') }}
@@ -256,6 +277,82 @@
   </div>
 </div>
 
+<!-- RECONCILE MODAL -->
+<div class="acc-modal-overlay" id="reconcileModalOverlay" role="dialog" aria-modal="true" style="display:none;">
+  <div class="acc-modal reconcile-modal">
+    <div class="reconcile-modal-header">
+      <div>
+        <h2 style="margin:0 0 4px;">⚖️ {{ t('reconciliation.modal_title') }}</h2>
+        <div class="rec-sub-info">
+          <span id="recAccountName" class="rec-acc-name"></span>
+          <span id="recAccountTypeBadge" class="acc-type-badge"></span>
+        </div>
+      </div>
+      <button type="button" class="btn-close-modal" onclick="closeReconcileModal()">&times;</button>
+    </div>
+
+    <!-- BALANCE COMPARISON CARD -->
+    <div class="rec-comparison-box">
+      <div class="rec-comp-col">
+        <span class="rec-comp-label">{{ t('accounts.system_balance') }}</span>
+        <span class="rec-comp-val" id="recSystemBalanceText">0.00</span>
+      </div>
+      <div class="rec-comp-divider">⟷</div>
+      <div class="rec-comp-col">
+        <span class="rec-comp-label">{{ t('reconciliation.statement_balance_label') }}</span>
+        <input type="number" step="0.01" id="recStatementBalance" class="rec-input-balance" placeholder="0.00" oninput="updateDiscrepancyPreview()">
+      </div>
+    </div>
+
+    <!-- DISCREPANCY STATUS -->
+    <div class="rec-discrepancy-card balanced" id="recDiscrepancyCard">
+      <div class="rec-disc-top">
+        <span class="rec-disc-label">{{ t('reconciliation.discrepancy_label') }}:</span>
+        <span class="rec-disc-val" id="recDiscrepancyVal">0.00</span>
+      </div>
+      <div class="rec-disc-desc" id="recDiscrepancyDesc">{{ t('reconciliation.balanced_badge') }}</div>
+    </div>
+
+    <!-- AUTO ADJUST & NOTE -->
+    <div class="rec-form-section">
+      <label class="rec-checkbox-label">
+        <input type="checkbox" id="recAutoAdjust" checked>
+        <span>{{ t('reconciliation.auto_adjust_label') }}</span>
+      </label>
+      <div class="acc-form-group" style="margin-top:10px;">
+        <label for="recNote">{{ t('reconciliation.note_label') }}</label>
+        <input type="text" id="recNote" placeholder="例如：2026年10月银行对账单校准">
+      </div>
+    </div>
+
+    <!-- TRANSACTION CHECKLIST -->
+    <div class="rec-transactions-section">
+      <div class="rec-tx-header">
+        <span class="rec-tx-title">📋 {{ t('reconciliation.tx_checklist_title') }} (<span id="recTxCount">0</span>)</span>
+        <button type="button" class="btn-rec-batch" onclick="batchToggleReconcileAll(true)">全部标记对账</button>
+      </div>
+      <div class="rec-tx-list" id="recTxList">
+        <div class="rec-tx-loading">加载流水明细中...</div>
+      </div>
+    </div>
+
+    <!-- AUDIT LOG HISTORY -->
+    <div class="rec-history-section">
+      <div class="rec-history-title">📜 {{ t('reconciliation.history_title') }}</div>
+      <div class="rec-history-list" id="recHistoryList">
+        <div class="rec-history-empty">暂无历史对账记录</div>
+      </div>
+    </div>
+
+    <div class="acc-modal-footer">
+      <button type="button" class="btn-cancel-modal" onclick="closeReconcileModal()">{{ t('common.cancel') }}</button>
+      <button type="button" class="btn-save-acc btn-confirm-reconcile" id="btnConfirmReconcile" onclick="submitReconciliation()">
+        {{ t('reconciliation.confirm_btn') }}
+      </button>
+    </div>
+  </div>
+</div>
+
 <form method="POST" id="deleteAccountForm" style="display:none;">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 </form>
@@ -291,7 +388,7 @@ window.closeEditModal = function () {
   }
 };
 
-['addModalOverlay','editModalOverlay'].forEach(id => {
+['addModalOverlay','editModalOverlay','reconcileModalOverlay'].forEach(id => {
   const overlay = document.getElementById(id);
   if (overlay) {
     overlay.addEventListener('click', function(e){
@@ -371,6 +468,259 @@ window.confirmDelete = function (id, name, subCount, installCount) {
       form.submit();
     }
   }
+};
+
+let currentReconcileAccId = null;
+let currentReconcileAccType = 'savings';
+let currentReconcileCurrency = 'MYR';
+let currentSystemBalance = 0.0;
+let currentAccountTxList = [];
+
+window.openReconcileModal = function (accId, name, type, currency, systemBalance) {
+  currentReconcileAccId = accId;
+  currentReconcileAccType = type;
+  currentReconcileCurrency = currency;
+  currentSystemBalance = parseFloat(systemBalance) || 0.0;
+
+  const modal = document.getElementById('reconcileModalOverlay');
+  if (!modal) return;
+
+  document.getElementById('recAccountName').textContent = name;
+  const badge = document.getElementById('recAccountTypeBadge');
+  badge.textContent = type;
+  badge.className = 'acc-type-badge badge-' + type;
+
+  document.getElementById('recSystemBalanceText').textContent = currency + ' ' + currentSystemBalance.toFixed(2);
+  const stInput = document.getElementById('recStatementBalance');
+  stInput.value = currentSystemBalance.toFixed(2);
+  document.getElementById('recNote').value = '';
+  document.getElementById('recAutoAdjust').checked = true;
+
+  updateDiscrepancyPreview();
+
+  modal.style.display = 'flex';
+  modal.classList.add('open');
+
+  loadReconciliationData(accId);
+};
+
+window.closeReconcileModal = function () {
+  const modal = document.getElementById('reconcileModalOverlay');
+  if (modal) {
+    modal.classList.remove('open');
+    modal.style.display = 'none';
+  }
+};
+
+window.updateDiscrepancyPreview = function () {
+  const stInput = document.getElementById('recStatementBalance');
+  const targetVal = parseFloat(stInput.value) || 0.0;
+  const card = document.getElementById('recDiscrepancyCard');
+  const valEl = document.getElementById('recDiscrepancyVal');
+  const descEl = document.getElementById('recDiscrepancyDesc');
+
+  const diff = Math.round((targetVal - currentSystemBalance) * 100) / 100;
+  valEl.textContent = (diff > 0 ? '+' : '') + diff.toFixed(2) + ' ' + currentReconcileCurrency;
+
+  if (Math.abs(diff) < 0.005) {
+    card.className = 'rec-discrepancy-card balanced';
+    descEl.textContent = '✅ 平账无差额：对账单金额与账面系统完全吻合';
+  } else {
+    card.className = 'rec-discrepancy-card has-diff';
+    if (currentReconcileAccType === 'credit_card') {
+      if (diff > 0) {
+        descEl.textContent = '⚠️ 账单欠款高于系统账面，差额 ' + diff.toFixed(2) + ' 将自动补录为未记账支出';
+      } else {
+        descEl.textContent = 'ℹ️ 账单欠款低于系统账面，差额 ' + Math.abs(diff).toFixed(2) + ' 将自动补录为还款/收入';
+      }
+    } else {
+      if (diff > 0) {
+        descEl.textContent = 'ℹ️ 银行实际结余高于系统账面，差额 ' + diff.toFixed(2) + ' 将自动补录为未记账收入';
+      } else {
+        descEl.textContent = '⚠️ 银行实际结余低于系统账面，差额 ' + Math.abs(diff).toFixed(2) + ' 将自动补录为未记账支出';
+      }
+    }
+  }
+};
+
+function loadReconciliationData(accId) {
+  const txListEl = document.getElementById('recTxList');
+  const histListEl = document.getElementById('recHistoryList');
+  txListEl.innerHTML = '<div class="rec-tx-loading">加载流水明细中...</div>';
+
+  fetch('/api/accounts/' + accId + '/reconciliation', {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (!data.ok) {
+      txListEl.innerHTML = '<div class="rec-tx-loading" style="color:#ef4444">加载失败</div>';
+      return;
+    }
+    currentAccountTxList = data.transactions || [];
+    document.getElementById('recTxCount').textContent = currentAccountTxList.length;
+
+    renderTxList(currentAccountTxList);
+    renderHistoryList(data.history || []);
+  })
+  .catch(err => {
+    txListEl.innerHTML = '<div class="rec-tx-loading" style="color:#ef4444">网络错误</div>';
+  });
+}
+
+function renderTxList(txs) {
+  const el = document.getElementById('recTxList');
+  if (!txs || txs.length === 0) {
+    el.innerHTML = '<div class="rec-history-empty">该账户下暂无交易流水</div>';
+    return;
+  }
+  let html = '';
+  txs.forEach(t => {
+    const isChecked = t.is_reconciled === 1 ? 'checked' : '';
+    const amtClass = t.type === 'expense' ? 'expense' : 'income';
+    const sign = t.type === 'expense' ? '-' : '+';
+    html += `
+      <div class="rec-tx-item">
+        <div class="rec-tx-left">
+          <input type="checkbox" class="rec-tx-check" ${isChecked} onchange="toggleTxReconciled(${t.id}, this.checked)">
+          <div>
+            <div class="rec-tx-desc">${t.category} - ${t.note || '无备注'}</div>
+            <div class="rec-tx-date">${t.date}</div>
+          </div>
+        </div>
+        <div class="rec-tx-right">
+          <span class="rec-tx-amt ${amtClass}">${sign}${t.amount.toFixed(2)}</span>
+        </div>
+      </div>
+    `;
+  });
+  el.innerHTML = html;
+}
+
+function renderHistoryList(history) {
+  const el = document.getElementById('recHistoryList');
+  if (!history || history.length === 0) {
+    el.innerHTML = '<div class="rec-history-empty">暂无历史对账记录</div>';
+    return;
+  }
+  let html = '';
+  history.forEach(h => {
+    const diffSign = h.discrepancy > 0 ? '+' : '';
+    html += `
+      <div class="rec-hist-item">
+        <div>
+          <span style="font-weight:600">${h.reconciled_at}</span>
+          ${h.note ? `<span class="rec-hist-date"> - ${h.note}</span>` : ''}
+        </div>
+        <div>
+          <span>对账单: ${h.statement_balance.toFixed(2)}</span>
+          <span class="rec-hist-diff" style="margin-left:8px;color:${Math.abs(h.discrepancy) < 0.005 ? '#10B981' : '#F59E0B'}">
+            差额: ${diffSign}${h.discrepancy.toFixed(2)}
+          </span>
+        </div>
+      </div>
+    `;
+  });
+  el.innerHTML = html;
+}
+
+window.toggleTxReconciled = function(txId, isChecked) {
+  fetch('/api/transactions/' + txId + '/toggle-reconciled', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({ is_reconciled: isChecked })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (!data.ok) {
+      if (typeof Swal !== 'undefined') Swal.fire('错误', data.message || '更新对账状态失败', 'error');
+    }
+  });
+};
+
+window.batchToggleReconcileAll = function(isChecked) {
+  if (!currentAccountTxList.length) return;
+  const ids = currentAccountTxList.map(t => t.id);
+  fetch('/api/accounts/' + currentReconcileAccId + '/batch-reconcile-transactions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({ tx_ids: ids, is_reconciled: isChecked })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      document.querySelectorAll('.rec-tx-check').forEach(cb => cb.checked = isChecked);
+    }
+  });
+};
+
+window.submitReconciliation = function () {
+  if (!currentReconcileAccId) return;
+  const stInput = document.getElementById('recStatementBalance');
+  const statementBalance = parseFloat(stInput.value);
+  if (isNaN(statementBalance)) {
+    if (typeof Swal !== 'undefined') Swal.fire('提示', '请输入合法的对账单金额', 'warning');
+    return;
+  }
+  const autoAdjust = document.getElementById('recAutoAdjust').checked;
+  const note = document.getElementById('recNote').value.trim();
+
+  const btn = document.getElementById('btnConfirmReconcile');
+  btn.disabled = true;
+  btn.textContent = '提交核对中...';
+
+  fetch('/api/accounts/' + currentReconcileAccId + '/reconcile', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({
+      statement_balance: statementBalance,
+      auto_adjust: autoAdjust,
+      note: note
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    btn.disabled = false;
+    btn.textContent = '确认并完成对账';
+    if (data.ok) {
+      if (typeof Swal !== 'undefined') {
+        Swal.fire({
+          icon: 'success',
+          title: '对账成功',
+          text: '当前核准余额：' + data.final_balance.toFixed(2) + (data.adjustment_tx_id ? '（已生成自动平账调整流水）' : ''),
+          timer: 1600,
+          showConfirmButton: false
+        }).then(() => {
+          window.location.reload();
+        });
+      } else {
+        alert('对账成功！当前余额：' + data.final_balance.toFixed(2));
+        window.location.reload();
+      }
+    } else {
+      if (typeof Swal !== 'undefined') {
+        Swal.fire('失败', data.message || '对账操作失败', 'error');
+      } else {
+        alert(data.message || '操作失败');
+      }
+    }
+  })
+  .catch(err => {
+    btn.disabled = false;
+    btn.textContent = '确认并完成对账';
+    if (typeof Swal !== 'undefined') {
+      Swal.fire('网络异常', '请稍后重试', 'error');
+    }
+  });
 };
 </script>
 {% endblock %}

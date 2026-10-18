@@ -4654,6 +4654,68 @@ html[data-theme="dark"] {
 }
 
 /* ==========================================================================
+   Account Reconciliation Styles (账户对账与余额校准)
+   ========================================================================== */
+.acc-badge-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.acc-rec-badge { font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; }
+.acc-rec-badge.rec-done { background: rgba(16, 185, 129, 0.12); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.25); }
+.acc-rec-badge.rec-pending { background: rgba(245, 158, 11, 0.12); color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.25); }
+.acc-balance-highlight { grid-column: 1 / -1; background: rgba(15, 118, 110, 0.05); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(15, 118, 110, 0.15); margin: 4px 0; }
+.acc-balance-val { font-size: 16px; font-weight: 700; color: #0F766E; }
+.acc-balance-val.negative { color: #EF4444; }
+.btn-acc-reconcile { border-color: rgba(15, 118, 110, 0.35); color: #0F766E; font-weight: 600; }
+.btn-acc-reconcile:hover { background: rgba(15, 118, 110, 0.12); }
+
+.reconcile-modal { max-width: 620px; }
+.reconcile-modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; border-bottom: 1px solid var(--acc-border); padding-bottom: 12px; }
+.rec-sub-info { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.rec-acc-name { font-size: 14px; color: var(--ink); font-weight: 600; }
+.btn-close-modal { background: none; border: none; font-size: 24px; color: var(--muted); cursor: pointer; padding: 0 4px; line-height: 1; }
+.btn-close-modal:hover { color: var(--ink); }
+
+.rec-comparison-box { display: flex; align-items: center; justify-content: space-between; background: rgba(0, 0, 0, 0.04); border: 1px solid var(--acc-border); border-radius: 12px; padding: 14px 18px; gap: 14px; margin-bottom: 14px; }
+.rec-comp-col { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.rec-comp-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.rec-comp-val { font-size: 20px; font-weight: 700; color: #0F766E; }
+.rec-comp-divider { font-size: 20px; color: var(--muted); }
+.rec-input-balance { font-size: 18px; font-weight: 700; padding: 6px 10px; border-radius: 8px; border: 1.5px solid var(--primary, #0F766E); background: var(--surface); color: var(--ink); width: 100%; box-sizing: border-box; }
+
+.rec-discrepancy-card { border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; transition: all 0.2s ease; border: 1px solid var(--acc-border); }
+.rec-discrepancy-card.balanced { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: #10B981; }
+.rec-discrepancy-card.has-diff { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3); color: #F59E0B; }
+.rec-disc-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; }
+.rec-disc-val { font-size: 16px; font-weight: 700; }
+.rec-disc-desc { font-size: 12px; margin-top: 4px; }
+
+.rec-form-section { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--acc-border); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+.rec-checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--ink); cursor: pointer; }
+.rec-checkbox-label input { width: 16px; height: 16px; accent-color: #0F766E; }
+
+.rec-transactions-section, .rec-history-section { margin-bottom: 14px; }
+.rec-tx-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.rec-tx-title, .rec-history-title { font-size: 13px; font-weight: 700; color: var(--ink); }
+.btn-rec-batch { font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--acc-border); background: transparent; color: var(--primary, #0F766E); cursor: pointer; }
+.btn-rec-batch:hover { background: rgba(15, 118, 110, 0.08); }
+
+.rec-tx-list, .rec-history-list { max-height: 160px; overflow-y: auto; border: 1px solid var(--acc-border); border-radius: 8px; background: rgba(0, 0, 0, 0.02); }
+.rec-tx-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); font-size: 12px; }
+.rec-tx-item:last-child { border-bottom: none; }
+.rec-tx-left { display: flex; align-items: center; gap: 8px; }
+.rec-tx-check { accent-color: #0F766E; width: 15px; height: 15px; cursor: pointer; }
+.rec-tx-date { color: var(--muted); font-size: 11px; }
+.rec-tx-desc { font-weight: 500; color: var(--ink); }
+.rec-tx-right { text-align: right; }
+.rec-tx-amt { font-weight: 700; }
+.rec-tx-amt.expense { color: #EF4444; }
+.rec-tx-amt.income { color: #10B981; }
+
+.rec-hist-item { display: flex; justify-content: space-between; padding: 6px 12px; font-size: 11px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+.rec-hist-item:last-child { border-bottom: none; }
+.rec-hist-date { color: var(--muted); }
+.rec-hist-diff { font-weight: 600; }
+.rec-tx-loading, .rec-history-empty { padding: 16px; text-align: center; color: var(--muted); font-size: 12px; }
+
+/* ==========================================================================
    Privacy Masking Mode (金额隐私遮罩模式)
    ========================================================================== */
 .nav-privacy-btn {

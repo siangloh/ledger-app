@@ -229,4 +229,18 @@
     <string name="recycle_bin_empty_desc">暂无已删除的交易记录</string>
     <string name="recycle_bin_confirm_empty">确定要清空回收站吗？此操作无法撤销！</string>
     <string name="recycle_bin_confirm_delete">确定要彻底删除此记录吗？此操作无法撤销！</string>
+
+    <!-- 账户对账与余额校准 -->
+    <string name="reconcile_title">账户对账校准</string>
+    <string name="reconcile_btn">对账</string>
+    <string name="reconciled_badge">已对账</string>
+    <string name="unreconciled_badge">待对账 (%1$d)</string>
+    <string name="statement_balance_label">对账单/银行实际余额</string>
+    <string name="statement_balance_hint">输入实际结余</string>
+    <string name="discrepancy_label">核算差额</string>
+    <string name="balanced_status">✅ 平账无差额</string>
+    <string name="auto_adjust_label">自动生成平账调整交易补齐差额</string>
+    <string name="reconcile_note_hint">对账备注（可选）</string>
+    <string name="confirm_reconcile">确认并完成对账</string>
+    <string name="reconcile_success">账户对账成功！当前余额：%1$s</string>
 </resources>
