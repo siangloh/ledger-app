@@ -38,7 +38,7 @@ img, canvas, svg, video { max-width: 100%; height: auto; }
   --shadow-card-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-serif: Georgia, "Iowan Old Style", "Songti SC", "STSong", serif;
+  --font-serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
@@ -283,8 +283,8 @@ a, button, input, select, textarea, [role="button"], .bnav-item, .card, .action-
 /* ---------- 现代 App 导航栏系统 ---------- */
 
 .app-header {
-  background: linear-gradient(135deg, var(--navy), var(--navy-2));
-  box-shadow: 0 4px 18px rgba(16, 33, 59, 0.25);
+  background: var(--navy);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -1240,8 +1240,8 @@ h3 {
 .card .amount.income { color: var(--green); }
 .card .amount.expense { color: var(--rose); }
 .card-highlight {
-  background: linear-gradient(160deg, var(--navy), var(--navy-2));
-  border: 1px solid rgba(16, 33, 59, 0.4);
+  background: var(--navy);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 .card-highlight .card-label { color: rgba(255, 255, 255, 0.65); }
 .card-highlight .amount { color: #f4ead0; }
@@ -2480,18 +2480,46 @@ canvas {
   }
 
   .filters {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    padding: 14px 16px;
-    border-radius: 16px;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 10px;
+    padding: 12px 14px;
+    border-radius: 14px;
   }
-  .filters > button, .filters > a {
+  .filters > label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    margin: 0;
+  }
+  .filters > label input,
+  .filters > label select {
     width: 100%;
+    height: 38px;
+    padding: 6px 10px;
+    font-size: 13px;
+    box-sizing: border-box;
+  }
+  .filters-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+  .filters > button, .filters > a,
+  .filters-actions > button, .filters-actions > a {
+    width: auto !important;
+    flex: 1;
     text-align: center;
-    padding: 12px;
-    font-size: 14px;
-    border-radius: 12px;
+    padding: 8px 12px;
+    font-size: 13.5px;
+    border-radius: 10px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
   }
 
   .row {
@@ -5374,6 +5402,37 @@ html[data-theme="dark"] {
 [data-theme="dark"] .btn-pending-transfer {
   color: #fde68a;
   border-color: rgba(245, 158, 11, 0.35);
+}
+
+/* 订阅列表状态胶囊筛选器 (与全站胶囊按钮风格统一) */
+.sub-filter-btn {
+  border-radius: 9999px !important;
+  padding: 5px 14px !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  background: var(--surface-soft) !important;
+  color: var(--ink-soft) !important;
+  border: 1px solid var(--border) !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.sub-filter-btn:hover {
+  background: var(--surface-hover) !important;
+  color: var(--ink) !important;
+}
+.sub-filter-btn.active {
+  background: var(--navy) !important;
+  color: #ffffff !important;
+  border-color: var(--navy) !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 3px rgba(15, 118, 110, 0.25);
+}
+
+/* 手机端 PWA 引导条出现时的安全防遮挡内边距，防止覆盖卡片操作区 */
+@media (max-width: 768px) {
+  body.has-pwa-banner {
+    padding-bottom: calc(180px + env(safe-area-inset-bottom, 0px)) !important;
+  }
 }
 
 

@@ -6,6 +6,10 @@
     <color name="primary_subtle">#134E4A</color>
     <color name="on_primary">#042F2E</color>
 
+    <!-- System Bar Tokens -->
+    <color name="status_bar_color">#0B1220</color>
+    <color name="nav_bar_color">#0B1220</color>
+
     <!-- Compatibility aliases -->
     <color name="navy_primary">#5EEAD4</color>
     <color name="navy_secondary">#2DD4BF</color>

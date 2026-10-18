@@ -22,8 +22,10 @@
       {% endfor %}
     </select>
   </label>
-  <button type="submit" class="btn-primary">{{ t('common.filter') }}</button>
-  <a href="{{ url_for('records') }}" class="btn-ghost">{{ t('common.cancel') }}</a>
+  <div class="filters-actions">
+    <button type="submit" class="btn-primary">{{ t('common.filter') }}</button>
+    <a href="{{ url_for('records') }}" class="btn-ghost">{{ t('common.cancel') }}</a>
+  </div>
 </form>
 
 <form method="post" action="{{ url_for('batch_delete_records') }}" id="batchForm">

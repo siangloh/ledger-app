@@ -69,6 +69,8 @@ fun MoreToolsScreen(
     var pendingError by remember { mutableStateOf<String?>(null) }
     var categorizingItem by remember { mutableStateOf<UncategorizedItem?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    var isPendingLoading by remember { mutableStateOf(true) }
+    var userCategories by remember { mutableStateOf<List<String>>(emptyList()) }
     var isSyncing by remember { mutableStateOf(false) }
 
     // Settings & Permissions states
@@ -90,9 +92,18 @@ fun MoreToolsScreen(
 
     fun refreshAll() {
         if (toolsSummary == null) isLoading = true
+        isPendingLoading = true
         toolsError = null
         pendingError = null
         scope.launch {
+            // 0. Load User Categories
+            try {
+                NativeLedgerApi.getCategories(context).onSuccess { catRes ->
+                    val names = catRes.expenses.map { it.name }.filter { it.isNotBlank() }
+                    if (names.isNotEmpty()) userCategories = names
+                }
+            } catch (_: Exception) {}
+
             // 1. Load Tools (Subscriptions & Installments)
             val toolsRes = NativeLedgerApi.getToolsSummary(context)
             toolsRes.onSuccess {
@@ -156,6 +167,7 @@ fun MoreToolsScreen(
                 pendingError = e.message ?: "获取待整理条目异常"
             }
 
+            isPendingLoading = false
             isLoading = false
         }
     }
@@ -239,6 +251,7 @@ fun MoreToolsScreen(
                     pendingCount = pendingItems.size,
                     pendingItems = pendingItems,
                     errorMessage = pendingError,
+                    isLoading = isPendingLoading,
                     onRetry = { refreshAll() },
                     onItemAction = { id, action ->
                         scope.launch {
@@ -374,6 +387,7 @@ fun MoreToolsScreen(
     categorizingItem?.let { item ->
         QuickCategorizeDialog(
             item = item,
+            userCategories = userCategories,
             onDismiss = { categorizingItem = null },
             onConfirmCategory = { cat ->
                 scope.launch {
@@ -399,6 +413,7 @@ fun PendingInboxCard(
     pendingCount: Int,
     pendingItems: List<UncategorizedItem>,
     errorMessage: String? = null,
+    isLoading: Boolean = false,
     onRetry: () -> Unit = {},
     onItemAction: (Long, String) -> Unit,
     onCategorizeItem: (UncategorizedItem) -> Unit
@@ -431,12 +446,20 @@ fun PendingInboxCard(
                             .background(if (pendingCount > 0) Color(0xFFF59E0B) else Slate100),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = if (pendingCount > 0) Icons.Default.Inbox else Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = if (pendingCount > 0) Color.White else PrimaryBlue,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = PrimaryTeal
+                            )
+                        } else {
+                            Icon(
+                                imageVector = if (pendingCount > 0) Icons.Default.Inbox else Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = if (pendingCount > 0) Color.White else PrimaryTeal,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
@@ -447,7 +470,8 @@ fun PendingInboxCard(
                             color = Slate800
                         )
                         Text(
-                            text = if (errorMessage != null) "加载失败：$errorMessage"
+                            text = if (isLoading) "正在同步待整理收件箱..."
+                                   else if (errorMessage != null) "加载失败：$errorMessage"
                                    else if (pendingCount > 0) "有 $pendingCount 笔账目需整理确认"
                                    else "所有账目已整理完毕 (Inbox Zero)",
                             fontSize = 12.sp,
@@ -1267,13 +1291,24 @@ fun FullLedgerFeaturesCard(
 @Composable
 fun QuickCategorizeDialog(
     item: UncategorizedItem,
+    userCategories: List<String> = emptyList(),
     onDismiss: () -> Unit,
     onConfirmCategory: (String) -> Unit
 ) {
-    val commonCategories = listOf(
+    var customCategory by remember { mutableStateOf("") }
+    val displayCategories = remember(userCategories) {
+        if (userCategories.isNotEmpty()) {
+            userCategories
+        } else {
+            listOf("餐饮", "交通", "杂货", "账单", "购物", "娱乐", "医疗", "居家", "数码", "理财", "教育", "其他")
+        }
+    }
+
+    val emojiMap = mapOf(
         "餐饮" to "🍔", "交通" to "🚗", "杂货" to "🛒", "账单" to "💡",
         "购物" to "🛍️", "娱乐" to "🎮", "医疗" to "💊", "居家" to "🏠",
-        "数码" to "📱", "理财" to "📈", "教育" to "📚", "其他" to "🏷️"
+        "数码" to "📱", "理财" to "📈", "教育" to "📚", "其他" to "🏷️",
+        "工资" to "💰", "奖金" to "🎁", "储蓄" to "🏦"
     )
 
     AlertDialog(
@@ -1283,19 +1318,43 @@ fun QuickCategorizeDialog(
         textContentColor = Slate800,
         title = { Text("为交易选择分类", fontWeight = FontWeight.Bold, fontSize = 17.sp) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Text(
                     text = "${item.note.ifBlank { "未命名消费" }} · RM ${String.format(Locale.getDefault(), "%.2f", item.amount)}",
                     fontSize = 13.sp,
                     color = Slate600
                 )
-                val chunked = commonCategories.chunked(3)
+
+                // 自定义分类输入框
+                OutlinedTextField(
+                    value = customCategory,
+                    onValueChange = { customCategory = it },
+                    placeholder = { Text("自定义分类...", fontSize = 12.sp, color = Slate400) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    trailingIcon = {
+                        if (customCategory.isNotBlank()) {
+                            IconButton(onClick = { onConfirmCategory(customCategory.trim()) }) {
+                                Icon(Icons.Default.Check, contentDescription = "确认", tint = PrimaryTeal)
+                            }
+                        }
+                    },
+                    singleLine = true
+                )
+
+                val chunked = displayCategories.chunked(3)
                 chunked.forEach { row ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        row.forEach { (catName, emoji) ->
+                        row.forEach { catName ->
+                            val emoji = emojiMap[catName] ?: "🏷️"
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = Slate100,
@@ -1310,15 +1369,35 @@ fun QuickCategorizeDialog(
                                 ) {
                                     Text(emoji, fontSize = 14.sp)
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text(catName, fontSize = 12.sp, color = Slate800, fontWeight = FontWeight.Medium)
+                                    Text(
+                                        text = catName,
+                                        fontSize = 12.sp,
+                                        color = Slate800,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
                             }
+                        }
+                        repeat(3 - row.size) {
+                            Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
             }
         },
-        confirmButton = {},
+        confirmButton = {
+            if (customCategory.isNotBlank()) {
+                Button(
+                    onClick = { onConfirmCategory(customCategory.trim()) },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal, contentColor = Color.White),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("使用「${customCategory.trim()}」")
+                }
+            }
+        },
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("取消", color = Slate600)

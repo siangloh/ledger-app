@@ -31,6 +31,7 @@ import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.compose.components.RecordsSkeletonList
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -68,6 +69,7 @@ fun RecordsScreen(
     var totalCount by remember { mutableStateOf(0) }
     var editingTx by remember { mutableStateOf<TransactionRecord?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<TransactionRecord?>(null) }
+    var loadJob by remember { mutableStateOf<Job?>(null) }
 
     fun loadPending() {
         scope.launch {
@@ -82,15 +84,15 @@ fun RecordsScreen(
     }
 
     fun loadData(resetPage: Boolean = true) {
+        val targetPage = if (resetPage) 1 else (currentPage + 1)
         if (resetPage) {
-            currentPage = 1
             if (transactions.isEmpty()) isLoading = true
             loadPending()
         } else {
             isLoadingMore = true
         }
-        scope.launch {
-            val targetPage = if (resetPage) 1 else currentPage
+        loadJob?.cancel()
+        loadJob = scope.launch {
             val res = NativeLedgerApi.getTransactions(
                 context = context,
                 type = selectedType,
@@ -102,6 +104,7 @@ fun RecordsScreen(
             isLoading = false
             isLoadingMore = false
             res.onSuccess { page ->
+                currentPage = targetPage
                 if (resetPage) {
                     transactions = page.items
                 } else {
@@ -112,7 +115,9 @@ fun RecordsScreen(
                 totalCount = page.totalCount
                 hasMore = page.hasMore
             }.onFailure { err ->
-                Toast.makeText(context, "加载流水失败：${err.message}", Toast.LENGTH_SHORT).show()
+                if (err !is kotlinx.coroutines.CancellationException) {
+                    Toast.makeText(context, "加载流水失败：${err.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -422,7 +427,6 @@ fun RecordsScreen(
                                 } else {
                                     OutlinedButton(
                                         onClick = {
-                                            currentPage += 1
                                             loadData(resetPage = false)
                                         },
                                         shape = RoundedCornerShape(10.dp),

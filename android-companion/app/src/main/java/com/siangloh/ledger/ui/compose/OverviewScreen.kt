@@ -17,6 +17,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
@@ -1140,6 +1143,9 @@ fun SpendingTrendSection(
     sparkline: List<SparklinePoint>,
     total: Double
 ) {
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
+    val activePoint = selectedIndex?.let { if (it in sparkline.indices) sparkline[it] else null }
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -1156,27 +1162,82 @@ fun SpendingTrendSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (activePoint != null) "支出走势 · ${activePoint.date}" else "支出走势",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900
+                    )
+                    if (activePoint != null) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "(长按/拖拽)",
+                            fontSize = 10.sp,
+                            color = PrimaryTeal,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
                 Text(
-                    text = "支出走势",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate900
-                )
-                Text(
-                    text = "当期合计 MYR ${String.format("%,.2f", total)}",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Slate600
+                    text = if (activePoint != null) {
+                        "MYR ${String.format("%,.2f", activePoint.amount)}"
+                    } else {
+                        "当期合计 MYR ${String.format("%,.2f", total)}"
+                    },
+                    fontSize = if (activePoint != null) 14.sp else 12.sp,
+                    fontWeight = if (activePoint != null) FontWeight.ExtraBold else FontWeight.SemiBold,
+                    color = if (activePoint != null) PrimaryTeal else Slate600
                 )
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Native Canvas Sparkline
+            // Native Canvas Sparkline with interactive touch / long-press inspection
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(60.dp)
+                    .height(68.dp)
+                    .pointerInput(sparkline) {
+                        detectDragGestures(
+                            onDragStart = { offset ->
+                                if (sparkline.size >= 2) {
+                                    val step = size.width / (sparkline.size - 1)
+                                    val idx = ((offset.x + step / 2) / step).toInt().coerceIn(0, sparkline.size - 1)
+                                    selectedIndex = idx
+                                }
+                            },
+                            onDrag = { change, _ ->
+                                if (sparkline.size >= 2) {
+                                    val step = size.width / (sparkline.size - 1)
+                                    val idx = ((change.position.x + step / 2) / step).toInt().coerceIn(0, sparkline.size - 1)
+                                    selectedIndex = idx
+                                }
+                            },
+                            onDragEnd = {},
+                            onDragCancel = {
+                                selectedIndex = null
+                            }
+                        )
+                    }
+                    .pointerInput(sparkline) {
+                        detectTapGestures(
+                            onTap = { offset ->
+                                if (sparkline.size >= 2) {
+                                    val step = size.width / (sparkline.size - 1)
+                                    val idx = ((offset.x + step / 2) / step).toInt().coerceIn(0, sparkline.size - 1)
+                                    selectedIndex = if (selectedIndex == idx) null else idx
+                                }
+                            },
+                            onLongPress = { offset ->
+                                if (sparkline.size >= 2) {
+                                    val step = size.width / (sparkline.size - 1)
+                                    val idx = ((offset.x + step / 2) / step).toInt().coerceIn(0, sparkline.size - 1)
+                                    selectedIndex = idx
+                                }
+                            }
+                        )
+                    }
             ) {
                 if (sparkline.size < 2) return@Canvas
                 val maxAmt = sparkline.maxOfOrNull { it.amount }?.takeIf { it > 0 } ?: 100.0
@@ -1185,7 +1246,7 @@ fun SpendingTrendSection(
 
                 val points = sparkline.mapIndexed { idx, pt ->
                     val x = idx * (w / (sparkline.size - 1))
-                    val y = h - ((pt.amount / maxAmt) * (h * 0.85f)).toFloat()
+                    val y = h - ((pt.amount / maxAmt) * (h * 0.82f)).toFloat() - 4.dp.toPx()
                     Offset(x, y)
                 }
 
@@ -1210,16 +1271,69 @@ fun SpendingTrendSection(
                 drawPath(
                     path = fillPath,
                     brush = Brush.verticalGradient(
-                        colors = listOf(Emerald400.copy(alpha = 0.35f), Color.Transparent)
+                        colors = listOf(PrimaryTeal.copy(alpha = 0.25f), Color.Transparent)
                     )
                 )
 
                 // Line stroke
                 drawPath(
                     path = path,
-                    color = Emerald500,
-                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                    color = PrimaryTeal,
+                    style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                 )
+
+                // Draw inspection indicator if point selected
+                selectedIndex?.let { idx ->
+                    if (idx in points.indices) {
+                        val pt = points[idx]
+                        // Vertical guideline
+                        drawLine(
+                            color = PrimaryTeal.copy(alpha = 0.6f),
+                            start = Offset(pt.x, 0f),
+                            end = Offset(pt.x, h),
+                            strokeWidth = 1.5.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
+                        )
+                        // Outer halo
+                        drawCircle(
+                            color = PrimaryTeal.copy(alpha = 0.22f),
+                            radius = 9.dp.toPx(),
+                            center = pt
+                        )
+                        // Middle solid point
+                        drawCircle(
+                            color = PrimaryTeal,
+                            radius = 4.5.dp.toPx(),
+                            center = pt
+                        )
+                        // Inner core
+                        drawCircle(
+                            color = Color.White,
+                            radius = 2.dp.toPx(),
+                            center = pt
+                        )
+                    }
+                }
+            }
+
+            if (activePoint != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "📅 ${activePoint.date}",
+                        fontSize = 11.sp,
+                        color = Slate500
+                    )
+                    Text(
+                        text = "点击图表可取消固定",
+                        fontSize = 11.sp,
+                        color = Slate400
+                    )
+                }
             }
         }
     }

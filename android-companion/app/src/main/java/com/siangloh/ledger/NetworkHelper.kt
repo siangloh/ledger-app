@@ -204,6 +204,9 @@ object NetworkHelper {
                         put("amount", tx.amount)
                         put("note", tx.note)
                         put("source", tx.source)
+                        if (tx.account_id != null) put("account_id", tx.account_id)
+                        if (tx.to_account_id != null) put("to_account_id", tx.to_account_id)
+                        if (tx.tags.isNotBlank()) put("tags", tx.tags)
                     }
                     jsonArray.put(obj)
                 }

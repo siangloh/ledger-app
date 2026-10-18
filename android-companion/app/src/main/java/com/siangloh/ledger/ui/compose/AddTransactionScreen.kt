@@ -52,6 +52,7 @@ fun AddTransactionScreen(
     var isSaving by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
+        draft.ensureInitialized(context)
         scope.launch {
             NativeLedgerApi.getAccounts(context).onSuccess {
                 accounts = it.accounts
@@ -82,6 +83,12 @@ fun AddTransactionScreen(
                     draft.selectedCategory = catGroup.expenses.first().name
                 }
             }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            draft.persist(context)
         }
     }
 
@@ -154,7 +161,7 @@ fun AddTransactionScreen(
                     )
                     if (draft.amountText.isNotBlank() || draft.note.isNotBlank() || draft.tags.isNotBlank()) {
                         TextButton(
-                            onClick = { draft.clear() },
+                            onClick = { draft.clear(context) },
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Text("清空草稿", fontSize = 12.sp, color = Slate500)
@@ -246,7 +253,7 @@ fun AddTransactionScreen(
                                 isSaving = false
                                 res.onSuccess {
                                     Toast.makeText(context, "🎉 记账成功！", Toast.LENGTH_SHORT).show()
-                                    draft.clear()
+                                    draft.clear(context)
                                     onFinished()
                                 }.onFailure { err ->
                                     if (err is ServerValidationException) {
@@ -257,11 +264,8 @@ fun AddTransactionScreen(
                                         try {
                                             withContext(Dispatchers.IO) {
                                                 val db = AppDatabase.getInstance(context)
-                                                val combinedNote = when {
-                                                    draft.note.isNotBlank() && draft.tags.isNotBlank() -> "${draft.note} #${draft.tags}".trim()
-                                                    draft.tags.isNotBlank() -> "#${draft.tags}".trim()
-                                                    draft.note.isNotBlank() -> draft.note.trim()
-                                                    else -> if (draft.txType == "transfer") "内部转账" else draft.selectedCategory
+                                                val rawNote = draft.note.trim().ifBlank {
+                                                    if (draft.txType == "transfer") "内部转账" else draft.selectedCategory
                                                 }
                                                 db.pendingTransactionDao().insert(
                                                     PendingTransaction(
@@ -270,15 +274,18 @@ fun AddTransactionScreen(
                                                         group_name = if (draft.txType == "income") draft.incomeGroup else "personal",
                                                         category = draft.selectedCategory,
                                                         amount = amt,
-                                                        note = combinedNote,
+                                                        note = rawNote,
                                                         source = "offline_manual",
-                                                        sync_status = "pending"
+                                                        sync_status = "pending",
+                                                        account_id = draft.selectedAccountId?.toLong(),
+                                                        to_account_id = draft.selectedToAccountId?.toLong(),
+                                                        tags = draft.tags.trim()
                                                     )
                                                 )
                                             }
                                             SyncWorker.enqueueSync(context)
                                             Toast.makeText(context, "✓ 当前网络未连接，已安全存入本地数据库，联网后将自动同步", Toast.LENGTH_LONG).show()
-                                            draft.clear()
+                                            draft.clear(context)
                                             onFinished()
                                         } catch (localDbErr: Exception) {
                                             Toast.makeText(context, "离线保存失败：${localDbErr.message}", Toast.LENGTH_LONG).show()
@@ -297,7 +304,8 @@ fun AddTransactionScreen(
                                 "transfer" -> Slate700
                                 "savings" -> PrimaryTeal
                                 else -> PrimaryTeal
-                            }
+                            },
+                            contentColor = Color.White
                         ),
                         modifier = Modifier
                             .fillMaxWidth()

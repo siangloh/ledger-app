@@ -15,5 +15,8 @@ data class PendingTransaction(
     val note: String,
     val source: String = "offline_manual",
     val sync_status: String = "pending", // "pending", "synced", "failed"
-    val created_at: Long = System.currentTimeMillis()
+    val created_at: Long = System.currentTimeMillis(),
+    val account_id: Long? = null,
+    val to_account_id: Long? = null,
+    val tags: String = ""
 )

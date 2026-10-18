@@ -4038,8 +4038,10 @@ function checkPwaUi() {
     setTimeout(() => {
       if (shouldShowPwaBanner()) {
         banner.style.display = 'flex';
+        document.body.classList.add('has-pwa-banner');
       } else {
         banner.style.display = 'none';
+        document.body.classList.remove('has-pwa-banner');
       }
     }, 1200);
   }
@@ -4156,6 +4158,7 @@ window.installPwaApp = function () {
 window.dismissPwaBanner = function () {
   const banner = document.getElementById('pwaInstallBanner');
   if (banner) banner.style.display = 'none';
+  document.body.classList.remove('has-pwa-banner');
   try {
     sessionStorage.setItem('pwa_banner_closed', 'true');
     localStorage.setItem('pwa_banner_dismissed', 'true');

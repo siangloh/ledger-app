@@ -21,13 +21,8 @@
 <div class="split-bill-container">
   <!-- 步骤 1：录入/解析小票 -->
   <section class="panel" style="margin-bottom: 24px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+    <div style="margin-bottom: 14px;">
       <h3 style="margin: 0;">{{ t('split_bill.step1') }}</h3>
-      <div class="tab-options" style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button type="button" class="btn-secondary btn-sm" onclick="openReviewModalWithGoodMoodSample()">{{ t('split_bill.demo_penang') }}</button>
-        <button type="button" class="btn-secondary btn-sm" onclick="openReviewModalWithSample()">{{ t('split_bill.demo_starbucks') }}</button>
-        <button type="button" class="btn-secondary btn-sm" onclick="loadSampleReceipt()">{{ t('split_bill.load_sample') }}</button>
-      </div>
     </div>
 
     <div class="receipt-input-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
@@ -74,21 +69,33 @@ Total 75.21"></textarea>
       </div>
     </div>
 
-    <!-- 🌍 全球多国小票实测体验预设 -->
-    <div style="margin-top: 16px; background: var(--surface-soft); padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
-      <div style="font-size: 12px; font-weight: 700; color: var(--navy); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
-        <span>{{ t('split_bill.presets_title') }}</span>
-        <span style="font-size: 11px; color: var(--muted); font-weight: normal;">{{ t('split_bill.presets_sub') }}</span>
+    <!-- 💡 可折叠示例小票与实测预设（按需展开，不抢占拍照输入核心视线） -->
+    <details style="margin-top: 14px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px;">
+      <summary style="font-size: 12.5px; font-weight: 600; color: var(--navy); cursor: pointer; user-select: none;">
+        💡 {{ t('split_bill.presets_summary', '查看体验示例与多国小票实测预设 (点此展开)') }}
+      </summary>
+      <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 10px;">
+        <div>
+          <div style="font-size: 11.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px;">{{ t('split_bill.presets_quick_sample', '快捷演示样例：') }}</div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn-secondary btn-sm" onclick="openReviewModalWithGoodMoodSample()">{{ t('split_bill.demo_penang') }}</button>
+            <button type="button" class="btn-secondary btn-sm" onclick="openReviewModalWithSample()">{{ t('split_bill.demo_starbucks') }}</button>
+            <button type="button" class="btn-secondary btn-sm" onclick="loadSampleReceipt()">{{ t('split_bill.load_sample') }}</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size: 11.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px;">{{ t('split_bill.presets_global', '全球多国实测预设：') }}</div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('my')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_my') }}</button>
+            <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('us')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_us') }}</button>
+            <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('jp')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_jp') }}</button>
+            <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('eu')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_eu') }}</button>
+            <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('sg')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_sg') }}</button>
+            <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('cn')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_cn') }}</button>
+          </div>
+        </div>
       </div>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('my')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_my') }}</button>
-        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('us')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_us') }}</button>
-        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('jp')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_jp') }}</button>
-        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('eu')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_eu') }}</button>
-        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('sg')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_sg') }}</button>
-        <button type="button" class="btn-ghost btn-sm" onclick="loadGlobalPreset('cn')" style="font-size: 11.5px; border: 1px solid var(--border); background: var(--surface);">{{ t('split_bill.preset_cn') }}</button>
-      </div>
-    </div>
+    </details>
   </section>
 
   <!-- 步骤 2：参与人管理与点选分摊 -->

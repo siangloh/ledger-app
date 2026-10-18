@@ -788,7 +788,6 @@ def api_sync_transactions():
         if u_row:
             user_id = u_row['id']
 
-    now = datetime.now().isoformat()
     synced_ids = []
     for item in txs:
         try:
@@ -800,9 +799,9 @@ def api_sync_transactions():
             # 离线同步防重检查：如果同用户、同日期、同类型、同金额、同备注的交易已存在，跳过插入
             existing = db.execute('''
                 SELECT id FROM transactions
-                WHERE user_id = ? AND date = ? AND type = ? AND abs(amount - ?) < 0.005 AND note = ?
+                WHERE user_id = ? AND date = ? AND (type = ? OR (type IN ('expense', 'income') AND ? = 'transfer')) AND abs(amount - ?) < 0.005 AND note = ?
                 LIMIT 1
-            ''', (str(user_id), t_date, t_type, amt, t_note)).fetchone()
+            ''', (str(user_id), t_date, t_type, t_type, amt, t_note)).fetchone()
 
             local_id = item.get('local_id') or item.get('id')
             if existing:
@@ -810,23 +809,25 @@ def api_sync_transactions():
                     synced_ids.append(local_id)
                 continue
 
-            db.execute(
-                'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
-                'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                (
-                    user_id,
-                    t_date,
-                    t_type,
-                    item.get('group_name') or 'personal',
-                    item.get('category') or '其他',
-                    amt,
-                    t_note,
-                    item.get('source') or 'offline_sync',
-                    now
-                )
-            )
-            if local_id is not None:
-                synced_ids.append(local_id)
+            # 复用核心业务服务以完整支持 account_id, to_account_id (双端配对转账), tags, 储蓄等完整语义
+            res = add_native_transaction(user_id=user_id, data=item, db=db)
+            if res.get('ok'):
+                if local_id is not None:
+                    synced_ids.append(local_id)
+            else:
+                # 若指定的离线账户已被删除或失效，降级剔除失效账户写入，确保离线账目永不丢失
+                logger.warning("[SYNC WARN] add_native_transaction validation rejected for offline tx (%s), trying safe fallback", res.get('message'))
+                fallback_item = dict(item)
+                if fallback_item.get('type') == 'transfer':
+                    fallback_item['category'] = fallback_item.get('category') or '内部划转'
+                    fallback_item['type'] = 'expense'
+                    if not fallback_item.get('note'):
+                        fallback_item['note'] = '离线转账'
+                fallback_item.pop('account_id', None)
+                fallback_item.pop('to_account_id', None)
+                fallback_res = add_native_transaction(user_id=user_id, data=fallback_item, db=db)
+                if fallback_res.get('ok') and local_id is not None:
+                    synced_ids.append(local_id)
         except Exception as e:
             logger.error("[SYNC ERROR] Failed to insert offline transaction: %s", e)
 

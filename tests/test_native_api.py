@@ -304,5 +304,64 @@ def test_native_subscription_monthly_calculation(flask_app, client, admin_user_i
         db.commit()
 
 
+def test_offline_sync_with_accounts_tags_and_transfer(flask_app, client, admin_user_id):
+    """验证离线同步契约能完整恢复 account_id、tags 以及两端配对转账"""
+    with flask_app.app.app_context():
+        db = get_db()
+        cur = db.execute("INSERT INTO accounts (user_id, name, type, credit_limit, currency, is_active, created_at) VALUES (?, 'SyncAccA', 'savings', 0, 'MYR', 1, datetime('now'))", (admin_user_id,))
+        acc_a = cur.lastrowid
+        cur2 = db.execute("INSERT INTO accounts (user_id, name, type, credit_limit, currency, is_active, created_at) VALUES (?, 'SyncAccB', 'current', 0, 'MYR', 1, datetime('now'))", (admin_user_id,))
+        acc_b = cur2.lastrowid
+        db.commit()
+
+    headers = {'X-API-KEY': 'test-auto-track-key'}
+    payload = {
+        "username": "admin",
+        "transactions": [
+            {
+                "local_id": 9991,
+                "date": "2026-10-18",
+                "type": "expense",
+                "category": "餐饮",
+                "amount": 35.50,
+                "note": "离线午餐",
+                "account_id": acc_a,
+                "tags": "lunch work"
+            },
+            {
+                "local_id": 9992,
+                "date": "2026-10-18",
+                "type": "transfer",
+                "amount": 150.00,
+                "account_id": acc_a,
+                "to_account_id": acc_b,
+                "note": "离线A转B"
+            }
+        ]
+    }
+    res = client.post('/api/transactions/sync', json=payload, headers=headers)
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data['ok'] is True
+    assert 9991 in data['synced_ids']
+    assert 9992 in data['synced_ids']
+
+    with flask_app.app.app_context():
+        db = get_db()
+        # 1. 验证常规离线消费记录的 account_id 与 tags
+        tx1 = db.execute("SELECT * FROM transactions WHERE user_id = ? AND note = '离线午餐'", (admin_user_id,)).fetchone()
+        assert tx1 is not None
+        assert tx1['account_id'] == acc_a
+        assert "lunch" in tx1['tags']
+
+        # 2. 验证离线转账成功生成两端配对分录
+        transfers = db.execute("SELECT * FROM transactions WHERE user_id = ? AND (note LIKE '%离线A转B%' OR note LIKE '%SyncAcc%')", (admin_user_id,)).fetchall()
+        assert len(transfers) >= 2
+        acc_ids = {t['account_id'] for t in transfers}
+        assert acc_a in acc_ids
+        assert acc_b in acc_ids
+
+
+
 
 

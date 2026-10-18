@@ -455,7 +455,7 @@
         <input type="text" name="note" class="form-control" placeholder="{{ t('subscriptions.form_note_ph', '如：家庭组4人分摊 / 绑定的虚拟卡号等') }}" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
       </div>
 
-      <div style="display:flex; justify-content:flex-end; gap:10px;">
+      <div style="position:sticky; bottom:-24px; margin:20px -24px -24px -24px; padding:14px 24px; background:var(--surface); border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; z-index:10; border-bottom-left-radius:14px; border-bottom-right-radius:14px; box-shadow:0 -4px 12px rgba(0,0,0,0.06);">
         <button type="button" class="btn btn-secondary" onclick="closeModal('modalAddSub')">{{ t('common.cancel', '取消') }}</button>
         <button type="submit" class="btn btn-primary">{{ t('subscriptions.save_sub', '保存订阅') }}</button>
       </div>
@@ -573,7 +573,7 @@
         <input type="text" id="editNote" name="note" class="form-control" style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
       </div>
 
-      <div style="display:flex; justify-content:flex-end; gap:10px;">
+      <div style="position:sticky; bottom:-24px; margin:20px -24px -24px -24px; padding:14px 24px; background:var(--surface); border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; z-index:10; border-bottom-left-radius:14px; border-bottom-right-radius:14px; box-shadow:0 -4px 12px rgba(0,0,0,0.06);">
         <button type="button" class="btn btn-secondary" onclick="closeModal('modalEditSub')">{{ t('common.cancel', '取消') }}</button>
         <button type="submit" class="btn btn-primary">{{ t('subscriptions.save_changes', '保存修改') }}</button>
       </div>
