@@ -162,6 +162,12 @@
                             hx-swap="innerHTML show:window:top" hx-push-url="true">
                             <span class="nav-icon">📤</span>{{ t('nav.import') }}
                         </a>
+                        <a href="{{ url_for('transactions.recycle_bin_page') }}"
+                            class="{{ 'active' if request.endpoint.split('.')[-1] == 'recycle_bin_page' }}"
+                            data-nav="recycle-bin" hx-get="{{ url_for('transactions.recycle_bin_page') }}" hx-target="#mainContainer"
+                            hx-swap="innerHTML show:window:top" hx-push-url="true">
+                            <span class="nav-icon">🗑️</span>{{ t('nav.recycle_bin', '回收站') }}
+                        </a>
                     </div>
                 </div>
 
@@ -313,6 +319,13 @@
                     hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
                     <div class="sheet-action-icon-wrap">📤</div>
                     <span class="sheet-action-label">{{ t('nav.import') }}</span>
+                </a>
+                <a href="{{ url_for('transactions.recycle_bin_page') }}"
+                    class="sheet-action-btn {{ 'active' if request.endpoint.split('.')[-1] == 'recycle_bin_page' }}" data-nav="recycle-bin"
+                    hx-get="{{ url_for('transactions.recycle_bin_page') }}" hx-target="#mainContainer"
+                    hx-swap="innerHTML show:window:top" hx-push-url="true" onclick="toggleMoreSheet(false)">
+                    <div class="sheet-action-icon-wrap">🗑️</div>
+                    <span class="sheet-action-label">{{ t('nav.recycle_bin', '回收站') }}</span>
                 </a>
                 <a href="{{ url_for('download_apk') }}" id="appDownloadTile" class="sheet-action-btn"
                     onclick="handleAppDownloadClick(event)" download="ledger-app.apk">

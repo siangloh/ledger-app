@@ -160,6 +160,7 @@ object NetworkHelper {
                 var verdict: String? = null
                 var isSuccess = responseCode in 200..299
                 try {
+                    val jsonObj = JSONObject(responseMsg)
                     verdict = if (jsonObj.has("verdict")) jsonObj.optString("verdict") else null
                     if (jsonObj.has("ok")) {
                         isSuccess = jsonObj.optBoolean("ok")
@@ -339,6 +340,134 @@ object NetworkHelper {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to fetch categories: ${e.message}", e)
                 callback?.invoke(false, emptyList())
+            }
+        }
+    }
+
+    fun getRecycleBinItems(page: Int = 1, callback: ((Boolean, List<JSONObject>, Int, String?) -> Unit)?) {
+        networkExecutor.execute {
+            try {
+                val username = getUsername()
+                val encodedUser = try { java.net.URLEncoder.encode(username, "UTF-8") } catch (_: Exception) { "" }
+                val fullUrl = "${getServerUrl()}/api/native/recycle-bin?username=$encodedUser&page=$page"
+                val url = URL(fullUrl)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.setRequestProperty("X-API-KEY", getApiKey())
+                conn.connectTimeout = 10000
+                conn.readTimeout = 10000
+
+                val responseCode = conn.responseCode
+                if (responseCode in 200..299) {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    val json = JSONObject(body)
+                    if (json.optBoolean("ok")) {
+                        val arr = json.optJSONArray("items")
+                        val items = mutableListOf<JSONObject>()
+                        if (arr != null) {
+                            for (i in 0 until arr.length()) {
+                                items.add(arr.getJSONObject(i))
+                            }
+                        }
+                        val total = json.optInt("total_count", items.size)
+                        callback?.invoke(true, items, total, null)
+                    } else {
+                        callback?.invoke(false, emptyList(), 0, json.optString("message", "Error"))
+                    }
+                } else {
+                    callback?.invoke(false, emptyList(), 0, "HTTP $responseCode")
+                }
+                conn.disconnect()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to fetch recycle bin: ${e.message}", e)
+                callback?.invoke(false, emptyList(), 0, e.message)
+            }
+        }
+    }
+
+    fun restoreRecycleBinItem(id: Long, callback: ((Boolean, String?) -> Unit)?) {
+        networkExecutor.execute {
+            try {
+                val username = getUsername()
+                val encodedUser = try { java.net.URLEncoder.encode(username, "UTF-8") } catch (_: Exception) { "" }
+                val fullUrl = "${getServerUrl()}/api/native/recycle-bin/$id/restore?username=$encodedUser"
+                val url = URL(fullUrl)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("X-API-KEY", getApiKey())
+                conn.connectTimeout = 10000
+                conn.readTimeout = 10000
+
+                val responseCode = conn.responseCode
+                if (responseCode in 200..299) {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    val json = JSONObject(body)
+                    callback?.invoke(json.optBoolean("ok"), json.optString("message"))
+                } else {
+                    callback?.invoke(false, "HTTP $responseCode")
+                }
+                conn.disconnect()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to restore recycle item: ${e.message}", e)
+                callback?.invoke(false, e.message)
+            }
+        }
+    }
+
+    fun permanentDeleteRecycleBinItem(id: Long, callback: ((Boolean, String?) -> Unit)?) {
+        networkExecutor.execute {
+            try {
+                val username = getUsername()
+                val encodedUser = try { java.net.URLEncoder.encode(username, "UTF-8") } catch (_: Exception) { "" }
+                val fullUrl = "${getServerUrl()}/api/native/recycle-bin/$id/permanent-delete?username=$encodedUser"
+                val url = URL(fullUrl)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("X-API-KEY", getApiKey())
+                conn.connectTimeout = 10000
+                conn.readTimeout = 10000
+
+                val responseCode = conn.responseCode
+                if (responseCode in 200..299) {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    val json = JSONObject(body)
+                    callback?.invoke(json.optBoolean("ok"), json.optString("message"))
+                } else {
+                    callback?.invoke(false, "HTTP $responseCode")
+                }
+                conn.disconnect()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to delete recycle item: ${e.message}", e)
+                callback?.invoke(false, e.message)
+            }
+        }
+    }
+
+    fun emptyRecycleBin(callback: ((Boolean, String?) -> Unit)?) {
+        networkExecutor.execute {
+            try {
+                val username = getUsername()
+                val encodedUser = try { java.net.URLEncoder.encode(username, "UTF-8") } catch (_: Exception) { "" }
+                val fullUrl = "${getServerUrl()}/api/native/recycle-bin/empty?username=$encodedUser"
+                val url = URL(fullUrl)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("X-API-KEY", getApiKey())
+                conn.connectTimeout = 10000
+                conn.readTimeout = 10000
+
+                val responseCode = conn.responseCode
+                if (responseCode in 200..299) {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    val json = JSONObject(body)
+                    callback?.invoke(json.optBoolean("ok"), json.optString("message"))
+                } else {
+                    callback?.invoke(false, "HTTP $responseCode")
+                }
+                conn.disconnect()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to empty recycle bin: ${e.message}", e)
+                callback?.invoke(false, e.message)
             }
         }
     }

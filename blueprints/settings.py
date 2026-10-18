@@ -56,7 +56,7 @@ def settings_page():
     # 统计数据简报
     stats = {'tx_count': 0, 'acc_count': len(accounts)}
     try:
-        r = db.execute("SELECT COUNT(*) as cnt FROM transactions WHERE user_id = ?", (str(user_id),)).fetchone()
+        r = db.execute("SELECT COUNT(*) as cnt FROM transactions WHERE user_id = ? AND deleted_at IS NULL", (str(user_id),)).fetchone()
         if r:
             stats['tx_count'] = r['cnt'] if hasattr(r, 'keys') else r[0]
     except Exception as e:
@@ -245,7 +245,7 @@ def api_export_data():
                        t.from_savings, t.from_savings_category, t.created_at
                 FROM transactions t
                 LEFT JOIN accounts a ON t.account_id = a.id
-                WHERE t.user_id = ?
+                WHERE t.user_id = ? AND t.deleted_at IS NULL
                 ORDER BY t.date DESC, t.id DESC
             ''', (str(user_id),)).fetchall()
 

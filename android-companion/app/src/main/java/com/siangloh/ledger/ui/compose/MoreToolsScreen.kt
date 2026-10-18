@@ -91,6 +91,7 @@ fun MoreToolsScreen(
     var showServerConfigDialog by remember { mutableStateOf(false) }
     var currentServerUrl by remember { mutableStateOf(NetworkHelper.getServerUrl(context)) }
     var currentApiKey by remember { mutableStateOf(NetworkHelper.getApiKey(context)) }
+    var showRecycleBinDialog by remember { mutableStateOf(false) }
 
     fun refreshAll() {
         if (toolsSummary == null) isLoading = true
@@ -353,6 +354,13 @@ fun MoreToolsScreen(
                 )
             }
 
+            // 6.5 回收站管理 (Recycle Bin)
+            item {
+                RecycleBinCard(
+                    onOpenRecycleBin = { showRecycleBinDialog = true }
+                )
+            }
+
             // 7. 界面语言设置 (Language Settings)
             item {
                 val currentLang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
@@ -406,6 +414,12 @@ fun MoreToolsScreen(
                 Toast.makeText(context, "配置已更新", Toast.LENGTH_SHORT).show()
                 refreshAll()
             }
+        )
+    }
+
+    if (showRecycleBinDialog) {
+        RecycleBinDialog(
+            onDismiss = { showRecycleBinDialog = false }
         )
     }
 
@@ -1687,3 +1701,485 @@ fun ServerConfigDialog(
         }
     )
 }
+
+// -----------------------------------------------------------------------------
+// Component: 回收站管理卡片 (Recycle Bin Card)
+// -----------------------------------------------------------------------------
+@Composable
+fun RecycleBinCard(
+    onOpenRecycleBin: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFEF2F2)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = stringResource(R.string.tools_recycle_bin),
+                        tint = Rose500,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = stringResource(R.string.tools_recycle_bin),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate800
+                    )
+                    Text(
+                        text = stringResource(R.string.tools_recycle_bin_desc),
+                        fontSize = 12.sp,
+                        color = Slate500
+                    )
+                }
+            }
+
+            OutlinedButton(
+                onClick = onOpenRecycleBin,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, Slate300),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+            ) {
+                Text(
+                    text = "查看",
+                    fontSize = 13.sp,
+                    color = Slate700,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Dialog: 回收站详情与恢复/彻底销毁 (Recycle Bin Dialog)
+// -----------------------------------------------------------------------------
+@Composable
+fun RecycleBinDialog(
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var items by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
+    var totalCount by remember { mutableStateOf(0) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var itemToDelete by remember { mutableStateOf<Long?>(null) }
+    var showEmptyConfirm by remember { mutableStateOf(false) }
+    var isOperating by remember { mutableStateOf(false) }
+
+    fun loadItems() {
+        isLoading = true
+        errorMessage = null
+        NetworkHelper.getRecycleBinItems(page = 1) { success, resultItems, total, error ->
+            scope.launch(Dispatchers.Main) {
+                isLoading = false
+                if (success) {
+                    items = resultItems
+                    totalCount = total
+                } else {
+                    errorMessage = error ?: "加载回收站失败"
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        loadItems()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        titleContentColor = Slate900,
+        textContentColor = Slate800,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = null,
+                        tint = Rose500,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.tools_recycle_bin),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900
+                    )
+                    if (totalCount > 0) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            shape = CircleShape,
+                            color = Slate100,
+                            modifier = Modifier.padding(start = 4.dp)
+                        ) {
+                            Text(
+                                text = "$totalCount",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Slate600,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (items.isNotEmpty()) {
+                    TextButton(
+                        onClick = { showEmptyConfirm = true },
+                        enabled = !isOperating,
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.recycle_bin_empty_btn),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Rose500
+                        )
+                    }
+                }
+            }
+        },
+        text = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 200.dp, max = 460.dp)
+            ) {
+                when {
+                    isLoading -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(36.dp),
+                                color = PrimaryTeal,
+                                strokeWidth = 3.dp
+                            )
+                        }
+                    }
+                    errorMessage != null -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = errorMessage ?: "加载失败",
+                                fontSize = 13.sp,
+                                color = ExpenseRed,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                            Button(
+                                onClick = { loadItems() },
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                            ) {
+                                Text(stringResource(R.string.common_retry), color = Color.White)
+                            }
+                        }
+                    }
+                    items.isEmpty() -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = null,
+                                tint = Slate300,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = stringResource(R.string.recycle_bin_empty_title),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Slate700
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.recycle_bin_empty_desc),
+                                fontSize = 12.sp,
+                                color = Slate400
+                            )
+                        }
+                    }
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(items) { item ->
+                                val id = item.optLong("id")
+                                val date = item.optString("date")
+                                val type = item.optString("type")
+                                val cat = item.optString("category")
+                                val note = item.optString("note")
+                                val amount = item.optDouble("amount")
+                                val accName = item.optString("account_name", "默认账户")
+                                val isExpense = type == "expense"
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Slate50,
+                                    border = BorderStroke(1.dp, Slate200),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = note.ifBlank { cat.ifBlank { "已删除记录" } },
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = Slate800,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = "$date · $cat · $accName",
+                                                    fontSize = 11.sp,
+                                                    color = Slate500
+                                                )
+                                            }
+                                            Text(
+                                                text = String.format(Locale.getDefault(), if (isExpense) "-RM %.2f" else "+RM %.2f", amount),
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isExpense) ExpenseRed else IncomeGreen
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            // 彻底删除按钮
+                                            OutlinedButton(
+                                                onClick = { itemToDelete = id },
+                                                enabled = !isOperating,
+                                                shape = RoundedCornerShape(8.dp),
+                                                border = BorderStroke(1.dp, Rose500.copy(alpha = 0.4f)),
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Rose500),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.recycle_bin_delete_btn),
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.width(8.dp))
+
+                                            // 恢复按钮 (PrimaryTeal, min 48dp)
+                                            Button(
+                                                onClick = {
+                                                    isOperating = true
+                                                    NetworkHelper.restoreRecycleBinItem(id) { success, msg ->
+                                                        scope.launch(Dispatchers.Main) {
+                                                            isOperating = false
+                                                            if (success) {
+                                                                Toast.makeText(context, "已成功恢复", Toast.LENGTH_SHORT).show()
+                                                                loadItems()
+                                                            } else {
+                                                                Toast.makeText(context, msg ?: "恢复失败", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                enabled = !isOperating,
+                                                shape = RoundedCornerShape(8.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal, contentColor = Color.White),
+                                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.recycle_bin_restore_btn),
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.common_close),
+                    fontSize = 13.sp,
+                    color = Slate600
+                )
+            }
+        }
+    )
+
+    // 二次确认：单条彻底删除
+    itemToDelete?.let { txId ->
+        AlertDialog(
+            onDismissRequest = { itemToDelete = null },
+            containerColor = Color.White,
+            title = {
+                Text(
+                    text = stringResource(R.string.recycle_bin_delete_btn),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Slate900
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.recycle_bin_confirm_delete),
+                    fontSize = 13.sp,
+                    color = Slate700
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val toDel = txId
+                        itemToDelete = null
+                        isOperating = true
+                        NetworkHelper.permanentDeleteRecycleBinItem(toDel) { success, msg ->
+                            scope.launch(Dispatchers.Main) {
+                                isOperating = false
+                                if (success) {
+                                    Toast.makeText(context, "已彻底删除", Toast.LENGTH_SHORT).show()
+                                    loadItems()
+                                } else {
+                                    Toast.makeText(context, msg ?: "删除失败", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Rose500, contentColor = Color.White),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text(stringResource(R.string.common_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { itemToDelete = null },
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text(stringResource(R.string.common_cancel), color = Slate600)
+                }
+            }
+        )
+    }
+
+    // 二次确认：清空回收站
+    if (showEmptyConfirm) {
+        AlertDialog(
+            onDismissRequest = { showEmptyConfirm = false },
+            containerColor = Color.White,
+            title = {
+                Text(
+                    text = stringResource(R.string.recycle_bin_empty_btn),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Slate900
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.recycle_bin_confirm_empty),
+                    fontSize = 13.sp,
+                    color = Slate700
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showEmptyConfirm = false
+                        isOperating = true
+                        NetworkHelper.emptyRecycleBin { success, msg ->
+                            scope.launch(Dispatchers.Main) {
+                                isOperating = false
+                                if (success) {
+                                    Toast.makeText(context, "回收站已清空", Toast.LENGTH_SHORT).show()
+                                    loadItems()
+                                } else {
+                                    Toast.makeText(context, msg ?: "清空失败", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Rose500, contentColor = Color.White),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text(stringResource(R.string.common_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showEmptyConfirm = false },
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text(stringResource(R.string.common_cancel), color = Slate600)
+                }
+            }
+        )
+    }
+}
+

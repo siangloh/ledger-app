@@ -163,7 +163,7 @@ def get_savings_breakdown(db, user_id=None):
     if not user_id:
         user_id = get_current_user_id()
     in_rows = db.execute(
-        "SELECT category, SUM(amount) as total FROM transactions WHERE user_id=? AND type='savings' GROUP BY category",
+        "SELECT category, SUM(amount) as total FROM transactions WHERE user_id=? AND type='savings' AND deleted_at IS NULL GROUP BY category",
         (user_id,)
     ).fetchall()
     savings_in = {}
@@ -173,7 +173,7 @@ def get_savings_breakdown(db, user_id=None):
 
     out_rows = db.execute(
         "SELECT COALESCE(NULLIF(from_savings_category, ''), category, '其他') as scat, SUM(amount) as total "
-        "FROM transactions WHERE user_id=? AND type='expense' AND COALESCE(from_savings, 0)=1 GROUP BY scat",
+        "FROM transactions WHERE user_id=? AND type='expense' AND COALESCE(from_savings, 0)=1 AND deleted_at IS NULL GROUP BY scat",
         (user_id,)
     ).fetchall()
     savings_out = {}
@@ -230,7 +230,7 @@ def get_category_budget_status(db, user_id=None, month=None, start_day=None):
 
     spent_rows = db.execute(
         "SELECT category, SUM(amount) as total FROM transactions "
-        "WHERE user_id = ? AND type = 'expense' AND date BETWEEN ? AND ? GROUP BY category",
+        "WHERE user_id = ? AND type = 'expense' AND date BETWEEN ? AND ? AND deleted_at IS NULL GROUP BY category",
         (user_id, start, end)
     ).fetchall()
     spent_by_category = {(r['category'] or '其他'): float(r['total'] or 0.0) for r in spent_rows}
@@ -292,7 +292,7 @@ def check_and_record_budget_alerts(db, user_id, category, month=None, start_day=
     start, end, _ = get_billing_cycle_dates(month, start_day)
     spent_row = db.execute(
         "SELECT SUM(amount) as total FROM transactions "
-        "WHERE user_id = ? AND type = 'expense' AND category = ? AND date BETWEEN ? AND ?",
+        "WHERE user_id = ? AND type = 'expense' AND category = ? AND date BETWEEN ? AND ? AND deleted_at IS NULL",
         (user_id, category, start, end)
     ).fetchone()
     spent = float(spent_row['total'] or 0.0) if spent_row else 0.0

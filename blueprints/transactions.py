@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import uuid
@@ -118,7 +119,7 @@ def add_transaction():
         m_start = f'{tx_month}-01'
         m_end = f'{tx_month}-{ld:02d}'
         m_rows = db.execute(
-            'SELECT type, group_name, category, amount FROM transactions WHERE user_id = ? AND date BETWEEN ? AND ?',
+            'SELECT type, group_name, category, amount FROM transactions WHERE user_id = ? AND date BETWEEN ? AND ? AND deleted_at IS NULL',
             (user_id, m_start, m_end)
         ).fetchall()
         m_inc = {'main': 0.0, 'side': 0.0}
@@ -181,7 +182,7 @@ def records():
     if page_size < 1 or page_size > 100:
         page_size = 25
 
-    where_clauses = ['user_id = ?']
+    where_clauses = ['user_id = ?', 'deleted_at IS NULL']
     params = [user_id]
     if start:
         where_clauses.append('date >= ?')
@@ -223,7 +224,7 @@ def records():
     next_page = page + 1 if has_more else None
 
     all_categories = db.execute(
-        'SELECT DISTINCT category FROM transactions WHERE user_id = ? AND category IS NOT NULL ORDER BY category',
+        'SELECT DISTINCT category FROM transactions WHERE user_id = ? AND category IS NOT NULL AND deleted_at IS NULL ORDER BY category',
         (user_id,)
     ).fetchall()
     categories = [c['category'] for c in all_categories]
@@ -386,14 +387,48 @@ def edit_record(tx_id):
 def delete_record(tx_id):
     user_id = get_current_user_id()
     db = get_db()
-    db.execute('DELETE FROM transactions WHERE id=? AND user_id=?', (tx_id, user_id))
+    row = db.execute('SELECT * FROM transactions WHERE id=? AND user_id=? AND deleted_at IS NULL', (tx_id, user_id)).fetchone()
+    if not row:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': t('records.empty', '记录不存在或已在回收站')}), 404
+        flash(t('records.empty', '记录不存在或已在回收站'), 'error')
+        return redirect(url_for('records'))
+
+    now_iso = datetime.now().isoformat()
+    snapshot_items = [{
+        'id': row['id'],
+        'date': row['date'],
+        'type': row['type'],
+        'group_name': row['group_name'],
+        'category': row['category'],
+        'amount': row['amount'],
+        'note': row['note'],
+        'tags': row['tags'],
+        'account_id': row['account_id'],
+        'deleted_at': row['deleted_at']
+    }]
+    desc = f"删除记录: {row['date']} {row['category'] or ''} {row['amount']}"
+    cur = db.execute(
+        "INSERT INTO operation_snapshots (user_id, operation_type, description, snapshot_data, created_at) VALUES (?, ?, ?, ?, ?)",
+        (str(user_id), 'single_delete', desc, json.dumps(snapshot_items), now_iso)
+    )
+    snapshot_id = cur.lastrowid
+
+    db.execute('UPDATE transactions SET deleted_at=? WHERE id=? AND user_id=?', (now_iso, tx_id, user_id))
     db.commit()
-    bump_data_version('delete', {'id': tx_id})
+    bump_data_version('delete', {'id': tx_id, 'snapshot_id': snapshot_id, 'recycle': True}, user_id=user_id, db=db)
 
+    msg = t('transactions.record_recycled', '记录已移入回收站')
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': t('transactions.record_deleted', '记录已删除'), 'id': tx_id})
+        return jsonify({
+            'ok': True,
+            'message': msg,
+            'id': tx_id,
+            'snapshot_id': snapshot_id,
+            'undo_url': url_for('transactions.undo_operation', snapshot_id=snapshot_id)
+        })
 
-    flash(t('transactions.record_deleted', '记录已删除'), 'success')
+    flash(msg, 'success')
     return redirect(url_for('records'))
 
 
@@ -402,6 +437,8 @@ def batch_delete_records():
     user_id = get_current_user_id()
     db = get_db()
     ids = request.form.getlist('ids')
+    if not ids and request.is_json:
+        ids = request.json.get('ids', [])
     if not ids:
         if is_ajax_request():
             return jsonify({'ok': False, 'message': t('transactions.no_records_selected', '未选中任何记录')}), 400
@@ -413,18 +450,56 @@ def batch_delete_records():
     for i in ids:
         try:
             valid_ids.append(int(i))
-        except ValueError:
+        except (ValueError, TypeError):
             pass
 
     if valid_ids:
         placeholders = ','.join('?' * len(valid_ids))
-        db.execute(f'DELETE FROM transactions WHERE user_id = ? AND id IN ({placeholders})', [user_id] + valid_ids)
-        db.commit()
-        bump_data_version('batch_delete', {'count': len(valid_ids)})
+        rows = db.execute(
+            f'SELECT * FROM transactions WHERE user_id = ? AND id IN ({placeholders}) AND deleted_at IS NULL',
+            [user_id] + valid_ids
+        ).fetchall()
+        if not rows:
+            if is_ajax_request():
+                return jsonify({'ok': False, 'message': t('transactions.no_valid_records_selected', '未选中有效的记录或均已在回收站')}), 400
+            flash(t('transactions.no_valid_records_selected', '未选中有效的记录或均已在回收站'), 'error')
+            return redirect(url_for('records'))
 
-        msg = t('transactions.batch_deleted', '成功批量删除 {count} 条记录', count=len(valid_ids))
+        actual_ids = [r['id'] for r in rows]
+        now_iso = datetime.now().isoformat()
+        snapshot_items = [{
+            'id': r['id'],
+            'date': r['date'],
+            'type': r['type'],
+            'group_name': r['group_name'],
+            'category': r['category'],
+            'amount': r['amount'],
+            'note': r['note'],
+            'tags': r['tags'],
+            'account_id': r['account_id'],
+            'deleted_at': r['deleted_at']
+        } for r in rows]
+        desc = f"批量删除 {len(actual_ids)} 条记录"
+        cur = db.execute(
+            "INSERT INTO operation_snapshots (user_id, operation_type, description, snapshot_data, created_at) VALUES (?, ?, ?, ?, ?)",
+            (str(user_id), 'batch_delete', desc, json.dumps(snapshot_items), now_iso)
+        )
+        snapshot_id = cur.lastrowid
+
+        act_placeholders = ','.join('?' * len(actual_ids))
+        db.execute(f'UPDATE transactions SET deleted_at = ? WHERE user_id = ? AND id IN ({act_placeholders})', [now_iso, user_id] + actual_ids)
+        db.commit()
+        bump_data_version('batch_delete', {'count': len(actual_ids), 'snapshot_id': snapshot_id, 'recycle': True}, user_id=user_id, db=db)
+
+        msg = t('transactions.batch_recycled', '成功将 {count} 条记录移入回收站', count=len(actual_ids))
         if is_ajax_request():
-            return jsonify({'ok': True, 'message': msg, 'deleted_ids': valid_ids})
+            return jsonify({
+                'ok': True,
+                'message': msg,
+                'deleted_ids': actual_ids,
+                'snapshot_id': snapshot_id,
+                'undo_url': url_for('transactions.undo_operation', snapshot_id=snapshot_id)
+            })
 
         flash(msg, 'success')
     else:
@@ -440,10 +515,17 @@ def batch_edit_records():
     """批量修改记录的分类与类型"""
     user_id = get_current_user_id()
     db = get_db()
-    ids = request.form.getlist('ids')
-    new_type = request.form.get('type')
-    new_category = request.form.get('category')
-    group_name = request.form.get('group_name') or None
+    json_data = request.get_json(silent=True) if request.is_json else None
+    if json_data:
+        ids = json_data.get('ids', [])
+        new_type = json_data.get('type')
+        new_category = json_data.get('category')
+        group_name = json_data.get('group_name') or None
+    else:
+        ids = request.form.getlist('ids')
+        new_type = request.form.get('type')
+        new_category = request.form.get('category')
+        group_name = request.form.get('group_name') or None
     if new_type and new_type != 'income':
         group_name = None
 
@@ -489,10 +571,29 @@ def batch_edit_records():
 
     set_clause = ", ".join(updates)
     placeholders = ','.join('?' * len(valid_ids))
-    sql = f"UPDATE transactions SET {set_clause} WHERE user_id = ? AND id IN ({placeholders})"
+
+    # 构建快照以便一键撤销批量修改
+    rows = db.execute(
+        f"SELECT id, type, group_name, category FROM transactions WHERE user_id = ? AND id IN ({placeholders}) AND deleted_at IS NULL",
+        [user_id] + valid_ids
+    ).fetchall()
+    snapshot_items = [{
+        'id': r['id'],
+        'type': r['type'],
+        'group_name': r['group_name'],
+        'category': r['category']
+    } for r in rows]
+    desc = f"批量修改分类/类型 {len(rows)} 条记录"
+    cur = db.execute(
+        "INSERT INTO operation_snapshots (user_id, operation_type, description, snapshot_data, created_at) VALUES (?, ?, ?, ?, ?)",
+        (str(user_id), 'batch_edit', desc, json.dumps(snapshot_items), datetime.now().isoformat())
+    )
+    snapshot_id = cur.lastrowid
+
+    sql = f"UPDATE transactions SET {set_clause} WHERE user_id = ? AND id IN ({placeholders}) AND deleted_at IS NULL"
     db.execute(sql, params + [user_id] + valid_ids)
     db.commit()
-    bump_data_version('batch_edit', {'count': len(valid_ids)})
+    bump_data_version('batch_edit', {'count': len(valid_ids), 'snapshot_id': snapshot_id}, user_id=user_id, db=db)
 
     # 批量修改后，对涉及到的每个支出分类各检查一次是否需要发出超支提醒
     budget_alerts = []
@@ -511,7 +612,14 @@ def batch_edit_records():
 
     msg = t('transactions.batch_edited', '成功批量修改 {count} 条记录', count=len(valid_ids))
     if is_ajax_request():
-        return jsonify({'ok': True, 'message': msg, 'edited_ids': valid_ids, 'budget_alerts': budget_alerts})
+        return jsonify({
+            'ok': True,
+            'message': msg,
+            'edited_ids': valid_ids,
+            'snapshot_id': snapshot_id,
+            'undo_url': f'/records/undo/{snapshot_id}',
+            'budget_alerts': budget_alerts
+        })
 
     flash(msg, 'success')
     return redirect(url_for('records'))
@@ -1090,3 +1198,223 @@ def api_merchant_suggestions():
         'ok': True,
         'suggestions': suggestions
     })
+
+
+# -----------------------------------------------------------------------------
+# 撤销中心与回收站路由 (Undo Snapshots & Recycle Bin)
+# -----------------------------------------------------------------------------
+
+@transactions_bp.route('/records/undo/<int:snapshot_id>', methods=['POST'], endpoint='undo_operation')
+def undo_operation(snapshot_id):
+    """撤销操作：根据快照数据原子恢复记录状态"""
+    user_id = get_current_user_id()
+    db = get_db()
+    snap = db.execute(
+        "SELECT * FROM operation_snapshots WHERE id = ? AND user_id = ?",
+        (snapshot_id, str(user_id))
+    ).fetchone()
+    if not snap:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': t('transactions.snapshot_not_found', '未找到该操作快照')}), 404
+        flash(t('transactions.snapshot_not_found', '未找到该操作快照'), 'error')
+        return redirect(url_for('records'))
+
+    if snap['is_reverted']:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': t('transactions.snapshot_already_reverted', '该操作已经撤销过，无需重复撤销')}), 400
+        flash(t('transactions.snapshot_already_reverted', '该操作已经撤销过，无需重复撤销'), 'warning')
+        return redirect(url_for('records'))
+
+    try:
+        items = json.loads(snap['snapshot_data'])
+    except Exception as e:
+        logger.error("Failed to parse snapshot data: %s", e)
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': t('transactions.snapshot_corrupted', '快照数据损坏，无法撤销')}), 500
+        flash(t('transactions.snapshot_corrupted', '快照数据损坏，无法撤销'), 'error')
+        return redirect(url_for('records'))
+
+    op_type = snap['operation_type']
+    if op_type in ('single_delete', 'batch_delete'):
+        for item in items:
+            db.execute(
+                "UPDATE transactions SET deleted_at = ? WHERE id = ? AND user_id = ?",
+                (item.get('deleted_at'), item['id'], str(user_id))
+            )
+    elif op_type == 'batch_edit':
+        for item in items:
+            db.execute(
+                "UPDATE transactions SET type = ?, group_name = ?, category = ? WHERE id = ? AND user_id = ?",
+                (item.get('type'), item.get('group_name'), item.get('category'), item['id'], str(user_id))
+            )
+
+    db.execute("UPDATE operation_snapshots SET is_reverted = 1 WHERE id = ?", (snapshot_id,))
+    db.commit()
+    bump_data_version('undo', {'snapshot_id': snapshot_id, 'operation_type': op_type}, user_id=user_id, db=db)
+
+    msg = t('transactions.undo_success', '已成功撤销该操作')
+    if is_ajax_request():
+        return jsonify({'ok': True, 'message': msg, 'reverted_count': len(items)})
+    flash(msg, 'success')
+    return redirect(url_for('records'))
+
+
+@transactions_bp.route('/recycle-bin', methods=['GET'], endpoint='recycle_bin_page')
+def recycle_bin_page():
+    """回收站主页：查看已删除的交易记录"""
+    user_id = get_current_user_id()
+    db = get_db()
+    search = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
+    if page < 1:
+        page = 1
+    page_size = 25
+
+    where_clauses = ['t.user_id = ?', 't.deleted_at IS NOT NULL']
+    params = [str(user_id)]
+    if search:
+        term = f"%{search}%"
+        where_clauses.append('(t.note LIKE ? OR t.category LIKE ? OR t.tags LIKE ?)')
+        params.extend([term, term, term])
+
+    where_sql = ' AND '.join(where_clauses)
+    count_row = db.execute(f"SELECT COUNT(*) as cnt FROM transactions t WHERE {where_sql}", params).fetchone()
+    total_count = count_row['cnt'] if count_row else 0
+
+    offset = (page - 1) * page_size
+    rows = db.execute(f'''
+        SELECT t.*, a.name as account_name
+        FROM transactions t
+        LEFT JOIN accounts a ON t.account_id = a.id
+        WHERE {where_sql}
+        ORDER BY t.deleted_at DESC, t.id DESC
+        LIMIT ? OFFSET ?
+    ''', params + [page_size, offset]).fetchall()
+
+    has_more = (offset + len(rows)) < total_count
+
+    return render_template(
+        'recycle_bin.html',
+        rows=rows,
+        total_count=total_count,
+        search=search,
+        page=page,
+        has_more=has_more
+    )
+
+
+@transactions_bp.route('/recycle-bin/<int:tx_id>/restore', methods=['POST'], endpoint='restore_record')
+def restore_record(tx_id):
+    """恢复回收站中的单条记录"""
+    user_id = get_current_user_id()
+    db = get_db()
+    row = db.execute('SELECT id FROM transactions WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL', (tx_id, str(user_id))).fetchone()
+    if not row:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': t('recycle_bin.record_not_found', '记录未找到或未在回收站中')}), 404
+        flash(t('recycle_bin.record_not_found', '记录未找到或未在回收站中'), 'error')
+        return redirect(url_for('transactions.recycle_bin_page'))
+
+    db.execute('UPDATE transactions SET deleted_at = NULL WHERE id = ? AND user_id = ?', (tx_id, str(user_id)))
+    db.commit()
+    bump_data_version('restore', {'id': tx_id}, user_id=user_id, db=db)
+
+    msg = t('recycle_bin.restored_success', '已成功恢复 {count} 条记录', count=1)
+    if is_ajax_request():
+        return jsonify({'ok': True, 'message': msg, 'id': tx_id})
+    flash(msg, 'success')
+    return redirect(url_for('transactions.recycle_bin_page'))
+
+
+@transactions_bp.route('/recycle-bin/batch-restore', methods=['POST'], endpoint='batch_restore_records')
+def batch_restore_records():
+    """批量恢复选中的回收站记录"""
+    user_id = get_current_user_id()
+    db = get_db()
+    ids = request.form.getlist('ids')
+    if not ids and request.is_json:
+        ids = request.json.get('ids', [])
+
+    valid_ids = []
+    for i in ids:
+        try:
+            valid_ids.append(int(i))
+        except (ValueError, TypeError):
+            pass
+
+    if not valid_ids:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': t('transactions.no_records_selected', '未选中任何记录')}), 400
+        flash(t('transactions.no_records_selected', '未选中任何记录'), 'error')
+        return redirect(url_for('transactions.recycle_bin_page'))
+
+    placeholders = ','.join('?' * len(valid_ids))
+    cur = db.execute(
+        f'UPDATE transactions SET deleted_at = NULL WHERE user_id = ? AND id IN ({placeholders}) AND deleted_at IS NOT NULL',
+        [str(user_id)] + valid_ids
+    )
+    restored_count = cur.rowcount
+    db.commit()
+    bump_data_version('restore', {'count': restored_count}, user_id=user_id, db=db)
+
+    msg = t('recycle_bin.restored_success', '已成功恢复 {count} 条记录', count=restored_count)
+    if is_ajax_request():
+        return jsonify({'ok': True, 'message': msg, 'restored_count': restored_count})
+    flash(msg, 'success')
+    return redirect(url_for('transactions.recycle_bin_page'))
+
+
+@transactions_bp.route('/recycle-bin/<int:tx_id>/permanent-delete', methods=['POST'], endpoint='permanent_delete_record')
+def permanent_delete_record(tx_id):
+    """彻底销毁单条记录"""
+    user_id = get_current_user_id()
+    db = get_db()
+    cur = db.execute('DELETE FROM transactions WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL', (tx_id, str(user_id)))
+    cnt = cur.rowcount
+    db.commit()
+    bump_data_version('permanent_delete', {'id': tx_id}, user_id=user_id, db=db)
+
+    if cnt == 0:
+        if is_ajax_request():
+            return jsonify({'ok': False, 'message': t('recycle_bin.record_not_found', '记录未找到')}), 404
+        flash(t('recycle_bin.record_not_found', '记录未找到'), 'error')
+        return redirect(url_for('transactions.recycle_bin_page'))
+
+    msg = t('recycle_bin.permanent_deleted', '记录已彻底销毁')
+    if is_ajax_request():
+        return jsonify({'ok': True, 'message': msg, 'id': tx_id})
+    flash(msg, 'success')
+    return redirect(url_for('transactions.recycle_bin_page'))
+
+
+@transactions_bp.route('/recycle-bin/empty', methods=['POST'], endpoint='empty_recycle_bin')
+def empty_recycle_bin():
+    """清空回收站中属于当前用户的所有已删除记录"""
+    user_id = get_current_user_id()
+    db = get_db()
+    cur = db.execute('DELETE FROM transactions WHERE user_id = ? AND deleted_at IS NOT NULL', (str(user_id),))
+    cnt = cur.rowcount
+    db.commit()
+    bump_data_version('empty_recycle_bin', {'deleted_count': cnt}, user_id=user_id, db=db)
+
+    msg = t('recycle_bin.empty_success', '回收站已清空')
+    if is_ajax_request():
+        return jsonify({'ok': True, 'message': msg, 'deleted_count': cnt})
+    flash(msg, 'success')
+    return redirect(url_for('transactions.recycle_bin_page'))
+
+
+@transactions_bp.route('/api/recycle-bin', methods=['GET'], endpoint='api_recycle_bin')
+def api_recycle_bin():
+    """API 获取回收站数据及统计"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'ok': False, 'message': 'Unauthorized'}), 401
+    db = get_db()
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    search = request.args.get('search', '').strip() or None
+    from services.native_api_service import get_native_recycle_bin
+    res = get_native_recycle_bin(user_id=user_id, page=page, limit=limit, search=search, db=db)
+    return jsonify(res)
+

@@ -35,7 +35,12 @@ from services.native_api_service import (
     get_native_accounts_summary,
     add_or_update_native_account,
     get_native_categories_list,
-    get_native_tools_summary
+    get_native_tools_summary,
+    get_native_recycle_bin,
+    restore_native_recycle_bin,
+    permanent_delete_native_recycle_bin,
+    empty_native_recycle_bin,
+    undo_native_operation
 )
 
 auto_track_bp = Blueprint('auto_track', __name__)
@@ -451,7 +456,7 @@ def api_auto_track():
                 matched_expense = db.execute('''
                     SELECT id, date, category, amount, note 
                     FROM transactions 
-                    WHERE user_id = ? AND type = 'expense' 
+                    WHERE user_id = ? AND type = 'expense' AND deleted_at IS NULL
                       AND (note LIKE ? OR ? LIKE '%' || note || '%' OR (category = '交通' AND ? = '交通'))
                     ORDER BY date DESC, created_at DESC, id DESC LIMIT 1
                 ''', (target_user_id, f"%{merchant_search}%", merchant_search, parsed.get('category'))).fetchone()
@@ -460,7 +465,7 @@ def api_auto_track():
                 matched_expense = db.execute('''
                     SELECT id, date, category, amount, note 
                     FROM transactions 
-                    WHERE user_id = ? AND type = 'expense' 
+                    WHERE user_id = ? AND type = 'expense' AND deleted_at IS NULL
                     ORDER BY date DESC, created_at DESC, id DESC LIMIT 1
                 ''', (target_user_id,)).fetchone()
 
@@ -627,7 +632,7 @@ def api_auto_track():
             last_expense = db.execute('''
                 SELECT id, date, category, amount, note, created_at 
                 FROM transactions 
-                WHERE user_id = ? AND type = 'expense' 
+                WHERE user_id = ? AND type = 'expense' AND deleted_at IS NULL
                 ORDER BY date DESC, created_at DESC, id DESC LIMIT 1
             ''', (target_user_id,)).fetchone()
 
@@ -826,7 +831,7 @@ def api_sync_transactions():
             # 离线同步防重检查：如果同用户、同日期、同类型、同金额、同备注的交易已存在，跳过插入
             existing = db.execute('''
                 SELECT id FROM transactions
-                WHERE user_id = ? AND date = ? AND (type = ? OR (type IN ('expense', 'income') AND ? = 'transfer')) AND abs(amount - ?) < 0.005 AND note = ?
+                WHERE user_id = ? AND date = ? AND (type = ? OR (type IN ('expense', 'income') AND ? = 'transfer')) AND abs(amount - ?) < 0.005 AND note = ? AND deleted_at IS NULL
                 LIMIT 1
             ''', (str(user_id), t_date, t_type, t_type, amt, t_note)).fetchone()
 
@@ -1196,4 +1201,66 @@ def api_native_tools_summary():
 
     res = get_native_tools_summary(user_id=user_id, db=db)
     return jsonify(res)
+
+
+@auto_track_bp.route('/api/native/recycle-bin', methods=['GET'], endpoint='api_native_recycle_bin')
+@csrf.exempt
+def api_native_recycle_bin():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    search = request.args.get('search', '').strip() or None
+    res = get_native_recycle_bin(user_id=user_id, page=page, limit=limit, search=search, db=db)
+    return jsonify(res)
+
+
+@auto_track_bp.route('/api/native/recycle-bin/<int:tx_id>/restore', methods=['POST'], endpoint='api_native_recycle_bin_restore')
+@csrf.exempt
+def api_native_recycle_bin_restore(tx_id: int):
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+    res = restore_native_recycle_bin(user_id=user_id, tx_id=tx_id, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/recycle-bin/<int:tx_id>/permanent-delete', methods=['POST', 'DELETE'], endpoint='api_native_recycle_bin_permanent_delete')
+@csrf.exempt
+def api_native_recycle_bin_permanent_delete(tx_id: int):
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+    res = permanent_delete_native_recycle_bin(user_id=user_id, tx_id=tx_id, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/recycle-bin/empty', methods=['POST', 'DELETE'], endpoint='api_native_recycle_bin_empty')
+@csrf.exempt
+def api_native_recycle_bin_empty():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+    res = empty_native_recycle_bin(user_id=user_id, db=db)
+    return jsonify(res)
+
+
+@auto_track_bp.route('/api/native/records/undo/<int:snapshot_id>', methods=['POST'], endpoint='api_native_records_undo')
+@csrf.exempt
+def api_native_records_undo(snapshot_id: int):
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+    res = undo_native_operation(user_id=user_id, snapshot_id=snapshot_id, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
 

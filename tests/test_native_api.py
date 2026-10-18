@@ -268,8 +268,10 @@ def test_native_transfer_pair_consistency_and_filter(flask_app, client, admin_us
 
     with flask_app.app.app_context():
         db = get_db()
-        remain_transfers = db.execute("SELECT COUNT(*) AS cnt FROM transactions WHERE user_id = ? AND note LIKE '%日常调拨资金%'", (admin_user_id,)).fetchone()
+        remain_transfers = db.execute("SELECT COUNT(*) AS cnt FROM transactions WHERE user_id = ? AND note LIKE '%日常调拨资金%' AND deleted_at IS NULL", (admin_user_id,)).fetchone()
         assert remain_transfers['cnt'] == 0
+        deleted_transfers = db.execute("SELECT COUNT(*) AS cnt FROM transactions WHERE user_id = ? AND note LIKE '%日常调拨资金%' AND deleted_at IS NOT NULL", (admin_user_id,)).fetchone()
+        assert deleted_transfers['cnt'] == 2
 
 
 def test_native_subscription_monthly_calculation(flask_app, client, admin_user_id):

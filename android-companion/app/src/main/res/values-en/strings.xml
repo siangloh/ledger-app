@@ -218,4 +218,15 @@
     <string name="cannot_transfer_msg">You need at least two accounts to make internal transfers. Please add an account first.</string>
     <string name="from_account_label">From Account:</string>
     <string name="to_account_label">To Account:</string>
+
+    <!-- Recycle Bin -->
+    <string name="tools_recycle_bin">Recycle Bin</string>
+    <string name="tools_recycle_bin_desc">Restore or permanently delete removed transactions</string>
+    <string name="recycle_bin_restore_btn">Restore</string>
+    <string name="recycle_bin_delete_btn">Delete Permanently</string>
+    <string name="recycle_bin_empty_btn">Empty Recycle Bin</string>
+    <string name="recycle_bin_empty_title">Recycle Bin is Empty</string>
+    <string name="recycle_bin_empty_desc">No deleted transactions found</string>
+    <string name="recycle_bin_confirm_empty">Are you sure you want to empty the recycle bin? This cannot be undone!</string>
+    <string name="recycle_bin_confirm_delete">Are you sure you want to permanently delete this? This cannot be undone!</string>
 </resources>

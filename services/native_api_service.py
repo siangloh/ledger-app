@@ -2,6 +2,7 @@
 Native API Service for mobile companion apps (Android Jetpack Compose & heads-up overlays).
 Adheres strictly to Thin Controller and Explicit Parameters rules (no implicit Flask context).
 """
+import json
 import logging
 import secrets
 from calendar import monthrange
@@ -94,7 +95,7 @@ def get_native_overview_summary(
     rows = db.execute('''
         SELECT id, date, type, category, amount, note, source, created_at
         FROM transactions
-        WHERE user_id = ? AND date BETWEEN ? AND ?
+        WHERE user_id = ? AND date BETWEEN ? AND ? AND deleted_at IS NULL
         ORDER BY date DESC, id DESC
     ''', (str(user_id), start_date, end_date)).fetchall()
 
@@ -179,7 +180,7 @@ def get_native_overview_summary(
             dup_info = None
             if p['suspected_duplicate_id']:
                 dup_row = db.execute(
-                    "SELECT id, date, amount, note, category FROM transactions WHERE id = ? AND user_id = ?",
+                    "SELECT id, date, amount, note, category FROM transactions WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
                     (p['suspected_duplicate_id'], str(user_id))
                 ).fetchone()
                 if dup_row:
@@ -319,7 +320,7 @@ def update_transaction_quick_category(
     clean_category = category.strip()
     target_tx = db.execute('''
         SELECT id, note, category, amount, date FROM transactions
-        WHERE id = ? AND user_id = ?
+        WHERE id = ? AND user_id = ? AND deleted_at IS NULL
     ''', (transaction_id, str(user_id))).fetchone()
 
     if not target_tx:
@@ -379,7 +380,7 @@ def get_native_transactions_list(
     if not db or not user_id:
         return {'ok': False, 'message': 'Invalid user or database connection'}
 
-    where_clauses = ["t.user_id = ?"]
+    where_clauses = ["t.user_id = ?", "t.deleted_at IS NULL"]
     params = [str(user_id)]
 
     INTERNAL_TRANSFER_CATS = ('内部划转', '转账/充值', '自转', '互转')
@@ -663,10 +664,11 @@ def delete_native_transaction(user_id: Any, tx_id: int, db: Any = None) -> Dict[
         return {'ok': False, 'message': '未授权或数据库连接失败'}
 
     from core.db import bump_data_version
+    now_iso = datetime.now().isoformat()
 
-    tx = db.execute('SELECT id, tags FROM transactions WHERE id = ? AND user_id = ?', (tx_id, str(user_id))).fetchone()
+    tx = db.execute('SELECT id, tags, date, category, amount, note, type, group_name, account_id, deleted_at FROM transactions WHERE id = ? AND user_id = ? AND deleted_at IS NULL', (tx_id, str(user_id))).fetchone()
     if not tx:
-        return {'ok': False, 'message': '未找到此交易记录'}
+        return {'ok': False, 'message': '未找到此交易记录或已被移入回收站'}
 
     tags = tx['tags'] or ''
     pair_tag = None
@@ -676,14 +678,28 @@ def delete_native_transaction(user_id: Any, tx_id: int, db: Any = None) -> Dict[
             break
 
     if pair_tag:
-        # 成对转账：原子同步删除出账与入账记录
-        db.execute("DELETE FROM transactions WHERE user_id = ? AND tags LIKE ?", (str(user_id), f"%{pair_tag}%"))
+        paired = db.execute("SELECT id, date, type, group_name, category, amount, note, tags, account_id, deleted_at FROM transactions WHERE user_id = ? AND tags LIKE ? AND deleted_at IS NULL", (str(user_id), f"%{pair_tag}%")).fetchall()
+        snapshot_items = [dict(p) for p in paired]
+        desc = "删除成对转账交易"
+        cur = db.execute(
+            "INSERT INTO operation_snapshots (user_id, operation_type, description, snapshot_data, created_at) VALUES (?, ?, ?, ?, ?)",
+            (str(user_id), 'single_delete', desc, json.dumps(snapshot_items), now_iso)
+        )
+        snapshot_id = cur.lastrowid
+        db.execute("UPDATE transactions SET deleted_at = ? WHERE user_id = ? AND tags LIKE ?", (now_iso, str(user_id), f"%{pair_tag}%"))
     else:
-        db.execute('DELETE FROM transactions WHERE id = ? AND user_id = ?', (tx_id, str(user_id)))
+        snapshot_items = [dict(tx)]
+        desc = f"删除交易: {tx['date']} {tx['category'] or ''} {tx['amount']}"
+        cur = db.execute(
+            "INSERT INTO operation_snapshots (user_id, operation_type, description, snapshot_data, created_at) VALUES (?, ?, ?, ?, ?)",
+            (str(user_id), 'single_delete', desc, json.dumps(snapshot_items), now_iso)
+        )
+        snapshot_id = cur.lastrowid
+        db.execute('UPDATE transactions SET deleted_at = ? WHERE id = ? AND user_id = ?', (now_iso, tx_id, str(user_id)))
 
     db.commit()
-    bump_data_version('delete', {'id': tx_id, 'user_id': user_id}, user_id=user_id, db=db)
-    return {'ok': True, 'message': '交易记录已删除'}
+    bump_data_version('delete', {'id': tx_id, 'user_id': user_id, 'snapshot_id': snapshot_id, 'recycle': True}, user_id=user_id, db=db)
+    return {'ok': True, 'message': '交易记录已移入回收站', 'snapshot_id': snapshot_id}
 
 
 # -----------------------------------------------------------------------------
@@ -719,7 +735,7 @@ def get_native_accounts_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
             COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0.0 END), 0.0) AS income_sum,
             COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0.0 END), 0.0) AS expense_sum
         FROM transactions
-        WHERE user_id = ? AND account_id IS NOT NULL
+        WHERE user_id = ? AND account_id IS NOT NULL AND deleted_at IS NULL
         GROUP BY account_id
     ''', (str(user_id),)).fetchall()
     flow_map = {r['account_id']: r for r in flow_rows}
@@ -941,4 +957,166 @@ def get_native_tools_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
         'installments': installments,
         'total_remaining_inst': round(total_remaining_inst, 2)
     }
+
+
+# -----------------------------------------------------------------------------
+# 原生回收站与操作快照撤销接口 (Recycle Bin & Undo)
+# -----------------------------------------------------------------------------
+
+def get_native_recycle_bin(user_id: Any, page: int = 1, limit: int = 50, search: Optional[str] = None, db: Any = None) -> Dict[str, Any]:
+    if not db or not user_id:
+        return {'ok': False, 'message': '未授权或数据库连接失败'}
+
+    where_clauses = ["t.user_id = ?", "t.deleted_at IS NOT NULL"]
+    params = [str(user_id)]
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        where_clauses.append("(t.note LIKE ? OR t.category LIKE ? OR t.tags LIKE ?)")
+        params.extend([term, term, term])
+
+    where_sql = " AND ".join(where_clauses)
+    total = db.execute(f"SELECT COUNT(*) AS cnt FROM transactions t WHERE {where_sql}", params).fetchone()['cnt']
+
+    page = max(1, page)
+    limit = max(1, min(limit, 100))
+    offset = (page - 1) * limit
+
+    data_query = f'''
+        SELECT t.id, t.date, t.type, t.category, t.amount, t.note, t.tags, t.account_id,
+               t.source, t.created_at, t.deleted_at, a.name AS account_name
+        FROM transactions t
+        LEFT JOIN accounts a ON t.account_id = a.id AND a.user_id = t.user_id
+        WHERE {where_sql}
+        ORDER BY t.deleted_at DESC, t.id DESC LIMIT ? OFFSET ?
+    '''
+    rows = db.execute(data_query, params + [limit, offset]).fetchall()
+    items = []
+    for r in rows:
+        items.append({
+            'id': r['id'],
+            'date': r['date'],
+            'type': r['type'],
+            'category': r['category'] or '其他',
+            'amount': float(r['amount'] or 0.0),
+            'note': r['note'] or '',
+            'tags': r['tags'] or '',
+            'account_id': r['account_id'],
+            'account_name': r['account_name'] or '默认账户',
+            'source': r['source'] or 'manual',
+            'created_at': r['created_at'],
+            'deleted_at': r['deleted_at']
+        })
+
+    return {
+        'ok': True,
+        'items': items,
+        'total_count': total,
+        'page': page,
+        'limit': limit,
+        'has_more': (offset + len(items)) < total
+    }
+
+
+def restore_native_recycle_bin(user_id: Any, tx_id: Optional[int] = None, ids: Optional[list] = None, db: Any = None) -> Dict[str, Any]:
+    if not db or not user_id:
+        return {'ok': False, 'message': '未授权或数据库连接失败'}
+
+    from core.db import bump_data_version
+    restore_ids = []
+    if tx_id:
+        restore_ids.append(tx_id)
+    if ids:
+        restore_ids.extend([int(i) for i in ids if str(i).isdigit()])
+
+    if not restore_ids:
+        return {'ok': False, 'message': '未指定要恢复的记录'}
+
+    placeholders = ','.join('?' * len(restore_ids))
+    cur = db.execute(
+        f"UPDATE transactions SET deleted_at = NULL WHERE user_id = ? AND id IN ({placeholders}) AND deleted_at IS NOT NULL",
+        [str(user_id)] + restore_ids
+    )
+    restored_count = cur.rowcount
+    db.commit()
+    bump_data_version('restore', {'restored_count': restored_count, 'user_id': user_id}, user_id=user_id, db=db)
+    return {'ok': True, 'message': f'成功恢复 {restored_count} 条记录', 'restored_count': restored_count}
+
+
+def permanent_delete_native_recycle_bin(user_id: Any, tx_id: Optional[int] = None, ids: Optional[list] = None, db: Any = None) -> Dict[str, Any]:
+    if not db or not user_id:
+        return {'ok': False, 'message': '未授权或数据库连接失败'}
+
+    from core.db import bump_data_version
+    del_ids = []
+    if tx_id:
+        del_ids.append(tx_id)
+    if ids:
+        del_ids.extend([int(i) for i in ids if str(i).isdigit()])
+
+    if not del_ids:
+        return {'ok': False, 'message': '未指定要彻底删除的记录'}
+
+    placeholders = ','.join('?' * len(del_ids))
+    cur = db.execute(
+        f"DELETE FROM transactions WHERE user_id = ? AND id IN ({placeholders}) AND deleted_at IS NOT NULL",
+        [str(user_id)] + del_ids
+    )
+    deleted_count = cur.rowcount
+    db.commit()
+    bump_data_version('permanent_delete', {'deleted_count': deleted_count, 'user_id': user_id}, user_id=user_id, db=db)
+    return {'ok': True, 'message': f'已彻底销毁 {deleted_count} 条记录', 'deleted_count': deleted_count}
+
+
+def empty_native_recycle_bin(user_id: Any, db: Any = None) -> Dict[str, Any]:
+    if not db or not user_id:
+        return {'ok': False, 'message': '未授权或数据库连接失败'}
+
+    from core.db import bump_data_version
+    cur = db.execute("DELETE FROM transactions WHERE user_id = ? AND deleted_at IS NOT NULL", (str(user_id),))
+    cnt = cur.rowcount
+    db.commit()
+    bump_data_version('empty_recycle_bin', {'deleted_count': cnt, 'user_id': user_id}, user_id=user_id, db=db)
+    return {'ok': True, 'message': f'回收站已清空，共销毁 {cnt} 条记录', 'deleted_count': cnt}
+
+
+def undo_native_operation(user_id: Any, snapshot_id: int, db: Any = None) -> Dict[str, Any]:
+    if not db or not user_id:
+        return {'ok': False, 'message': '未授权或数据库连接失败'}
+
+    from core.db import bump_data_version
+    snap = db.execute(
+        "SELECT * FROM operation_snapshots WHERE id = ? AND user_id = ?",
+        (snapshot_id, str(user_id))
+    ).fetchone()
+    if not snap:
+        return {'ok': False, 'message': '未找到该操作快照'}
+
+    if snap['is_reverted']:
+        return {'ok': False, 'message': '该操作已经撤销过，无需重复撤销'}
+
+    try:
+        items = json.loads(snap['snapshot_data'])
+    except Exception as e:
+        logger.error("Failed to parse snapshot json: %s", e)
+        return {'ok': False, 'message': '快照数据损坏'}
+
+    op_type = snap['operation_type']
+    if op_type in ('single_delete', 'batch_delete'):
+        for item in items:
+            db.execute(
+                "UPDATE transactions SET deleted_at = ? WHERE id = ? AND user_id = ?",
+                (item.get('deleted_at'), item['id'], str(user_id))
+            )
+    elif op_type == 'batch_edit':
+        for item in items:
+            db.execute(
+                "UPDATE transactions SET type = ?, group_name = ?, category = ? WHERE id = ? AND user_id = ?",
+                (item.get('type'), item.get('group_name'), item.get('category'), item['id'], str(user_id))
+            )
+
+    db.execute("UPDATE operation_snapshots SET is_reverted = 1 WHERE id = ?", (snapshot_id,))
+    db.commit()
+    bump_data_version('undo', {'snapshot_id': snapshot_id, 'operation_type': op_type, 'user_id': user_id}, user_id=user_id, db=db)
+    return {'ok': True, 'message': '已成功撤销操作', 'reverted_count': len(items)}
+
 

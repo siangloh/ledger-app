@@ -466,7 +466,9 @@ def init_db(app_logger=None):
         from_savings INTEGER DEFAULT 0,
         from_savings_category TEXT,
         tags TEXT,
-        account_id INTEGER
+        account_id INTEGER,
+        merged_info TEXT,
+        deleted_at TEXT
     );
     ''')
     db.commit()
@@ -855,8 +857,29 @@ def init_db(app_logger=None):
     except Exception as e:
         logger.debug("ALTER transactions ADD merged_info notice: %s", e)
 
+    try:
+        db.execute("ALTER TABLE transactions ADD COLUMN deleted_at TEXT")
+        db.commit()
+    except Exception as e:
+        logger.debug("ALTER transactions ADD deleted_at notice: %s", e)
+
+    # 关键批量操作快照与撤销表 (Undo & Snapshots)
+    db.execute('''
+    CREATE TABLE IF NOT EXISTS operation_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        operation_type TEXT NOT NULL,
+        description TEXT,
+        snapshot_data TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        is_reverted INTEGER DEFAULT 0
+    )''')
+    db.execute('CREATE INDEX IF NOT EXISTS idx_operation_snapshots_user ON operation_snapshots(user_id, created_at DESC)')
+    db.commit()
+
     # 核心性能索引轻量幂等迁移（支持已有库热升级）
     core_indices = [
+        "CREATE INDEX IF NOT EXISTS idx_transactions_user_deleted ON transactions(user_id, deleted_at, date DESC)",
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC, id DESC)",
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_type ON transactions(user_id, type)",
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_type_cat_amt ON transactions(user_id, type, category, amount)",

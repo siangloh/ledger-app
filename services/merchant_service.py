@@ -41,15 +41,16 @@ def get_merchant_suggestions(
                 COUNT(*) AS count,
                 ROUND(AVG(t1.amount), 2) AS avg_amount,
                 (SELECT amount FROM transactions t2 
-                 WHERE t2.user_id = ? AND TRIM(t2.note) = TRIM(t1.note) 
+                 WHERE t2.user_id = ? AND TRIM(t2.note) = TRIM(t1.note) AND t2.deleted_at IS NULL
                  ORDER BY t2.date DESC, t2.id DESC LIMIT 1) AS last_amount,
                 (SELECT account_id FROM transactions t3 
-                 WHERE t3.user_id = ? AND TRIM(t3.note) = TRIM(t1.note) 
+                 WHERE t3.user_id = ? AND TRIM(t3.note) = TRIM(t1.note) AND t3.deleted_at IS NULL
                  ORDER BY t3.date DESC, t3.id DESC LIMIT 1) AS last_account_id,
                 MAX(t1.date) AS last_date
             FROM transactions t1
             LEFT JOIN merchant_category_overrides mco ON mco.merchant_note = TRIM(t1.note) AND mco.user_id = ?
             WHERE t1.user_id = ? 
+              AND t1.deleted_at IS NULL
               AND t1.note IS NOT NULL 
               AND TRIM(t1.note) != '' 
               AND TRIM(t1.note) NOT LIKE '[%'

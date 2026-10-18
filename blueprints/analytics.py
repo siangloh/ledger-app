@@ -36,7 +36,7 @@ def get_category_insights_data(db, time_range='all', start_date=None, end_date=N
             month_keys.append(cur)
             cur = shift_month(cur, 1)
 
-    query = "SELECT date, category, amount FROM transactions WHERE user_id = ? AND type='expense'"
+    query = "SELECT date, category, amount FROM transactions WHERE user_id = ? AND type='expense' AND deleted_at IS NULL"
     params = [user_id]
     if start_date:
         query += " AND date >= ?"
@@ -71,13 +71,13 @@ def get_category_insights_data(db, time_range='all', start_date=None, end_date=N
 
     # 统计当月与上月的绝对支出
     cur_month_rows = db.execute(
-        "SELECT category, SUM(amount) as total FROM transactions WHERE user_id = ? AND type='expense' AND date LIKE ? GROUP BY category",
+        "SELECT category, SUM(amount) as total FROM transactions WHERE user_id = ? AND type='expense' AND date LIKE ? AND deleted_at IS NULL GROUP BY category",
         (user_id, f"{current_month}%")
     ).fetchall()
     cur_month_map = {r['category'] or '其他': float(r['total'] or 0) for r in cur_month_rows}
 
     prev_month_rows = db.execute(
-        "SELECT category, SUM(amount) as total FROM transactions WHERE user_id = ? AND type='expense' AND date LIKE ? GROUP BY category",
+        "SELECT category, SUM(amount) as total FROM transactions WHERE user_id = ? AND type='expense' AND date LIKE ? AND deleted_at IS NULL GROUP BY category",
         (user_id, f"{prev_month}%")
     ).fetchall()
     prev_month_map = {r['category'] or '其他': float(r['total'] or 0) for r in prev_month_rows}
@@ -204,7 +204,7 @@ def api_dashboard_charts():
     end = f'{month}-{last_day:02d}'
 
     rows = db.execute(
-        'SELECT type, group_name, category, amount FROM transactions WHERE user_id = ? AND date BETWEEN ? AND ?',
+        'SELECT type, group_name, category, amount FROM transactions WHERE user_id = ? AND date BETWEEN ? AND ? AND deleted_at IS NULL',
         (user_id, start, end)
     ).fetchall()
 
@@ -268,7 +268,7 @@ def api_overview():
         end_date = (request.args.get('end') or '').strip() or None
     # 'all': start_date and end_date stay None
 
-    query = 'SELECT date, type, group_name, category, amount, COALESCE(from_savings, 0) as from_savings FROM transactions WHERE user_id = ?'
+    query = 'SELECT date, type, group_name, category, amount, COALESCE(from_savings, 0) as from_savings FROM transactions WHERE user_id = ? AND deleted_at IS NULL'
     params = [user_id]
     if start_date:
         query += ' AND date >= ?'

@@ -218,4 +218,15 @@
     <string name="cannot_transfer_msg">Anda memerlukan sekurang-kurangnya dua akaun untuk membuat pindahan dalaman. Sila tambah akaun dahulu.</string>
     <string name="from_account_label">Daripada Akaun:</string>
     <string name="to_account_label">Ke Akaun:</string>
+
+    <!-- Recycle Bin -->
+    <string name="tools_recycle_bin">Tong Kitar Semula</string>
+    <string name="tools_recycle_bin_desc">Pulihkan atau padam kekal transaksi yang dipadam</string>
+    <string name="recycle_bin_restore_btn">Pulihkan</string>
+    <string name="recycle_bin_delete_btn">Padam Kekal</string>
+    <string name="recycle_bin_empty_btn">Kosongkan Tong</string>
+    <string name="recycle_bin_empty_title">Tong Kitar Semula Kosong</string>
+    <string name="recycle_bin_empty_desc">Tiada rekod transaksi dipadam ditemui</string>
+    <string name="recycle_bin_confirm_empty">Adakah anda pasti mahu mengosongkan tong kitar semula? Ini tidak boleh dibatalkan!</string>
+    <string name="recycle_bin_confirm_delete">Adakah anda pasti mahu memadam kekal rekod ini? Ini tidak boleh dibatalkan!</string>
 </resources>

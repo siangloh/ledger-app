@@ -1,0 +1,333 @@
+{% extends layout|default('base.html') %}
+{% block title %}{{ t('recycle_bin.title', '回收站') }} - {{ t('nav.brand') }}{% endblock %}
+
+{% block content %}
+<div class="recycle-bin-container" style="max-width: 1100px; margin: 0 auto; padding-bottom: 40px;">
+  <!-- 顶部面包屑与标题栏 -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+    <div>
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+        <a href="{{ url_for('records') }}" class="btn-ghost" style="padding: 4px 10px; font-size: 13px; text-decoration: none;">
+          ← {{ t('nav.records', '历史记录') }}
+        </a>
+        <span style="color: var(--muted); font-size: 13px;">/</span>
+        <span style="color: var(--navy); font-weight: 600; font-size: 14px;">{{ t('recycle_bin.title', '回收站') }}</span>
+      </div>
+      <h2 style="margin: 0; font-size: 24px; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 8px;">
+        <span>🗑️</span> {{ t('recycle_bin.title', '回收站') }}
+      </h2>
+      <p style="margin: 4px 0 0; color: var(--ink-soft); font-size: 13px;">
+        {{ t('recycle_bin.subtitle', '已删除的交易记录暂存在此处，可随时恢复或彻底销毁') }}
+      </p>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      {% if rows %}
+      <button type="button" class="btn-danger-solid" onclick="confirmEmptyRecycleBin()" style="padding: 8px 16px; font-size: 13px;">
+        {{ t('recycle_bin.empty_bin', '清空回收站') }}
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 搜索筛选栏 -->
+  <form method="get" action="{{ url_for('transactions.recycle_bin_page') }}" class="filters" style="margin-bottom: 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+    <label style="flex: 1; min-width: 220px; margin: 0;">
+      <input type="text" name="search" value="{{ search or '' }}" placeholder="{{ t('common.search', '搜索备注、分类、标签...') }}" style="width: 100%;">
+    </label>
+    <div style="display: flex; gap: 8px;">
+      <button type="submit" class="btn-primary" style="padding: 7px 16px;">{{ t('common.filter', '筛选') }}</button>
+      {% if search %}
+      <a href="{{ url_for('transactions.recycle_bin_page') }}" class="btn-ghost" style="padding: 7px 14px; text-decoration: none;">{{ t('common.cancel', '重置') }}</a>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if rows %}
+  <form method="post" action="{{ url_for('transactions.batch_restore_records') }}" id="recycleBatchForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <!-- 批量恢复浮动栏 -->
+    <div id="recycleBatchBar" style="display: none; align-items: center; justify-content: space-between; background: var(--surface-soft); padding: 10px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+      <div style="font-size: 14px; color: var(--ink-soft);">
+        {{ t('records.batch_selected', count='<strong id="recycleSelectedCount" style="color: var(--teal, #0F766E);">0</strong>')|safe }}
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button type="button" class="btn-ghost" onclick="clearRecycleSelections()" style="padding: 5px 12px; font-size: 13px;">{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn-primary" style="padding: 5px 16px; font-size: 13px;">
+          {{ t('recycle_bin.batch_restore', '批量恢复') }}
+        </button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="records-table">
+        <thead>
+          <tr>
+            <th style="width: 40px; text-align: center;">
+              <input type="checkbox" id="selectAllRecycleCheckbox" onchange="toggleSelectAllRecycle(this)">
+            </th>
+            <th>{{ t('records.th_date', '记账日期') }}</th>
+            <th>{{ t('records.th_type', '类型') }}</th>
+            <th>{{ t('records.th_category', '分类') }}</th>
+            <th style="text-align: right; padding-right: 18px;">{{ t('records.th_amount', '金额') }}</th>
+            <th>{{ t('records.th_note', '备注/商户') }}</th>
+            <th>{{ t('recycle_bin.deleted_at', '删除时间') }}</th>
+            <th style="text-align: right; min-width: 140px;">{{ t('records.th_actions', '操作') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr id="recycle-row-{{ r.id }}" data-id="{{ r.id }}">
+            <td style="text-align: center;">
+              <input type="checkbox" name="ids" value="{{ r.id }}" class="recycle-checkbox" onchange="updateRecycleBatchBar()">
+            </td>
+            <td>{{ r.date|user_date }}</td>
+            <td>
+              <span class="tag {{ 'tag-income' if r.type=='income' else ('tag-savings' if r.type=='savings' else 'tag-expense') }}">
+                {{ t('common.income') if r.type=='income' else (t('common.savings') if r.type=='savings' else t('common.expense')) }}
+              </span>
+            </td>
+            <td><strong>{{ r.category|t_cat }}</strong></td>
+            <td class="amount-cell {{ 'income' if r.type=='income' else ('savings' if r.type=='savings' else 'expense') }}">
+              {{ r.amount|money }}
+            </td>
+            <td>
+              {{ r.note or '-' }}
+              {% if r.tags %}
+              <div style="margin-top: 2px; display: flex; gap: 4px; flex-wrap: wrap;">
+                {% for tag in r.tags.split(',') %}
+                  {% if tag.strip() %}
+                  <span class="tag tag-pill-sm" style="font-size: 10px; padding: 1px 5px; opacity: 0.8;">#{{ tag.strip() }}</span>
+                  {% endif %}
+                {% endfor %}
+              </div>
+              {% endif %}
+            </td>
+            <td style="font-size: 12px; color: var(--muted);" title="{{ r.deleted_at }}">
+              {{ r.deleted_at[:16]|replace('T', ' ') if r.deleted_at else '-' }}
+            </td>
+            <td class="actions" style="text-align: right;">
+              <div style="display: inline-flex; gap: 6px;">
+                <button type="button" class="btn-primary" onclick="restoreSingleItem({{ r.id }})" style="padding: 4px 10px; font-size: 12px;">
+                  {{ t('recycle_bin.restore', '恢复') }}
+                </button>
+                <button type="button" class="btn-danger-ghost" onclick="permanentDeleteSingleItem({{ r.id }}, '{{ r.date }} · {{ r.category|t_cat }} · {{ r.amount|money }}')" style="padding: 4px 10px; font-size: 12px;">
+                  {{ t('recycle_bin.permanent_delete', '彻底删除') }}
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+  {% else %}
+  <!-- 空状态提示 -->
+  <div style="text-align: center; padding: 60px 20px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius-md); margin-top: 20px;">
+    <div style="font-size: 48px; margin-bottom: 12px; opacity: 0.6;">🌱</div>
+    <h3 style="font-size: 18px; color: var(--navy); margin-bottom: 6px;">{{ t('recycle_bin.title', '回收站') }}</h3>
+    <p style="color: var(--muted); font-size: 14px; max-width: 400px; margin: 0 auto 20px;">
+      {{ t('recycle_bin.empty_hint', '回收站空空如也，没有任何已删除的记录') }}
+    </p>
+    <a href="{{ url_for('records') }}" class="btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+      <span>📖</span> {{ t('nav.records', '返回历史记录') }}
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function updateRecycleBatchBar() {
+  const checkboxes = document.querySelectorAll('.recycle-checkbox:checked');
+  const count = checkboxes.length;
+  const bar = document.getElementById('recycleBatchBar');
+  const countSpan = document.getElementById('recycleSelectedCount');
+  if (countSpan) countSpan.textContent = count;
+  if (bar) bar.style.display = count > 0 ? 'flex' : 'none';
+
+  const allCheckboxes = document.querySelectorAll('.recycle-checkbox');
+  const selectAll = document.getElementById('selectAllRecycleCheckbox');
+  if (selectAll && allCheckboxes.length > 0) {
+    selectAll.checked = checkboxes.length === allCheckboxes.length;
+    selectAll.indeterminate = count > 0 && count < allCheckboxes.length;
+  }
+}
+
+function toggleSelectAllRecycle(masterCheckbox) {
+  const allCheckboxes = document.querySelectorAll('.recycle-checkbox');
+  allCheckboxes.forEach(cb => { cb.checked = masterCheckbox.checked; });
+  updateRecycleBatchBar();
+}
+
+function clearRecycleSelections() {
+  const allCheckboxes = document.querySelectorAll('.recycle-checkbox');
+  allCheckboxes.forEach(cb => { cb.checked = false; });
+  const selectAll = document.getElementById('selectAllRecycleCheckbox');
+  if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
+  updateRecycleBatchBar();
+}
+
+function restoreSingleItem(id) {
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+  fetch(`/recycle-bin/${id}/restore`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfToken,
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      const row = document.getElementById(`recycle-row-${id}`);
+      if (row) {
+        row.style.transition = 'all 0.3s ease';
+        row.style.opacity = '0';
+        row.style.transform = 'translateX(20px)';
+        setTimeout(() => {
+          row.remove();
+          updateRecycleBatchBar();
+          const remainingRows = document.querySelectorAll('.recycle-checkbox');
+          if (remainingRows.length === 0) location.reload();
+        }, 300);
+      }
+      if (typeof Swal !== 'undefined') {
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: data.message || '已成功恢复记录',
+          showConfirmButton: false,
+          timer: 2000
+        });
+      }
+    } else {
+      alert(data.message || '恢复失败');
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    alert('网络请求失败');
+  });
+}
+
+function permanentDeleteSingleItem(id, detailText) {
+  const confirmMsg = window.t ? window.t('recycle_bin.confirm_permanent_delete', '确定要彻底删除该记录吗？此操作无法撤销！') : '确定要彻底删除该记录吗？此操作无法撤销！';
+  const performDelete = () => {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+    fetch(`/recycle-bin/${id}/permanent-delete`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.ok) {
+        const row = document.getElementById(`recycle-row-${id}`);
+        if (row) {
+          row.style.transition = 'all 0.3s ease';
+          row.style.opacity = '0';
+          row.style.transform = 'scale(0.9)';
+          setTimeout(() => {
+            row.remove();
+            updateRecycleBatchBar();
+            const remainingRows = document.querySelectorAll('.recycle-checkbox');
+            if (remainingRows.length === 0) location.reload();
+          }, 300);
+        }
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'info',
+            title: data.message || '已彻底销毁记录',
+            showConfirmButton: false,
+            timer: 2000
+          });
+        }
+      } else {
+        alert(data.message || '彻底删除失败');
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      alert('网络请求失败');
+    });
+  };
+
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      icon: 'warning',
+      title: '彻底删除',
+      html: detailText + '<br><span style="color:#d9534f;font-weight:600;font-size:13px;">' + confirmMsg + '</span>',
+      showCancelButton: true,
+      reverseButtons: true,
+      confirmButtonText: window.t ? window.t('recycle_bin.permanent_delete', '彻底删除') : '彻底删除',
+      cancelButtonText: window.t ? window.t('common.cancel', '取消') : '取消',
+      buttonsStyling: false,
+      customClass: {
+        confirmButton: 'btn-danger-solid',
+        cancelButton: 'btn-ghost',
+        actions: 'app-swal-actions'
+      }
+    }).then(res => {
+      if (res.isConfirmed) performDelete();
+    });
+  } else {
+    if (confirm(confirmMsg)) performDelete();
+  }
+}
+
+function confirmEmptyRecycleBin() {
+  const confirmMsg = window.t ? window.t('recycle_bin.confirm_empty', '确定要清空回收站中的所有记录吗？此操作无法撤销！') : '确定要清空回收站中的所有记录吗？此操作无法撤销！';
+  const performEmpty = () => {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+    fetch('/recycle-bin/empty', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.ok) {
+        location.reload();
+      } else {
+        alert(data.message || '清空失败');
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      alert('网络请求失败');
+    });
+  };
+
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      icon: 'error',
+      title: window.t ? window.t('recycle_bin.empty_bin', '清空回收站') : '清空回收站',
+      text: confirmMsg,
+      showCancelButton: true,
+      reverseButtons: true,
+      confirmButtonText: window.t ? window.t('common.confirm', '确认清空') : '确认清空',
+      cancelButtonText: window.t ? window.t('common.cancel', '取消') : '取消',
+      buttonsStyling: false,
+      customClass: {
+        confirmButton: 'btn-danger-solid',
+        cancelButton: 'btn-ghost',
+        actions: 'app-swal-actions'
+      }
+    }).then(res => {
+      if (res.isConfirmed) performEmpty();
+    });
+  } else {
+    if (confirm(confirmMsg)) performEmpty();
+  }
+}
+</script>
+{% endblock %}

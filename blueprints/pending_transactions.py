@@ -127,7 +127,7 @@ def get_pending_transactions():
                        a.name as account_name
                 FROM transactions t
                 LEFT JOIN accounts a ON t.account_id = a.id
-                WHERE t.id = ? AND t.user_id = ?
+                WHERE t.id = ? AND t.user_id = ? AND t.deleted_at IS NULL
             ''', (dup_id, str(user_id))).fetchone()
             if dup_row:
                 it['suspected_duplicate'] = dict(dup_row)

@@ -218,4 +218,15 @@
     <string name="cannot_transfer_msg">您当前可用账户不足两个，无法进行内部调拨划转。请先添加账户。</string>
     <string name="from_account_label">从转出账户：</string>
     <string name="to_account_label">到转入账户：</string>
+
+    <!-- Recycle Bin -->
+    <string name="tools_recycle_bin">回收站</string>
+    <string name="tools_recycle_bin_desc">恢复或彻底销毁已删除的交易</string>
+    <string name="recycle_bin_restore_btn">恢复</string>
+    <string name="recycle_bin_delete_btn">彻底删除</string>
+    <string name="recycle_bin_empty_btn">清空回收站</string>
+    <string name="recycle_bin_empty_title">回收站为空</string>
+    <string name="recycle_bin_empty_desc">暂无已删除的交易记录</string>
+    <string name="recycle_bin_confirm_empty">确定要清空回收站吗？此操作无法撤销！</string>
+    <string name="recycle_bin_confirm_delete">确定要彻底删除此记录吗？此操作无法撤销！</string>
 </resources>

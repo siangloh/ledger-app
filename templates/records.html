@@ -25,6 +25,9 @@
   <div class="filters-actions">
     <button type="submit" class="btn-primary">{{ t('common.filter') }}</button>
     <a href="{{ url_for('records') }}" class="btn-ghost">{{ t('common.cancel') }}</a>
+    <a href="{{ url_for('transactions.recycle_bin_page') }}" class="btn-ghost" style="display: inline-flex; align-items: center; gap: 4px; text-decoration: none;" title="{{ t('recycle_bin.title', '回收站') }}">
+      <span>🗑️</span><span>{{ t('recycle_bin.title', '回收站') }}</span>
+    </a>
   </div>
 </form>
 
@@ -178,19 +181,52 @@ function openBatchEditDialog() {
         .then(data => {
           if (typeof finishProgressBar === 'function') finishProgressBar();
           if (data.ok) {
-            Swal.fire({
-              toast: true,
-              position: 'top-end',
-              icon: 'success',
-              title: data.message,
-              showConfirmButton: false,
-              timer: 2500,
-              customClass: { popup: 'app-swal-toast' }
-            });
             if (typeof htmx !== 'undefined') {
               htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
             } else {
               window.location.reload();
+            }
+
+            if (data.undo_url) {
+              Swal.fire({
+                toast: true,
+                position: 'bottom-end',
+                icon: 'success',
+                title: data.message,
+                showConfirmButton: true,
+                confirmButtonText: window.t ? window.t('transactions.undo_btn', '撤销') : '撤销',
+                timer: 7000,
+                timerProgressBar: true,
+                buttonsStyling: false,
+                customClass: {
+                  popup: 'app-swal-toast app-swal-undo-toast',
+                  confirmButton: 'btn-primary btn-sm'
+                }
+              }).then(undoRes => {
+                if (undoRes.isConfirmed) {
+                  fetch(data.undo_url, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest' }
+                  }).then(r => r.json()).then(uData => {
+                    if (uData.ok) {
+                      Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: uData.message || '已成功撤销修改', showConfirmButton: false, timer: 2000 });
+                      if (typeof htmx !== 'undefined') {
+                        htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
+                      } else { location.reload(); }
+                    }
+                  });
+                }
+              });
+            } else {
+              Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: data.message,
+                showConfirmButton: false,
+                timer: 2500,
+                customClass: { popup: 'app-swal-toast' }
+              });
             }
           } else {
             errorAlert(data.message || (window.t ? window.t('records.batch_edit_failed', '批量修改失败') : '批量修改失败'));
@@ -321,11 +357,11 @@ function confirmBatchDelete() {
               title: window.t ? window.t('records.undo_batch_toast', '已撤销删除，记录已保留') : '已撤销删除，记录已保留',
               showConfirmButton: false,
               timer: 2000
-            });
           } else if (res.dismiss === Swal.DismissReason.timer || !isUndone) {
             if (typeof showProgressBar === 'function') showProgressBar();
             const form = document.getElementById('batchForm');
             const formData = new FormData(form);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
             fetch('{{ url_for("batch_delete_records") }}', {
               method: 'POST',
               body: formData,
@@ -337,15 +373,44 @@ function confirmBatchDelete() {
               if (data.ok) {
                 rows.forEach(r => r.remove());
                 updateBatchBar();
-                Swal.fire({
-                  toast: true,
-                  position: 'top-end',
-                  icon: 'success',
-                  title: data.message,
-                  showConfirmButton: false,
-                  timer: 2500,
-                  customClass: { popup: 'app-swal-toast' }
-                });
+                if (data.undo_url) {
+                  Swal.fire({
+                    toast: true,
+                    position: 'bottom-end',
+                    icon: 'info',
+                    title: data.message || '记录已移入回收站',
+                    showConfirmButton: true,
+                    confirmButtonText: window.t ? window.t('transactions.undo_btn', '撤销') : '撤销',
+                    timer: 7000,
+                    timerProgressBar: true,
+                    buttonsStyling: false,
+                    customClass: { popup: 'app-swal-toast app-swal-undo-toast', confirmButton: 'btn-primary btn-sm' }
+                  }).then(undoRes => {
+                    if (undoRes.isConfirmed) {
+                      fetch(data.undo_url, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest' }
+                      }).then(r => r.json()).then(uData => {
+                        if (uData.ok) {
+                          Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: uData.message || '已成功撤销删除', showConfirmButton: false, timer: 2000 });
+                          if (typeof htmx !== 'undefined') {
+                            htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
+                          } else { location.reload(); }
+                        }
+                      });
+                    }
+                  });
+                } else {
+                  Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: data.message,
+                    showConfirmButton: false,
+                    timer: 2500,
+                    customClass: { popup: 'app-swal-toast' }
+                  });
+                }
               } else {
                 rows.forEach(r => {
                   r.style.opacity = '';
@@ -459,15 +524,44 @@ function confirmSingleDelete(actionUrl, detailText, btnEl) {
               if (data.ok) {
                 if (row) row.remove();
                 updateBatchBar();
-                Swal.fire({
-                  toast: true,
-                  position: 'top-end',
-                  icon: 'success',
-                  title: data.message || (window.t ? window.t('swal.deleted', '已删除') : '记录已删除'),
-                  showConfirmButton: false,
-                  timer: 2000,
-                  customClass: { popup: 'app-swal-toast' }
-                });
+                if (data.undo_url) {
+                  Swal.fire({
+                    toast: true,
+                    position: 'bottom-end',
+                    icon: 'info',
+                    title: data.message || '记录已移入回收站',
+                    showConfirmButton: true,
+                    confirmButtonText: window.t ? window.t('transactions.undo_btn', '撤销') : '撤销',
+                    timer: 7000,
+                    timerProgressBar: true,
+                    buttonsStyling: false,
+                    customClass: { popup: 'app-swal-toast app-swal-undo-toast', confirmButton: 'btn-primary btn-sm' }
+                  }).then(undoRes => {
+                    if (undoRes.isConfirmed) {
+                      fetch(data.undo_url, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest' }
+                      }).then(r => r.json()).then(uData => {
+                        if (uData.ok) {
+                          Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: uData.message || '已成功撤销删除', showConfirmButton: false, timer: 2000 });
+                          if (typeof htmx !== 'undefined') {
+                            htmx.ajax('GET', window.location.href, { target: '#mainContainer', swap: 'innerHTML' });
+                          } else { location.reload(); }
+                        }
+                      });
+                    }
+                  });
+                } else {
+                  Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: data.message || (window.t ? window.t('swal.deleted', '已删除') : '记录已移入回收站'),
+                    showConfirmButton: false,
+                    timer: 2000,
+                    customClass: { popup: 'app-swal-toast' }
+                  });
+                }
               } else {
                 if (row) {
                   row.style.opacity = '';

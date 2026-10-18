@@ -110,7 +110,7 @@ def _query_month_metrics(user_id: int, month_str: str, db: Any) -> Dict[str, Any
     rows = db.execute('''
         SELECT amount, type, category
         FROM transactions
-        WHERE user_id = ? AND date BETWEEN ? AND ?
+        WHERE user_id = ? AND date BETWEEN ? AND ? AND deleted_at IS NULL
     ''', (user_id, start_d, end_d)).fetchall()
 
     income = 0.0
@@ -463,7 +463,7 @@ def get_monthly_poster_data(
         rows = db.execute('''
             SELECT id, date, type, group_name, category, amount, note, from_savings
             FROM transactions
-            WHERE user_id = ? AND date BETWEEN ? AND ?
+            WHERE user_id = ? AND date BETWEEN ? AND ? AND deleted_at IS NULL
             ORDER BY date ASC, id ASC
         ''', (user_id, start_date, end_date)).fetchall()
 
