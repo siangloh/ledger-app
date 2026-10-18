@@ -63,9 +63,9 @@
   </div>
 
   <!-- 4. Top 3 最贵项开销集中度 -->
-  <div class="card" style="padding: 18px 20px; border-left: 4px solid #8b5cf6; position: relative;">
+  <div class="card" style="padding: 18px 20px; border-left: 4px solid var(--primary, #0F766E); position: relative;">
     <div style="font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">{{ t('subscriptions.kpi_top3', 'Top 3 最贵订阅占比') }}</div>
-    <div style="font-size: 26px; font-weight: 700; color: #8b5cf6; margin-top: 6px;">
+    <div style="font-size: 26px; font-weight: 700; color: var(--primary, #0F766E); margin-top: 6px;">
       {{ summary.top_3_percentage_total }}%
     </div>
     <div style="font-size: 12px; color: var(--ink-soft); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -245,7 +245,7 @@
           </td>
 
           <!-- 月均等效开销 -->
-          <td class="sensitive-val" style="padding: 12px; text-align: right; font-weight: 600; color: #4f46e5;">
+          <td class="sensitive-val" style="padding: 12px; text-align: right; font-weight: 600; color: var(--primary, #0F766E);">
             {% if s.billing_cycle.value == 'MONTHLY' %}
               {{ current_user_currency|default('RM') }} {{ "{:,.2f}".format(s.cost) if s.currency == (current_user_currency_code|default('MYR')) else '换算中' }}
             {% else %}

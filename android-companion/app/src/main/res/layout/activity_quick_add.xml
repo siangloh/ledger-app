@@ -11,9 +11,9 @@
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@color/navy_primary"
-        app:titleTextColor="@color/white"
-        app:title="离线快速记账 (Quick Add)" />
+        android:background="@color/surface"
+        app:titleTextColor="@color/text_primary"
+        app:title="离线快捷记账" />
 
     <ScrollView
         android:layout_width="match_parent"
@@ -24,9 +24,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@color/card_bg"
-            android:padding="20dp"
-            android:elevation="2dp">
+            android:background="@drawable/bg_card_rounded"
+            android:padding="20dp">
 
             <!-- Type Selector -->
             <RadioGroup
@@ -41,8 +40,8 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="支出 (Expense)"
-                    android:textColor="@color/text_main"
+                    android:text="支出"
+                    android:textColor="@color/text_primary"
                     android:checked="true"
                     android:textSize="15sp" />
 
@@ -51,8 +50,8 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="收入 (Income)"
-                    android:textColor="@color/text_main"
+                    android:text="收入"
+                    android:textColor="@color/text_primary"
                     android:textSize="15sp" />
             </RadioGroup>
 
@@ -60,33 +59,34 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="金额 (RM)"
+                android:text="记账金额 (MYR)"
                 android:textStyle="bold"
-                android:textColor="@color/text_main"
+                android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 android:layout_marginBottom="4dp" />
 
             <EditText
                 android:id="@+id/amountEditText"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="52dp"
                 android:hint="0.00"
                 android:inputType="numberDecimal"
                 android:textSize="22sp"
                 android:textStyle="bold"
-                android:textColor="@color/input_text"
-                android:textColorHint="@color/input_hint"
-                android:padding="12dp"
-                android:background="@color/input_bg"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:background="@drawable/bg_input_rounded"
                 android:layout_marginBottom="16dp" />
 
             <!-- Category -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="分类 (Category)"
+                android:text="账目分类"
                 android:textStyle="bold"
-                android:textColor="@color/text_main"
+                android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 android:layout_marginBottom="4dp" />
 
@@ -94,7 +94,7 @@
                 android:id="@+id/categorySpinner"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:background="@color/input_bg"
+                android:background="@drawable/bg_input_rounded"
                 android:padding="8dp"
                 android:layout_marginBottom="16dp" />
 
@@ -102,77 +102,80 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="日期 (Date)"
+                android:text="记账日期"
                 android:textStyle="bold"
-                android:textColor="@color/text_main"
+                android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 android:layout_marginBottom="4dp" />
 
             <EditText
                 android:id="@+id/dateEditText"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
                 android:focusable="false"
                 android:clickable="true"
-                android:padding="12dp"
-                android:background="@color/input_bg"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:background="@drawable/bg_input_rounded"
                 android:textSize="15sp"
-                android:textColor="@color/input_text"
-                android:textColorHint="@color/input_hint"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted"
                 android:layout_marginBottom="16dp" />
 
             <!-- Note / Merchant -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="商户 / 备注 (Merchant / Note)"
+                android:text="商户与备注"
                 android:textStyle="bold"
-                android:textColor="@color/text_main"
+                android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 android:layout_marginBottom="4dp" />
 
             <EditText
                 android:id="@+id/noteEditText"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="如：FamilyMart 午餐"
-                android:padding="12dp"
-                android:background="@color/input_bg"
+                android:layout_height="48dp"
+                android:hint="例如：午餐、超市购物"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:background="@drawable/bg_input_rounded"
                 android:textSize="15sp"
-                android:textColor="@color/input_text"
-                android:textColorHint="@color/input_hint"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted"
                 android:layout_marginBottom="16dp" />
 
             <!-- Custom Tags -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="自定义标签 (Tags)"
+                android:text="自定义标签"
                 android:textStyle="bold"
-                android:textColor="@color/text_main"
+                android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 android:layout_marginBottom="4dp" />
 
             <EditText
                 android:id="@+id/tagEditText"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="可选，如：#出差 #报销"
-                android:padding="12dp"
-                android:background="@color/input_bg"
+                android:layout_height="48dp"
+                android:hint="可选，如：出差 报销"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:background="@drawable/bg_input_rounded"
                 android:textSize="15sp"
-                android:textColor="@color/input_text"
-                android:textColorHint="@color/input_hint"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted"
                 android:layout_marginBottom="24dp" />
 
             <!-- Save Button -->
             <Button
                 android:id="@+id/saveButton"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:backgroundTint="@color/navy_primary"
-                android:text="💾 保存记录 (离线优先)"
-                android:textColor="@color/white"
+                android:layout_height="50dp"
+                android:backgroundTint="@color/primary"
+                android:text="保存账目"
+                android:textColor="@color/on_primary"
                 android:textStyle="bold"
                 android:textSize="16sp" />
 
@@ -184,10 +187,10 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:padding="12dp"
-                android:text="✨ 需要记储蓄、账户扣减或分期？\n前往高级记账大厅"
-                android:textColor="@color/navy_primary"
+                android:text="✨ 需要记储蓄、账户扣减或转账？\n前往全功能记账大厅"
+                android:textColor="@color/primary"
                 android:textSize="13sp"
-                app:strokeColor="@color/navy_primary" />
+                app:strokeColor="@color/primary" />
 
         </LinearLayout>
     </ScrollView>

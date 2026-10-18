@@ -1549,10 +1549,10 @@ function isDarkModeActive() {
 
 function getChartPalette() {
   if (isDarkModeActive()) {
-    // 高对比度现代暗色主题调色盘，适配深蓝黑卡片底色
-    return ['#38bdf8', '#fbbf24', '#34d399', '#a78bfa', '#f87171', '#fb923c', '#818cf8', '#f472b6', '#2dd4bf', '#e879f9'];
+    // 高对比度现代暗色主题调色盘，适配深蓝黑卡片底色 (去紫)
+    return ['#5EEAD4', '#38bdf8', '#fbbf24', '#34d399', '#f87171', '#fb923c', '#2dd4bf', '#f472b6', '#94a3b8', '#0284c7'];
   }
-  return ['#10213b', '#b6902f', '#1e7a5c', '#7a5c8a', '#4d7ea8', '#a0522d', '#5c6b73', '#b04a56', '#2b6cb0', '#d69e2e'];
+  return ['#0F766E', '#b6902f', '#1e7a5c', '#0284c7', '#4d7ea8', '#a0522d', '#5c6b73', '#b04a56', '#2b6cb0', '#d69e2e'];
 }
 
 function destroyChart(instance) {
@@ -5194,10 +5194,10 @@ if (window.matchMedia) {
     const catSlotH = 56;
     const catColors = [
       ['#F59E0B', '#D97706'],
-      ['#6366F1', '#4F46E5'],
+      ['#0F766E', '#115E59'],
       ['#EC4899', '#DB2777'],
       ['#10B981', '#059669'],
-      ['#8B5CF6', '#7C3AED']
+      ['#0284C7', '#0369A1']
     ];
 
     if (categories.length === 0) {

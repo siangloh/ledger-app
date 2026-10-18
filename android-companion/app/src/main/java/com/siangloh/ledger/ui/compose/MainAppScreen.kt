@@ -2,6 +2,7 @@ package com.siangloh.ledger.ui.compose
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -48,10 +49,8 @@ fun MainAppScreen(
     Scaffold(
         bottomBar = {
             Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shadow(elevation = 16.dp, shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)),
-                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, Slate200),
                 color = Color.White
             ) {
                 NavigationBar(
@@ -63,70 +62,31 @@ fun MainAppScreen(
                     navItems.forEachIndexed { index, item ->
                         val isSelected = selectedTab == index
 
-                        if (item.isPrimaryAction) {
-                            NavigationBarItem(
-                                selected = isSelected,
-                                onClick = { selectedTab = index },
-                                icon = {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(46.dp)
-                                            .clip(CircleShape)
-                                            .background(PrimaryBlue)
-                                            .shadow(4.dp, CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Add,
-                                            contentDescription = item.title,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(26.dp)
-                                        )
-                                    }
-                                },
-                                label = {
-                                    Text(
-                                        text = item.title,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) PrimaryBlue else Slate600
-                                    )
-                                },
-                                colors = NavigationBarItemDefaults.colors(
-                                    indicatorColor = Color.Transparent,
-                                    selectedIconColor = Color.White,
-                                    unselectedIconColor = Color.White,
-                                    selectedTextColor = PrimaryBlue,
-                                    unselectedTextColor = Slate600
+                        NavigationBarItem(
+                            selected = isSelected,
+                            onClick = { selectedTab = index },
+                            icon = {
+                                Icon(
+                                    imageVector = item.icon,
+                                    contentDescription = item.title,
+                                    modifier = Modifier.size(24.dp)
                                 )
-                            )
-                        } else {
-                            NavigationBarItem(
-                                selected = isSelected,
-                                onClick = { selectedTab = index },
-                                icon = {
-                                    Icon(
-                                        imageVector = item.icon,
-                                        contentDescription = item.title,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                },
-                                label = {
-                                    Text(
-                                        text = item.title,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                    )
-                                },
-                                colors = NavigationBarItemDefaults.colors(
-                                    indicatorColor = PrimaryBlue.copy(alpha = 0.12f),
-                                    selectedIconColor = PrimaryBlue,
-                                    unselectedIconColor = Slate400,
-                                    selectedTextColor = PrimaryBlue,
-                                    unselectedTextColor = Slate500
+                            },
+                            label = {
+                                Text(
+                                    text = item.title,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = PrimaryTealSubtle,
+                                selectedIconColor = PrimaryTeal,
+                                unselectedIconColor = Slate400,
+                                selectedTextColor = PrimaryTeal,
+                                unselectedTextColor = Slate500
                             )
-                        }
+                        )
                     }
                 }
             }

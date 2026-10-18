@@ -1,10 +1,10 @@
 package com.siangloh.ledger.ui.compose
 
+import android.app.DatePickerDialog
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -12,22 +12,24 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.siangloh.ledger.NetworkHelper
 import com.siangloh.ledger.data.AccountRecord
 import com.siangloh.ledger.data.AppDatabase
 import com.siangloh.ledger.data.CategoryRecord
 import com.siangloh.ledger.data.NativeLedgerApi
+import com.siangloh.ledger.data.ServerValidationException
 import com.siangloh.ledger.data.entities.PendingTransaction
 import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -39,21 +41,14 @@ fun AddTransactionScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var txType by remember { mutableStateOf("expense") } // 'expense', 'income', 'transfer'
-    var amountText by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var tags by remember { mutableStateOf("") }
-    var dateStr by remember {
-        mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()))
-    }
-    var selectedCategory by remember { mutableStateOf("餐饮") }
-    var selectedAccountId by remember { mutableStateOf<Int?>(null) }
-    var selectedToAccountId by remember { mutableStateOf<Int?>(null) }
+    // 采用 TransactionDraftHolder 保持跨 Tab、查账返回与屏幕旋转时的草稿稳定
+    val draft = TransactionDraftHolder
 
     var accounts by remember { mutableStateOf<List<AccountRecord>>(emptyList()) }
     var expenseCategories by remember { mutableStateOf<List<CategoryRecord>>(emptyList()) }
     var incomeCategories by remember { mutableStateOf<List<CategoryRecord>>(emptyList()) }
-    var incomeGroup by remember { mutableStateOf("main") }
+    var savingsCategories by remember { mutableStateOf<List<CategoryRecord>>(emptyList()) }
+    var showAllCategories by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -61,45 +56,80 @@ fun AddTransactionScreen(
             NativeLedgerApi.getAccounts(context).onSuccess {
                 accounts = it.accounts
                 val defId = it.defaultAccountId
-                if (selectedAccountId == null && it.accounts.isNotEmpty()) {
-                    selectedAccountId = if (defId != null && it.accounts.any { a -> a.id == defId }) {
+                if (draft.selectedAccountId == null && it.accounts.isNotEmpty()) {
+                    draft.selectedAccountId = if (defId != null && it.accounts.any { a -> a.id == defId }) {
                         defId
                     } else {
                         it.accounts.first().id
                     }
                 }
-                if (it.defaultGroup != null && incomeGroup == "main") {
-                    incomeGroup = it.defaultGroup
+                if (it.defaultGroup != null && draft.incomeGroup == "main") {
+                    draft.incomeGroup = it.defaultGroup
                 }
-                if (selectedToAccountId == null && it.accounts.size > 1) {
-                    val remaining = it.accounts.filter { a -> a.id != selectedAccountId }
+                if (draft.selectedToAccountId == null && it.accounts.size > 1) {
+                    val remaining = it.accounts.filter { a -> a.id != draft.selectedAccountId }
                     if (remaining.isNotEmpty()) {
-                        selectedToAccountId = remaining.first().id
+                        draft.selectedToAccountId = remaining.first().id
                     }
                 }
             }
-            NativeLedgerApi.getCategories(context).onSuccess { (exp, inc) ->
-                expenseCategories = exp
-                incomeCategories = inc
-                if (exp.isNotEmpty() && txType == "expense") {
-                    selectedCategory = exp.first().name
+
+            NativeLedgerApi.getCategories(context).onSuccess { catGroup ->
+                expenseCategories = catGroup.expenses
+                incomeCategories = catGroup.incomes
+                savingsCategories = catGroup.savings
+                if (draft.txType == "expense" && catGroup.expenses.isNotEmpty() && catGroup.expenses.none { it.name == draft.selectedCategory }) {
+                    draft.selectedCategory = catGroup.expenses.first().name
                 }
             }
         }
     }
 
-    LaunchedEffect(txType) {
-        if (txType == "expense") {
-            if (expenseCategories.isNotEmpty() && expenseCategories.none { it.name == selectedCategory }) {
-                selectedCategory = expenseCategories.first().name
+    LaunchedEffect(draft.txType) {
+        when (draft.txType) {
+            "expense" -> {
+                if (expenseCategories.isNotEmpty() && expenseCategories.none { it.name == draft.selectedCategory }) {
+                    draft.selectedCategory = expenseCategories.first().name
+                }
             }
-        } else if (txType == "income") {
-            if (incomeCategories.isNotEmpty() && incomeCategories.none { it.name == selectedCategory }) {
-                selectedCategory = incomeCategories.first().name
+            "income" -> {
+                if (incomeCategories.isNotEmpty() && incomeCategories.none { it.name == draft.selectedCategory }) {
+                    draft.selectedCategory = incomeCategories.first().name
+                }
             }
-        } else if (txType == "transfer") {
-            selectedCategory = "内部划转"
+            "savings" -> {
+                if (savingsCategories.isNotEmpty() && savingsCategories.none { it.name == draft.selectedCategory }) {
+                    draft.selectedCategory = savingsCategories.first().name
+                } else if (savingsCategories.isEmpty()) {
+                    draft.selectedCategory = "定期存款"
+                }
+            }
+            "transfer" -> {
+                draft.selectedCategory = "内部划转"
+            }
         }
+    }
+
+    // 日期选择器逻辑：点击日期卡片即弹出原生日历弹窗
+    fun showDatePicker() {
+        val cal = Calendar.getInstance()
+        try {
+            val parsed = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(draft.dateStr)
+            if (parsed != null) cal.time = parsed
+        } catch (_: Exception) {}
+
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val chosenCal = Calendar.getInstance().apply {
+                    set(year, month, dayOfMonth)
+                }
+                draft.dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(chosenCal.time)
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
     }
 
     Scaffold(
@@ -111,51 +141,177 @@ fun AddTransactionScreen(
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Text(
-                    text = "快速记账",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate900
-                )
-                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "快速记账",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900
+                    )
+                    if (draft.amountText.isNotBlank() || draft.note.isNotBlank() || draft.tags.isNotBlank()) {
+                        TextButton(
+                            onClick = { draft.clear() },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("清空草稿", fontSize = 12.sp, color = Slate500)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // 类型切换 Segmented Controls
+                // 四向分段器 (支出 / 收入 / 储蓄 / 内部划转)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Slate100, RoundedCornerShape(12.dp))
-                        .padding(4.dp),
+                        .background(Slate100, RoundedCornerShape(10.dp))
+                        .padding(3.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val types = listOf(
-                        "expense" to "支出 (Expense)",
-                        "income" to "收入 (Income)",
-                        "transfer" to "自转 (Transfer)"
+                        "expense" to "支出",
+                        "income" to "收入",
+                        "savings" to "储蓄",
+                        "transfer" to "划转"
                     )
                     types.forEach { (typeKey, label) ->
-                        val isSelected = txType == typeKey
-                        val bg = if (isSelected) {
-                            when (typeKey) {
-                                "income" -> Emerald600
-                                "transfer" -> Sky500
-                                else -> Indigo600
-                            }
-                        } else Color.Transparent
+                        val isSelected = draft.txType == typeKey
+                        val bg = if (isSelected) PrimaryTeal else Color.Transparent
 
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = bg,
                             modifier = Modifier
                                 .weight(1f)
-                                .clickable { txType = typeKey }
+                                .clickable { draft.txType = typeKey }
                         ) {
                             Text(
                                 text = label,
-                                fontSize = 12.sp,
+                                fontSize = 13.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) Color.White else Slate600,
+                                color = if (isSelected) Color.White else Slate700,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                modifier = Modifier.padding(vertical = 8.dp)
+                                modifier = Modifier.padding(vertical = 7.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        bottomBar = {
+            // 底部常驻保存操作区：键盘弹出时自动跟随，绝对不遮挡最后一个输入字段
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White)
+                    .imePadding()
+                    .navigationBarsPadding(),
+                shadowElevation = 8.dp,
+                color = Color.White
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val amt = draft.amountText.toDoubleOrNull() ?: 0.0
+                            if (amt <= 0) {
+                                Toast.makeText(context, "请输入大于 0 的有效金额", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            if (draft.txType == "transfer" && draft.selectedAccountId != null && draft.selectedAccountId == draft.selectedToAccountId) {
+                                Toast.makeText(context, "转出账户与转入账户不能相同", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+
+                            isSaving = true
+                            scope.launch {
+                                val res = NativeLedgerApi.addTransaction(
+                                    context = context,
+                                    type = draft.txType,
+                                    amount = amt,
+                                    category = draft.selectedCategory,
+                                    date = draft.dateStr,
+                                    note = draft.note,
+                                    tags = draft.tags,
+                                    accountId = draft.selectedAccountId,
+                                    toAccountId = if (draft.txType == "transfer") draft.selectedToAccountId else null,
+                                    groupName = if (draft.txType == "income") draft.incomeGroup else null
+                                )
+                                isSaving = false
+                                res.onSuccess {
+                                    Toast.makeText(context, "🎉 记账成功！", Toast.LENGTH_SHORT).show()
+                                    draft.clear()
+                                    onFinished()
+                                }.onFailure { err ->
+                                    if (err is ServerValidationException) {
+                                        // 服务端业务拒绝（如账户无效、余额不足、未登录等），明确提示用户，不伪称断网
+                                        Toast.makeText(context, "⚠️ 提交未通过：${err.message}", Toast.LENGTH_LONG).show()
+                                    } else if (!NetworkHelper.isOnline(context) || err is IOException || err.message?.contains("Unable to resolve host") == true) {
+                                        // 真实的离线状态：存入本地 Room 离线表，等待联网自动同步
+                                        try {
+                                            withContext(Dispatchers.IO) {
+                                                val db = AppDatabase.getInstance(context)
+                                                val combinedNote = when {
+                                                    draft.note.isNotBlank() && draft.tags.isNotBlank() -> "${draft.note} #${draft.tags}".trim()
+                                                    draft.tags.isNotBlank() -> "#${draft.tags}".trim()
+                                                    draft.note.isNotBlank() -> draft.note.trim()
+                                                    else -> if (draft.txType == "transfer") "内部转账" else draft.selectedCategory
+                                                }
+                                                db.pendingTransactionDao().insert(
+                                                    PendingTransaction(
+                                                        date = draft.dateStr,
+                                                        type = draft.txType,
+                                                        group_name = if (draft.txType == "income") draft.incomeGroup else "personal",
+                                                        category = draft.selectedCategory,
+                                                        amount = amt,
+                                                        note = combinedNote,
+                                                        source = "offline_manual",
+                                                        sync_status = "pending"
+                                                    )
+                                                )
+                                            }
+                                            SyncWorker.enqueueSync(context)
+                                            Toast.makeText(context, "✓ 当前网络未连接，已安全存入本地数据库，联网后将自动同步", Toast.LENGTH_LONG).show()
+                                            draft.clear()
+                                            onFinished()
+                                        } catch (localDbErr: Exception) {
+                                            Toast.makeText(context, "离线保存失败：${localDbErr.message}", Toast.LENGTH_LONG).show()
+                                        }
+                                    } else {
+                                        Toast.makeText(context, "记账失败：${err.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !isSaving,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = when (draft.txType) {
+                                "income" -> IncomeGreen
+                                "transfer" -> Slate700
+                                "savings" -> PrimaryTeal
+                                else -> PrimaryTeal
+                            }
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (draft.txType == "transfer") "确认转账并记录" else "保存这笔账目",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
@@ -171,48 +327,48 @@ fun AddTransactionScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // 大字号金额输入卡片
+            // 1. 金额录入紧凑卡片 (Tabular numbers, 48px高度输入，无多余占屏空隙)
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 color = Color.White,
                 shadowElevation = 0.5.dp,
-                border = BorderStroke(1.dp, Slate100),
+                border = BorderStroke(1.dp, Slate200),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp)
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
                 ) {
-                    Text("记账金额", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Slate400)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("记账金额", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Slate500)
+                    Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
                             text = "MYR",
-                            fontSize = 24.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate600
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         OutlinedTextField(
-                            value = amountText,
+                            value = draft.amountText,
                             onValueChange = {
                                 if (it.isEmpty() || it.matches(Regex("""^\d*\.?\d{0,2}$"""))) {
-                                    amountText = it
+                                    draft.amountText = it
                                 }
                             },
-                            placeholder = { Text("0.00", fontSize = 28.sp, color = Slate400) },
+                            placeholder = { Text("0.00", fontSize = 24.sp, color = Slate400) },
                             singleLine = true,
                             textStyle = LocalTextStyle.current.copy(
-                                fontSize = 28.sp,
+                                fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = when (txType) {
-                                    "income" -> Emerald600
-                                    "transfer" -> Sky500
-                                    else -> Indigo600
+                                color = when (draft.txType) {
+                                    "income" -> IncomeGreen
+                                    "transfer" -> Slate700
+                                    else -> Slate900
                                 }
                             ),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -225,31 +381,31 @@ fun AddTransactionScreen(
                         )
                     }
 
-                    // 常用金额微调快捷胶囊
+                    // 常用金额微调胶囊
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         listOf("10", "20", "50", "100").forEach { quickAmt ->
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(6.dp),
                                 color = Slate100,
                                 modifier = Modifier
                                     .weight(1f)
                                     .clickable {
-                                        val current = amountText.toDoubleOrNull() ?: 0.0
-                                        amountText = String.format(Locale.US, "%.2f", current + quickAmt.toDouble())
+                                        val current = draft.amountText.toDoubleOrNull() ?: 0.0
+                                        draft.amountText = String.format(Locale.US, "%.2f", current + quickAmt.toDouble())
                                     }
                             ) {
                                 Text(
                                     text = "+$quickAmt",
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Slate700,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    modifier = Modifier.padding(vertical = 6.dp)
+                                    modifier = Modifier.padding(vertical = 5.dp)
                                 )
                             }
                         }
@@ -257,77 +413,95 @@ fun AddTransactionScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // 分类选择网格 (支出与收入)
-            if (txType != "transfer") {
-                val currentCats = if (txType == "income") incomeCategories else expenseCategories
+            // 2. 分类选择 (只在非 transfer 时显示；支持常用收起，避免数十个全量平铺挡住保存)
+            if (draft.txType != "transfer") {
+                val currentCats = when (draft.txType) {
+                    "income" -> incomeCategories
+                    "savings" -> savingsCategories
+                    else -> expenseCategories
+                }
+
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = Color.White,
                     shadowElevation = 0.5.dp,
-                    border = BorderStroke(1.dp, Slate100),
+                    border = BorderStroke(1.dp, Slate200),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp)
+                            .padding(14.dp)
                     ) {
-                        Text("选择分类", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        val displayCats = if (currentCats.isNotEmpty()) currentCats else {
-                            listOf(
-                                CategoryRecord(0, "餐饮", "expense"),
-                                CategoryRecord(0, "交通", "expense"),
-                                CategoryRecord(0, "杂货", "expense"),
-                                CategoryRecord(0, "账单", "expense"),
-                                CategoryRecord(0, "购物", "expense"),
-                                CategoryRecord(0, "娱乐", "expense"),
-                                CategoryRecord(0, "医疗", "expense"),
-                                CategoryRecord(0, "其他", "expense")
-                            )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("选择分类", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                            if (currentCats.size > 8) {
+                                Text(
+                                    text = if (showAllCategories) "收起 ▴" else "更多分类 (${currentCats.size}) ▾",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = PrimaryTeal,
+                                    modifier = Modifier
+                                        .clickable { showAllCategories = !showAllCategories }
+                                        .padding(4.dp)
+                                )
+                            }
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                        // 分两行/多行网格展示
+                        val fallbackCats = when (draft.txType) {
+                            "income" -> listOf("工资", "兼职", "奖金", "投资", "其他")
+                            "savings" -> listOf("定期存款", "应急基金", "投资理财", "心愿基金")
+                            else -> listOf("餐饮", "交通", "杂货", "账单", "购物", "娱乐", "医疗", "其他")
+                        }.map { CategoryRecord(0, it, draft.txType) }
+
+                        val allCats = if (currentCats.isNotEmpty()) currentCats else fallbackCats
+                        val displayCats = if (showAllCategories) allCats else allCats.take(8)
+
                         val chunked = displayCats.chunked(4)
                         chunked.forEach { rowCats ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    .padding(vertical = 3.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 rowCats.forEach { cat ->
-                                    val isSelected = selectedCategory == cat.name
-                                    val emoji = CategoryUiHelper.getCategoryEmoji(cat.name, txType)
-                                    val tintColor = if (isSelected) Indigo600 else Slate100
+                                    val isSelected = draft.selectedCategory == cat.name
+                                    val emoji = CategoryUiHelper.getCategoryEmoji(cat.name, draft.txType)
+                                    val tintBg = if (isSelected) PrimaryTealSubtle else Slate100
+                                    val borderStroke = if (isSelected) BorderStroke(1.5.dp, PrimaryTeal) else null
 
                                     Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = tintColor,
-                                        border = if (isSelected) BorderStroke(1.5.dp, Indigo600) else null,
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = tintBg,
+                                        border = borderStroke,
                                         modifier = Modifier
                                             .weight(1f)
-                                            .clickable { selectedCategory = cat.name }
+                                            .clickable { draft.selectedCategory = cat.name }
                                     ) {
                                         Column(
                                             horizontalAlignment = Alignment.CenterHorizontally,
-                                            modifier = Modifier.padding(vertical = 10.dp)
+                                            modifier = Modifier.padding(vertical = 8.dp, horizontal = 2.dp)
                                         ) {
-                                            Text(emoji, fontSize = 20.sp)
-                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(emoji, fontSize = 18.sp)
+                                            Spacer(modifier = Modifier.height(2.dp))
                                             Text(
                                                 text = cat.name,
                                                 fontSize = 11.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) Color.White else Slate700
+                                                color = if (isSelected) PrimaryTeal else Slate700,
+                                                maxLines = 1
                                             )
                                         }
                                     }
                                 }
-                                // 填充空白保持网格对齐
                                 if (rowCats.size < 4) {
                                     for (i in 0 until (4 - rowCats.size)) {
                                         Spacer(modifier = Modifier.weight(1f))
@@ -336,31 +510,33 @@ fun AddTransactionScreen(
                             }
                         }
 
-                        if (txType == "income") {
+                        // 收入专属分组 (主业 / 副业)
+                        if (draft.txType == "income") {
                             Spacer(modifier = Modifier.height(10.dp))
-                            Text("收入分组", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate700)
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Text("收入分组", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Slate700)
+                            Spacer(modifier = Modifier.height(4.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 val groups = listOf("main" to "💼 主业收入", "side" to "📈 副业/理财")
                                 groups.forEach { (grpKey, grpLabel) ->
-                                    val isGrpSelected = incomeGroup == grpKey
+                                    val isGrpSelected = draft.incomeGroup == grpKey
                                     Surface(
                                         shape = RoundedCornerShape(8.dp),
-                                        color = if (isGrpSelected) Emerald600 else Slate100,
+                                        color = if (isGrpSelected) PrimaryTealSubtle else Slate100,
+                                        border = if (isGrpSelected) BorderStroke(1.dp, PrimaryTeal) else null,
                                         modifier = Modifier
                                             .weight(1f)
-                                            .clickable { incomeGroup = grpKey }
+                                            .clickable { draft.incomeGroup = grpKey }
                                     ) {
                                         Text(
                                             text = grpLabel,
-                                            fontSize = 12.sp,
+                                            fontSize = 11.sp,
                                             fontWeight = if (isGrpSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isGrpSelected) Color.White else Slate700,
+                                            color = if (isGrpSelected) PrimaryTeal else Slate700,
                                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                            modifier = Modifier.padding(vertical = 8.dp)
+                                            modifier = Modifier.padding(vertical = 7.dp)
                                         )
                                     }
                                 }
@@ -368,25 +544,25 @@ fun AddTransactionScreen(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // 账户选择
+            // 3. 结算账户选择卡片
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 color = Color.White,
                 shadowElevation = 0.5.dp,
-                border = BorderStroke(1.dp, Slate100),
+                border = BorderStroke(1.dp, Slate200),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        text = if (txType == "transfer") "转出账户" else "结算账户",
-                        fontSize = 13.sp,
+                        text = if (draft.txType == "transfer") "转出账户" else "结算账户",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     if (accounts.isEmpty()) {
                         Text("暂无已配置账户，将使用默认账户记录", fontSize = 12.sp, color = Slate400)
@@ -395,21 +571,21 @@ fun AddTransactionScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             accounts.forEach { acc ->
-                                val isSelected = selectedAccountId == acc.id
+                                val isSelected = draft.selectedAccountId == acc.id
                                 Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (isSelected) Indigo600 else Slate100,
-                                    modifier = Modifier.clickable { selectedAccountId = acc.id }
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) PrimaryTeal else Slate100,
+                                    modifier = Modifier.clickable { draft.selectedAccountId = acc.id }
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
                                     ) {
-                                        Text(CategoryUiHelper.getAccountTypeIcon(acc.type), fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(CategoryUiHelper.getAccountTypeIcon(acc.type), fontSize = 13.sp)
+                                        Spacer(modifier = Modifier.width(5.dp))
                                         Text(
                                             text = acc.name,
                                             fontSize = 12.sp,
@@ -423,29 +599,29 @@ fun AddTransactionScreen(
                     }
 
                     // 如果是账户互转，选择转入账户
-                    if (txType == "transfer") {
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Text("转入账户", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                        Spacer(modifier = Modifier.height(10.dp))
+                    if (draft.txType == "transfer") {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("转入账户", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             accounts.forEach { acc ->
-                                val isSelected = selectedToAccountId == acc.id
+                                val isSelected = draft.selectedToAccountId == acc.id
                                 Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (isSelected) Sky500 else Slate100,
-                                    modifier = Modifier.clickable { selectedToAccountId = acc.id }
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) PrimaryTeal else Slate100,
+                                    modifier = Modifier.clickable { draft.selectedToAccountId = acc.id }
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
                                     ) {
-                                        Text(CategoryUiHelper.getAccountTypeIcon(acc.type), fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(CategoryUiHelper.getAccountTypeIcon(acc.type), fontSize = 13.sp)
+                                        Spacer(modifier = Modifier.width(5.dp))
                                         Text(
                                             text = acc.name,
                                             fontSize = 12.sp,
@@ -460,155 +636,98 @@ fun AddTransactionScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // 备注、标签与日期
+            // 4. 补充信息（折叠式区域，降低主路径滚动负担，日期支持原生弹窗挑选）
+            val hasDetails = draft.note.isNotBlank() || draft.tags.isNotBlank() || draft.isDetailsExpanded
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 color = Color.White,
                 shadowElevation = 0.5.dp,
-                border = BorderStroke(1.dp, Slate100),
+                border = BorderStroke(1.dp, Slate200),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    OutlinedTextField(
-                        value = note,
-                        onValueChange = { note = it },
-                        label = { Text("商户 / 备注说明") },
-                        placeholder = { Text("可选，如：Starbucks、麦当劳、超市买菜") },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Indigo600,
-                            focusedLabelColor = Indigo600
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = tags,
-                        onValueChange = { tags = it },
-                        label = { Text("标签 (Tags)") },
-                        placeholder = { Text("可选，如：#出差 #聚会 #报销") },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Indigo600,
-                            focusedLabelColor = Indigo600
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = dateStr,
-                        onValueChange = { dateStr = it },
-                        label = { Text("记账日期 (YYYY-MM-DD)") },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Indigo600,
-                            focusedLabelColor = Indigo600
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // 保存按钮
-            Button(
-                onClick = {
-                    val amt = amountText.toDoubleOrNull() ?: 0.0
-                    if (amt <= 0) {
-                        Toast.makeText(context, "请输入大于 0 的有效金额", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    isSaving = true
-                    scope.launch {
-                        val res = NativeLedgerApi.addTransaction(
-                            context = context,
-                            type = txType,
-                            amount = amt,
-                            category = selectedCategory,
-                            date = dateStr,
-                            note = note,
-                            tags = tags,
-                            accountId = selectedAccountId,
-                            toAccountId = if (txType == "transfer") selectedToAccountId else null,
-                            groupName = if (txType == "income") incomeGroup else null
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { draft.isDetailsExpanded = !draft.isDetailsExpanded },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "补充商户备注、标签与记账日期",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate800
                         )
-                        isSaving = false
-                        res.onSuccess {
-                            Toast.makeText(context, "🎉 记账成功！", Toast.LENGTH_SHORT).show()
-                            amountText = ""
-                            note = ""
-                            tags = ""
-                            onFinished()
-                        }.onFailure { err ->
-                            // 网络不可用或请求失败时，自动存入 Room 本地数据库，触发后台同步队列！
-                            try {
-                                withContext(Dispatchers.IO) {
-                                    val db = AppDatabase.getInstance(context)
-                                    val combinedNote = when {
-                                        note.isNotBlank() && tags.isNotBlank() -> "$note #$tags".trim()
-                                        tags.isNotBlank() -> "#$tags".trim()
-                                        note.isNotBlank() -> note.trim()
-                                        else -> if (txType == "transfer") "内部转账" else selectedCategory
-                                    }
-                                    db.pendingTransactionDao().insert(
-                                        PendingTransaction(
-                                            date = dateStr,
-                                            type = txType,
-                                            group_name = if (txType == "income") incomeGroup else "personal",
-                                            category = selectedCategory,
-                                            amount = amt,
-                                            note = combinedNote,
-                                            source = "offline_manual",
-                                            sync_status = "pending"
-                                        )
-                                    )
+                        Text(
+                            text = if (hasDetails) "收起 ▴" else "展开 ▾",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PrimaryTeal
+                        )
+                    }
+
+                    if (hasDetails) {
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedTextField(
+                            value = draft.note,
+                            onValueChange = { draft.note = it },
+                            label = { Text("商户 / 备注说明", fontSize = 12.sp) },
+                            placeholder = { Text("如：Starbucks、麦当劳、超市买菜", fontSize = 12.sp) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = draft.tags,
+                            onValueChange = { draft.tags = it },
+                            label = { Text("标签 (Tags)", fontSize = 12.sp) },
+                            placeholder = { Text("如：#出差 #聚会 #报销", fontSize = 12.sp) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // 日期选择卡片：展示日期并附带日历图标，点击唤出原生日历
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Slate200),
+                            color = Slate50,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showDatePicker() }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("记账日期", fontSize = 10.sp, color = Slate500)
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(draft.dateStr, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
                                 }
-                                SyncWorker.enqueueSync(context)
-                                Toast.makeText(context, "✓ 网络不可用，已安全存入本地数据库，联网后将自动同步！", Toast.LENGTH_LONG).show()
-                                amountText = ""
-                                note = ""
-                                tags = ""
-                                onFinished()
-                            } catch (localDbErr: Exception) {
-                                Toast.makeText(context, "保存失败：${localDbErr.message}", Toast.LENGTH_LONG).show()
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = "选择日期",
+                                    tint = PrimaryTeal,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                         }
                     }
-                },
-                enabled = !isSaving,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = when (txType) {
-                        "income" -> Emerald600
-                        "transfer" -> Sky500
-                        else -> Indigo600
-                    }
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                } else {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (txType == "transfer") "确认转账并记录" else "保存这笔账目",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(60.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

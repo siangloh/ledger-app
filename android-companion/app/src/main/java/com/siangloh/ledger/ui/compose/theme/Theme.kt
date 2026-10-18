@@ -5,36 +5,49 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Emerald500,
-    secondary = Sky400,
-    background = Slate900,
-    surface = Slate800,
+val LightColorScheme = lightColorScheme(
+    primary = Teal700,
     onPrimary = Color.White,
+    primaryContainer = Teal50,
+    onPrimaryContainer = Teal900,
+    secondary = Slate600,
     onSecondary = Color.White,
-    onBackground = Slate50,
-    onSurface = Slate50
+    background = Slate50,
+    onBackground = Slate900,
+    surface = Color.White,
+    onSurface = Slate900,
+    surfaceVariant = Slate100,
+    onSurfaceVariant = Slate700,
+    outline = Slate200,
+    error = ExpenseRed,
+    onError = Color.White
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = Emerald600,
-    secondary = Sky500,
-    background = Slate50,
-    surface = Color.White,
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onBackground = Slate900,
-    onSurface = Slate900
+val DarkColorScheme = darkColorScheme(
+    primary = Teal300,
+    onPrimary = Teal900,
+    primaryContainer = Teal800,
+    onPrimaryContainer = Teal100,
+    secondary = Slate400,
+    onSecondary = Slate950,
+    background = Slate950,
+    onBackground = Slate50,
+    surface = Slate900,
+    onSurface = Slate50,
+    surfaceVariant = Slate800,
+    onSurfaceVariant = Slate300,
+    outline = Slate700,
+    error = Color(0xFFEF4444),
+    onError = Color.White
 )
 
 @Composable
 fun LedgerTheme(
-    darkTheme: Boolean = false,
+    darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    // 强制使用明亮、高对比度主题语义色彩，杜绝系统深色模式下与硬编码卡片颜色混用产生的“深底深字”或低对比度问题
     MaterialTheme(
-        colorScheme = LightColorScheme,
+        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
         content = content
     )
 }

@@ -56,7 +56,15 @@ data class AccountsSummary(
 data class CategoryRecord(
     val id: Int,
     val name: String,
-    val type: String // 'expense' or 'income'
+    val type: String // 'expense', 'income', 'savings'
+)
+
+class ServerValidationException(message: String) : Exception(message)
+
+data class CategoriesResult(
+    val expenses: List<CategoryRecord>,
+    val incomes: List<CategoryRecord>,
+    val savings: List<CategoryRecord>
 )
 
 data class SubscriptionRecord(
@@ -230,11 +238,12 @@ object NativeLedgerApi {
                            else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
             conn.disconnect()
 
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
+            val json = try { JSONObject(respBody) } catch (_: Exception) { JSONObject() }
+            if (respCode in 200..299 && json.optBoolean("ok", false)) {
                 Result.success(json.optLong("id", 0L))
             } else {
-                Result.failure(Exception(json.optString("message", "记账失败")))
+                val msg = json.optString("message", if (respCode >= 400) "服务端校验未通过 (HTTP $respCode)" else "记账失败")
+                Result.failure(ServerValidationException(msg))
             }
         } catch (e: Exception) {
             Log.e(TAG, "addTransaction error: ${e.message}", e)
@@ -426,7 +435,7 @@ object NativeLedgerApi {
         }
     }
 
-    suspend fun getCategories(context: Context): Result<Pair<List<CategoryRecord>, List<CategoryRecord>>> = withContext(Dispatchers.IO) {
+    suspend fun getCategories(context: Context): Result<CategoriesResult> = withContext(Dispatchers.IO) {
         try {
             val params = mutableListOf<String>()
             val username = NetworkHelper.getUsername(context)
@@ -442,6 +451,7 @@ object NativeLedgerApi {
             val json = JSONObject(respBody)
             val expenseArr = json.optJSONArray("expense_categories") ?: JSONArray()
             val incomeArr = json.optJSONArray("income_categories") ?: JSONArray()
+            val savingsArr = json.optJSONArray("savings_categories") ?: JSONArray()
 
             val expenses = mutableListOf<CategoryRecord>()
             for (i in 0 until expenseArr.length()) {
@@ -455,7 +465,13 @@ object NativeLedgerApi {
                 incomes.add(CategoryRecord(obj.optInt("id"), obj.optString("name"), "income"))
             }
 
-            Result.success(Pair(expenses, incomes))
+            val savings = mutableListOf<CategoryRecord>()
+            for (i in 0 until savingsArr.length()) {
+                val obj = savingsArr.getJSONObject(i)
+                savings.add(CategoryRecord(obj.optInt("id"), obj.optString("name"), "savings"))
+            }
+
+            Result.success(CategoriesResult(expenses, incomes, savings))
         } catch (e: Exception) {
             Log.e(TAG, "getCategories error: ${e.message}", e)
             Result.failure(e)

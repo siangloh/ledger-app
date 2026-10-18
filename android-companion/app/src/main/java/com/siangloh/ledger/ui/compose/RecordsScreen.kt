@@ -146,7 +146,7 @@ fun RecordsScreen(
                         onClick = onNavigateToAdd,
                         modifier = Modifier
                             .size(36.dp)
-                            .background(Indigo600, CircleShape)
+                            .background(PrimaryTeal, CircleShape)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
@@ -224,7 +224,7 @@ fun RecordsScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Indigo600,
+                        focusedBorderColor = PrimaryTeal,
                         unfocusedBorderColor = Slate200,
                         focusedContainerColor = Slate50,
                         unfocusedContainerColor = Slate50
@@ -251,7 +251,7 @@ fun RecordsScreen(
                         val isSelected = selectedType == typeKey
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = if (isSelected) Indigo600 else Slate100,
+                            color = if (isSelected) PrimaryTeal else Slate100,
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable { selectedType = typeKey }
@@ -304,7 +304,7 @@ fun RecordsScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = onNavigateToAdd,
-                        colors = ButtonDefaults.buttonColors(containerColor = Indigo600),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -418,7 +418,7 @@ fun RecordsScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (isLoadingMore) {
-                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Indigo600)
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = PrimaryTeal)
                                 } else {
                                     OutlinedButton(
                                         onClick = {
@@ -430,7 +430,7 @@ fun RecordsScreen(
                                     ) {
                                         Icon(Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(18.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("加载更多流水 (已展示 ${transactions.size} / $totalCount 条)", fontSize = 13.sp, color = Indigo600)
+                                        Text("加载更多流水 (已展示 ${transactions.size} / $totalCount 条)", fontSize = 13.sp, color = PrimaryTeal)
                                     }
                                 }
                             }
@@ -614,7 +614,7 @@ fun TransactionCard(
                         Text(
                             text = tx.tags,
                             fontSize = 10.sp,
-                            color = Indigo600,
+                            color = PrimaryTeal,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -695,8 +695,8 @@ fun EditTransactionBottomSheet(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Indigo600,
-                    focusedLabelColor = Indigo600
+                    focusedBorderColor = PrimaryTeal,
+                    focusedLabelColor = PrimaryTeal
                 )
             )
 
@@ -711,8 +711,8 @@ fun EditTransactionBottomSheet(
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Indigo600,
-                        focusedLabelColor = Indigo600
+                        focusedBorderColor = PrimaryTeal,
+                        focusedLabelColor = PrimaryTeal
                     )
                 )
                 OutlinedTextField(
@@ -722,8 +722,8 @@ fun EditTransactionBottomSheet(
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Indigo600,
-                        focusedLabelColor = Indigo600
+                        focusedBorderColor = PrimaryTeal,
+                        focusedLabelColor = PrimaryTeal
                     )
                 )
             }
@@ -738,8 +738,8 @@ fun EditTransactionBottomSheet(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Indigo600,
-                    focusedLabelColor = Indigo600
+                    focusedBorderColor = PrimaryTeal,
+                    focusedLabelColor = PrimaryTeal
                 )
             )
 
@@ -753,8 +753,8 @@ fun EditTransactionBottomSheet(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Indigo600,
-                    focusedLabelColor = Indigo600
+                    focusedBorderColor = PrimaryTeal,
+                    focusedLabelColor = PrimaryTeal
                 )
             )
 
@@ -795,7 +795,7 @@ fun EditTransactionBottomSheet(
                     .fillMaxWidth()
                     .height(48.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Indigo600)
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal)
             ) {
                 if (isSaving) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))

@@ -115,55 +115,57 @@ fun AccountsScreen() {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-            // 净资产全景卡片
+            // 净资产全景卡片 (中性卡片，清晰呈现资产负债结构)
             item {
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = Slate900,
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Slate200),
+                    shadowElevation = 0.5.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp)
+                            .padding(18.dp)
                     ) {
                         Text(
                             text = "净资产 (Net Worth)",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Slate400
+                            color = Slate500
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         val netWorth = summary?.netWorth ?: 0.0
                         Text(
                             text = "MYR ${String.format(Locale.US, "%,.2f", netWorth)}",
-                            fontSize = 28.sp,
+                            fontSize = 26.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = Slate900
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column {
-                                Text("总资产", fontSize = 11.sp, color = Slate400)
+                                Text("总资产", fontSize = 11.sp, color = Slate500)
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "MYR ${String.format(Locale.US, "%,.2f", summary?.totalAssets ?: 0.0)}",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Emerald400
+                                    color = IncomeGreen
                                 )
                             }
                             Column(horizontalAlignment = Alignment.End) {
-                                Text("总负债 / 账单", fontSize = 11.sp, color = Slate400)
+                                Text("总负债 / 账单", fontSize = 11.sp, color = Slate500)
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "MYR ${String.format(Locale.US, "%,.2f", summary?.totalLiabilities ?: 0.0)}",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Rose500
+                                    color = ExpenseRed
                                 )
                             }
                         }
@@ -171,23 +173,46 @@ fun AccountsScreen() {
                 }
             }
 
-            // 快捷功能按键行
+            // 快捷功能按键行 (账户不足 2 个时禁用转账并给予清晰指引)
             item {
+                val accountsList = summary?.accounts ?: emptyList()
+                val canTransfer = accountsList.size >= 2
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Button(
-                        onClick = { showTransferDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Indigo600),
+                        onClick = {
+                            if (!canTransfer) {
+                                Toast.makeText(context, "请先添加至少两个可用账户再进行互转", Toast.LENGTH_SHORT).show()
+                            } else {
+                                showTransferDialog = true
+                            }
+                        },
+                        enabled = canTransfer,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PrimaryTeal,
+                            disabledContainerColor = Slate200
+                        ),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .weight(1f)
                             .height(44.dp)
                     ) {
-                        Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Default.SwapHoriz,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = if (canTransfer) Color.White else Slate400
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("账户互转", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "账户互转",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (canTransfer) Color.White else Slate400
+                        )
                     }
 
                     OutlinedButton(
@@ -394,7 +419,7 @@ fun AddAccountDialog(
                         val isSelected = selectedType == typeKey
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = if (isSelected) Indigo600 else Slate100,
+                            color = if (isSelected) PrimaryTeal else Slate100,
                             modifier = Modifier.clickable { selectedType = typeKey }
                         ) {
                             Text(
@@ -446,7 +471,7 @@ fun AddAccountDialog(
                     }
                 },
                 enabled = !isSaving,
-                colors = ButtonDefaults.buttonColors(containerColor = Indigo600)
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal)
             ) {
                 Text("添加", color = Color.White)
             }
@@ -467,6 +492,24 @@ fun TransferFundsDialog(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    if (accounts.size < 2) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            containerColor = Color.White,
+            title = { Text("无法进行互转", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Slate900) },
+            text = { Text("您当前可用账户不足两个，无法进行内部调拨划转。请先添加账户。", color = Slate700) },
+            confirmButton = {
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal)
+                ) {
+                    Text("知道了", color = Color.White)
+                }
+            }
+        )
+        return
+    }
 
     var fromId by remember { mutableStateOf(accounts.firstOrNull()?.id ?: 0) }
     var toId by remember { mutableStateOf(accounts.getOrNull(1)?.id ?: 0) }
@@ -496,7 +539,7 @@ fun TransferFundsDialog(
                         val isSelected = fromId == acc.id
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = if (isSelected) Indigo600 else Slate100,
+                            color = if (isSelected) PrimaryTeal else Slate100,
                             modifier = Modifier.clickable { fromId = acc.id }
                         ) {
                             Text(
@@ -521,7 +564,7 @@ fun TransferFundsDialog(
                         val isSelected = toId == acc.id
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = if (isSelected) Sky500 else Slate100,
+                            color = if (isSelected) PrimaryTeal else Slate100,
                             modifier = Modifier.clickable { toId = acc.id }
                         ) {
                             Text(
@@ -588,7 +631,7 @@ fun TransferFundsDialog(
                     }
                 },
                 enabled = !isSaving,
-                colors = ButtonDefaults.buttonColors(containerColor = Indigo600)
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal)
             ) {
                 Text("确认划转", color = Color.White)
             }

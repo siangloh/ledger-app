@@ -398,14 +398,15 @@ fun OverviewScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
                     .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
             item {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 // 1. Status Bar Header (● Listening 状态与待分类角标)
                 ListeningStatusHeader(
                     isListening = overviewData.isListening,
                     lastActive = overviewData.lastActiveTime,
+                    isOfflineCache = overviewData.isOfflineCache,
                     toReviewCount = overviewData.uncategorizedCount,
                     hasOverlayPermission = hasOverlayPermission,
                     onRequestOverlayPermission = {
@@ -527,13 +528,13 @@ fun OverviewScreen(
                             text = "查看全部流水",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Indigo600
+                            color = PrimaryTeal
                         )
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = null,
                             modifier = Modifier.size(14.dp),
-                            tint = Indigo600
+                            tint = PrimaryTeal
                         )
                     }
                 }
@@ -575,20 +576,20 @@ fun OverviewScreen(
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Indigo600.copy(alpha = 0.3f))
+                        border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.3f))
                     ) {
                         Icon(
                             imageVector = Icons.Default.ReceiptLong,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = Indigo600
+                            tint = PrimaryTeal
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "查看全部流水明细（原生筛选 / 搜索 / 编辑 / 删除）>",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Indigo600
+                            color = PrimaryTeal
                         )
                     }
                 }
@@ -760,12 +761,21 @@ fun OverviewScreen(
 fun ListeningStatusHeader(
     isListening: Boolean,
     lastActive: String,
+    isOfflineCache: Boolean,
     toReviewCount: Int,
     hasOverlayPermission: Boolean,
     onRequestOverlayPermission: () -> Unit,
     onRefresh: () -> Unit,
     onSettings: () -> Unit
 ) {
+    val context = LocalContext.current
+    var isOverlayDismissed by remember {
+        mutableStateOf(
+            context.getSharedPreferences("ledger_overview_prefs", Context.MODE_PRIVATE)
+                .getBoolean("overlay_banner_dismissed", false)
+        )
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.4f,
@@ -783,46 +793,53 @@ fun ListeningStatusHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left: Listening Pulse Badge
+            // Left: 监听状态与同步时间 (清晰区分常驻服务与数据同步时间)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xFFE6F4EA))
+                    .background(if (isListening) PrimaryTealSubtle else Slate100)
                     .clickable { onRefresh() }
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(Emerald500.copy(alpha = if (isListening) pulseAlpha else 0.4f))
+                        .background(if (isListening) Emerald500.copy(alpha = pulseAlpha) else Slate400)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (isListening) {
-                        "● 实时监听中 · ${formatFriendlyTime(lastActive)}"
-                    } else "● 未连接",
-                    color = if (isListening) Emerald600 else Slate500,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Column {
+                    Text(
+                        text = if (isListening) "通知监听中 (服务常驻)" else "通知监听未开启",
+                        color = if (isListening) PrimaryTeal else Slate600,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (isOfflineCache) "快照数据 · 上次同步 ${formatFriendlyTime(lastActive)}" else "数据已同步 · 刚刚",
+                        color = Slate500,
+                        fontSize = 10.sp
+                    )
+                }
             }
 
             // Right: To Review Count Badge + Settings
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (toReviewCount > 0) Color(0xFFFEF3C7) else Slate100,
-                    modifier = Modifier.padding(end = 8.dp)
-                ) {
-                    Text(
-                        text = if (toReviewCount > 0) "⚠️ $toReviewCount 待整理" else "0 待整理",
-                        color = if (toReviewCount > 0) Amber500 else Slate600,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
+                if (toReviewCount > 0) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFFFEF3C7),
+                        modifier = Modifier.padding(end = 6.dp)
+                    ) {
+                        Text(
+                            text = "⚠️ $toReviewCount 待整理",
+                            color = Amber500,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                 }
 
                 IconButton(
@@ -839,33 +856,47 @@ fun ListeningStatusHeader(
             }
         }
 
-        if (!hasOverlayPermission) {
+        if (!hasOverlayPermission && !isOverlayDismissed) {
             Spacer(modifier = Modifier.height(8.dp))
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = Color(0xFFEFF6FF),
-                border = BorderStroke(1.dp, Color(0xFFBFDBFE)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onRequestOverlayPermission() }
+                color = PrimaryTealSubtle,
+                border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.2f)),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "⚡ 开启付款悬浮识别卡片 (仿 ExpenseMY) >",
-                        color = Color(0xFF1D4ED8),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        tint = Color(0xFF1D4ED8),
-                        modifier = Modifier.size(14.dp)
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onRequestOverlayPermission() }
+                    ) {
+                        Text(
+                            text = "⚡ 开启付款悬浮识别卡片 (自动快捷记账) >",
+                            color = PrimaryTeal,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            isOverlayDismissed = true
+                            context.getSharedPreferences("ledger_overview_prefs", Context.MODE_PRIVATE)
+                                .edit().putBoolean("overlay_banner_dismissed", true).apply()
+                        },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "关闭",
+                            tint = Slate400,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }
@@ -880,71 +911,70 @@ fun PeriodSelector(
     onPrevMonth: () -> Unit,
     onNextMonth: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         // Segmented Tabs: [ 按月 ] [ 近3月 ] [ 按年 ]
         Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(10.dp),
             color = Slate100,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.height(34.dp)
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                modifier = Modifier.padding(2.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 val tabs = listOf("month" to "按月", "3m" to "近3月", "year" to "按年")
                 tabs.forEach { (key, label) ->
                     val isSelected = period == key
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(8.dp),
                         color = if (isSelected) Color.White else Color.Transparent,
-                        shadowElevation = if (isSelected) 2.dp else 0.dp,
+                        shadowElevation = if (isSelected) 1.dp else 0.dp,
                         modifier = Modifier
-                            .weight(1f)
                             .clickable { onPeriodChanged(key) }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = label,
                             color = if (isSelected) Slate900 else Slate600,
-                            fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(vertical = 8.dp)
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
         // Month pagination: < 2026年10月 >
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onPrevMonth, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    imageVector = Icons.Default.ChevronLeft,
-                    contentDescription = "Previous Month",
-                    tint = Slate600
+        if (period == "month") {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onPrevMonth, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = "上个月",
+                        tint = Slate600,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Text(
+                    text = displayMonth,
+                    color = Slate700,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
-            }
-            Text(
-                text = displayMonth,
-                color = Slate700,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
-            IconButton(onClick = onNextMonth, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "Next Month",
-                    tint = Slate600
-                )
+                IconButton(onClick = onNextMonth, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "下个月",
+                        tint = Slate600,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
@@ -957,9 +987,9 @@ fun SpendingHeroCard(
     transferAmount: Double
 ) {
     Card(
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Slate900),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -970,26 +1000,37 @@ fun SpendingHeroCard(
                         colors = listOf(Color(0xFF0F172A), Color(0xFF1E293B))
                     )
                 )
-                .padding(20.dp)
+                .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
-            Text(
-                text = "当期总支出",
-                color = Slate400,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "当期总支出",
+                    color = Slate400,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+                Text(
+                    text = "已剔除同名互转",
+                    color = Slate500,
+                    fontSize = 11.sp
+                )
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Text(
                 text = "MYR ${String.format("%,.2f", totalSpending)}",
                 color = Color.White,
-                fontSize = 32.sp,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Sub-metrics pills
             Row(
@@ -1000,11 +1041,11 @@ fun SpendingHeroCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
+                            .size(7.dp)
                             .clip(CircleShape)
                             .background(Emerald400)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(5.dp))
                     Text(
                         text = "日常消费: MYR ${String.format("%,.2f", expenseAmount)}",
                         color = Slate200,
@@ -1016,11 +1057,11 @@ fun SpendingHeroCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
+                            .size(7.dp)
                             .clip(CircleShape)
                             .background(Sky400)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(5.dp))
                     Text(
                         text = "对外转账: MYR ${String.format("%,.2f", transferAmount)}",
                         color = Slate200,
@@ -1029,14 +1070,6 @@ fun SpendingHeroCard(
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "已自动剔除本人同名账户互转",
-                color = Slate400,
-                fontSize = 11.sp
-            )
         }
     }
 }
@@ -1048,7 +1081,7 @@ fun UncategorizedInboxBanner(
     onClick: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         color = Color(0xFFFEF3C7),
         border = BorderStroke(1.dp, Color(0xFFFDE68A)),
         modifier = Modifier
@@ -1056,30 +1089,30 @@ fun UncategorizedInboxBanner(
             .clickable { onClick() }
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFFBBF24)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "🏷️", fontSize = 18.sp)
+                    Text(text = "🏷️", fontSize = 16.sp)
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
-                        text = "$count expenses need a category",
+                        text = "$count 笔支出待补充分类",
                         color = Color(0xFF92400E),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "MYR ${String.format("%,.2f", amount)} in total",
+                        text = "共计 MYR ${String.format("%,.2f", amount)}",
                         color = Color(0xFFB45309),
                         fontSize = 11.sp
                     )
@@ -1087,15 +1120,15 @@ fun UncategorizedInboxBanner(
             }
 
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(8.dp),
                 color = Color(0xFFB45309)
             ) {
                 Text(
-                    text = "Sort out >",
+                    text = "去整理 >",
                     color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                 )
             }
         }
@@ -1108,15 +1141,15 @@ fun SpendingTrendSection(
     total: Double
 ) {
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(14.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1124,20 +1157,20 @@ fun SpendingTrendSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Spending trend",
+                    text = "支出走势",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = Slate900
                 )
                 Text(
-                    text = "MYR ${String.format("%,.2f", total)} total",
+                    text = "当期合计 MYR ${String.format("%,.2f", total)}",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Slate600
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Native Canvas Sparkline
             Canvas(
@@ -1306,7 +1339,7 @@ fun NativeBottomBar(
             BottomNavItem(
                 icon = Icons.Default.Dashboard,
                 label = "概览",
-                tint = Emerald600,
+                tint = PrimaryTeal,
                 selected = true,
                 onClick = onHome,
                 modifier = Modifier.weight(1f)
@@ -1333,7 +1366,7 @@ fun NativeBottomBar(
             BottomNavItem(
                 icon = Icons.Default.ReceiptLong,
                 label = "流水明细",
-                tint = Indigo600,
+                tint = Slate700,
                 selected = false,
                 onClick = onRecords,
                 modifier = Modifier.weight(1f)

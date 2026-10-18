@@ -41,9 +41,9 @@ object CategoryUiHelper {
             "杂货" -> Emerald500
             "账单" -> Amber500
             "购物" -> Rose500
-            "娱乐" -> Color(0xFFA855F7) // Purple
+            "娱乐" -> Sky500
             "医疗" -> Color(0xFFEF4444) // Red
-            "内部划转" -> Indigo600
+            "内部划转" -> Slate600
             else -> Slate500
         }
     }

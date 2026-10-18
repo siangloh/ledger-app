@@ -750,10 +750,13 @@ def get_native_categories_list(user_id: Any, db: Any = None) -> Dict[str, Any]:
 
     expense_cats = []
     income_cats = []
+    savings_cats = []
     for r in rows:
         item = {'id': r['id'], 'name': r['name'], 'type': r['type']}
         if r['type'] == 'income':
             income_cats.append(item)
+        elif r['type'] == 'savings':
+            savings_cats.append(item)
         else:
             expense_cats.append(item)
 
@@ -761,11 +764,14 @@ def get_native_categories_list(user_id: Any, db: Any = None) -> Dict[str, Any]:
         expense_cats = [{'id': 0, 'name': n, 'type': 'expense'} for n in ["餐饮", "交通", "杂货", "账单", "购物", "娱乐", "医疗", "其他"]]
     if not income_cats:
         income_cats = [{'id': 0, 'name': n, 'type': 'income'} for n in ["工资", "兼职", "奖金", "投资", "其他"]]
+    if not savings_cats:
+        savings_cats = [{'id': 0, 'name': n, 'type': 'savings'} for n in ["定期存款", "应急基金", "投资理财", "心愿基金"]]
 
     return {
         'ok': True,
         'expense_categories': expense_cats,
-        'income_categories': income_cats
+        'income_categories': income_cats,
+        'savings_categories': savings_cats
     }
 
 

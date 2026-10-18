@@ -282,7 +282,7 @@ fun MoreToolsScreen(
                     totalRemaining = toolsSummary?.totalRemainingInst ?: 0.0,
                     errorMessage = toolsError,
                     onRetry = { refreshAll() },
-                    onOpenManage = { onOpenWebUrl("/debts") }
+                    onOpenManage = { onOpenWebUrl("/liabilities") }
                 )
             }
 
@@ -701,13 +701,13 @@ fun SubscriptionsCard(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFEDE9FE)),
+                            .background(PrimaryTealSubtle),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Repeat,
                             contentDescription = null,
-                            tint = Color(0xFF7C3AED),
+                            tint = PrimaryTeal,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -787,7 +787,7 @@ fun SubscriptionsCard(
                         modifier = Modifier.fillMaxWidth().height(36.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("前往订阅中心维护与新增周期扣款", fontSize = 12.sp, color = Indigo600)
+                        Text("前往订阅中心维护与新增周期扣款", fontSize = 12.sp, color = PrimaryTeal)
                     }
                 }
             }
@@ -1216,11 +1216,11 @@ fun FullLedgerFeaturesCard(
             Spacer(modifier = Modifier.height(6.dp))
 
             val quickLinks = listOf(
-                Triple("💳 周期订阅", "/subscriptions", Indigo600),
-                Triple("📉 债务管理", "/debts", Rose500),
-                Triple("📊 统计洞察", "/report", Sky500),
+                Triple("💳 周期订阅", "/subscriptions", PrimaryTeal),
+                Triple("📉 债务管理", "/liabilities", Rose500),
+                Triple("📊 统计洞察", "/categories/insights", PrimaryTeal),
                 Triple("🏷️ 分类管理", "/categories", Amber600),
-                Triple("📥 导入导出", "/export", Slate700),
+                Triple("📥 导入中心", "/import", Slate700),
                 Triple("👤 用户绑定", "settings", Emerald600)
             )
 

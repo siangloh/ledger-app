@@ -201,6 +201,8 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<ImageButton>(R.id.btnCloseBatteryBanner).setOnClickListener {
             batteryBanner.visibility = View.GONE
+            getSharedPreferences("ledger_overview_prefs", Context.MODE_PRIVATE)
+                .edit().putBoolean("battery_banner_dismissed", true).apply()
         }
 
         // 离线视图按键
@@ -489,8 +491,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkBatteryOptimization() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val sp = getSharedPreferences("ledger_overview_prefs", Context.MODE_PRIVATE)
+            val dismissed = sp.getBoolean("battery_banner_dismissed", false)
             val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
-            if (pm != null && !pm.isIgnoringBatteryOptimizations(packageName)) {
+            if (!dismissed && pm != null && !pm.isIgnoringBatteryOptimizations(packageName)) {
                 batteryBanner.visibility = View.VISIBLE
             } else {
                 batteryBanner.visibility = View.GONE
