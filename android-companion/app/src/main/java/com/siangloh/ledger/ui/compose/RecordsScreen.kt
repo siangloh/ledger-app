@@ -29,6 +29,8 @@ import com.siangloh.ledger.data.AppDatabase
 import com.siangloh.ledger.data.LocalDataStore
 import com.siangloh.ledger.data.NativeLedgerApi
 import com.siangloh.ledger.data.TransactionRecord
+import com.siangloh.ledger.data.SavedFilterRecord
+import com.siangloh.ledger.data.AccountRecord
 import com.siangloh.ledger.data.entities.PendingTransaction
 import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.compose.components.RecordsSkeletonList
@@ -75,6 +77,39 @@ fun RecordsScreen(
     var showDeleteConfirm by remember { mutableStateOf<TransactionRecord?>(null) }
     var loadJob by remember { mutableStateOf<Job?>(null) }
 
+    // 筛选预设与多维度高级筛选状态
+    var savedFilters by remember { mutableStateOf<List<SavedFilterRecord>>(emptyList()) }
+    var activeFilterId by remember { mutableStateOf<Int?>(null) }
+    var filterCategory by remember { mutableStateOf<String?>(null) }
+    var filterAccountId by remember { mutableStateOf<Int?>(null) }
+    var filterMinAmount by remember { mutableStateOf<Double?>(null) }
+    var filterMaxAmount by remember { mutableStateOf<Double?>(null) }
+    var filterStartDate by remember { mutableStateOf<String?>(null) }
+    var filterEndDate by remember { mutableStateOf<String?>(null) }
+    var showAdvancedFilterSheet by remember { mutableStateOf(false) }
+    var showSavePresetDialog by remember { mutableStateOf(false) }
+    var availableCategories by remember { mutableStateOf<List<String>>(emptyList()) }
+    var availableAccounts by remember { mutableStateOf<List<AccountRecord>>(emptyList()) }
+
+    fun loadFilterOptions() {
+        scope.launch {
+            NativeLedgerApi.getSavedFilters(context).onSuccess {
+                savedFilters = it
+            }
+            NativeLedgerApi.getCategories(context).onSuccess { catRes ->
+                val all = (catRes.expenses.map { it.name } + catRes.incomes.map { it.name } + catRes.savings.map { it.name }).distinct()
+                availableCategories = all
+            }
+            NativeLedgerApi.getAccounts(context).onSuccess { accRes ->
+                availableAccounts = accRes.accounts
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        loadFilterOptions()
+    }
+
     // 搜索 300ms 防抖，空内容即时响应，避免每次击键都向服务器发起高频无效请求
     LaunchedEffect(searchQuery) {
         if (searchQuery.isBlank()) {
@@ -110,8 +145,14 @@ fun RecordsScreen(
             val res = NativeLedgerApi.getTransactions(
                 context = context,
                 type = selectedType,
-                month = selectedMonth,
+                month = if (filterStartDate.isNullOrBlank() && filterEndDate.isNullOrBlank()) selectedMonth else null,
+                category = filterCategory,
                 search = debouncedSearchQuery,
+                accountId = filterAccountId,
+                startDate = filterStartDate,
+                endDate = filterEndDate,
+                minAmount = filterMinAmount,
+                maxAmount = filterMaxAmount,
                 page = targetPage,
                 limit = 50
             )
@@ -136,9 +177,63 @@ fun RecordsScreen(
         }
     }
 
-    LaunchedEffect(selectedType, selectedMonth, debouncedSearchQuery) {
+    fun applySavedFilter(sf: SavedFilterRecord) {
+        try {
+            val json = JSONObject(sf.criteriaJson)
+            activeFilterId = sf.id
+            if (json.has("type")) {
+                selectedType = json.optString("type", "all")
+            }
+            if (json.has("category")) {
+                val cat = json.optString("category")
+                filterCategory = if (cat.isNotBlank() && cat != "all" && cat != "全部") cat else null
+            } else {
+                filterCategory = null
+            }
+            if (json.has("account_id")) {
+                val aid = json.optInt("account_id")
+                filterAccountId = if (aid > 0) aid else null
+            } else {
+                filterAccountId = null
+            }
+            if (json.has("min_amount")) {
+                val min = json.optDouble("min_amount")
+                filterMinAmount = if (!min.isNaN() && min >= 0) min else null
+            } else {
+                filterMinAmount = null
+            }
+            if (json.has("max_amount")) {
+                val max = json.optDouble("max_amount")
+                filterMaxAmount = if (!max.isNaN() && max > 0) max else null
+            } else {
+                filterMaxAmount = null
+            }
+            if (json.has("q")) {
+                searchQuery = json.optString("q")
+            } else if (json.has("search")) {
+                searchQuery = json.optString("search")
+            }
+            if (json.has("date_range")) {
+                val dr = json.optString("date_range")
+                if (dr == "this_month") {
+                    selectedMonth = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
+                    filterStartDate = null
+                    filterEndDate = null
+                } else if (dr == "last_month") {
+                    val cal = Calendar.getInstance()
+                    cal.add(Calendar.MONTH, -1)
+                    selectedMonth = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(cal.time)
+                    filterStartDate = null
+                    filterEndDate = null
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    LaunchedEffect(selectedType, selectedMonth, debouncedSearchQuery, filterCategory, filterAccountId, filterMinAmount, filterMaxAmount, filterStartDate, filterEndDate) {
         loadData(resetPage = true)
     }
+
 
     Scaffold(
         topBar = {
@@ -225,33 +320,181 @@ fun RecordsScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // 搜索输入框
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("搜索商户、备注或标签...", fontSize = 13.sp, color = Slate400) },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null, tint = Slate400, modifier = Modifier.size(18.dp))
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(20.dp)) {
-                                Icon(Icons.Default.Close, contentDescription = "清除", tint = Slate400, modifier = Modifier.size(16.dp))
+                // 搜索输入框与高级筛选按钮
+                val activeFilterCount = (if (filterCategory != null) 1 else 0) +
+                        (if (filterAccountId != null) 1 else 0) +
+                        (if (filterMinAmount != null || filterMaxAmount != null) 1 else 0) +
+                        (if (filterStartDate != null || filterEndDate != null) 1 else 0)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text(stringResource(R.string.search_records_placeholder), fontSize = 13.sp, color = Slate400) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = null, tint = Slate400, modifier = Modifier.size(18.dp))
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(20.dp)) {
+                                    Icon(Icons.Default.Close, contentDescription = "清除", tint = Slate400, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryTeal,
+                            unfocusedBorderColor = Slate200,
+                            focusedContainerColor = Slate50,
+                            unfocusedContainerColor = Slate50
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                    )
+
+                    Box {
+                        IconButton(
+                            onClick = { showAdvancedFilterSheet = true },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(if (activeFilterCount > 0) PrimaryTeal else Slate100, RoundedCornerShape(12.dp))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FilterList,
+                                contentDescription = stringResource(R.string.filter_btn),
+                                tint = if (activeFilterCount > 0) Color.White else Slate700,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        if (activeFilterCount > 0) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Rose500,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 2.dp, y = (-2).dp)
+                                    .size(18.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = activeFilterCount.toString(),
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryTeal,
-                        unfocusedBorderColor = Slate200,
-                        focusedContainerColor = Slate50,
-                        unfocusedContainerColor = Slate50
-                    ),
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 快捷预设芯片滚动栏
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
-                )
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val isAllPreset = activeFilterId == null && activeFilterCount == 0 && selectedType == "all" && debouncedSearchQuery.isEmpty()
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (isAllPreset) PrimaryTeal else Slate100,
+                        modifier = Modifier
+                            .height(30.dp)
+                            .clickable {
+                                activeFilterId = null
+                                filterCategory = null
+                                filterAccountId = null
+                                filterMinAmount = null
+                                filterMaxAmount = null
+                                filterStartDate = null
+                                filterEndDate = null
+                                selectedType = "all"
+                                searchQuery = ""
+                            }
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
+                            Text(
+                                text = stringResource(R.string.filter_all),
+                                fontSize = 12.sp,
+                                fontWeight = if (isAllPreset) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isAllPreset) Color.White else Slate700
+                            )
+                        }
+                    }
+
+                    savedFilters.filter { it.isPinned }.forEach { sf ->
+                        val isSelected = activeFilterId == sf.id
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (isSelected) PrimaryTeal else Slate100,
+                            modifier = Modifier
+                                .height(30.dp)
+                                .clickable {
+                                    if (isSelected) {
+                                        activeFilterId = null
+                                        filterCategory = null
+                                        filterAccountId = null
+                                        filterMinAmount = null
+                                        filterMaxAmount = null
+                                        filterStartDate = null
+                                        filterEndDate = null
+                                        selectedType = "all"
+                                    } else {
+                                        applySavedFilter(sf)
+                                    }
+                                }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 10.dp)
+                            ) {
+                                Text("📌", fontSize = 10.sp)
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = sf.name,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.White else Slate700,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+
+                    // 存为预设按钮
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = Slate100,
+                        border = BorderStroke(1.dp, Slate200),
+                        modifier = Modifier
+                            .height(30.dp)
+                            .clickable { showSavePresetDialog = true }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 10.dp)
+                        ) {
+                            Icon(Icons.Default.BookmarkAdd, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = stringResource(R.string.filter_save_as_preset),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = PrimaryTeal
+                            )
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -286,6 +529,75 @@ fun RecordsScreen(
                         }
                     }
                 }
+
+                // 激活的过滤项微标签 (可一键移除)
+                if (filterCategory != null || filterAccountId != null || filterMinAmount != null || filterMaxAmount != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        filterCategory?.let { cat ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = PrimaryTealSubtle,
+                                modifier = Modifier.clickable { filterCategory = null }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text("分类: $cat", fontSize = 11.sp, color = PrimaryTeal)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(Icons.Default.Close, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
+                        filterAccountId?.let { aid ->
+                            val accName = availableAccounts.find { it.id == aid }?.name ?: "账户#$aid"
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = PrimaryTealSubtle,
+                                modifier = Modifier.clickable { filterAccountId = null }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text("账户: $accName", fontSize = 11.sp, color = PrimaryTeal)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(Icons.Default.Close, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
+                        if (filterMinAmount != null || filterMaxAmount != null) {
+                            val amtLabel = "金额: " + (filterMinAmount?.let { "≥$it" } ?: "") +
+                                    (if (filterMinAmount != null && filterMaxAmount != null) " ~ " else "") +
+                                    (filterMaxAmount?.let { "≤$it" } ?: "")
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = PrimaryTealSubtle,
+                                modifier = Modifier.clickable {
+                                    filterMinAmount = null
+                                    filterMaxAmount = null
+                                }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(amtLabel, fontSize = 11.sp, color = PrimaryTeal)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(Icons.Default.Close, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
             }
         }
     ) { paddingVals ->
@@ -659,7 +971,64 @@ fun RecordsScreen(
             }
         )
     }
+
+    // 高级筛选底部抽屉
+    if (showAdvancedFilterSheet) {
+        AdvancedFilterBottomSheet(
+            currentType = selectedType,
+            currentCategory = filterCategory,
+            currentAccountId = filterAccountId,
+            currentMinAmount = filterMinAmount,
+            currentMaxAmount = filterMaxAmount,
+            availableCategories = availableCategories,
+            availableAccounts = availableAccounts,
+            onDismiss = { showAdvancedFilterSheet = false },
+            onSaveAsPresetClick = {
+                showAdvancedFilterSheet = false
+                showSavePresetDialog = true
+            },
+            onApply = { newType, newCat, newAid, newMin, newMax ->
+                selectedType = newType
+                filterCategory = newCat
+                filterAccountId = newAid
+                filterMinAmount = newMin
+                filterMaxAmount = newMax
+                activeFilterId = null
+                showAdvancedFilterSheet = false
+            }
+        )
+    }
+
+    // 保存为预设弹窗
+    if (showSavePresetDialog) {
+        SavePresetDialog(
+            onDismiss = { showSavePresetDialog = false },
+            onConfirm = { name, isPinned ->
+                val criteria = JSONObject().apply {
+                    put("type", selectedType)
+                    filterCategory?.let { put("category", it) }
+                    filterAccountId?.let { put("account_id", it) }
+                    filterMinAmount?.let { put("min_amount", it) }
+                    filterMaxAmount?.let { put("max_amount", it) }
+                    if (searchQuery.isNotBlank()) put("q", searchQuery.trim())
+                    put("date_range", "this_month")
+                }
+                scope.launch {
+                    val res = NativeLedgerApi.createSavedFilter(context, name, criteria, isPinned)
+                    showSavePresetDialog = false
+                    res.onSuccess { created ->
+                        Toast.makeText(context, context.getString(R.string.filter_save_preset_success), Toast.LENGTH_SHORT).show()
+                        loadFilterOptions()
+                        activeFilterId = created.id
+                    }.onFailure { err ->
+                        Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${err.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        )
+    }
 }
+
 
 @Composable
 fun TransactionCard(
@@ -1008,3 +1377,309 @@ fun formatDisplayMonth(monthStr: String, context: Context? = null): String {
         monthStr
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AdvancedFilterBottomSheet(
+    currentType: String,
+    currentCategory: String?,
+    currentAccountId: Int?,
+    currentMinAmount: Double?,
+    currentMaxAmount: Double?,
+    availableCategories: List<String>,
+    availableAccounts: List<AccountRecord>,
+    onDismiss: () -> Unit,
+    onSaveAsPresetClick: () -> Unit,
+    onApply: (type: String, category: String?, accountId: Int?, minAmount: Double?, maxAmount: Double?) -> Unit
+) {
+    var tempType by remember { mutableStateOf(currentType) }
+    var tempCategory by remember { mutableStateOf(currentCategory) }
+    var tempAccountId by remember { mutableStateOf(currentAccountId) }
+    var minAmountStr by remember { mutableStateOf(currentMinAmount?.let { String.format(Locale.US, "%.2f", it) } ?: "") }
+    var maxAmountStr by remember { mutableStateOf(currentMaxAmount?.let { String.format(Locale.US, "%.2f", it) } ?: "") }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.filter_btn),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900
+                )
+                TextButton(
+                    onClick = {
+                        tempType = "all"
+                        tempCategory = null
+                        tempAccountId = null
+                        minAmountStr = ""
+                        maxAmountStr = ""
+                    }
+                ) {
+                    Text(stringResource(R.string.filter_reset_btn), color = Slate500, fontSize = 13.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 交易类型
+            Text(stringResource(R.string.filter_type_label), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                listOf(
+                    "all" to "全部",
+                    "expense" to "支出",
+                    "income" to "收入",
+                    "transfer" to "自转"
+                ).forEach { (tKey, tLabel) ->
+                    val isSel = tempType == tKey
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSel) PrimaryTeal else Slate100,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { tempType = tKey }
+                    ) {
+                        Text(
+                            text = tLabel,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSel) Color.White else Slate700,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 金额区间
+            Text(stringResource(R.string.filter_amount_range), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = minAmountStr,
+                    onValueChange = { minAmountStr = it },
+                    placeholder = { Text(stringResource(R.string.filter_min_amount_hint), fontSize = 12.sp, color = Slate400) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PrimaryTeal, focusedLabelColor = PrimaryTeal)
+                )
+                Text("~", color = Slate400, fontWeight = FontWeight.Bold)
+                OutlinedTextField(
+                    value = maxAmountStr,
+                    onValueChange = { maxAmountStr = it },
+                    placeholder = { Text(stringResource(R.string.filter_max_amount_hint), fontSize = 12.sp, color = Slate400) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PrimaryTeal, focusedLabelColor = PrimaryTeal)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 账户筛选
+            if (availableAccounts.isNotEmpty()) {
+                Text(stringResource(R.string.filter_account_label), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val isAllAcc = tempAccountId == null
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isAllAcc) PrimaryTeal else Slate100,
+                        modifier = Modifier.clickable { tempAccountId = null }
+                    ) {
+                        Text(
+                            text = stringResource(R.string.filter_all),
+                            fontSize = 12.sp,
+                            fontWeight = if (isAllAcc) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isAllAcc) Color.White else Slate700,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                    availableAccounts.forEach { acc ->
+                        val isSel = tempAccountId == acc.id
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSel) PrimaryTeal else Slate100,
+                            modifier = Modifier.clickable { tempAccountId = if (isSel) null else acc.id }
+                        ) {
+                            Text(
+                                text = acc.name,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSel) Color.White else Slate700,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // 分类筛选
+            if (availableCategories.isNotEmpty()) {
+                Text(stringResource(R.string.filter_category_label), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val isAllCat = tempCategory == null
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isAllCat) PrimaryTeal else Slate100,
+                        modifier = Modifier.clickable { tempCategory = null }
+                    ) {
+                        Text(
+                            text = stringResource(R.string.filter_all),
+                            fontSize = 12.sp,
+                            fontWeight = if (isAllCat) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isAllCat) Color.White else Slate700,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                    availableCategories.forEach { cat ->
+                        val isSel = tempCategory == cat
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSel) PrimaryTeal else Slate100,
+                            modifier = Modifier.clickable { tempCategory = if (isSel) null else cat }
+                        ) {
+                            Text(
+                                text = cat,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSel) Color.White else Slate700,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            // 底部操作按钮
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onSaveAsPresetClick,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(stringResource(R.string.filter_save_as_preset), fontSize = 13.sp, color = PrimaryTeal)
+                }
+                Button(
+                    onClick = {
+                        val min = minAmountStr.toDoubleOrNull()
+                        val max = maxAmountStr.toDoubleOrNull()
+                        onApply(tempType, tempCategory, tempAccountId, min, max)
+                    },
+                    modifier = Modifier
+                        .weight(1.3f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal)
+                ) {
+                    Text(stringResource(R.string.filter_apply_btn), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SavePresetDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, isPinned: Boolean) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var isPinned by remember { mutableStateOf(true) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        titleContentColor = Slate900,
+        textContentColor = Slate800,
+        title = { Text(stringResource(R.string.filter_save_as_preset), fontWeight = FontWeight.Bold, fontSize = 17.sp) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.filter_preset_name_label), fontSize = 13.sp, color = Slate600)
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    placeholder = { Text(stringResource(R.string.filter_preset_name_hint), fontSize = 13.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PrimaryTeal,
+                        focusedLabelColor = PrimaryTeal
+                    )
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { isPinned = !isPinned }
+                ) {
+                    Checkbox(
+                        checked = isPinned,
+                        onCheckedChange = { isPinned = it },
+                        colors = CheckboxDefaults.colors(checkedColor = PrimaryTeal)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(stringResource(R.string.filter_pin_quick_bar), fontSize = 13.sp, color = Slate700)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        onConfirm(name.trim(), isPinned)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                enabled = name.isNotBlank()
+            ) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel), color = Slate600)
+            }
+        }
+    )
+}
+

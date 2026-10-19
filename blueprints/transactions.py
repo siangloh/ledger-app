@@ -44,6 +44,14 @@ from services.budget_service import (
     set_category_budget as set_category_budget_svc,
     delete_category_budget
 )
+from services.saved_filters_service import (
+    get_saved_filters,
+    create_saved_filter,
+    update_saved_filter,
+    delete_saved_filter,
+    build_filter_sql,
+    resolve_date_range
+)
 from core.i18n import t
 
 transactions_bp = Blueprint('transactions', __name__)
@@ -186,10 +194,31 @@ def add_transaction():
 def records():
     user_id = get_current_user_id()
     db = get_db()
-    start = request.args.get('start', '')
-    end = request.args.get('end', '')
-    type_ = request.args.get('type', '')
-    category = request.args.get('category', '')
+
+    filter_id = request.args.get('filter_id', type=int)
+    saved_filter_obj = None
+    if filter_id:
+        filter_row = db.execute("SELECT * FROM saved_filters WHERE id = ? AND user_id = ?", (filter_id, str(user_id))).fetchone()
+        if filter_row:
+            try:
+                saved_filter_obj = json.loads(filter_row['criteria']) if isinstance(filter_row['criteria'], str) else (filter_row['criteria'] or {})
+            except Exception:
+                saved_filter_obj = {}
+
+    criteria = saved_filter_obj or {}
+
+    # 优先从 request.args 取值，若未传递且指定了 filter_id 则使用预设中的条件
+    q = request.args.get('q', criteria.get('q', ''))
+    start = request.args.get('start', criteria.get('start', ''))
+    end = request.args.get('end', criteria.get('end', ''))
+    date_range = request.args.get('date_range', criteria.get('date_range', ''))
+    type_ = request.args.get('type', criteria.get('type', ''))
+    category = request.args.get('category', criteria.get('category', ''))
+    account_id = request.args.get('account_id', criteria.get('account_id', ''))
+    min_amount = request.args.get('min_amount', criteria.get('min_amount', ''))
+    max_amount = request.args.get('max_amount', criteria.get('max_amount', ''))
+    source = request.args.get('source', criteria.get('source', ''))
+
     page = request.args.get('page', 1, type=int)
     if page < 1:
         page = 1
@@ -197,22 +226,21 @@ def records():
     if page_size < 1 or page_size > 100:
         page_size = 25
 
-    where_clauses = ['user_id = ?', 'deleted_at IS NULL']
-    params = [user_id]
-    if start:
-        where_clauses.append('date >= ?')
-        params.append(start)
-    if end:
-        where_clauses.append('date <= ?')
-        params.append(end)
-    if type_:
-        where_clauses.append('type = ?')
-        params.append(type_)
-    if category:
-        where_clauses.append('category = ?')
-        params.append(category)
+    effective_start, effective_end = resolve_date_range(date_range, start, end)
 
-    where_sql = ' AND '.join(where_clauses)
+    where_sql, params = build_filter_sql(
+        user_id=user_id,
+        q=q,
+        tx_type=type_,
+        category=category,
+        account_id=account_id,
+        start=start,
+        end=end,
+        date_range=date_range,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        source=source
+    )
 
     # 1. 单次快速聚合汇总统计总览金额与匹配总笔数（无需加载全量记录到内存）
     agg_sql = f'''
@@ -244,6 +272,13 @@ def records():
     ).fetchall()
     categories = [c['category'] for c in all_categories]
 
+    accounts = db.execute(
+        'SELECT id, name, type, currency FROM accounts WHERE user_id = ? AND is_active = 1 ORDER BY id',
+        (user_id,)
+    ).fetchall()
+
+    saved_filters = get_saved_filters(user_id=user_id, db=db)
+
     latest_evt = get_latest_event(user_id=user_id, db=db)
     latest_id = latest_evt['data'].get('id') if latest_evt and latest_evt.get('data') else None
 
@@ -259,9 +294,16 @@ def records():
             latest_id=latest_id,
             start=start,
             end=end,
+            date_range=date_range,
             type=type_,
             type_=type_,
             category=category,
+            account_id=account_id,
+            min_amount=min_amount,
+            max_amount=max_amount,
+            source=source,
+            q=q,
+            filter_id=filter_id,
             page_size=page_size
         )
 
@@ -280,9 +322,16 @@ def records():
             latest_id=latest_id,
             start=start,
             end=end,
+            date_range=date_range,
             type=type_,
             type_=type_,
             category=category,
+            account_id=account_id,
+            min_amount=min_amount,
+            max_amount=max_amount,
+            source=source,
+            q=q,
+            filter_id=filter_id,
             page_size=page_size
         )
 
@@ -296,13 +345,31 @@ def records():
 
     return render_template(
         'records.html',
-        rows=rows, start=start, end=end, type=type_, type_=type_, category=category,
+        rows=rows,
+        start=start,
+        end=end,
+        date_range=date_range,
+        effective_start=effective_start,
+        effective_end=effective_end,
+        type=type_,
+        type_=type_,
+        category=category,
+        account_id=account_id,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        source=source,
+        q=q,
+        filter_id=filter_id,
         categories=categories,
+        accounts=accounts,
+        saved_filters=saved_filters,
         income_categories=income_categories,
         expense_categories=expense_categories,
         savings_categories=savings_categories,
         savings_pool_by_category=savings_pool_by_category,
-        total_income=total_income, total_expense=total_expense, total_savings=total_savings,
+        total_income=total_income,
+        total_expense=total_expense,
+        total_savings=total_savings,
         total_count=total_count,
         has_more=has_more,
         page=page,
@@ -310,6 +377,65 @@ def records():
         latest_id=latest_id,
         page_size=page_size
     )
+
+
+@transactions_bp.route('/api/saved-filters', methods=['GET', 'POST'], endpoint='api_saved_filters')
+def api_saved_filters():
+    user_id = get_current_user_id()
+    db = get_db()
+    if request.method == 'GET':
+        filters = get_saved_filters(user_id=user_id, db=db)
+        return jsonify({'ok': True, 'filters': filters})
+
+    data = request.get_json(silent=True) or request.form
+    name = data.get('name', '')
+    criteria = data.get('criteria', {})
+    is_pinned = int(data.get('is_pinned', 0))
+    res = create_saved_filter(user_id=user_id, name=name, criteria=criteria, is_pinned=is_pinned, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@transactions_bp.route('/api/saved-filters/<int:filter_id>', methods=['PUT', 'POST', 'DELETE'], endpoint='api_saved_filter_item')
+def api_saved_filter_item(filter_id: int):
+    user_id = get_current_user_id()
+    db = get_db()
+    if request.method == 'DELETE':
+        res = delete_saved_filter(user_id=user_id, filter_id=filter_id, db=db)
+        status_code = 200 if res.get('ok') else 400
+        return jsonify(res), status_code
+
+    data = request.get_json(silent=True) or request.form
+    name = data.get('name')
+    criteria = data.get('criteria')
+    is_pinned = data.get('is_pinned')
+    order_num = data.get('order_num')
+    res = update_saved_filter(
+        user_id=user_id,
+        filter_id=filter_id,
+        name=name,
+        criteria=criteria,
+        is_pinned=is_pinned,
+        order_num=order_num,
+        db=db
+    )
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@transactions_bp.route('/api/saved-filters/<int:filter_id>/toggle-pin', methods=['POST'], endpoint='api_saved_filter_toggle_pin')
+def api_saved_filter_toggle_pin(filter_id: int):
+    user_id = get_current_user_id()
+    db = get_db()
+    row = db.execute("SELECT is_pinned FROM saved_filters WHERE id = ? AND user_id = ?", (filter_id, str(user_id))).fetchone()
+    if not row:
+        return jsonify({'ok': False, 'message': 'Filter not found'}), 404
+    new_pinned = 0 if row['is_pinned'] else 1
+    res = update_saved_filter(user_id=user_id, filter_id=filter_id, is_pinned=new_pinned, db=db)
+    if res.get('ok'):
+        res['is_pinned'] = bool(new_pinned)
+    return jsonify(res)
+
 
 
 @transactions_bp.route('/records/<int:tx_id>/edit', methods=['GET', 'POST'], endpoint='edit_record')

@@ -284,4 +284,27 @@
     <string name="budget_cancel_btn">Batal</string>
     <string name="budget_delete_btn">Kosongkan Had</string>
     <string name="budget_category_count_fmt">%1$d belanjawan kategori</string>
+
+    <!-- Carian & Penapis Tersimpan (Search & Saved Filters) -->
+    <string name="search_records_placeholder">Cari peniaga, nota, tag...</string>
+    <string name="filter_btn">Penapis Lanjutan</string>
+    <string name="filter_all">Semua</string>
+    <string name="filter_preset_quick">Praset</string>
+    <string name="filter_save_as_preset">Simpan Praset</string>
+    <string name="filter_preset_name_label">Nama Praset</string>
+    <string name="filter_preset_name_hint">cth. Perbelanjaan Besar</string>
+    <string name="filter_pin_quick_bar">Semat ke bar pantas</string>
+    <string name="filter_type_label">Jenis Transaksi</string>
+    <string name="filter_category_label">Kategori</string>
+    <string name="filter_account_label">Akaun</string>
+    <string name="filter_amount_range">Julat Jumlah</string>
+    <string name="filter_min_amount_hint">Jumlah Min</string>
+    <string name="filter_max_amount_hint">Jumlah Maks</string>
+    <string name="filter_apply_btn">Gunakan Penapis</string>
+    <string name="filter_reset_btn">Set Semula</string>
+    <string name="filter_save_preset_success">Praset penapis berjaya disimpan</string>
+    <string name="filter_delete_preset_success">Praset dipadam</string>
+    <string name="action_save">Simpan</string>
+    <string name="action_cancel">Batal</string>
 </resources>
+

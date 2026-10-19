@@ -911,8 +911,20 @@ def init_db(app_logger=None):
         note TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )''')
-    db.execute('CREATE INDEX IF NOT EXISTS idx_acc_reconciliations_user_acc ON account_reconciliations(user_id, account_id, reconciled_at DESC)')
+    db.execute('''
+    CREATE TABLE IF NOT EXISTS saved_filters (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        criteria TEXT NOT NULL,
+        is_pinned INTEGER NOT NULL DEFAULT 0,
+        order_num INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )''')
+    db.execute('CREATE INDEX IF NOT EXISTS idx_saved_filters_user ON saved_filters(user_id, is_pinned DESC, order_num ASC, id ASC)')
     db.commit()
+
 
     # 分类规则与商户纠正记忆轻量幂等迁移
     for col_sql in [

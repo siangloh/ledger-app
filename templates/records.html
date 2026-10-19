@@ -3,33 +3,114 @@
 {% block content %}
 <h2>{{ t('records.title') }}</h2>
 
-<form method="get" class="filters">
-  <label>{{ t('records.date_start') }} <input type="date" name="start" value="{{ start }}"></label>
-  <label>{{ t('records.date_end') }} <input type="date" name="end" value="{{ end }}"></label>
-  <label>{{ t('common.type') }}
-    <select name="type">
-      <option value="">{{ t('common.all') }}</option>
-      <option value="income" {{ 'selected' if type=='income' }}>{{ t('common.income') }}</option>
-      <option value="expense" {{ 'selected' if type=='expense' }}>{{ t('common.expense') }}</option>
-      <option value="savings" {{ 'selected' if type=='savings' }}>{{ t('common.savings') }}</option>
+<!-- 快捷筛选预设栏 (Deep Teal 胶囊芯片) -->
+<div class="saved-filters-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; background: var(--surface); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+    <span style="font-size: 13px; font-weight: 600; color: var(--navy); display: inline-flex; align-items: center; gap: 4px;">
+      <span>⚡</span><span>{{ t('filters.quick_presets', '快捷筛选:') }}</span>
+    </span>
+    <a href="{{ url_for('records') }}" class="tag-pill {{ 'active' if not filter_id and not q and not start and not end and not type and not category and not account_id and not min_amount and not max_amount and not source and not date_range else '' }}" style="text-decoration: none; padding: 4px 12px; border-radius: 16px; font-size: 12px; cursor: pointer;">
+      {{ t('common.all', '全部') }}
+    </a>
+    {% for sf in saved_filters %}
+      {% if sf.is_pinned %}
+        <a href="{{ url_for('records', filter_id=sf.id) }}" class="tag-pill {{ 'active' if filter_id == sf.id else '' }}" style="text-decoration: none; padding: 4px 12px; border-radius: 16px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="{{ sf.name }}">
+          <span>📌</span><span>{{ sf.name }}</span>
+        </a>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <div style="display: flex; gap: 8px; align-items: center;">
+    <button type="button" class="btn-ghost" onclick="openSaveFilterModal()" style="font-size: 12px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px;" title="{{ t('filters.save_current_hint', '将当前搜索条件保存为快捷预设') }}">
+      <span>💾</span><span>{{ t('filters.save_current', '存为预设') }}</span>
+    </button>
+    <button type="button" class="btn-ghost" onclick="openManageFiltersModal()" style="font-size: 12px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px;" title="{{ t('filters.manage_presets_hint', '管理预设名称、钉选与删除') }}">
+      <span>⚙️</span><span>{{ t('filters.manage_presets', '管理预设') }}</span>
+    </button>
+  </div>
+</div>
+
+<form method="get" class="filters" id="recordsFilterForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; align-items: end;">
+  <label style="grid-column: span 2; min-width: 220px;">
+    {{ t('filters.search_keyword', '关键词搜索') }}
+    <input type="text" name="q" value="{{ q or '' }}" placeholder="{{ t('filters.search_placeholder', '搜索备注、商户、分类或标签...') }}" style="width: 100%;">
+  </label>
+  <label>
+    {{ t('filters.date_range', '时间范围') }}
+    <select name="date_range" id="filterDateRange" onchange="handleDateRangeChange(this.value)">
+      <option value="" {{ 'selected' if not date_range }}>{{ t('common.all', '全部时间') }}</option>
+      <option value="this_month" {{ 'selected' if date_range=='this_month' }}>{{ t('filters.this_month', '本月') }}</option>
+      <option value="last_month" {{ 'selected' if date_range=='last_month' }}>{{ t('filters.last_month', '上月') }}</option>
+      <option value="last_30_days" {{ 'selected' if date_range=='last_30_days' }}>{{ t('filters.last_30_days', '近 30 天') }}</option>
+      <option value="this_year" {{ 'selected' if date_range=='this_year' }}>{{ t('filters.this_year', '今年') }}</option>
+      <option value="custom" {{ 'selected' if date_range=='custom' or (start or end) and date_range not in ('this_month', 'last_month', 'last_30_days', 'this_year') }}>{{ t('filters.custom_range', '自定义日期') }}</option>
     </select>
   </label>
-  <label>{{ t('common.category') }}
+  <label id="dateStartWrap" style="{{ 'display: none;' if date_range and date_range != 'custom' else '' }}">
+    {{ t('records.date_start', '起始日期') }} <input type="date" name="start" id="filterStart" value="{{ start }}">
+  </label>
+  <label id="dateEndWrap" style="{{ 'display: none;' if date_range and date_range != 'custom' else '' }}">
+    {{ t('records.date_end', '结束日期') }} <input type="date" name="end" id="filterEnd" value="{{ end }}">
+  </label>
+  <label>
+    {{ t('common.type', '类型') }}
+    <select name="type">
+      <option value="">{{ t('common.all', '全部') }}</option>
+      <option value="expense" {{ 'selected' if type=='expense' }}>{{ t('common.expense', '支出') }}</option>
+      <option value="income" {{ 'selected' if type=='income' }}>{{ t('common.income', '收入') }}</option>
+      <option value="savings" {{ 'selected' if type=='savings' }}>{{ t('common.savings', '结余储蓄') }}</option>
+      <option value="transfer" {{ 'selected' if type=='transfer' }}>{{ t('common.transfer', '自转/划转') }}</option>
+    </select>
+  </label>
+  <label>
+    {{ t('common.category', '分类') }}
     <select name="category">
-      <option value="">{{ t('common.all') }}</option>
+      <option value="">{{ t('common.all', '全部') }}</option>
       {% for c in categories %}
       <option value="{{ c }}" {{ 'selected' if category==c }}>{{ c|t_cat }}</option>
       {% endfor %}
     </select>
   </label>
-  <div class="filters-actions">
-    <button type="submit" class="btn-primary">{{ t('common.filter') }}</button>
-    <a href="{{ url_for('records') }}" class="btn-ghost">{{ t('common.cancel') }}</a>
+  <label>
+    {{ t('common.account', '账户') }}
+    <select name="account_id">
+      <option value="">{{ t('common.all', '全部') }}</option>
+      {% for acc in accounts %}
+      <option value="{{ acc.id }}" {{ 'selected' if account_id|string == acc.id|string }}>{{ acc.icon or '💳' }} {{ acc.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    {{ t('filters.min_amount', '最低金额') }}
+    <input type="number" step="0.01" min="0" name="min_amount" value="{{ min_amount or '' }}" placeholder="0.00">
+  </label>
+  <label>
+    {{ t('filters.max_amount', '最高金额') }}
+    <input type="number" step="0.01" min="0" name="max_amount" value="{{ max_amount or '' }}" placeholder="9999.00">
+  </label>
+  <label>
+    {{ t('records.th_source', '来源渠道') }}
+    <select name="source">
+      <option value="">{{ t('common.all', '全部') }}</option>
+      <option value="auto_track" {{ 'selected' if source=='auto_track' }}>{{ t('records.src_auto_track', '自动记账') }}</option>
+      <option value="manual" {{ 'selected' if source=='manual' }}>{{ t('records.src_manual', '手动录入') }}</option>
+      <option value="split_bill" {{ 'selected' if source=='split_bill' }}>{{ t('records.src_split_bill', 'AA分账') }}</option>
+      <option value="recurring" {{ 'selected' if source=='recurring' }}>{{ t('records.src_recurring', '固定收支') }}</option>
+      <option value="import" {{ 'selected' if source=='import' }}>{{ t('records.src_import', '批量导入') }}</option>
+    </select>
+  </label>
+
+  <div class="filters-actions" style="grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 6px; flex-wrap: wrap;">
+    <button type="submit" class="btn-primary" style="background: #0F766E; border-color: #0F766E; display: inline-flex; align-items: center; gap: 4px;">
+      <span>🔍</span><span>{{ t('common.filter', '筛选') }}</span>
+    </button>
+    <a href="{{ url_for('records') }}" class="btn-ghost">{{ t('common.reset', '重置清空') }}</a>
     <a href="{{ url_for('transactions.recycle_bin_page') }}" class="btn-ghost" style="display: inline-flex; align-items: center; gap: 4px; text-decoration: none;" title="{{ t('recycle_bin.title', '回收站') }}">
       <span>🗑️</span><span>{{ t('recycle_bin.title', '回收站') }}</span>
     </a>
   </div>
 </form>
+
 
 <form method="post" action="{{ url_for('batch_delete_records') }}" id="batchForm">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -1366,6 +1447,170 @@ async function openEditRecordModal(txId) {
   });
 }
 
+function handleDateRangeChange(val) {
+  const startWrap = document.getElementById('dateStartWrap');
+  const endWrap = document.getElementById('dateEndWrap');
+  if (!startWrap || !endWrap) return;
+  if (!val || val === 'custom') {
+    startWrap.style.display = '';
+    endWrap.style.display = '';
+  } else {
+    startWrap.style.display = 'none';
+    endWrap.style.display = 'none';
+  }
+}
+
+function openSaveFilterModal() {
+  const form = document.getElementById('recordsFilterForm');
+  if (!form) return;
+  const formData = new FormData(form);
+  const criteria = {};
+  for (const [k, v] of formData.entries()) {
+    if (v && String(v).trim()) {
+      criteria[k] = String(v).trim();
+    }
+  }
+
+  const promptTitle = window.t ? window.t('filters.save_as_preset', '保存为快捷筛选预设') : '保存为快捷筛选预设';
+  const nameLabel = window.t ? window.t('filters.preset_name', '预设名称：') : '预设名称：';
+  const namePlaceholder = window.t ? window.t('filters.preset_name_placeholder', '例如：本月大额餐饮、Grab日常') : '例如：本月大额餐饮、Grab日常';
+  const pinLabel = window.t ? window.t('filters.pin_preset', '固定在快捷栏 (Pin)') : '固定在快捷栏 (Pin)';
+  const confirmBtn = window.t ? window.t('common.save', '保存') : '保存';
+  const cancelBtn = window.t ? window.t('common.cancel', '取消') : '取消';
+
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: promptTitle,
+      html: `
+        <div style="text-align: left; margin-top: 10px;">
+          <label style="font-size: 13px; font-weight: 600; color: var(--navy); display: block; margin-bottom: 6px;">${nameLabel}</label>
+          <input id="swalPresetName" class="swal2-input" placeholder="${namePlaceholder}" style="width: 100%; margin: 0 0 12px 0; height: 38px; box-sizing: border-box; font-size: 14px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); cursor: pointer;">
+            <input type="checkbox" id="swalPresetPinned" checked style="width: 16px; height: 16px; cursor: pointer;">
+            <span>${pinLabel}</span>
+          </label>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: confirmBtn,
+      cancelButtonText: cancelBtn,
+      confirmButtonColor: '#0F766E',
+      preConfirm: () => {
+        const name = (document.getElementById('swalPresetName').value || '').trim();
+        const isPinned = document.getElementById('swalPresetPinned').checked ? 1 : 0;
+        if (!name) {
+          Swal.showValidationMessage(window.t ? window.t('filters.name_required', '请输入预设名称') : '请输入预设名称');
+          return false;
+        }
+        return { name, isPinned };
+      }
+    }).then(result => {
+      if (result.isConfirmed && result.value) {
+        fetch('/api/saved-filters', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({
+            name: result.value.name,
+            criteria: criteria,
+            is_pinned: result.value.isPinned
+          })
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            Swal.fire({
+              icon: 'success',
+              title: window.t ? window.t('filters.created_success', '筛选预设已保存') : '筛选预设已保存',
+              timer: 1500,
+              showConfirmButton: false
+            }).then(() => {
+              window.location.href = '/records?filter_id=' + data.filter.id;
+            });
+          } else {
+            errorAlert(data.message || '保存失败');
+          }
+        })
+        .catch(() => errorAlert('网络错误'));
+      }
+    });
+  }
+}
+
+function openManageFiltersModal() {
+  fetch('/api/saved-filters', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok || !data.filters) return;
+      const filters = data.filters;
+      let html = '<div style="max-height: 380px; overflow-y: auto; text-align: left; display: flex; flex-direction: column; gap: 8px;">';
+      if (filters.length === 0) {
+        html += '<p style="text-align: center; color: var(--muted); padding: 20px 0;">' + (window.t ? window.t('common.no_data', '暂无预设') : '暂无预设') + '</p>';
+      } else {
+        filters.forEach(f => {
+          html += `
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--surface-soft); border-radius: 8px; border: 1px solid var(--border);">
+              <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                <span style="font-size: 16px;">${f.is_pinned ? '📌' : '📍'}</span>
+                <div>
+                  <strong style="font-size: 13.5px; color: var(--navy);">${f.name}</strong>
+                  <div style="font-size: 11px; color: var(--muted);">${Object.keys(f.criteria || {}).length ? Object.entries(f.criteria).map(([k, v]) => k + '=' + v).join(', ') : '全部'}</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="btn-ghost" onclick="toggleFilterPin(${f.id})" style="font-size: 11px; padding: 3px 8px;">
+                  ${f.is_pinned ? (window.t ? window.t('filters.unpin', '取消固定') : '取消固定') : (window.t ? window.t('filters.pin', '固定') : '固定')}
+                </button>
+                <button type="button" class="btn-danger-ghost" onclick="deleteFilterPreset(${f.id})" style="font-size: 11px; padding: 3px 8px;">
+                  ${window.t ? window.t('common.delete', '删除') : '删除'}
+                </button>
+              </div>
+            </div>
+          `;
+        });
+      }
+      html += '</div>';
+
+      Swal.fire({
+        title: window.t ? window.t('filters.manage_presets', '管理筛选预设') : '管理筛选预设',
+        html: html,
+        showConfirmButton: false,
+        showCloseButton: true,
+        width: 480
+      });
+    });
+}
+
+function toggleFilterPin(id) {
+  fetch('/api/saved-filters/' + id + '/toggle-pin', {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      openManageFiltersModal();
+    }
+  });
+}
+
+function deleteFilterPreset(id) {
+  const confirmMsg = window.t ? window.t('filters.delete_preset_confirm', '确定要删除该筛选预设吗？') : '确定要删除该筛选预设吗？';
+  if (!confirm(confirmMsg)) return;
+  fetch('/api/saved-filters/' + id, {
+    method: 'DELETE',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      openManageFiltersModal();
+    }
+  });
+}
+
 // 显式挂载至 window 作用域，确保内联属性及动态 DOM 派发 100% 可用
 window.setupRecordsObserver = setupRecordsObserver;
 window.updateBatchBar = updateBatchBar;
@@ -1376,5 +1621,11 @@ window.confirmSingleDelete = confirmSingleDelete;
 window.openBatchEditDialog = openBatchEditDialog;
 window.openOffsetModal = openOffsetModal;
 window.openEditRecordModal = openEditRecordModal;
+window.handleDateRangeChange = handleDateRangeChange;
+window.openSaveFilterModal = openSaveFilterModal;
+window.openManageFiltersModal = openManageFiltersModal;
+window.toggleFilterPin = toggleFilterPin;
+window.deleteFilterPreset = deleteFilterPreset;
 </script>
+
 {% endblock %}

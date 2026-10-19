@@ -284,4 +284,27 @@
     <string name="budget_cancel_btn">Cancel</string>
     <string name="budget_delete_btn">Clear Limit</string>
     <string name="budget_category_count_fmt">%1$d category budgets</string>
+
+    <!-- Search & Saved Filters -->
+    <string name="search_records_placeholder">Search merchant, note, tags...</string>
+    <string name="filter_btn">Filter</string>
+    <string name="filter_all">All</string>
+    <string name="filter_preset_quick">Presets</string>
+    <string name="filter_save_as_preset">Save Preset</string>
+    <string name="filter_preset_name_label">Preset Name</string>
+    <string name="filter_preset_name_hint">e.g. Large Expenses</string>
+    <string name="filter_pin_quick_bar">Pin to quick bar</string>
+    <string name="filter_type_label">Transaction Type</string>
+    <string name="filter_category_label">Category</string>
+    <string name="filter_account_label">Account</string>
+    <string name="filter_amount_range">Amount Range</string>
+    <string name="filter_min_amount_hint">Min Amount</string>
+    <string name="filter_max_amount_hint">Max Amount</string>
+    <string name="filter_apply_btn">Apply Filter</string>
+    <string name="filter_reset_btn">Reset Filter</string>
+    <string name="filter_save_preset_success">Filter preset saved</string>
+    <string name="filter_delete_preset_success">Preset deleted</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
 </resources>
+

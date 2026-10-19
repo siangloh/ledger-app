@@ -284,4 +284,27 @@
     <string name="budget_cancel_btn">取消</string>
     <string name="budget_delete_btn">清除限额</string>
     <string name="budget_category_count_fmt">%1$d 个分类预算</string>
+
+    <!-- 搜索与筛选预设 (Search & Saved Filters) -->
+    <string name="search_records_placeholder">搜索商户、备注或标签...</string>
+    <string name="filter_btn">高级筛选</string>
+    <string name="filter_all">全部</string>
+    <string name="filter_preset_quick">快捷预设</string>
+    <string name="filter_save_as_preset">存为预设</string>
+    <string name="filter_preset_name_label">预设名称</string>
+    <string name="filter_preset_name_hint">例如：本月大额餐饮</string>
+    <string name="filter_pin_quick_bar">固定在顶部快捷栏</string>
+    <string name="filter_type_label">交易类型</string>
+    <string name="filter_category_label">分类筛选</string>
+    <string name="filter_account_label">账户筛选</string>
+    <string name="filter_amount_range">金额区间</string>
+    <string name="filter_min_amount_hint">最低金额</string>
+    <string name="filter_max_amount_hint">最高金额</string>
+    <string name="filter_apply_btn">应用筛选</string>
+    <string name="filter_reset_btn">重置筛选</string>
+    <string name="filter_save_preset_success">快捷筛选预设已保存</string>
+    <string name="filter_delete_preset_success">预设已删除</string>
+    <string name="action_save">保存</string>
+    <string name="action_cancel">取消</string>
 </resources>
+

@@ -180,6 +180,14 @@ data class BudgetOverviewRecord(
     val okCount: Int
 )
 
+data class SavedFilterRecord(
+    val id: Int,
+    val name: String,
+    val criteriaJson: String,
+    val isPinned: Boolean,
+    val orderNum: Int
+)
+
 object NativeLedgerApi {
     private const val TAG = "NativeLedgerApi"
 
@@ -228,11 +236,16 @@ object NativeLedgerApi {
         category: String? = null,
         search: String? = null,
         accountId: Int? = null,
+        startDate: String? = null,
+        endDate: String? = null,
+        minAmount: Double? = null,
+        maxAmount: Double? = null,
+        source: String? = null,
         page: Int = 1,
         limit: Int = 50,
         forceRefresh: Boolean = false
     ): Result<TransactionsPage> = withContext(Dispatchers.IO) {
-        val cacheKey = "${month.orEmpty()}_${type.orEmpty()}_${category.orEmpty()}_${search.orEmpty().trim()}_a${accountId ?: 0}_p${page}_l${limit}"
+        val cacheKey = "${month.orEmpty()}_${type.orEmpty()}_${category.orEmpty()}_${search.orEmpty().trim()}_a${accountId ?: 0}_s${startDate.orEmpty()}_e${endDate.orEmpty()}_min${minAmount ?: 0.0}_max${maxAmount ?: 0.0}_src${source.orEmpty()}_p${page}_l${limit}"
         val now = System.currentTimeMillis()
         if (!forceRefresh) {
             val mem = recordsCache[cacheKey]
@@ -247,9 +260,14 @@ object NativeLedgerApi {
             if (username.isNotEmpty()) params.add("username=${URLEncoder.encode(username, "UTF-8")}")
             if (!type.isNullOrBlank() && type != "all") params.add("type=${URLEncoder.encode(type, "UTF-8")}")
             if (!month.isNullOrBlank()) params.add("month=${URLEncoder.encode(month, "UTF-8")}")
+            if (!startDate.isNullOrBlank()) params.add("start=${URLEncoder.encode(startDate, "UTF-8")}")
+            if (!endDate.isNullOrBlank()) params.add("end=${URLEncoder.encode(endDate, "UTF-8")}")
             if (!category.isNullOrBlank() && category != "全部" && category != "all") params.add("category=${URLEncoder.encode(category, "UTF-8")}")
             if (!search.isNullOrBlank()) params.add("search=${URLEncoder.encode(search, "UTF-8")}")
             if (accountId != null && accountId > 0) params.add("account_id=$accountId")
+            if (minAmount != null && minAmount >= 0.0) params.add("min_amount=$minAmount")
+            if (maxAmount != null && maxAmount > 0.0) params.add("max_amount=$maxAmount")
+            if (!source.isNullOrBlank() && source != "all") params.add("source=${URLEncoder.encode(source, "UTF-8")}")
             params.add("page=$page")
             params.add("limit=$limit")
 
@@ -1361,6 +1379,108 @@ object NativeLedgerApi {
             Result.failure(e)
         }
     }
+
+    suspend fun getSavedFilters(context: Context): Result<List<SavedFilterRecord>> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/saved-filters" + if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "GET")
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                val arr = json.optJSONArray("filters") ?: JSONArray()
+                val list = mutableListOf<SavedFilterRecord>()
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    list.add(
+                        SavedFilterRecord(
+                            id = obj.getInt("id"),
+                            name = obj.getString("name"),
+                            criteriaJson = obj.optJSONObject("criteria")?.toString() ?: "{}",
+                            isPinned = obj.optBoolean("is_pinned", false),
+                            orderNum = obj.optInt("order_num", 0)
+                        )
+                    )
+                }
+                Result.success(list)
+            } else {
+                Result.failure(Exception(json.optString("message", "获取筛选预设失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getSavedFilters error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun createSavedFilter(
+        context: Context,
+        name: String,
+        criteria: JSONObject,
+        isPinned: Boolean = false
+    ): Result<SavedFilterRecord> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/saved-filters" + if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "POST")
+            conn.doOutput = true
+            conn.setRequestProperty("Content-Type", "application/json")
+            val payload = JSONObject().apply {
+                put("name", name)
+                put("criteria", criteria)
+                put("is_pinned", if (isPinned) 1 else 0)
+            }
+            conn.outputStream.use { os ->
+                OutputStreamWriter(os, "UTF-8").use { it.write(payload.toString()) }
+            }
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                val fObj = json.getJSONObject("filter")
+                Result.success(
+                    SavedFilterRecord(
+                        id = fObj.getInt("id"),
+                        name = fObj.getString("name"),
+                        criteriaJson = fObj.optJSONObject("criteria")?.toString() ?: "{}",
+                        isPinned = fObj.optBoolean("is_pinned", false),
+                        orderNum = fObj.optInt("order_num", 0)
+                    )
+                )
+            } else {
+                Result.failure(Exception(json.optString("message", "保存筛选预设失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "createSavedFilter error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteSavedFilter(context: Context, filterId: Int): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/saved-filters/$filterId" + if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "DELETE")
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                Result.success(true)
+            } else {
+                Result.failure(Exception(json.optString("message", "删除筛选预设失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "deleteSavedFilter error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }
+
 
 

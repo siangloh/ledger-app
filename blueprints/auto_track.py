@@ -62,6 +62,12 @@ from services.budget_service import (
     set_category_budget as set_category_budget_svc,
     delete_category_budget
 )
+from services.saved_filters_service import (
+    get_saved_filters,
+    create_saved_filter,
+    update_saved_filter,
+    delete_saved_filter
+)
 
 auto_track_bp = Blueprint('auto_track', __name__)
 
@@ -1126,6 +1132,11 @@ def api_native_transactions():
         category = request.args.get('category')
         search = request.args.get('search')
         account_id = request.args.get('account_id')
+        start = request.args.get('start')
+        end = request.args.get('end')
+        min_amount = request.args.get('min_amount')
+        max_amount = request.args.get('max_amount')
+        source = request.args.get('source')
         try:
             account_id = int(account_id) if account_id else None
         except (ValueError, TypeError):
@@ -1146,6 +1157,11 @@ def api_native_transactions():
             category=category,
             search=search,
             account_id=account_id,
+            start=start,
+            end=end,
+            min_amount=min_amount,
+            max_amount=max_amount,
+            source=source,
             page=page,
             limit=limit,
             db=db
@@ -1157,6 +1173,59 @@ def api_native_transactions():
     res = add_native_transaction(user_id=user_id, data=data, db=db)
     status_code = 200 if res.get('ok') else 400
     return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/saved-filters', methods=['GET', 'POST'], endpoint='api_native_saved_filters')
+@csrf.exempt
+def api_native_saved_filters():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    if request.method == 'GET':
+        filters = get_saved_filters(user_id=user_id, db=db)
+        return jsonify({'ok': True, 'filters': filters})
+
+    data = request.get_json(silent=True) or request.form
+    name = data.get('name', '')
+    criteria = data.get('criteria', {})
+    is_pinned = int(data.get('is_pinned', 0))
+    res = create_saved_filter(user_id=user_id, name=name, criteria=criteria, is_pinned=is_pinned, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/saved-filters/<int:filter_id>', methods=['PUT', 'POST', 'DELETE'], endpoint='api_native_saved_filter_item')
+@csrf.exempt
+def api_native_saved_filter_item(filter_id: int):
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    if request.method == 'DELETE':
+        res = delete_saved_filter(user_id=user_id, filter_id=filter_id, db=db)
+        status_code = 200 if res.get('ok') else 400
+        return jsonify(res), status_code
+
+    data = request.get_json(silent=True) or request.form
+    name = data.get('name')
+    criteria = data.get('criteria')
+    is_pinned = data.get('is_pinned')
+    order_num = data.get('order_num')
+    res = update_saved_filter(
+        user_id=user_id,
+        filter_id=filter_id,
+        name=name,
+        criteria=criteria,
+        is_pinned=is_pinned,
+        order_num=order_num,
+        db=db
+    )
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
 
 
 @auto_track_bp.route('/api/native/transactions/<int:tx_id>', methods=['PUT', 'POST', 'DELETE'], endpoint='api_native_transaction_item')

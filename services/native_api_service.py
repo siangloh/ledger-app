@@ -8,7 +8,7 @@ import secrets
 from calendar import monthrange
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -381,6 +381,11 @@ def get_native_transactions_list(
     category: Optional[str] = None,
     search: Optional[str] = None,
     account_id: Optional[int] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    min_amount: Optional[Union[float, str]] = None,
+    max_amount: Optional[Union[float, str]] = None,
+    source: Optional[str] = None,
     page: int = 1,
     limit: int = 50,
     db: Any = None
@@ -411,6 +416,14 @@ def get_native_transactions_list(
         where_clauses.append("t.date LIKE ?")
         params.append(f"{month}%")
 
+    if start:
+        where_clauses.append("t.date >= ?")
+        params.append(start)
+
+    if end:
+        where_clauses.append("t.date <= ?")
+        params.append(end)
+
     if category and category not in ('全部', 'all', ''):
         where_clauses.append("t.category = ?")
         params.append(category)
@@ -418,6 +431,24 @@ def get_native_transactions_list(
     if account_id:
         where_clauses.append("t.account_id = ?")
         params.append(account_id)
+
+    if min_amount is not None and str(min_amount).strip() != '':
+        try:
+            where_clauses.append("t.amount >= ?")
+            params.append(float(min_amount))
+        except (ValueError, TypeError):
+            pass
+
+    if max_amount is not None and str(max_amount).strip() != '':
+        try:
+            where_clauses.append("t.amount <= ?")
+            params.append(float(max_amount))
+        except (ValueError, TypeError):
+            pass
+
+    if source and source not in ('all', ''):
+        where_clauses.append("t.source = ?")
+        params.append(source)
 
     if search and search.strip():
         term = f"%{search.strip()}%"

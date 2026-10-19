@@ -49,7 +49,7 @@
 
 {% if has_more %}
 <tr id="recordsLoadMoreSentinel"
-    hx-get="{{ url_for('records', page=next_page, partial_rows=1, start=start or None, end=end or None, type=(type or type_) or None, category=category or None, page_size=page_size if page_size and page_size != 25 else None) }}"
+    hx-get="{{ url_for('records', page=next_page, partial_rows=1, start=start or None, end=end or None, date_range=date_range or None, type=(type or type_) or None, category=category or None, account_id=account_id or None, min_amount=min_amount or None, max_amount=max_amount or None, source=source or None, q=q or None, filter_id=filter_id or None, page_size=page_size if page_size and page_size != 25 else None) }}"
     hx-trigger="click"
     hx-swap="outerHTML"
     class="records-sentinel-row"
