@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.siangloh.ledger.NetworkHelper
 import com.siangloh.ledger.R
 import com.siangloh.ledger.data.CashflowRepository
 import com.siangloh.ledger.ui.compose.theme.*
@@ -404,19 +405,24 @@ private fun CashflowDonutChart(
 @Composable
 fun CashflowSummaryCard(month: String, revision: Int = 0, onOpen: () -> Unit) {
     val context = LocalContext.current
-    var data by remember(month) { mutableStateOf<CashflowRepository.Result?>(null) }
+    var data by remember(month) { mutableStateOf(CashflowRepository.getCached(context, month)) }
     var failed by remember(month) { mutableStateOf(false) }
 
     LaunchedEffect(month, revision) {
-        data = null
-        failed = false
+        val cached = CashflowRepository.getCached(context, month)
+        if (cached != null) {
+            data = cached
+            failed = false
+            // 只要本地有缓存，且非外部显式要求强制刷新 (revision == 0)，直接消费本地快照，绝不发起慢速网络请求！
+            if (revision == 0) return@LaunchedEffect
+        }
         try {
-            data = CashflowRepository.load(context, month)
+            data = CashflowRepository.load(context, month, forceRefresh = revision > 0)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
             android.util.Log.w("Cashflow", "Summary unavailable", error)
-            failed = true
+            if (data == null) failed = true
         }
     }
 
@@ -474,7 +480,7 @@ fun CashflowSummaryCard(month: String, revision: Int = 0, onOpen: () -> Unit) {
                 val paid = d.optDouble("paid", 0.0)
                 val topCats = expenseSlices(d).take(3)
 
-                if (result.cached) {
+                if (result.cached && !NetworkHelper.isOnline(context)) {
                     Text(stringResource(R.string.cf_cached), fontSize = 11.sp, color = WarningAmber)
                 }
 
@@ -930,9 +936,9 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
     var month by rememberSaveable { mutableStateOf(initialMonth) }
     var currency by rememberSaveable { mutableStateOf("") }
     var refresh by remember { mutableIntStateOf(0) }
-    var result by remember { mutableStateOf<CashflowRepository.Result?>(null) }
+    var result by remember { mutableStateOf(CashflowRepository.getCached(context, initialMonth, currency)) }
     var failed by remember { mutableStateOf(false) }
-    var loading by remember { mutableStateOf(true) }
+    var loading by remember { mutableStateOf(result == null) }
 
     var selection by remember { mutableStateOf<TxSelection?>(null) }
     var selectedBill by remember { mutableStateOf<JSONObject?>(null) }
@@ -941,17 +947,32 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
     var selectedTab by rememberSaveable { mutableStateOf(CashflowDashboardTab.OVERVIEW) }
 
     LaunchedEffect(month, currency, refresh) {
-        loading = true
+        val cached = CashflowRepository.getCached(context, month, currency)
+        if (cached != null) {
+            result = cached
+            loading = false
+            failed = false
+            // 若非用户主动点击刷新按钮 (refresh == 0)，直接消费本地快照，绝不发起慢速网络请求！
+            if (refresh == 0) {
+                return@LaunchedEffect
+            }
+        } else {
+            // 本地无缓存时才置为 loading 态
+            loading = true
+        }
+
         failed = false
-        result = null
         selection = null
         try {
-            result = CashflowRepository.load(context, month, currency)
+            val fresh = CashflowRepository.load(context, month, currency, forceRefresh = refresh > 0)
+            result = fresh
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
             android.util.Log.w("Cashflow", "Analysis unavailable", error)
-            failed = true
+            if (result == null) {
+                failed = true
+            }
         } finally {
             loading = false
         }
@@ -963,7 +984,16 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
             time = format.parse(month)!!
             add(Calendar.MONTH, delta)
         }
-        month = format.format(calendar.time)
+        val targetMonth = format.format(calendar.time)
+        val cached = CashflowRepository.getCached(context, targetMonth, currency)
+        if (cached != null) {
+            result = cached
+            loading = false
+            failed = false
+        } else {
+            loading = true
+        }
+        month = targetMonth
     }
 
     fun update(payload: JSONObject) {
@@ -1048,7 +1078,16 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                     shape = RoundedCornerShape(8.dp),
                                     color = if (isSelected) Teal50 else Color.White,
                                     border = BorderStroke(1.dp, if (isSelected) PrimaryTeal else Slate200),
-                                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { currency = code }
+                                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
+                                        val targetCurrency = code
+                                        val cached = CashflowRepository.getCached(context, month, targetCurrency)
+                                        if (cached != null) {
+                                            result = cached
+                                            loading = false
+                                            failed = false
+                                        }
+                                        currency = targetCurrency
+                                    }
                                 ) {
                                     Text(
                                         text = code,
@@ -1063,7 +1102,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                     }
                 }
 
-                if (result?.cached == true) {
+                if (result?.cached == true && !NetworkHelper.isOnline(context)) {
                     Spacer(Modifier.height(6.dp))
                     Text(stringResource(R.string.cf_cached), fontSize = 11.sp, color = WarningAmber)
                 }

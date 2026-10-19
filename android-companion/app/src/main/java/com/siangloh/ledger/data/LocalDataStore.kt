@@ -304,6 +304,15 @@ object LocalDataStore {
                 Log.w(TAG, "Preload aux data failed: ${e.message}")
             }
 
+            // 4. 批量预载当月与上月收支分析 (Cashflow Analysis)，离线优先保底，确保进分析页 0ms 秒开
+            for (m in listOf(today, prevMonth)) {
+                try {
+                    CashflowRepository.load(context, m, forceRefresh = force)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Preload cashflow for $m failed: ${e.message}")
+                }
+            }
+
             saveFullSyncTime(context)
             Log.i(TAG, "All user data successfully preloaded into local storage!")
 
