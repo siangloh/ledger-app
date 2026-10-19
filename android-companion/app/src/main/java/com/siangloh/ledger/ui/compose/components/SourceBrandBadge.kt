@@ -37,20 +37,38 @@ object SourceBrandBadgeHelper {
     fun normalizeChannel(rawChannel: String?, note: String = ""): String? {
         val c = (rawChannel ?: "").trim().lowercase()
         val n = note.trim().lowercase()
-        return when {
-            c == "maybank" || c.contains("mae") || c.contains("m2u") || n.contains("maybank") || n.contains("mae") -> "maybank"
-            c == "tng" || c.contains("touch") || c.contains("ewallet") || n.contains("toll payment") || n.contains("tng") -> "tng"
-            c == "public_bank" || c.contains("public") || c.contains("mypb") || c.contains("pbb") || n.contains("public bank") || n.contains("mypb") -> "public_bank"
-            c == "grab" || n.contains("grab") -> "grab"
-            c == "shopee" || n.contains("shopee") -> "shopee"
-            c == "cimb" || n.contains("cimb") -> "cimb"
-            c == "duitnow" || n.contains("duitnow") -> "duitnow"
+
+        // 1. 先匹配明确的渠道参数
+        val directMatch = when {
+            c == "maybank" || c.contains("mae") || c.contains("m2u") -> "maybank"
+            c == "tng" || c.contains("touch") || c.contains("ewallet") -> "tng"
+            c == "public_bank" || c.contains("public") || c.contains("mypb") || c.contains("pbb") -> "public_bank"
+            c == "grab" || c.contains("grab") -> "grab"
+            c == "shopee" || c.contains("shopee") -> "shopee"
+            c == "cimb" || c.contains("cimb") -> "cimb"
+            c == "duitnow" || c.contains("duitnow") -> "duitnow"
             c.contains("bank") || c.contains("card") || c.contains("sms") -> "bank_card"
-            c.contains("generic") || c.contains("notification") -> if (n.isNotEmpty()) normalizeChannel(null, n) ?: "generic" else "generic"
-            c.isNotEmpty() -> c
-            n.isNotEmpty() -> normalizeChannel(null, n)
+            c.isNotEmpty() && c != "generic" && c != "notification" -> c
             else -> null
         }
+        if (directMatch != null) return directMatch
+
+        // 2. 若渠道未指定或为通用通知，根据备注关键字推断银行/钱包品牌
+        if (n.isNotEmpty()) {
+            val inferred = when {
+                n.contains("maybank") || n.contains("mae") || n.contains("m2u") -> "maybank"
+                n.contains("tng") || n.contains("touchngo") || n.contains("touch n go") || n.contains("touch 'n go") || n.contains("toll payment") || n.contains("paydirect") || n.contains("ewallet") -> "tng"
+                n.contains("public bank") || n.contains("mypb") || n.contains("pbb") || n.contains("publicbank") -> "public_bank"
+                n.contains("grab") || n.contains("grabpay") -> "grab"
+                n.contains("shopee") || n.contains("shopeepay") -> "shopee"
+                n.contains("cimb") -> "cimb"
+                n.contains("duitnow") -> "duitnow"
+                else -> null
+            }
+            if (inferred != null) return inferred
+        }
+
+        return if (c == "generic" || c == "notification") "generic" else null
     }
 
     @Composable
