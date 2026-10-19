@@ -260,4 +260,28 @@
     <string name="category_rules_apply_all_btn">Klasifikasi Semula Semua</string>
     <string name="category_rules_confirm_delete">Padam peraturan kategori peniaga ini?</string>
     <string name="category_rules_confirm_apply_all">Gunakan semua peraturan aktif pada transaksi belum dikategorikan?</string>
+
+    <!-- Pengurusan Belanjawan (Budget Management) -->
+    <string name="budget_title">Perancangan Belanjawan</string>
+    <string name="budget_subtitle">Jumlah belanjawan · Elaun harian · Had kategori</string>
+    <string name="budget_overall_title">Belanjawan Keseluruhan Bulanan</string>
+    <string name="budget_spent_format">Dibelanjakan: %1$s / %2$s</string>
+    <string name="budget_remaining_format">Baki: %1$s</string>
+    <string name="budget_overspent_format">Terlebih: %1$s</string>
+    <string name="budget_daily_allowance_format">Elaun Selamat Harian: %1$s</string>
+    <string name="budget_cycle_days_format">%1$d hari lagi dalam kitaran</string>
+    <string name="budget_set_overall_btn">Tetapkan Belanjawan</string>
+    <string name="budget_edit_overall_btn">Ubah Belanjawan</string>
+    <string name="budget_set_dialog_title">Tetapkan Had Belanjawan Bulanan</string>
+    <string name="budget_amount_hint">Masukkan had (0 untuk batal)</string>
+    <string name="budget_status_ok">Mencukupi</string>
+    <string name="budget_status_warn">Amaran</string>
+    <string name="budget_status_reached">Mencapai Had</string>
+    <string name="budget_status_over">Terlebih</string>
+    <string name="budget_no_budget">Tiada belanjawan ditetapkan</string>
+    <string name="budget_set_cat_dialog_title">Tetapkan Belanjawan "%1$s"</string>
+    <string name="budget_save_btn">Simpan Belanjawan</string>
+    <string name="budget_cancel_btn">Batal</string>
+    <string name="budget_delete_btn">Kosongkan Had</string>
+    <string name="budget_category_count_fmt">%1$d belanjawan kategori</string>
 </resources>

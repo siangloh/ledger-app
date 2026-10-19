@@ -56,6 +56,12 @@ from services.category_rules_service import (
     apply_rule_to_history,
     apply_all_rules_to_history
 )
+from services.budget_service import (
+    get_budget_overview,
+    set_overall_budget,
+    set_category_budget as set_category_budget_svc,
+    delete_category_budget
+)
 
 auto_track_bp = Blueprint('auto_track', __name__)
 
@@ -1460,6 +1466,78 @@ def api_native_category_rules_apply_all():
     )
     status_code = 200 if res.get('ok') else 400
     return jsonify(res), status_code
+
+
+# ---------------------------------------------------------------------------
+# 原生伴侣端预算管理 API (Native Budget API)
+# ---------------------------------------------------------------------------
+
+@auto_track_bp.route('/api/native/budgets', methods=['GET'], endpoint='api_native_budgets_overview')
+@csrf.exempt
+def api_native_budgets_overview():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    month = request.args.get('month')
+    res = get_budget_overview(user_id=user_id, month=month, db=db)
+    return jsonify(res), 200
+
+
+@auto_track_bp.route('/api/native/budgets/overall', methods=['POST'], endpoint='api_native_budgets_overall')
+@csrf.exempt
+def api_native_budgets_overall():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    data = request.get_json(silent=True) or request.form
+    try:
+        limit = float(data.get('monthly_limit') or data.get('limit') or 0.0)
+    except (ValueError, TypeError):
+        limit = 0.0
+
+    res = set_overall_budget(user_id=user_id, monthly_limit=limit, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/budgets/category', methods=['POST'], endpoint='api_native_budgets_category')
+@csrf.exempt
+def api_native_budgets_category():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    data = request.get_json(silent=True) or request.form
+    category = (data.get('category') or '').strip()
+    try:
+        limit = float(data.get('monthly_limit') or data.get('limit') or 0.0)
+    except (ValueError, TypeError):
+        limit = 0.0
+
+    res = set_category_budget_svc(user_id=user_id, category=category, monthly_limit=limit, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/budgets/delete', methods=['POST', 'DELETE'], endpoint='api_native_budgets_delete')
+@csrf.exempt
+def api_native_budgets_delete():
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+
+    data = request.get_json(silent=True) or request.form
+    category = (data.get('category') or '').strip()
+    res = delete_category_budget(user_id=user_id, category=category, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
 
 
 

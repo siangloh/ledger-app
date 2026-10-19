@@ -1,7 +1,7 @@
-{% if budget_status %}
-{% set over_list = budget_status | selectattr('level', 'equalto', 'over') | list %}
-{% set reached_list = budget_status | selectattr('level', 'equalto', 'reached') | list %}
-{% set warn_list = budget_status | selectattr('level', 'equalto', 'warn') | list %}
+{% if budget_status or (budget_overview and budget_overview.overall.is_set) %}
+{% set over_list = budget_status | selectattr('level', 'equalto', 'over') | list if budget_status else [] %}
+{% set reached_list = budget_status | selectattr('level', 'equalto', 'reached') | list if budget_status else [] %}
+{% set warn_list = budget_status | selectattr('level', 'equalto', 'warn') | list if budget_status else [] %}
 <div class="panels">
   <section class="panel panel-full budget-dash-panel">
     <div class="budget-dash-header">
@@ -9,15 +9,17 @@
         <span class="budget-dash-icon">🎯</span>
         <strong>{{ t('dashboard.budget_monitor') }}</strong>
         <span class="budget-dash-counts">
-          {{ t('dashboard.budget_set_count', count=budget_status|length) }}
-          {% if over_list|length > 0 %}
-            <span class="b-badge-alert">⚠️ {{ t('dashboard.budget_over_count', count=over_list|length) }}</span>
-          {% elif reached_list|length > 0 %}
-            <span class="b-badge-reached">🎯 {{ t('dashboard.budget_reached_count', count=reached_list|length) }}</span>
-          {% elif warn_list|length > 0 %}
-            <span class="b-badge-warn">⚡ {{ t('dashboard.budget_warn_count', count=warn_list|length) }}</span>
-          {% else %}
-            <span class="b-badge-ok">✓ {{ t('dashboard.budget_ok') }}</span>
+          {% if budget_status %}
+            {{ t('dashboard.budget_set_count', count=budget_status|length) }}
+            {% if over_list|length > 0 %}
+              <span class="b-badge-alert">⚠️ {{ t('dashboard.budget_over_count', count=over_list|length) }}</span>
+            {% elif reached_list|length > 0 %}
+              <span class="b-badge-reached">🎯 {{ t('dashboard.budget_reached_count', count=reached_list|length) }}</span>
+            {% elif warn_list|length > 0 %}
+              <span class="b-badge-warn">⚡ {{ t('dashboard.budget_warn_count', count=warn_list|length) }}</span>
+            {% else %}
+              <span class="b-badge-ok">✓ {{ t('dashboard.budget_ok') }}</span>
+            {% endif %}
           {% endif %}
         </span>
       </div>
@@ -26,6 +28,36 @@
       </a>
     </div>
 
+    {% if budget_overview and budget_overview.overall.is_set %}
+    <!-- Overall Budget Spotlight Card -->
+    <div class="budget-overall-spotlight" style="margin-bottom: 16px; padding: 14px 16px; background: var(--bg-hover, #f8fafc); border-radius: 10px; border-left: 4px solid var(--primary, #0F766E); border-top: 1px solid var(--border, #e2e8f0); border-right: 1px solid var(--border, #e2e8f0); border-bottom: 1px solid var(--border, #e2e8f0);">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <strong style="font-size: 14px; color: var(--text-main, #0f172a);">{{ t('categories.overall_budget_title', '月度总预算') }}</strong>
+          <span style="font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; background: {% if budget_overview.overall.level == 'over' %}rgba(239,68,68,0.15); color: #ef4444;{% elif budget_overview.overall.level in ('warn', 'reached') %}rgba(245,158,11,0.15); color: #f59e0b;{% else %}rgba(15,118,110,0.15); color: #0F766E;{% endif %}">
+            {{ budget_overview.overall.pct }}%
+          </span>
+        </div>
+        <div style="font-size: 13px;">
+          <span style="color: var(--muted, #64748b);">{{ current_user_currency|default('RM') }}{{ '%.0f' | format(budget_overview.overall.spent) }} / {{ current_user_currency|default('RM') }}{{ '%.0f' | format(budget_overview.overall.limit) }}</span>
+          {% if budget_overview.overall.remaining < 0 %}
+            <span style="margin-left: 8px; color: #ef4444; font-weight: 600;">(超 {{ current_user_currency|default('RM') }}{{ '%.0f' | format(-budget_overview.overall.remaining) }})</span>
+          {% else %}
+            <span style="margin-left: 8px; color: #0F766E; font-weight: 600;">(余 {{ current_user_currency|default('RM') }}{{ '%.0f' | format(budget_overview.overall.remaining) }})</span>
+          {% endif %}
+        </div>
+      </div>
+      <div style="width: 100%; height: 7px; background: rgba(0,0,0,0.06); border-radius: 999px; overflow: hidden; margin-bottom: 8px;">
+        <div style="height: 100%; width: {{ [budget_overview.overall.pct, 100] | min }}%; border-radius: 999px; background: {% if budget_overview.overall.level == 'over' %}#ef4444{% elif budget_overview.overall.level in ('warn', 'reached') %}#f59e0b{% else %}#0F766E{% endif %};"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--muted, #64748b);">
+        <span style="color: #0F766E; font-weight: 600;">💡 {{ t('categories.daily_allowance') }}: {{ current_user_currency|default('RM') }}{{ '%.1f' | format(budget_overview.overall.daily_allowance) }}/天</span>
+        <span>📅 {{ t('categories.cycle_remaining_days', days=budget_overview.billing_cycle.remaining_days) }}</span>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if budget_status %}
     <div class="budget-dash-grid {{ 'collapsed' if budget_status|length > 4 else '' }}" id="budgetDashGrid">
       {% for b in budget_status %}
       <div class="budget-dash-card level-{{ b.level }} {{ 'hidden-extra' if loop.index > 4 else '' }}">
@@ -57,6 +89,7 @@
     <div class="budget-dash-expand" id="budgetDashExpandBtn" onclick="toggleBudgetDashExpand()">
       <span>{{ t('dashboard.expand_budgets', count=budget_status|length) }}</span>
     </div>
+    {% endif %}
     {% endif %}
   </section>
 </div>

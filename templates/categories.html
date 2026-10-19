@@ -74,6 +74,69 @@
     </form>
   </section>
 
+  <!-- 2.5 月度总预算与支出规划 (Overall Budget & Spending Plan) -->
+  <section class="panel panel-overall-budget" style="border-left: 4px solid var(--primary, #0F766E); background: var(--bg-card, #ffffff); border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06));">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">🎯</span>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-main, #0f172a);">{{ t('categories.overall_budget_title') }}</h3>
+          {% if budget_overview and budget_overview.overall.is_set %}
+            <span class="badge" style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: {% if budget_overview.overall.level == 'over' %}rgba(239,68,68,0.15); color: #ef4444;{% elif budget_overview.overall.level in ('warn', 'reached') %}rgba(245,158,11,0.15); color: #f59e0b;{% else %}rgba(15,118,110,0.15); color: #0F766E;{% endif %}">
+              {% if budget_overview.overall.level == 'over' %}⚠️ {{ t('categories.overall_budget_over') }}{% elif budget_overview.overall.level == 'reached' %}🎯 100%{% elif budget_overview.overall.level == 'warn' %}⚡ {{ budget_overview.overall.pct }}%{% else %}✓ {{ budget_overview.overall.pct }}%{% endif %}
+            </span>
+          {% endif %}
+        </div>
+        <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--muted, #64748b);">{{ t('categories.overall_budget_subtitle') }}</p>
+      </div>
+      <div>
+        <button type="button" class="btn-primary btn-sm" onclick="openSetOverallBudgetModal('{{ budget_overview.overall.limit if (budget_overview and budget_overview.overall.is_explicit) else '' }}')" style="border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; background: #0F766E;">
+          <span>⚙️</span>
+          <span>{% if budget_overview and budget_overview.overall.is_explicit %}{{ t('categories.overall_budget_edit_btn') }}{% else %}{{ t('categories.overall_budget_set_btn') }}{% endif %}</span>
+        </button>
+      </div>
+    </div>
+
+    {% if budget_overview and budget_overview.overall.is_set %}
+      <div style="background: var(--bg-hover, #f8fafc); border-radius: 10px; padding: 14px; border: 1px solid var(--border, #e2e8f0);">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; font-size: 13px;">
+          <div>
+            <span style="color: var(--muted, #64748b);">{{ t('categories.overall_budget_spent') }}: </span>
+            <strong style="font-size: 15px; color: var(--text-main, #0f172a);">{{ current_user_currency }}{{ '%.2f' | format(budget_overview.overall.spent) }}</strong>
+            <span style="color: var(--muted, #64748b); margin: 0 4px;">/</span>
+            <span style="color: var(--muted, #64748b);">{{ current_user_currency }}{{ '%.2f' | format(budget_overview.overall.limit) }}</span>
+          </div>
+          <div style="text-align: right;">
+            {% if budget_overview.overall.remaining < 0 %}
+              <span style="color: #ef4444; font-weight: 700;">{{ t('categories.overall_budget_over') }}: {{ current_user_currency }}{{ '%.2f' | format(-budget_overview.overall.remaining) }}</span>
+            {% else %}
+              <span style="color: #0F766E; font-weight: 700;">{{ t('categories.overall_budget_remaining') }}: {{ current_user_currency }}{{ '%.2f' | format(budget_overview.overall.remaining) }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div style="width: 100%; height: 8px; background: rgba(0,0,0,0.06); border-radius: 999px; overflow: hidden; margin-bottom: 12px;">
+          <div style="height: 100%; width: {{ [budget_overview.overall.pct, 100] | min }}%; border-radius: 999px; background: {% if budget_overview.overall.level == 'over' %}#ef4444{% elif budget_overview.overall.level in ('warn', 'reached') %}#f59e0b{% else %}#0F766E{% endif %}; transition: width 0.4s ease;"></div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted, #64748b);">
+          <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(15,118,110,0.08); padding: 4px 10px; border-radius: 6px; color: #0F766E; font-weight: 600;">
+            <span>💡 {{ t('categories.daily_allowance') }}:</span>
+            <span style="font-size: 13px;">{{ current_user_currency }}{{ '%.2f' | format(budget_overview.overall.daily_allowance) }}/天</span>
+          </div>
+          <div>
+            <span>📅 {{ t('categories.cycle_remaining_days', days=budget_overview.billing_cycle.remaining_days) }}</span>
+            <span style="font-size: 11px; opacity: 0.8; margin-left: 4px;">({{ t('categories.cycle_days_tip') }})</span>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div style="background: var(--bg-hover, #f8fafc); border-radius: 10px; padding: 14px; border: 1px dashed var(--border, #e2e8f0); text-align: center; color: var(--muted, #64748b); font-size: 13px;">
+        <span>🎯 {{ t('categories.overall_unset_hint') }}</span>
+      </div>
+    {% endif %}
+  </section>
+
   <!-- 3. 支出分类 -->
   <section class="panel panel-expense-cat">
     <div class="expense-panel-header">
@@ -716,6 +779,62 @@ window.openEditCategoryModal = function (catId, currentName, currentColor) {
       } catch (err) {
         Swal.fire(window.t ? window.t('swal.title_failed', '操作失败') : '操作失败', window.t ? window.t('swal.network_error', '网络请求超时或服务错误') : '网络请求超时或服务错误', 'error');
       }
+    }
+  });
+window.openSetOverallBudgetModal = function(currentLimit) {
+  const isSet = currentLimit && parseFloat(currentLimit) > 0;
+  Swal.fire({
+    title: window.t ? window.t('categories.modal_set_overall_title', '设定月度总预算限额') : '设定月度总预算限额',
+    html: `
+      <p style="font-size: 13px; color: var(--muted, #64748b); margin-bottom: 12px;">
+        ${window.t ? window.t('categories.modal_set_overall_desc', '请输入月度综合最高支出限额。输入 0 或留空可取消总预算。') : '请输入月度综合最高支出限额。输入 0 或留空可取消总预算。'}
+      </p>
+      <input type="number" step="0.01" min="0" id="swalOverallLimitInput" class="swal2-input"
+             placeholder="例如: 3000.00" value="${isSet ? currentLimit : ''}" style="max-width: 80%; font-size: 16px;">
+    `,
+    showCancelButton: true,
+    confirmButtonText: window.t ? window.t('common.save', '保存') : '保存',
+    cancelButtonText: window.t ? window.t('common.cancel', '取消') : '取消',
+    confirmButtonColor: '#0F766E',
+    focusConfirm: false,
+    preConfirm: () => {
+      const input = document.getElementById('swalOverallLimitInput');
+      return input ? input.value.trim() : '';
+    }
+  }).then((res) => {
+    if (res.isConfirmed) {
+      const val = res.value;
+      const numVal = parseFloat(val) || 0;
+      fetch('/api/budgets/overall', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': (document.querySelector('meta[name="csrf-token"]') || {}).content || ''
+        },
+        body: JSON.stringify({ monthly_limit: numVal })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          Swal.fire({
+            icon: 'success',
+            title: data.message || (window.t ? window.t('swal.title_success', '操作成功') : '操作成功'),
+            timer: 1200,
+            showConfirmButton: false
+          }).then(() => {
+            window.location.reload();
+          });
+        } else {
+          Swal.fire({
+            icon: 'error',
+            title: window.t ? window.t('swal.title_failed', '操作失败') : '操作失败',
+            text: data.message || '请检查输入'
+          });
+        }
+      })
+      .catch(err => {
+        Swal.fire({ icon: 'error', title: '网络请求异常', text: err.toString() });
+      });
     }
   });
 };

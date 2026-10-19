@@ -221,7 +221,7 @@ def get_category_budget_status(db, user_id=None, month=None, start_day=None):
             start_day = 1
 
     budgets = db.execute(
-        'SELECT category, monthly_limit FROM category_budgets WHERE user_id = ?', (user_id,)
+        "SELECT category, monthly_limit FROM category_budgets WHERE user_id = ? AND category != '__OVERALL__'", (user_id,)
     ).fetchall()
     if not budgets:
         return []

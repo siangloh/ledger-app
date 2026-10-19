@@ -138,6 +138,48 @@ data class ToolsSummary(
     val totalRemainingInst: Double
 )
 
+data class BudgetItemRecord(
+    val category: String,
+    val limit: Double,
+    val spent: Double,
+    val remaining: Double,
+    val pct: Double,
+    val level: String, // 'ok', 'warn', 'reached', 'over'
+    val color: String
+)
+
+data class BillingCycleRecord(
+    val startDate: String,
+    val endDate: String,
+    val label: String,
+    val startDay: Int,
+    val totalDays: Int,
+    val passedDays: Int,
+    val remainingDays: Int
+)
+
+data class OverallBudgetRecord(
+    val limit: Double,
+    val spent: Double,
+    val remaining: Double,
+    val pct: Double,
+    val level: String,
+    val dailyAllowance: Double,
+    val isExplicit: Boolean,
+    val isSet: Boolean
+)
+
+data class BudgetOverviewRecord(
+    val month: String,
+    val billingCycle: BillingCycleRecord,
+    val overall: OverallBudgetRecord,
+    val categories: List<BudgetItemRecord>,
+    val totalCategoriesBudgeted: Int,
+    val overCount: Int,
+    val warnCount: Int,
+    val okCount: Int
+)
+
 object NativeLedgerApi {
     private const val TAG = "NativeLedgerApi"
 
@@ -1130,5 +1172,195 @@ object NativeLedgerApi {
             Result.failure(e)
         }
     }
+
+    suspend fun getBudgetOverview(
+        context: Context,
+        month: String? = null
+    ): Result<BudgetOverviewRecord> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val qList = mutableListOf<String>()
+            if (!month.isNullOrBlank()) qList.add("month=${URLEncoder.encode(month, "UTF-8")}")
+            if (username.isNotEmpty()) qList.add("username=${URLEncoder.encode(username, "UTF-8")}")
+            val qStr = if (qList.isNotEmpty()) "?" + qList.joinToString("&") else ""
+            val conn = openConnection(context, "/api/native/budgets$qStr", "GET")
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (!json.optBoolean("ok", false)) {
+                return@withContext Result.failure(Exception(json.optString("message", "加载预算失败")))
+            }
+
+            val cycleObj = json.optJSONObject("billing_cycle") ?: JSONObject()
+            val cycle = BillingCycleRecord(
+                startDate = cycleObj.optString("start_date", ""),
+                endDate = cycleObj.optString("end_date", ""),
+                label = cycleObj.optString("label", ""),
+                startDay = cycleObj.optInt("start_day", 1),
+                totalDays = cycleObj.optInt("total_days", 30),
+                passedDays = cycleObj.optInt("passed_days", 1),
+                remainingDays = cycleObj.optInt("remaining_days", 30)
+            )
+
+            val overallObj = json.optJSONObject("overall") ?: JSONObject()
+            val overall = OverallBudgetRecord(
+                limit = overallObj.optDouble("limit", 0.0),
+                spent = overallObj.optDouble("spent", 0.0),
+                remaining = overallObj.optDouble("remaining", 0.0),
+                pct = overallObj.optDouble("pct", 0.0),
+                level = overallObj.optString("level", "none"),
+                dailyAllowance = overallObj.optDouble("daily_allowance", 0.0),
+                isExplicit = overallObj.optBoolean("is_explicit", false),
+                isSet = overallObj.optBoolean("is_set", false)
+            )
+
+            val catArray = json.optJSONArray("categories") ?: JSONArray()
+            val catList = mutableListOf<BudgetItemRecord>()
+            for (i in 0 until catArray.length()) {
+                val c = catArray.getJSONObject(i)
+                catList.add(
+                    BudgetItemRecord(
+                        category = c.optString("category", ""),
+                        limit = c.optDouble("limit", 0.0),
+                        spent = c.optDouble("spent", 0.0),
+                        remaining = c.optDouble("remaining", 0.0),
+                        pct = c.optDouble("pct", 0.0),
+                        level = c.optString("level", "ok"),
+                        color = c.optString("color", "#0F766E")
+                    )
+                )
+            }
+
+            val summaryObj = json.optJSONObject("summary") ?: JSONObject()
+            val record = BudgetOverviewRecord(
+                month = json.optString("month", ""),
+                billingCycle = cycle,
+                overall = overall,
+                categories = catList,
+                totalCategoriesBudgeted = summaryObj.optInt("total_categories_budgeted", catList.size),
+                overCount = summaryObj.optInt("over_count", 0),
+                warnCount = summaryObj.optInt("warn_count", 0),
+                okCount = summaryObj.optInt("ok_count", 0)
+            )
+            Result.success(record)
+        } catch (e: Exception) {
+            Log.e(TAG, "getBudgetOverview error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun saveOverallBudget(
+        context: Context,
+        monthlyLimit: Double
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/budgets/overall" +
+                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "POST")
+            conn.doOutput = true
+            val payload = JSONObject().apply {
+                put("monthly_limit", monthlyLimit)
+            }.toString()
+
+            OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                it.write(payload)
+                it.flush()
+            }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                Result.success(json)
+            } else {
+                Result.failure(Exception(json.optString("message", "设置总预算失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "saveOverallBudget error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun saveCategoryBudget(
+        context: Context,
+        category: String,
+        monthlyLimit: Double
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/budgets/category" +
+                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "POST")
+            conn.doOutput = true
+            val payload = JSONObject().apply {
+                put("category", category)
+                put("monthly_limit", monthlyLimit)
+            }.toString()
+
+            OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                it.write(payload)
+                it.flush()
+            }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                Result.success(json)
+            } else {
+                Result.failure(Exception(json.optString("message", "设置分类预算失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "saveCategoryBudget error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteCategoryBudget(
+        context: Context,
+        category: String
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/budgets/delete" +
+                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "POST")
+            conn.doOutput = true
+            val payload = JSONObject().apply {
+                put("category", category)
+            }.toString()
+
+            OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                it.write(payload)
+                it.flush()
+            }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                Result.success(json)
+            } else {
+                Result.failure(Exception(json.optString("message", "删除分类预算失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "deleteCategoryBudget error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }
+
 

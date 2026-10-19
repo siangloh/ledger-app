@@ -296,6 +296,14 @@ def get_native_overview_summary(
             'last_active_time': last_active_time or today.isoformat()
         }
     }
+    try:
+        from services.budget_service import get_budget_overview
+        budget_overview = get_budget_overview(user_id=user_id, month=selected_month, db=db)
+        res['budget'] = budget_overview
+    except Exception as e:
+        logger.debug("Failed to attach budget to native overview: %s", e)
+        res['budget'] = None
+
     if len(_OVERVIEW_CACHE) > 200:
         _OVERVIEW_CACHE.clear()
     _OVERVIEW_CACHE[cache_key] = res

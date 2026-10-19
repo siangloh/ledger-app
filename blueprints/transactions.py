@@ -38,6 +38,12 @@ from services.category_rules_service import (
     apply_rule_to_history,
     apply_all_rules_to_history
 )
+from services.budget_service import (
+    get_budget_overview,
+    set_overall_budget,
+    set_category_budget as set_category_budget_svc,
+    delete_category_budget
+)
 from core.i18n import t
 
 transactions_bp = Blueprint('transactions', __name__)
@@ -772,6 +778,7 @@ def categories_page():
     budget_map = {b['category']: b for b in budget_status}
     rules_res = get_category_rules(user_id=user_id, db=db, limit=200)
     category_rules = rules_res.get('rules', [])
+    budget_overview = get_budget_overview(user_id=user_id, db=db)
     all_categories = sorted(list(set(
         [c['name'] for c in expense] +
         [c['name'] for c in income_main] +
@@ -780,7 +787,7 @@ def categories_page():
     )))
     return render_template(
         'categories.html', income_main=income_main, income_side=income_side, expense=expense, savings=savings,
-        budget_map=budget_map, category_rules=category_rules, all_categories=all_categories
+        budget_map=budget_map, budget_overview=budget_overview, category_rules=category_rules, all_categories=all_categories
     )
 
 
@@ -1025,6 +1032,59 @@ def api_category_rules_apply_all():
         only_uncategorized=only_uncat,
         db=db
     )
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+# ---------------------------------------------------------------------------
+# 预算管理 Web 端 API (Budget Management API)
+# ---------------------------------------------------------------------------
+
+@transactions_bp.route('/api/budgets', methods=['GET'], endpoint='api_budgets_overview')
+def api_budgets_overview():
+    user_id = get_current_user_id()
+    db = get_db()
+    month = request.args.get('month')
+    res = get_budget_overview(user_id=user_id, month=month, db=db)
+    return jsonify(res)
+
+
+@transactions_bp.route('/api/budgets/overall', methods=['POST'], endpoint='api_budgets_overall')
+def api_budgets_overall():
+    user_id = get_current_user_id()
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+    try:
+        limit = float(data.get('monthly_limit') or data.get('limit') or 0.0)
+    except (ValueError, TypeError):
+        limit = 0.0
+    res = set_overall_budget(user_id=user_id, monthly_limit=limit, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@transactions_bp.route('/api/budgets/category', methods=['POST'], endpoint='api_budgets_category')
+def api_budgets_category():
+    user_id = get_current_user_id()
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+    category = (data.get('category') or '').strip()
+    try:
+        limit = float(data.get('monthly_limit') or data.get('limit') or 0.0)
+    except (ValueError, TypeError):
+        limit = 0.0
+    res = set_category_budget_svc(user_id=user_id, category=category, monthly_limit=limit, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@transactions_bp.route('/api/budgets/delete', methods=['POST'], endpoint='api_budgets_delete')
+def api_budgets_delete():
+    user_id = get_current_user_id()
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+    category = (data.get('category') or '').strip()
+    res = delete_category_budget(user_id=user_id, category=category, db=db)
     status_code = 200 if res.get('ok') else 400
     return jsonify(res), status_code
 

@@ -111,6 +111,7 @@ from services.ocr_service import (
     score_receipt_orientation,
     parse_receipt_text_to_items
 )
+from services.budget_service import get_budget_overview
 
 # 蓝图导入
 from blueprints.auth import auth_bp
@@ -543,6 +544,7 @@ def index():
     expense_categories = get_categories(db, 'expense', None, user_id)
     savings_categories = get_categories(db, 'savings', None, user_id)
     budget_status = get_category_budget_status(db, user_id, month, start_day=budget_start_day)
+    budget_overview = get_budget_overview(user_id, month, db=db)
     accounts = db.execute(
         "SELECT id, name, currency, type FROM accounts WHERE user_id = ? ORDER BY type, name",
         (str(user_id),)
@@ -554,6 +556,7 @@ def index():
         cycle_range_label=cycle_range_label,
         budget_start_day=budget_start_day,
         budget_status=budget_status,
+        budget_overview=budget_overview,
         accounts=accounts,
         prev_month=shift_month(month, -1),
         next_month=shift_month(month, 1),
