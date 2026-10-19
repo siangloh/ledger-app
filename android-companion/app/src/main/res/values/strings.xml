@@ -304,6 +304,17 @@
     <string name="filter_reset_btn">重置筛选</string>
     <string name="filter_save_preset_success">快捷筛选预设已保存</string>
     <string name="filter_delete_preset_success">预设已删除</string>
+    <!-- 记录来源与溯源 (Source & Provenance Tracking) -->
+    <string name="filter_source_label">记录来源</string>
+    <string name="filter_channel_label">通知渠道</string>
+    <string name="source_provenance_title">记录来源与追溯</string>
+    <string name="source_type_label">记录方式</string>
+    <string name="source_channel_label">通知渠道</string>
+    <string name="source_channel_hint">ℹ️ 渠道仅代表捕获该笔账目的推送 App，资金扣款账户为【%1$s】。两者相互独立，切勿混淆。</string>
+    <string name="source_batch_label">导入批次</string>
+    <string name="source_edited_label">编辑状态</string>
+    <string name="source_edited_desc">最后修改于 %1$s (%2$s) · 编辑不改变原始记录来源</string>
+    <string name="source_merged_badge">🔗 已合并通知去重凭据</string>
     <string name="action_save">保存</string>
     <string name="action_cancel">取消</string>
 </resources>

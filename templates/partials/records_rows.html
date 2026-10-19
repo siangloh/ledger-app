@@ -10,7 +10,9 @@
     data-tags="{{ (r.tags or '')|e }}"
     data-from-savings="{{ 1 if r.from_savings else 0 }}"
     data-from-savings-category="{{ (r.from_savings_category or '')|e }}"
-    data-source="{{ r.source or '' }}">
+    data-source="{{ r.source or '' }}"
+    data-channel="{{ r.channel or '' }}"
+    data-import-batch-id="{{ r.import_batch_id or '' }}">
   <td data-col="checkbox" style="text-align: center;">
     <input type="checkbox" name="ids" value="{{ r.id }}" class="record-checkbox" onchange="updateBatchBar()">
   </td>
@@ -34,7 +36,22 @@
       </div>
     {% endif %}
   </td>
-  <td data-col="source"><span class="tag">{{ {'manual': t('records.src_manual'), 'nlp': t('records.src_nlp'), 'import': t('records.src_import'), 'recurring': t('records.src_recurring'), 'auto_track': t('records.src_auto_track'), 'split_bill': t('records.src_split_bill')}.get(r.source, r.source) }}</span></td>
+  <td data-col="source">
+    {% set src_info = format_source_display(r.source, r.channel) if format_source_display else None %}
+    {% if src_info %}
+      <button type="button"
+              class="tag-pill-src"
+              onclick="openSourceDetailsModal({{ r.id }})"
+              title="{{ src_info.full_label }} · {{ t('records.source_view_details', '点击查看来源与追溯详情') }}"
+              style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; cursor: pointer; border: 1px solid rgba(0,0,0,0.08); background: var(--surface-soft); color: {{ src_info.badge_color }}; transition: all 0.15s ease;">
+        <span style="font-size: 11px;">{{ src_info.badge_emoji }}</span>
+        <span>{{ src_info.badge_text }}</span>
+        {% if r.updated_at %}<span style="font-size: 9px; opacity: 0.7;" title="{{ t('records.source_updated_at', '最后编辑') }}: {{ r.updated_at }}">✎</span>{% endif %}
+      </button>
+    {% else %}
+      <span class="tag">{{ r.source or 'unknown' }}</span>
+    {% endif %}
+  </td>
   <td data-col="actions" class="actions">
     <div class="actions-inner">
       {% if r.type == 'income' %}
@@ -49,7 +66,7 @@
 
 {% if has_more %}
 <tr id="recordsLoadMoreSentinel"
-    hx-get="{{ url_for('records', page=next_page, partial_rows=1, start=start or None, end=end or None, date_range=date_range or None, type=(type or type_) or None, category=category or None, account_id=account_id or None, min_amount=min_amount or None, max_amount=max_amount or None, source=source or None, q=q or None, filter_id=filter_id or None, page_size=page_size if page_size and page_size != 25 else None) }}"
+    hx-get="{{ url_for('records', page=next_page, partial_rows=1, start=start or None, end=end or None, date_range=date_range or None, type=(type or type_) or None, category=category or None, account_id=account_id or None, min_amount=min_amount or None, max_amount=max_amount or None, source=source or None, channel=channel or None, q=q or None, filter_id=filter_id or None, page_size=page_size if page_size and page_size != 25 else None) }}"
     hx-trigger="click"
     hx-swap="outerHTML"
     class="records-sentinel-row"

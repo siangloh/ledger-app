@@ -304,6 +304,17 @@
     <string name="filter_reset_btn">Reset Filter</string>
     <string name="filter_save_preset_success">Filter preset saved</string>
     <string name="filter_delete_preset_success">Preset deleted</string>
+    <!-- Source & Provenance Tracking -->
+    <string name="filter_source_label">Record Source</string>
+    <string name="filter_channel_label">Notification Channel</string>
+    <string name="source_provenance_title">Record Source &amp; Provenance</string>
+    <string name="source_type_label">Source Type</string>
+    <string name="source_channel_label">Notification Channel</string>
+    <string name="source_channel_hint">ℹ️ Channel only represents the app that delivered the notification. The fund account is [%1$s]. They are independent concepts.</string>
+    <string name="source_batch_label">Import Batch</string>
+    <string name="source_edited_label">Edit Status</string>
+    <string name="source_edited_desc">Last modified at %1$s (%2$s) · Editing does not change original source</string>
+    <string name="source_merged_badge">🔗 Merged notification evidence retained</string>
     <string name="action_save">Save</string>
     <string name="action_cancel">Cancel</string>
 </resources>

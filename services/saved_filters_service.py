@@ -95,6 +95,7 @@ def build_filter_sql(
     min_amount: Optional[Union[float, str]] = None,
     max_amount: Optional[Union[float, str]] = None,
     source: Optional[str] = None,
+    channel: Optional[str] = None,
     table_prefix: str = ''
 ) -> Tuple[str, List[Any]]:
     """
@@ -162,16 +163,27 @@ def build_filter_sql(
         except (ValueError, TypeError):
             pass
 
-    # 6. 来源过滤
+    # 6. 来源过滤（平滑兼容历史 auto_track / auto_track_confirmed 与未知来源）
     if source and source not in ('all', ''):
-        where_clauses.append(f"{prefix}source = ?")
-        params.append(source)
+        s_clean = str(source).strip().lower()
+        if s_clean in ('notification', 'auto_track', 'auto_track_confirmed'):
+            where_clauses.append(f"({prefix}source = 'notification' OR {prefix}source = 'auto_track' OR {prefix}source = 'auto_track_confirmed')")
+        elif s_clean in ('unknown', 'legacy'):
+            where_clauses.append(f"({prefix}source = 'unknown' OR {prefix}source IS NULL OR {prefix}source = '')")
+        else:
+            where_clauses.append(f"{prefix}source = ?")
+            params.append(s_clean)
 
-    # 7. 全局模糊关键词搜索（匹配备注、分类、标签、来源）
+    # 6.5 通知渠道进一步细化筛选
+    if channel and channel not in ('all', ''):
+        where_clauses.append(f"{prefix}channel = ?")
+        params.append(str(channel).strip().lower())
+
+    # 7. 全局模糊关键词搜索（匹配备注、分类、标签、来源、渠道）
     if q and q.strip():
         term = f"%{q.strip()}%"
-        where_clauses.append(f"({prefix}note LIKE ? OR {prefix}tags LIKE ? OR {prefix}category LIKE ? OR {prefix}source LIKE ?)")
-        params.extend([term, term, term, term])
+        where_clauses.append(f"({prefix}note LIKE ? OR {prefix}tags LIKE ? OR {prefix}category LIKE ? OR {prefix}source LIKE ? OR {prefix}channel LIKE ?)")
+        params.extend([term, term, term, term, term])
 
     return " AND ".join(where_clauses), params
 

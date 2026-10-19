@@ -86,6 +86,8 @@ fun RecordsScreen(
     var filterMaxAmount by remember { mutableStateOf<Double?>(null) }
     var filterStartDate by remember { mutableStateOf<String?>(null) }
     var filterEndDate by remember { mutableStateOf<String?>(null) }
+    var filterSource by remember { mutableStateOf<String?>(null) }
+    var filterChannel by remember { mutableStateOf<String?>(null) }
     var showAdvancedFilterSheet by remember { mutableStateOf(false) }
     var showSavePresetDialog by remember { mutableStateOf(false) }
     var availableCategories by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -153,6 +155,8 @@ fun RecordsScreen(
                 endDate = filterEndDate,
                 minAmount = filterMinAmount,
                 maxAmount = filterMaxAmount,
+                source = filterSource,
+                channel = filterChannel,
                 page = targetPage,
                 limit = 50
             )
@@ -208,6 +212,18 @@ fun RecordsScreen(
             } else {
                 filterMaxAmount = null
             }
+            if (json.has("source")) {
+                val src = json.optString("source")
+                filterSource = if (src.isNotBlank() && src != "all") src else null
+            } else {
+                filterSource = null
+            }
+            if (json.has("channel")) {
+                val ch = json.optString("channel")
+                filterChannel = if (ch.isNotBlank() && ch != "all") ch else null
+            } else {
+                filterChannel = null
+            }
             if (json.has("q")) {
                 searchQuery = json.optString("q")
             } else if (json.has("search")) {
@@ -230,7 +246,7 @@ fun RecordsScreen(
         } catch (_: Exception) {}
     }
 
-    LaunchedEffect(selectedType, selectedMonth, debouncedSearchQuery, filterCategory, filterAccountId, filterMinAmount, filterMaxAmount, filterStartDate, filterEndDate) {
+    LaunchedEffect(selectedType, selectedMonth, debouncedSearchQuery, filterCategory, filterAccountId, filterMinAmount, filterMaxAmount, filterStartDate, filterEndDate, filterSource, filterChannel) {
         loadData(resetPage = true)
     }
 
@@ -324,7 +340,9 @@ fun RecordsScreen(
                 val activeFilterCount = (if (filterCategory != null) 1 else 0) +
                         (if (filterAccountId != null) 1 else 0) +
                         (if (filterMinAmount != null || filterMaxAmount != null) 1 else 0) +
-                        (if (filterStartDate != null || filterEndDate != null) 1 else 0)
+                        (if (filterStartDate != null || filterEndDate != null) 1 else 0) +
+                        (if (filterSource != null) 1 else 0) +
+                        (if (filterChannel != null) 1 else 0)
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -418,6 +436,8 @@ fun RecordsScreen(
                                 filterMaxAmount = null
                                 filterStartDate = null
                                 filterEndDate = null
+                                filterSource = null
+                                filterChannel = null
                                 selectedType = "all"
                                 searchQuery = ""
                             }
@@ -448,6 +468,8 @@ fun RecordsScreen(
                                         filterMaxAmount = null
                                         filterStartDate = null
                                         filterEndDate = null
+                                        filterSource = null
+                                        filterChannel = null
                                         selectedType = "all"
                                     } else {
                                         applySavedFilter(sf)
@@ -531,7 +553,7 @@ fun RecordsScreen(
                 }
 
                 // 激活的过滤项微标签 (可一键移除)
-                if (filterCategory != null || filterAccountId != null || filterMinAmount != null || filterMaxAmount != null) {
+                if (filterCategory != null || filterAccountId != null || filterMinAmount != null || filterMaxAmount != null || filterSource != null || filterChannel != null) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier
@@ -540,6 +562,63 @@ fun RecordsScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        filterSource?.let { src ->
+                            val srcLabel = when (src) {
+                                "notification" -> "📱 手机通知"
+                                "manual" -> "✍️ 手动记账"
+                                "import" -> "📥 文件导入"
+                                "api" -> "⚡ API接入"
+                                "nlp" -> "🤖 智能记账"
+                                "recurring" -> "🔄 固定收支"
+                                "split_bill" -> "👥 AA分账"
+                                "reconciliation" -> "⚖️ 平账"
+                                "unknown" -> "❓ 未知/历史"
+                                else -> src
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = PrimaryTealSubtle,
+                                modifier = Modifier.clickable {
+                                    filterSource = null
+                                    filterChannel = null
+                                }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text("来源: $srcLabel", fontSize = 11.sp, color = PrimaryTeal)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(Icons.Default.Close, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
+                        filterChannel?.let { ch ->
+                            val chLabel = when (ch) {
+                                "maybank" -> "Maybank"
+                                "tng" -> "Touch 'n Go"
+                                "grab" -> "Grab"
+                                "public_bank" -> "Public Bank"
+                                "shopee" -> "ShopeePay"
+                                "bank_card" -> "银行短信"
+                                "generic" -> "其他通知"
+                                else -> ch
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = PrimaryTealSubtle,
+                                modifier = Modifier.clickable { filterChannel = null }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text("渠道: $chLabel", fontSize = 11.sp, color = PrimaryTeal)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(Icons.Default.Close, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
                         filterCategory?.let { cat ->
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
@@ -980,6 +1059,8 @@ fun RecordsScreen(
             currentAccountId = filterAccountId,
             currentMinAmount = filterMinAmount,
             currentMaxAmount = filterMaxAmount,
+            currentSource = filterSource,
+            currentChannel = filterChannel,
             availableCategories = availableCategories,
             availableAccounts = availableAccounts,
             onDismiss = { showAdvancedFilterSheet = false },
@@ -987,12 +1068,14 @@ fun RecordsScreen(
                 showAdvancedFilterSheet = false
                 showSavePresetDialog = true
             },
-            onApply = { newType, newCat, newAid, newMin, newMax ->
+            onApply = { newType, newCat, newAid, newMin, newMax, newSrc, newChan ->
                 selectedType = newType
                 filterCategory = newCat
                 filterAccountId = newAid
                 filterMinAmount = newMin
                 filterMaxAmount = newMax
+                filterSource = newSrc
+                filterChannel = newChan
                 activeFilterId = null
                 showAdvancedFilterSheet = false
             }
@@ -1010,6 +1093,8 @@ fun RecordsScreen(
                     filterAccountId?.let { put("account_id", it) }
                     filterMinAmount?.let { put("min_amount", it) }
                     filterMaxAmount?.let { put("max_amount", it) }
+                    filterSource?.let { put("source", it) }
+                    filterChannel?.let { put("channel", it) }
                     if (searchQuery.isNotBlank()) put("q", searchQuery.trim())
                     put("date_range", "this_month")
                 }
@@ -1107,6 +1192,38 @@ fun TransactionCard(
                                 color = Slate600,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
+                        }
+                        // 来源微型胶囊 (短标签、微型图标，低调优雅，不挤占金额与商户)
+                        val badgeDisplay = if (tx.badgeText.isNotBlank()) tx.badgeText else tx.sourceLabel
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Slate100
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            ) {
+                                if (tx.badgeEmoji.isNotBlank()) {
+                                    Text(
+                                        text = tx.badgeEmoji,
+                                        fontSize = 10.sp,
+                                        modifier = Modifier.padding(end = 2.dp)
+                                    )
+                                }
+                                Text(
+                                    text = badgeDisplay,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Slate600
+                                )
+                                if (tx.isEdited) {
+                                    Text(
+                                        text = " ✎",
+                                        fontSize = 9.sp,
+                                        color = Slate400
+                                    )
+                                }
+                            }
                         }
                         // 账户信息
                         if (tx.accountName != "未指定") {
@@ -1291,7 +1408,129 @@ fun EditTransactionBottomSheet(
                 )
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 记录来源与溯源元数据区块 (展示来源、渠道、批次及独立性提示)
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Slate50,
+                border = BorderStroke(1.dp, Slate200),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.source_provenance_title),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate800
+                        )
+                        val badgeDisplay = if (tx.badgeText.isNotBlank()) tx.badgeText else tx.sourceLabel
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Slate200
+                        ) {
+                            Text(
+                                text = "${tx.badgeEmoji} $badgeDisplay".trim(),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Slate700,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // 通知渠道与资金账户独立性说明
+                    if (!tx.channel.isNullOrBlank() || tx.source == "notification") {
+                        val chDisplay = tx.channelLabel ?: tx.channel ?: "App通知"
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = stringResource(R.string.source_channel_label) + "：",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Slate500
+                            )
+                            Text(
+                                text = chDisplay,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Slate800
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Amber50,
+                            border = BorderStroke(1.dp, Amber200),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = stringResource(R.string.source_channel_hint, tx.accountName.ifBlank { "未指定" }),
+                                fontSize = 10.sp,
+                                color = Amber700,
+                                modifier = Modifier.padding(8.dp),
+                                lineHeight = 14.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+
+                    if (!tx.importBatchId.isNullOrBlank()) {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = stringResource(R.string.source_batch_label) + "：",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Slate500
+                            )
+                            Text(
+                                text = tx.importBatchId,
+                                fontSize = 11.sp,
+                                color = Slate700,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+
+                    if (tx.isEdited || !tx.updatedAt.isNullOrBlank()) {
+                        val editTime = tx.updatedAt ?: "-"
+                        val editSrc = tx.lastEditSource ?: "已编辑"
+                        Text(
+                            text = stringResource(R.string.source_edited_desc, editTime, editSrc),
+                            fontSize = 10.sp,
+                            color = Slate500,
+                            lineHeight = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+
+                    if (tx.hasMergedEvidence) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Slate100,
+                            modifier = Modifier.padding(top = 2.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.source_merged_badge),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = PrimaryTeal,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
 
             // 保存按钮
             Button(
@@ -1386,15 +1625,19 @@ fun AdvancedFilterBottomSheet(
     currentAccountId: Int?,
     currentMinAmount: Double?,
     currentMaxAmount: Double?,
+    currentSource: String? = null,
+    currentChannel: String? = null,
     availableCategories: List<String>,
     availableAccounts: List<AccountRecord>,
     onDismiss: () -> Unit,
     onSaveAsPresetClick: () -> Unit,
-    onApply: (type: String, category: String?, accountId: Int?, minAmount: Double?, maxAmount: Double?) -> Unit
+    onApply: (type: String, category: String?, accountId: Int?, minAmount: Double?, maxAmount: Double?, source: String?, channel: String?) -> Unit
 ) {
     var tempType by remember { mutableStateOf(currentType) }
     var tempCategory by remember { mutableStateOf(currentCategory) }
     var tempAccountId by remember { mutableStateOf(currentAccountId) }
+    var tempSource by remember { mutableStateOf(currentSource) }
+    var tempChannel by remember { mutableStateOf(currentChannel) }
     var minAmountStr by remember { mutableStateOf(currentMinAmount?.let { String.format(Locale.US, "%.2f", it) } ?: "") }
     var maxAmountStr by remember { mutableStateOf(currentMaxAmount?.let { String.format(Locale.US, "%.2f", it) } ?: "") }
 
@@ -1426,6 +1669,8 @@ fun AdvancedFilterBottomSheet(
                         tempType = "all"
                         tempCategory = null
                         tempAccountId = null
+                        tempSource = null
+                        tempChannel = null
                         minAmountStr = ""
                         maxAmountStr = ""
                     }
@@ -1462,6 +1707,124 @@ fun AdvancedFilterBottomSheet(
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             modifier = Modifier.padding(vertical = 8.dp)
                         )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 记录来源筛选
+            Text(stringResource(R.string.filter_source_label), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val isAllSrc = tempSource == null
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isAllSrc) PrimaryTeal else Slate100,
+                    modifier = Modifier.clickable {
+                        tempSource = null
+                        tempChannel = null
+                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.filter_all),
+                        fontSize = 12.sp,
+                        fontWeight = if (isAllSrc) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isAllSrc) Color.White else Slate700,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+                val sources = listOf(
+                    "notification" to "📱 手机通知",
+                    "manual" to "✍️ 手动记账",
+                    "import" to "📥 文件导入",
+                    "api" to "⚡ API 接入",
+                    "nlp" to "🤖 智能记账",
+                    "recurring" to "🔄 固定收支",
+                    "split_bill" to "👥 AA分账",
+                    "reconciliation" to "⚖️ 平账调整",
+                    "unknown" to "❓ 未知/历史"
+                )
+                sources.forEach { (srcKey, srcLabel) ->
+                    val isSel = tempSource == srcKey
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSel) PrimaryTeal else Slate100,
+                        modifier = Modifier.clickable {
+                            if (isSel) {
+                                tempSource = null
+                                tempChannel = null
+                            } else {
+                                tempSource = srcKey
+                                if (srcKey != "notification") tempChannel = null
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = srcLabel,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSel) Color.White else Slate700,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            // 当选择“手机通知”来源时，联动展示通知渠道二级筛选
+            if (tempSource == "notification") {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(stringResource(R.string.filter_channel_label), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate600)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val isAllChan = tempChannel == null
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isAllChan) PrimaryTeal else Slate100,
+                        modifier = Modifier.clickable { tempChannel = null }
+                    ) {
+                        Text(
+                            text = "全部渠道",
+                            fontSize = 11.sp,
+                            fontWeight = if (isAllChan) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isAllChan) Color.White else Slate700,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        )
+                    }
+                    val channels = listOf(
+                        "maybank" to "Maybank",
+                        "tng" to "Touch 'n Go",
+                        "grab" to "Grab",
+                        "public_bank" to "Public Bank",
+                        "shopee" to "ShopeePay",
+                        "bank_card" to "银行短信",
+                        "generic" to "其他通知"
+                    )
+                    channels.forEach { (chanKey, chanLabel) ->
+                        val isSel = tempChannel == chanKey
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSel) PrimaryTeal else Slate100,
+                            modifier = Modifier.clickable { tempChannel = if (isSel) null else chanKey }
+                        ) {
+                            Text(
+                                text = chanLabel,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSel) Color.White else Slate700,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -1605,7 +1968,7 @@ fun AdvancedFilterBottomSheet(
                     onClick = {
                         val min = minAmountStr.toDoubleOrNull()
                         val max = maxAmountStr.toDoubleOrNull()
-                        onApply(tempType, tempCategory, tempAccountId, min, max)
+                        onApply(tempType, tempCategory, tempAccountId, min, max, tempSource, tempChannel)
                     },
                     modifier = Modifier
                         .weight(1.3f)

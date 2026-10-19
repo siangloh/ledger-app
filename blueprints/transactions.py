@@ -52,6 +52,13 @@ from services.saved_filters_service import (
     build_filter_sql,
     resolve_date_range
 )
+from services.source_tracking_service import (
+    record_import_batch,
+    get_transaction_source_details,
+    get_supported_sources_for_filter,
+    get_supported_channels_for_filter,
+    format_source_display
+)
 from core.i18n import t
 
 transactions_bp = Blueprint('transactions', __name__)
@@ -218,6 +225,7 @@ def records():
     min_amount = request.args.get('min_amount', criteria.get('min_amount', ''))
     max_amount = request.args.get('max_amount', criteria.get('max_amount', ''))
     source = request.args.get('source', criteria.get('source', ''))
+    channel = request.args.get('channel', criteria.get('channel', ''))
 
     page = request.args.get('page', 1, type=int)
     if page < 1:
@@ -239,7 +247,8 @@ def records():
         date_range=date_range,
         min_amount=min_amount,
         max_amount=max_amount,
-        source=source
+        source=source,
+        channel=channel
     )
 
     # 1. 单次快速聚合汇总统计总览金额与匹配总笔数（无需加载全量记录到内存）
@@ -302,6 +311,10 @@ def records():
             min_amount=min_amount,
             max_amount=max_amount,
             source=source,
+            channel=channel,
+            supported_sources=get_supported_sources_for_filter(),
+            supported_channels=get_supported_channels_for_filter(),
+            format_source_display=format_source_display,
             q=q,
             filter_id=filter_id,
             page_size=page_size
@@ -330,6 +343,10 @@ def records():
             min_amount=min_amount,
             max_amount=max_amount,
             source=source,
+            channel=channel,
+            supported_sources=get_supported_sources_for_filter(),
+            supported_channels=get_supported_channels_for_filter(),
+            format_source_display=format_source_display,
             q=q,
             filter_id=filter_id,
             page_size=page_size
@@ -358,6 +375,10 @@ def records():
         min_amount=min_amount,
         max_amount=max_amount,
         source=source,
+        channel=channel,
+        supported_sources=get_supported_sources_for_filter(),
+        supported_channels=get_supported_channels_for_filter(),
+        format_source_display=format_source_display,
         q=q,
         filter_id=filter_id,
         categories=categories,
@@ -454,9 +475,9 @@ def edit_record(tx_id):
             amount = 0
         new_category = f.get('category')
 
-        # 检查是否为 auto_track 来源且修改了分类，若是则记忆商户-分类映射覆盖
+        # 检查是否为 auto_track / notification 来源且修改了分类，若是则记忆商户-分类映射覆盖
         current_tx = db.execute('SELECT source, note, category FROM transactions WHERE id=? AND user_id=?', (tx_id, user_id)).fetchone()
-        if current_tx and current_tx['source'] == 'auto_track' and current_tx['note'] and new_category:
+        if current_tx and current_tx['source'] in ('auto_track', 'auto_track_confirmed', 'notification') and current_tx['note'] and new_category:
             merchant_note = current_tx['note'].strip()
             if merchant_note:
                 now_str = datetime.now().isoformat()
@@ -471,10 +492,25 @@ def edit_record(tx_id):
             from_savings_category = f.get('category') or '储蓄'
 
         tags = (f.get('tags') or '').strip()
-        db.execute(
-            'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=?, from_savings=?, from_savings_category=?, tags=? WHERE id=? AND user_id=?',
-            (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), from_savings, from_savings_category, tags, tx_id, user_id)
-        )
+        now_iso = datetime.now().isoformat()
+        account_id_val = f.get('account_id')
+        if account_id_val is not None and str(account_id_val).strip() != '':
+            try:
+                aid_int = int(account_id_val)
+                db.execute(
+                    'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=?, from_savings=?, from_savings_category=?, tags=?, account_id=?, updated_at=?, last_edit_source=? WHERE id=? AND user_id=?',
+                    (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), from_savings, from_savings_category, tags, aid_int, now_iso, 'web_edit', tx_id, user_id)
+                )
+            except (ValueError, TypeError):
+                db.execute(
+                    'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=?, from_savings=?, from_savings_category=?, tags=?, updated_at=?, last_edit_source=? WHERE id=? AND user_id=?',
+                    (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), from_savings, from_savings_category, tags, now_iso, 'web_edit', tx_id, user_id)
+                )
+        else:
+            db.execute(
+                'UPDATE transactions SET date=?, type=?, group_name=?, category=?, amount=?, note=?, from_savings=?, from_savings_category=?, tags=?, updated_at=?, last_edit_source=? WHERE id=? AND user_id=?',
+                (f.get('date'), tx_type, group_name, new_category, amount, f.get('note', ''), from_savings, from_savings_category, tags, now_iso, 'web_edit', tx_id, user_id)
+            )
         db.commit()
         bump_data_version('edit', {'id': tx_id, 'from_savings': from_savings, 'from_savings_category': from_savings_category})
 
@@ -709,6 +745,11 @@ def batch_edit_records():
     if new_category:
         updates.append("category = ?")
         params.append(new_category)
+
+    updates.append("updated_at = ?")
+    params.append(datetime.now().isoformat())
+    updates.append("last_edit_source = ?")
+    params.append('web_batch_edit')
 
     set_clause = ", ".join(updates)
     placeholders = ','.join('?' * len(valid_ids))
@@ -1377,10 +1418,11 @@ def import_upload():
     user_id = get_current_user_id()
     expense_categories = get_categories(db, 'expense', None, user_id)
     income_categories_flat = get_categories(db, 'income', 'main', user_id) + get_categories(db, 'income', 'side', user_id)
+    orig_filename = os.path.basename(file.filename or 'statement.csv')
 
     return render_template(
         'import_preview.html',
-        token=token, ext=ext, columns=columns, preview_rows=preview_rows, row_count=len(df),
+        token=token, ext=ext, orig_filename=orig_filename, columns=columns, preview_rows=preview_rows, row_count=len(df),
         expense_categories=expense_categories, income_categories_flat=income_categories_flat,
     )
 
@@ -1421,6 +1463,15 @@ def import_confirm():
     now = datetime.now().isoformat()
     touched_expense_cat_months = set()
 
+    orig_filename = f.get('orig_filename') or 'statement.csv'
+    batch_id = record_import_batch(
+        user_id=user_id,
+        filename=orig_filename,
+        row_count=len(df),
+        file_type=ext.lstrip('.'),
+        db=db
+    )
+
     for _, row in df.iterrows():
         try:
             raw_date = str(row[date_col]).strip()
@@ -1458,9 +1509,9 @@ def import_confirm():
             note = str(row[note_col]).strip() if note_col else ''
 
             db.execute(
-                'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
-                'VALUES (?,?,?,?,?,?,?,?,?)',
-                (user_id, tx_date, tx_type, group_name, category, amount, note, 'import', now)
+                'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, import_batch_id, created_at) '
+                'VALUES (?,?,?,?,?,?,?,?,?,?)',
+                (user_id, tx_date, tx_type, group_name, category, amount, note, 'import', batch_id, now)
             )
             inserted += 1
             if tx_type == 'expense':
@@ -1721,4 +1772,18 @@ def api_recycle_bin():
     from services.native_api_service import get_native_recycle_bin
     res = get_native_recycle_bin(user_id=user_id, page=page, limit=limit, search=search, db=db)
     return jsonify(res)
+
+
+@transactions_bp.route('/api/records/<int:tx_id>/source-details', methods=['GET'], endpoint='api_record_source_details')
+def api_record_source_details(tx_id: int):
+    """返回单笔交易详尽来源溯源证据元数据"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'ok': False, 'message': 'Unauthorized'}), 401
+    db = get_db()
+    details = get_transaction_source_details(user_id=user_id, tx_id=tx_id, db=db)
+    if not details:
+        return jsonify({'ok': False, 'message': '未找到对应的交易记录或来源详情'}), 404
+    return jsonify({'ok': True, 'details': details})
+
 

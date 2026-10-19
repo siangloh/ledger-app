@@ -766,9 +766,11 @@ def api_auto_track():
             if parsed.get('category') in ('其他', '未分类', '待分类', '') and sub.get('category'):
                 parsed['category'] = sub['category']
 
+        channel_val = parsed.get('channel') or 'generic'
+        source_ref_val = content_hash[:16]
         cur = db.execute(
-            'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
-            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, channel, source_ref, created_at) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             (
                 target_user_id,
                 parsed['date'],
@@ -777,7 +779,9 @@ def api_auto_track():
                 parsed['category'],
                 parsed['amount'],
                 parsed['note'],
-                'auto_track',
+                'notification',
+                channel_val,
+                source_ref_val,
                 now
             )
         )
@@ -1188,6 +1192,7 @@ def api_native_transactions():
         min_amount = request.args.get('min_amount')
         max_amount = request.args.get('max_amount')
         source = request.args.get('source')
+        channel = request.args.get('channel')
         try:
             account_id = int(account_id) if account_id else None
         except (ValueError, TypeError):
@@ -1213,6 +1218,7 @@ def api_native_transactions():
             min_amount=min_amount,
             max_amount=max_amount,
             source=source,
+            channel=channel,
             page=page,
             limit=limit,
             db=db

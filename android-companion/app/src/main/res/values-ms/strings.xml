@@ -304,6 +304,17 @@
     <string name="filter_reset_btn">Set Semula</string>
     <string name="filter_save_preset_success">Praset penapis berjaya disimpan</string>
     <string name="filter_delete_preset_success">Praset dipadam</string>
+    <!-- Pengesanan Sumber Rekod (Source & Provenance Tracking) -->
+    <string name="filter_source_label">Sumber Rekod</string>
+    <string name="filter_channel_label">Saluran Notifikasi</string>
+    <string name="source_provenance_title">Sumber Rekod &amp; Asal-usul</string>
+    <string name="source_type_label">Jenis Sumber</string>
+    <string name="source_channel_label">Saluran Notifikasi</string>
+    <string name="source_channel_hint">ℹ️ Saluran hanya mewakili aplikasi pemberitahuan. Akaun dana ialah [%1$s]. Kedua-duanya adalah konsep berbeza.</string>
+    <string name="source_batch_label">Kelompok Import</string>
+    <string name="source_edited_label">Status Suntingan</string>
+    <string name="source_edited_desc">Disunting pada %1$s (%2$s) · Suntingan tidak mengubah sumber asal</string>
+    <string name="source_merged_badge">🔗 Bukti pemberitahuan digabungkan disimpan</string>
     <string name="action_save">Simpan</string>
     <string name="action_cancel">Batal</string>
 </resources>

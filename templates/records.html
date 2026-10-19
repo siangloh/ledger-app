@@ -89,14 +89,25 @@
     <input type="number" step="0.01" min="0" name="max_amount" value="{{ max_amount or '' }}" placeholder="9999.00">
   </label>
   <label>
-    {{ t('records.th_source', '来源渠道') }}
-    <select name="source">
-      <option value="">{{ t('common.all', '全部') }}</option>
-      <option value="auto_track" {{ 'selected' if source=='auto_track' }}>{{ t('records.src_auto_track', '自动记账') }}</option>
-      <option value="manual" {{ 'selected' if source=='manual' }}>{{ t('records.src_manual', '手动录入') }}</option>
-      <option value="split_bill" {{ 'selected' if source=='split_bill' }}>{{ t('records.src_split_bill', 'AA分账') }}</option>
-      <option value="recurring" {{ 'selected' if source=='recurring' }}>{{ t('records.src_recurring', '固定收支') }}</option>
-      <option value="import" {{ 'selected' if source=='import' }}>{{ t('records.src_import', '批量导入') }}</option>
+    {{ t('records.th_source', '记录来源') }}
+    <select name="source" id="filterSource" onchange="handleSourceFilterChange(this.value)">
+      <option value="">{{ t('common.all', '全部来源') }}</option>
+      {% for s in supported_sources %}
+        {% if s.id != 'all' %}
+          <option value="{{ s.id }}" {{ 'selected' if source==s.id }}>{{ s.label }}</option>
+        {% endif %}
+      {% endfor %}
+    </select>
+  </label>
+  <label id="filterChannelWrap" style="{{ 'display: none;' if source not in ('notification', 'auto_track', 'auto_track_confirmed') else '' }}">
+    {{ t('records.source_channel_filter', '通知渠道') }}
+    <select name="channel" id="filterChannel">
+      <option value="">{{ t('records.all_channels', '全部渠道') }}</option>
+      {% for ch in supported_channels %}
+        {% if ch.id != 'all' %}
+          <option value="{{ ch.id }}" {{ 'selected' if channel==ch.id }}>{{ ch.label }}</option>
+        {% endif %}
+      {% endfor %}
     </select>
   </label>
 
@@ -1611,6 +1622,185 @@ function deleteFilterPreset(id) {
   });
 }
 
+function handleSourceFilterChange(val) {
+  const wrap = document.getElementById('filterChannelWrap');
+  if (!wrap) return;
+  if (val === 'notification' || val === 'auto_track') {
+    wrap.style.display = '';
+  } else {
+    wrap.style.display = 'none';
+    const sel = document.getElementById('filterChannel');
+    if (sel) sel.value = '';
+  }
+}
+
+function openSourceDetailsModal(txId) {
+  if (typeof Swal === 'undefined') return;
+  Swal.fire({
+    title: window.t ? window.t('common.loading', '加载中...') : '加载中...',
+    didOpen: () => { Swal.showLoading(); },
+    allowOutsideClick: false,
+    showConfirmButton: false
+  });
+
+  fetch('/api/records/' + txId + '/source-details', {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.ok || !data.details) {
+      Swal.fire({
+        icon: 'error',
+        title: '获取失败',
+        text: data.message || '未找到该笔交易的来源追溯信息'
+      });
+      return;
+    }
+    const d = data.details;
+    const isIncome = d.type === 'income';
+    const isSavings = d.type === 'savings';
+    const typeLabel = isIncome ? (window.t ? window.t('common.income', '收入') : '收入') : (isSavings ? (window.t ? window.t('common.savings', '结余储蓄') : '结余储蓄') : (window.t ? window.t('common.expense', '支出') : '支出'));
+    const typeColor = isIncome ? '#059669' : (isSavings ? '#0284c7' : '#e11d48');
+
+    let html = `
+      <div style="text-align: left; font-size: 13.5px; line-height: 1.6; color: var(--ink);">
+        <!-- 基础交易卡片摘要 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: var(--surface-soft); border-radius: 10px; border: 1px solid var(--border); margin-bottom: 16px;">
+          <div>
+            <div style="font-weight: 700; font-size: 15px; color: var(--navy); display: flex; align-items: center; gap: 6px;">
+              <span>${d.note ? d.note : d.category}</span>
+            </div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+              ${d.date} · <span style="color: ${typeColor}; font-weight: 600;">${typeLabel}</span> · ${d.category}
+            </div>
+          </div>
+          <div style="font-size: 18px; font-weight: 800; color: ${typeColor};">
+            ${isIncome ? '+' : (isSavings ? '' : '-')} RM ${Number(d.amount).toFixed(2)}
+          </div>
+        </div>
+
+        <!-- 来源与渠道核心区块 -->
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--surface); border-radius: 8px; border: 1px solid var(--border);">
+            <span style="font-weight: 600; color: var(--navy);">
+              <span style="margin-right: 4px;">🏷️</span>${window.t ? window.t('records.source_type', '记录来源') : '记录来源'}
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--teal);">
+              <span>${d.source_emoji}</span><span>${d.source_label}</span>
+            </span>
+          </div>
+
+          ${d.channel_label ? `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--surface); border-radius: 8px; border: 1px solid var(--border);">
+            <span style="font-weight: 600; color: var(--navy);">
+              <span style="margin-right: 4px;">📱</span>${window.t ? window.t('records.source_channel', '通知渠道') : '通知渠道'}
+            </span>
+            <span style="font-weight: 600; color: #0284c7;">
+              ${d.channel_label}
+            </span>
+          </div>
+          ` : ''}
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--surface); border-radius: 8px; border: 1px solid var(--border);">
+            <span style="font-weight: 600; color: var(--navy);">
+              <span style="margin-right: 4px;">🏦</span>${window.t ? window.t('records.source_account', '资金账户') : '资金账户'}
+            </span>
+            <span style="font-weight: 600; color: var(--ink);">
+              ${d.account_name}
+            </span>
+          </div>
+        </div>
+
+        <!-- 独立性提示 -->
+        <div style="font-size: 11.5px; color: var(--muted); background: rgba(15, 118, 110, 0.06); padding: 8px 12px; border-radius: 8px; border-left: 3px solid #0F766E; margin-bottom: 16px;">
+          ℹ️ ${window.t ? window.t('records.source_account_hint', '通知 App 仅代表动账通知接收渠道，不代表实际扣款账户。') : '通知 App 仅代表动账通知接收渠道，不代表实际扣款账户。'}
+        </div>
+
+        <!-- 导入批次或参考信息 -->
+        ${d.import_batch ? `
+        <div style="padding: 10px 12px; background: var(--surface-soft); border-radius: 8px; border: 1px solid var(--border); margin-bottom: 14px;">
+          <div style="font-weight: 600; font-size: 12.5px; color: var(--navy); margin-bottom: 6px;">
+            📁 ${window.t ? window.t('records.source_import_batch', '导入批次信息') : '导入批次信息'}
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 3px;">
+            <span>${window.t ? window.t('records.source_import_file', '原始文件') : '原始文件'}:</span>
+            <strong style="color: var(--ink);">${d.import_batch.filename}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--muted);">
+            <span>批次识别号:</span>
+            <code>${d.import_batch.id}</code>
+          </div>
+        </div>
+        ` : ''}
+
+        ${d.source_ref ? `
+        <div style="display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); padding: 6px 10px; background: var(--surface-soft); border-radius: 6px; margin-bottom: 12px;">
+          <span>${window.t ? window.t('records.source_ref', '参考凭据') : '参考凭据'}:</span>
+          <code>${d.source_ref}</code>
+        </div>
+        ` : ''}
+
+        <!-- 时间审计记录（创建 vs 编辑） -->
+        <div style="padding: 10px 12px; background: var(--surface-soft); border-radius: 8px; border: 1px solid var(--border); font-size: 12px; color: var(--muted); margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span>${window.t ? window.t('records.source_created_at', '录入时间') : '录入时间'}:</span>
+            <span>${d.created_at || d.date}</span>
+          </div>
+          ${d.is_edited ? `
+          <div style="display: flex; justify-content: space-between; color: #d97706; font-weight: 500;">
+            <span>${window.t ? window.t('records.source_updated_at', '最后编辑') : '最后编辑'} (${d.last_edit_source || '用户修改'}):</span>
+            <span>${d.updated_at}</span>
+          </div>
+          ` : `
+          <div style="display: flex; justify-content: space-between; color: #059669; font-weight: 500;">
+            <span>完整性:</span>
+            <span>原始记录未修改</span>
+          </div>
+          `}
+        </div>
+
+        <!-- 多渠道合并追溯证据 (Merged Evidence) -->
+        ${d.has_merged_evidence ? `
+        <div style="padding: 10px 12px; background: rgba(2, 132, 199, 0.05); border-radius: 8px; border: 1px solid rgba(2, 132, 199, 0.2);">
+          <div style="font-weight: 600; font-size: 12.5px; color: #0284c7; margin-bottom: 6px;">
+            🔗 ${window.t ? window.t('records.source_merged_evidence', '合并排重追溯证据') : '合并排重追溯证据'} (${d.merged_evidence.length})
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            ${d.merged_evidence.map(m => `
+              <div style="font-size: 11.5px; padding: 6px 8px; background: #fff; border-radius: 6px; border: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between; font-weight: 600;">
+                  <span>${m.channel_name} (${m.reason})</span>
+                  <span>RM ${Number(m.amount).toFixed(2)}</span>
+                </div>
+                <div style="color: var(--muted); font-size: 11px; margin-top: 2px;">
+                  合并时间: ${m.merged_at}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
+      </div>
+    `;
+
+    Swal.fire({
+      title: window.t ? window.t('records.source_modal_title', '交易来源与追溯') : '交易来源与追溯',
+      html: html,
+      showCloseButton: true,
+      confirmButtonText: window.t ? window.t('common.confirm', '了解') : '了解',
+      confirmButtonColor: '#0F766E',
+      width: 480
+    });
+  })
+  .catch(err => {
+    Swal.fire({
+      icon: 'error',
+      title: '网络错误',
+      text: err.message || '无法获取来源信息'
+    });
+  });
+}
+
 // 显式挂载至 window 作用域，确保内联属性及动态 DOM 派发 100% 可用
 window.setupRecordsObserver = setupRecordsObserver;
 window.updateBatchBar = updateBatchBar;
@@ -1626,6 +1816,8 @@ window.openSaveFilterModal = openSaveFilterModal;
 window.openManageFiltersModal = openManageFiltersModal;
 window.toggleFilterPin = toggleFilterPin;
 window.deleteFilterPreset = deleteFilterPreset;
+window.handleSourceFilterChange = handleSourceFilterChange;
+window.openSourceDetailsModal = openSourceDetailsModal;
 </script>
 
 {% endblock %}

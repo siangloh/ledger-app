@@ -470,7 +470,12 @@ def init_db(app_logger=None):
         merged_info TEXT,
         deleted_at TEXT,
         is_reconciled INTEGER DEFAULT 0,
-        reconciled_at TEXT
+        reconciled_at TEXT,
+        channel TEXT,
+        import_batch_id TEXT,
+        source_ref TEXT,
+        updated_at TEXT,
+        last_edit_source TEXT
     );
     ''')
     db.commit()
@@ -939,6 +944,32 @@ def init_db(app_logger=None):
         except Exception as e:
             logger.debug("Category rule column migration notice: %s", e)
 
+    # 记录来源追踪与导入批次轻量幂等迁移
+    for col_sql in [
+        "ALTER TABLE transactions ADD COLUMN channel TEXT",
+        "ALTER TABLE transactions ADD COLUMN import_batch_id TEXT",
+        "ALTER TABLE transactions ADD COLUMN source_ref TEXT",
+        "ALTER TABLE transactions ADD COLUMN updated_at TEXT",
+        "ALTER TABLE transactions ADD COLUMN last_edit_source TEXT",
+    ]:
+        try:
+            db.execute(col_sql)
+            db.commit()
+        except Exception as e:
+            logger.debug("Source tracking column migration notice: %s", e)
+
+    db.execute('''
+    CREATE TABLE IF NOT EXISTS import_batches (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        file_type TEXT,
+        row_count INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL
+    )''')
+    db.execute('CREATE INDEX IF NOT EXISTS idx_import_batches_user ON import_batches(user_id, created_at DESC)')
+    db.commit()
+
     # 核心性能索引轻量幂等迁移（支持已有库热升级）
     core_indices = [
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_deleted ON transactions(user_id, deleted_at, date DESC)",
@@ -948,6 +979,8 @@ def init_db(app_logger=None):
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_cat ON transactions(user_id, category)",
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_account ON transactions(user_id, account_id, type, amount)",
         "CREATE INDEX IF NOT EXISTS idx_transactions_user_type_date ON transactions(user_id, type, date DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_transactions_user_source ON transactions(user_id, source, channel)",
+        "CREATE INDEX IF NOT EXISTS idx_transactions_user_batch ON transactions(user_id, import_batch_id)",
         "CREATE INDEX IF NOT EXISTS idx_categories_user_type ON categories(user_id, type, group_name)",
         "CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id, is_active)",
         "CREATE INDEX IF NOT EXISTS idx_accounts_user_active ON accounts(user_id, is_active, type, id)",

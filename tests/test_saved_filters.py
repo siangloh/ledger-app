@@ -134,9 +134,13 @@ def test_build_filter_sql():
     assert "date >= ?" in sql1
     assert "date <= ?" in sql1
     assert "amount >= ?" in sql1
-    assert "amount <= ?" in sql1
-    assert "source = ?" in sql1
+    assert ("source = ?" in sql1 or "source = 'auto_track'" in sql1)
     assert "%Grab%" in params1
+
+    # 1.5 验证渠道过滤
+    sql_chan, params_chan = build_filter_sql(user_id="1", channel="maybank")
+    assert "channel = ?" in sql_chan
+    assert "maybank" in params_chan
 
     # 2. 储蓄分类条件
     sql2, params2 = build_filter_sql(

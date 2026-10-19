@@ -283,9 +283,12 @@ def confirm_pending_transaction(pending_id: int):
     if row['suspected_duplicate_id']:
         tags = f"{tags} non_duplicate_verified".strip()
 
+    chan = row['channel'] or 'generic'
+    ref = (row['raw_text'] or '')[:16] if row['raw_text'] else None
+
     cur = db.execute('''
-        INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at, account_id, tags)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'auto_track_confirmed', ?, ?, ?)
+        INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, channel, source_ref, created_at, account_id, tags)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'notification', ?, ?, ?, ?, ?)
     ''', (
         str(user_id),
         tx_date,
@@ -294,6 +297,8 @@ def confirm_pending_transaction(pending_id: int):
         tx_category,
         row['amount'],
         tx_note,
+        chan,
+        ref,
         now,
         account_id,
         tags
@@ -438,7 +443,9 @@ def merge_pending_transaction(pending_id: int):
         'merged_at': now,
         'pending_id': pending_id,
         'amount': float(row['amount']),
-        'channel': row['channel'],
+        'channel': row['channel'] or 'generic',
+        'source': 'notification',
+        'source_ref': (row['raw_text'] or '')[:16] if row['raw_text'] else None,
         'raw_text': row['raw_text'],
         'note': row['note'] or row['merchant'],
         'reason': row['on_hold_reason'] or row['review_reason']
@@ -460,8 +467,8 @@ def merge_pending_transaction(pending_id: int):
             pass
 
     db.execute(
-        f"UPDATE transactions SET merged_info = ? {account_update_sql} WHERE id = ? AND user_id = ?",
-        [json.dumps(existing_merged_info, ensure_ascii=False)] + account_param + [target_id, str(user_id)]
+        f"UPDATE transactions SET merged_info = ?, updated_at = ?, last_edit_source = 'merge_pending' {account_update_sql} WHERE id = ? AND user_id = ?",
+        [json.dumps(existing_merged_info, ensure_ascii=False), now] + account_param + [target_id, str(user_id)]
     )
     db.commit()
 

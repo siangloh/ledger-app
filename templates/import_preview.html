@@ -19,6 +19,7 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="token" value="{{ token }}">
   <input type="hidden" name="ext" value="{{ ext }}">
+  <input type="hidden" name="orig_filename" value="{{ orig_filename }}">
 
   <div class="row">
     <label>{{ t('import.col_date', '日期列') }}

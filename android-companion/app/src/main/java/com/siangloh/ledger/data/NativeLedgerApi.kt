@@ -22,7 +22,21 @@ data class TransactionRecord(
     val tags: String,
     val accountId: Int?,
     val accountName: String,
-    val accountType: String
+    val accountType: String,
+    val source: String = "unknown",
+    val channel: String? = null,
+    val sourceLabel: String = "未知/历史",
+    val channelLabel: String? = null,
+    val badgeText: String = "",
+    val badgeEmoji: String = "",
+    val badgeColor: String = "#94a3b8",
+    val importBatchId: String? = null,
+    val sourceRef: String? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
+    val lastEditSource: String? = null,
+    val isEdited: Boolean = false,
+    val hasMergedEvidence: Boolean = false
 )
 
 data class TransactionsPage(
@@ -258,11 +272,12 @@ object NativeLedgerApi {
         minAmount: Double? = null,
         maxAmount: Double? = null,
         source: String? = null,
+        channel: String? = null,
         page: Int = 1,
         limit: Int = 50,
         forceRefresh: Boolean = false
     ): Result<TransactionsPage> = withContext(Dispatchers.IO) {
-        val cacheKey = "${month.orEmpty()}_${type.orEmpty()}_${category.orEmpty()}_${search.orEmpty().trim()}_a${accountId ?: 0}_s${startDate.orEmpty()}_e${endDate.orEmpty()}_min${minAmount ?: 0.0}_max${maxAmount ?: 0.0}_src${source.orEmpty()}_p${page}_l${limit}"
+        val cacheKey = "${month.orEmpty()}_${type.orEmpty()}_${category.orEmpty()}_${search.orEmpty().trim()}_a${accountId ?: 0}_s${startDate.orEmpty()}_e${endDate.orEmpty()}_min${minAmount ?: 0.0}_max${maxAmount ?: 0.0}_src${source.orEmpty()}_chan${channel.orEmpty()}_p${page}_l${limit}"
         val now = System.currentTimeMillis()
         if (!forceRefresh) {
             val mem = recordsCache[cacheKey]
@@ -285,6 +300,7 @@ object NativeLedgerApi {
             if (minAmount != null && minAmount >= 0.0) params.add("min_amount=$minAmount")
             if (maxAmount != null && maxAmount > 0.0) params.add("max_amount=$maxAmount")
             if (!source.isNullOrBlank() && source != "all") params.add("source=${URLEncoder.encode(source, "UTF-8")}")
+            if (!channel.isNullOrBlank() && channel != "all") params.add("channel=${URLEncoder.encode(channel, "UTF-8")}")
             params.add("page=$page")
             params.add("limit=$limit")
 
@@ -340,7 +356,21 @@ object NativeLedgerApi {
                     tags = obj.optString("tags", ""),
                     accountId = if (obj.has("account_id") && !obj.isNull("account_id")) obj.optInt("account_id") else null,
                     accountName = obj.optString("account_name", "未指定"),
-                    accountType = obj.optString("account_type", "")
+                    accountType = obj.optString("account_type", ""),
+                    source = obj.optString("source", "unknown"),
+                    channel = if (obj.has("channel") && !obj.isNull("channel")) obj.optString("channel") else null,
+                    sourceLabel = obj.optString("source_label", "未知/历史"),
+                    channelLabel = if (obj.has("channel_label") && !obj.isNull("channel_label")) obj.optString("channel_label") else null,
+                    badgeText = obj.optString("badge_text", ""),
+                    badgeEmoji = obj.optString("badge_emoji", ""),
+                    badgeColor = obj.optString("badge_color", "#94a3b8"),
+                    importBatchId = if (obj.has("import_batch_id") && !obj.isNull("import_batch_id")) obj.optString("import_batch_id") else null,
+                    sourceRef = if (obj.has("source_ref") && !obj.isNull("source_ref")) obj.optString("source_ref") else null,
+                    createdAt = if (obj.has("created_at") && !obj.isNull("created_at")) obj.optString("created_at") else null,
+                    updatedAt = if (obj.has("updated_at") && !obj.isNull("updated_at")) obj.optString("updated_at") else null,
+                    lastEditSource = if (obj.has("last_edit_source") && !obj.isNull("last_edit_source")) obj.optString("last_edit_source") else null,
+                    isEdited = obj.optBoolean("is_edited", false),
+                    hasMergedEvidence = obj.optBoolean("has_merged_evidence", false)
                 )
             )
         }

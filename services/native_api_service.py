@@ -10,6 +10,8 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Dict, Any, Optional, Union
 
+from services.source_tracking_service import format_source_display
+
 logger = logging.getLogger(__name__)
 
 
@@ -386,6 +388,7 @@ def get_native_transactions_list(
     min_amount: Optional[Union[float, str]] = None,
     max_amount: Optional[Union[float, str]] = None,
     source: Optional[str] = None,
+    channel: Optional[str] = None,
     page: int = 1,
     limit: int = 50,
     db: Any = None
@@ -447,13 +450,23 @@ def get_native_transactions_list(
             pass
 
     if source and source not in ('all', ''):
-        where_clauses.append("t.source = ?")
-        params.append(source)
+        s_clean = str(source).strip().lower()
+        if s_clean in ('notification', 'auto_track', 'auto_track_confirmed'):
+            where_clauses.append("(t.source = 'notification' OR t.source = 'auto_track' OR t.source = 'auto_track_confirmed')")
+        elif s_clean in ('unknown', 'legacy'):
+            where_clauses.append("(t.source = 'unknown' OR t.source IS NULL OR t.source = '')")
+        else:
+            where_clauses.append("t.source = ?")
+            params.append(s_clean)
+
+    if channel and channel not in ('all', ''):
+        where_clauses.append("t.channel = ?")
+        params.append(str(channel).strip().lower())
 
     if search and search.strip():
         term = f"%{search.strip()}%"
-        where_clauses.append("(t.note LIKE ? OR t.tags LIKE ? OR t.category LIKE ?)")
-        params.extend([term, term, term])
+        where_clauses.append("(t.note LIKE ? OR t.tags LIKE ? OR t.category LIKE ? OR t.source LIKE ? OR t.channel LIKE ?)")
+        params.extend([term, term, term, term, term])
 
     where_sql = " AND ".join(where_clauses)
 
@@ -468,7 +481,9 @@ def get_native_transactions_list(
 
     data_query = f'''
         SELECT t.id, t.date, t.type, t.category, t.amount, t.note, t.tags, t.account_id,
-               t.source, t.created_at, a.name AS account_name, a.type AS account_type
+               t.source, t.channel, t.import_batch_id, t.source_ref, t.created_at,
+               t.updated_at, t.last_edit_source, t.merged_info,
+               a.name AS account_name, a.type AS account_type
         FROM transactions t
         LEFT JOIN accounts a ON t.account_id = a.id AND a.user_id = t.user_id
         WHERE {where_sql}
@@ -478,6 +493,7 @@ def get_native_transactions_list(
     rows = db.execute(data_query, data_params).fetchall()
     items = []
     for r in rows:
+        disp = format_source_display(r['source'], r['channel'])
         items.append({
             'id': r['id'],
             'date': r['date'],
@@ -489,8 +505,21 @@ def get_native_transactions_list(
             'account_id': r['account_id'],
             'account_name': r['account_name'] or '未指定账户',
             'account_type': r['account_type'] or '',
-            'source': r['source'] or 'manual',
-            'created_at': r['created_at']
+            'source': disp['source'],
+            'channel': disp['channel'],
+            'source_label': disp['source_label'],
+            'channel_label': disp['channel_label'],
+            'badge_text': disp['badge_text'],
+            'badge_icon': disp['badge_icon'],
+            'badge_emoji': disp['badge_emoji'],
+            'badge_color': disp['badge_color'],
+            'import_batch_id': r['import_batch_id'],
+            'source_ref': r['source_ref'],
+            'created_at': r['created_at'],
+            'updated_at': r['updated_at'],
+            'last_edit_source': r['last_edit_source'],
+            'is_edited': bool(r['updated_at']),
+            'has_merged_evidence': bool(r['merged_info'])
         })
 
     has_more = (offset + len(items)) < total_count
