@@ -177,8 +177,8 @@ class NotificationService : NotificationListenerService() {
 
         // 5. 通过 Phase-1 检验，尝试发送给后端（或离线/等待WiFi时加入 Room 队列）
         if (NetworkHelper.canSyncNow(this)) {
-            Log.i(TAG, "Posting transaction notification to backend...")
-            NetworkHelper.postNotificationAsync(fullContent, this) { success, msg, verdict ->
+            Log.i(TAG, "Posting transaction notification to backend (package: $pkgName)...")
+            NetworkHelper.postNotificationAsync(fullContent, this, packageName = pkgName) { success, msg, verdict ->
                 serviceScope.launch {
                     val finalOutcome = when (verdict) {
                         "rejected_promo" -> "synced_rejected_promo"

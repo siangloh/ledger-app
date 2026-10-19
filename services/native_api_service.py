@@ -39,7 +39,8 @@ def get_native_overview_summary(
     user_id: Any,
     period: str = "month",  # "month", "3m", "year"
     selected_month: Optional[str] = None,
-    db: Any = None
+    db: Any = None,
+    lang: str = "zh"
 ) -> Dict[str, Any]:
     """
     Computes summary metrics for native mobile Overview screen (ExpenseMY aesthetic):
@@ -62,7 +63,7 @@ def get_native_overview_summary(
     # 多 Worker 安全的数据版本缓存感知：版本未变时秒级直接命中缓存，无需重复全表扫描
     from core.db import get_data_version
     current_version = get_data_version(user_id=str(user_id), db=db)
-    cache_key = (str(user_id), current_version, period, selected_month)
+    cache_key = (str(user_id), current_version, period, selected_month, lang)
     if cache_key in _OVERVIEW_CACHE:
         cached_res = dict(_OVERVIEW_CACHE[cache_key])
         return cached_res
@@ -95,7 +96,7 @@ def get_native_overview_summary(
 
     # 1. Fetch transactions within date range
     rows = db.execute('''
-        SELECT id, date, type, category, amount, note, source, created_at
+        SELECT id, date, type, category, amount, note, source, channel, created_at
         FROM transactions
         WHERE user_id = ? AND date BETWEEN ? AND ? AND deleted_at IS NULL
         ORDER BY date DESC, id DESC
@@ -236,6 +237,7 @@ def get_native_overview_summary(
     # 3. 近期交易列表 (最多 25 笔)
     recent_list = []
     for r in rows[:25]:
+        disp = format_source_display(r['source'], r['channel'] if 'channel' in r.keys() else None, lang=lang, note=r['note'])
         recent_list.append({
             'id': r['id'],
             'date': r['date'],
@@ -243,7 +245,14 @@ def get_native_overview_summary(
             'category': r['category'] or '其他',
             'amount': float(r['amount'] or 0.0),
             'note': r['note'] or '',
-            'source': r['source'] or 'auto_track',
+            'source': disp['source'],
+            'channel': disp['channel'],
+            'source_label': disp['source_label'],
+            'channel_label': disp['channel_label'],
+            'badge_text': disp['badge_text'],
+            'badge_icon': disp['badge_icon'],
+            'badge_emoji': disp['badge_emoji'],
+            'badge_color': disp['badge_color'],
             'created_at': r['created_at']
         })
 
@@ -391,7 +400,8 @@ def get_native_transactions_list(
     channel: Optional[str] = None,
     page: int = 1,
     limit: int = 50,
-    db: Any = None
+    db: Any = None,
+    lang: str = "zh"
 ) -> Dict[str, Any]:
     if not db or not user_id:
         return {'ok': False, 'message': 'Invalid user or database connection'}
@@ -500,7 +510,7 @@ def get_native_transactions_list(
     rows = db.execute(data_query, data_params).fetchall()
     items = []
     for r in rows:
-        disp = format_source_display(r['source'], r['channel'])
+        disp = format_source_display(r['source'], r['channel'], lang=lang, note=r['note'])
         items.append({
             'id': r['id'],
             'date': r['date'],

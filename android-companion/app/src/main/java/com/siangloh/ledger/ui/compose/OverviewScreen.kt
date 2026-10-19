@@ -56,6 +56,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.*
+import com.siangloh.ledger.ui.compose.components.SourceBrandBadge
 
 data class TransactionItem(
     val id: Long,
@@ -65,6 +66,11 @@ data class TransactionItem(
     val amount: Double,
     val note: String,
     val source: String,
+    val channel: String? = null,
+    val badgeText: String = "",
+    val badgeEmoji: String = "",
+    val badgeColor: String = "",
+    val isEdited: Boolean = false,
     val isOfflineLocal: Boolean = false
 )
 
@@ -188,6 +194,7 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
                     val item = txArray.optJSONObject(i) ?: continue
                     val amtRaw = if (item.isNull("amount")) 0.0 else item.optDouble("amount", 0.0)
                     val amt = if (amtRaw.isNaN() || amtRaw.isInfinite()) 0.0 else amtRaw
+                    val ch = item.optString("channel").takeIf { it.isNotBlank() && it != "null" }
                     txList.add(
                         TransactionItem(
                             id = item.optLong("id", 0L),
@@ -196,7 +203,12 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
                             category = item.optString("category", "其他").takeIf { it != "null" } ?: "其他",
                             amount = amt,
                             note = item.optString("note", "").takeIf { it != "null" } ?: "",
-                            source = item.optString("source", "unknown").takeIf { it != "null" } ?: "unknown"
+                            source = item.optString("source", "unknown").takeIf { it != "null" } ?: "unknown",
+                            channel = ch,
+                            badgeText = item.optString("badge_text", ""),
+                            badgeEmoji = item.optString("badge_emoji", ""),
+                            badgeColor = item.optString("badge_color", ""),
+                            isEdited = item.optBoolean("is_edited", false)
                         )
                     )
                 } catch (_: Exception) {}
@@ -1645,8 +1657,23 @@ fun TransactionCardItem(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // 1. 来源与渠道专属 Brand Badge (Maybank / TNG / PB / Grab / 手动 等)
+                        SourceBrandBadge(
+                            source = tx.source,
+                            channel = tx.channel,
+                            note = tx.note,
+                            isEdited = tx.isEdited,
+                            fallbackBadgeText = tx.badgeText,
+                            fallbackBadgeEmoji = tx.badgeEmoji,
+                            fallbackBadgeColor = tx.badgeColor
+                        )
+
+                        // 2. 分类微胶囊
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = Slate100
@@ -1658,7 +1685,8 @@ fun TransactionCardItem(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(6.dp))
+
+                        // 3. 日期
                         Text(
                             text = tx.date,
                             color = Slate400,

@@ -208,15 +208,15 @@ fun MoreToolsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "工具与设置",
+                            text = stringResource(R.string.tools_title),
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate800
                         )
                         Text(
-                            text = "待办收件箱 · 智能OCR · 周期记账 · 自动化",
+                            text = stringResource(R.string.tools_subtitle),
                             fontSize = 12.sp,
                             color = Slate500
                         )
@@ -1629,7 +1629,10 @@ fun LanguageSettingsCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -1645,12 +1648,14 @@ fun LanguageSettingsCard(
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
                         Text(
                             text = stringResource(R.string.language_settings_title),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Slate900
+                            color = Slate900,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = langLabel,
@@ -1660,14 +1665,16 @@ fun LanguageSettingsCard(
                     }
                 }
 
+                Spacer(modifier = Modifier.width(8.dp))
+
                 OutlinedButton(
                     onClick = { showDialog = true },
                     shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                     border = BorderStroke(1.dp, PrimaryTeal)
                 ) {
                     Text(
-                        text = stringResource(R.string.language_select_dialog_title),
+                        text = stringResource(R.string.language_switch_btn),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = PrimaryTeal
@@ -3118,12 +3125,17 @@ fun BudgetManagementDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Row(
+                                        modifier = Modifier.weight(1f, fill = false),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Text(
                                             text = stringResource(R.string.budget_overall_title),
                                             fontSize = 15.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Slate900
+                                            color = Slate900,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                         if (data != null && data.overall.isSet) {
                                             Spacer(modifier = Modifier.width(6.dp))
@@ -3152,25 +3164,29 @@ fun BudgetManagementDialog(
                                         }
                                     }
 
+                                    Spacer(modifier = Modifier.width(8.dp))
+
                                     TextButton(
                                         onClick = { showSetOverallDialog = true },
-                                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                                        modifier = Modifier.defaultMinSize(minHeight = 44.dp)
                                     ) {
                                         Text(
                                             text = if (data != null && data.overall.isExplicit) stringResource(R.string.budget_edit_overall_btn)
                                                    else stringResource(R.string.budget_set_overall_btn),
                                             color = Color(0xFF0F766E),
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp
+                                            fontSize = 13.sp,
+                                            maxLines = 1
                                         )
                                     }
                                 }
 
                                 if (data != null && data.overall.isSet) {
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(modifier = Modifier.height(10.dp))
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
                                             text = stringResource(
@@ -3179,6 +3195,7 @@ fun BudgetManagementDialog(
                                                 String.format(Locale.getDefault(), "RM %.2f", data.overall.limit)
                                             ),
                                             fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
                                             color = Slate600
                                         )
                                         if (data.overall.remaining < 0) {
@@ -3243,6 +3260,8 @@ fun BudgetManagementDialog(
                                             )
                                         }
 
+                                        Spacer(modifier = Modifier.width(8.dp))
+
                                         Text(
                                             text = stringResource(
                                                 R.string.budget_cycle_days_format,
@@ -3255,7 +3274,7 @@ fun BudgetManagementDialog(
                                 } else {
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
-                                        text = stringResource(R.string.budget_no_budget) + "，设立最高开支额度可计算每日安全预算",
+                                        text = stringResource(R.string.budget_no_budget) + stringResource(R.string.budget_no_budget_desc),
                                         fontSize = 12.sp,
                                         color = Slate400
                                     )
@@ -3272,18 +3291,18 @@ fun BudgetManagementDialog(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "分类支出预算 (${data?.categories?.size ?: 0})",
+                                text = stringResource(R.string.budget_categories_title_fmt, data?.categories?.size ?: 0),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Slate800
                             )
                             TextButton(
                                 onClick = { showAddCategoryBudgetDialog = true },
-                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                                modifier = Modifier.defaultMinSize(minHeight = 44.dp)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF0F766E), modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("添加分类", color = Color(0xFF0F766E), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text(stringResource(R.string.budget_add_category_btn), color = Color(0xFF0F766E), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         }
                     }
@@ -3298,7 +3317,7 @@ fun BudgetManagementDialog(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "暂无分类预算，点击「添加分类」为餐饮、购物等单独设置上限",
+                                    text = stringResource(R.string.budget_no_categories_hint),
                                     fontSize = 12.sp,
                                     color = Slate400,
                                     textAlign = TextAlign.Center

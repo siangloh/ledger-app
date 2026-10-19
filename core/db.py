@@ -492,6 +492,32 @@ def init_db(app_logger=None):
         except Exception as e:
             logger.debug("ALTER transactions ADD user_id skipped: %s", e)
     db.execute("UPDATE transactions SET user_id = ? WHERE user_id IS NULL OR user_id = ''", (admin_id,))
+    try:
+        db.execute("""
+            UPDATE transactions 
+            SET channel = 'tng' 
+            WHERE (channel IS NULL OR channel = '' OR channel = 'generic') 
+              AND (
+                  lower(note) LIKE '%toll payment%'
+                  OR lower(note) LIKE '%tng%'
+                  OR lower(note) LIKE '%touch%'
+                  OR id IN (184, 185)
+              )
+        """)
+        db.execute("""
+            UPDATE transactions 
+            SET channel = 'maybank' 
+            WHERE (channel IS NULL OR channel = '' OR channel = 'generic') 
+              AND (lower(note) LIKE '%maybank%' OR lower(note) LIKE '%mae%' OR lower(note) LIKE '%m2u%')
+        """)
+        db.execute("""
+            UPDATE transactions 
+            SET channel = 'public_bank' 
+            WHERE (channel IS NULL OR channel = '' OR channel = 'generic') 
+              AND (lower(note) LIKE '%public bank%' OR lower(note) LIKE '%mypb%' OR lower(note) LIKE '%pbb%')
+        """)
+    except Exception as e:
+        logger.debug("Backfill historical channels notice: %s", e)
     db.commit()
 
     # 4. 固定收支表

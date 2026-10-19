@@ -148,7 +148,12 @@ object NetworkHelper {
         return true
     }
 
-    fun postNotificationAsync(text: String, context: Context? = null, callback: ((Boolean, String, String?) -> Unit)? = null) {
+    fun postNotificationAsync(
+        text: String,
+        context: Context? = null,
+        packageName: String? = null,
+        callback: ((Boolean, String, String?) -> Unit)? = null
+    ) {
         networkExecutor.execute {
             try {
                 val key = getApiKey(context)
@@ -178,6 +183,9 @@ object NetworkHelper {
                 val jsonPayload = JSONObject().apply {
                     put("key", key)
                     put("text", text)
+                    if (!packageName.isNullOrBlank()) {
+                        put("package_name", packageName)
+                    }
                     if (username.isNotEmpty()) {
                         put("username", username)
                     }

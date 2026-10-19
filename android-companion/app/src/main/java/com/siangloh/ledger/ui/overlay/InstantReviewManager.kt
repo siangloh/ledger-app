@@ -186,15 +186,14 @@ object InstantReviewManager {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFF10B981))
+                                    com.siangloh.ledger.ui.compose.components.SourceBrandBadge(
+                                        source = "notification",
+                                        channel = channel,
+                                        note = merchant
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "${channel.ifBlank { "自动记账" }} · 识别成功",
+                                        text = "· 识别成功",
                                         color = Color(0xFF94A3B8),
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Medium

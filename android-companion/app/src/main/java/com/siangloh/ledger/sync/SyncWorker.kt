@@ -84,7 +84,7 @@ class SyncWorker(
                 for (notif in pendingNotifs) {
                     db.pendingNotificationDao().markAsSyncing(notif.id)
                     val latch = CountDownLatch(1)
-                    NetworkHelper.postNotificationAsync(notif.rawText, applicationContext) { success, msg, verdict ->
+                    NetworkHelper.postNotificationAsync(notif.rawText, applicationContext, packageName = notif.packageName) { success, msg, verdict ->
                         kotlinx.coroutines.runBlocking {
                             if (success || verdict == "rejected_promo" || verdict == "duplicate_ignored" || verdict == "on_hold" || verdict == "ignored_internal_transfer") {
                                 db.pendingNotificationDao().delete(notif.id)

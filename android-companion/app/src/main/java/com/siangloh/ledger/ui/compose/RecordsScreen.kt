@@ -34,6 +34,7 @@ import com.siangloh.ledger.data.AccountRecord
 import com.siangloh.ledger.data.entities.PendingTransaction
 import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.compose.components.RecordsSkeletonList
+import com.siangloh.ledger.ui.compose.components.SourceBrandBadge
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -365,7 +366,7 @@ fun RecordsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "账本流水明细",
+                        text = stringResource(R.string.records_title),
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
@@ -378,7 +379,7 @@ fun RecordsScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "记一笔",
+                            contentDescription = stringResource(R.string.nav_add),
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
@@ -457,7 +458,7 @@ fun RecordsScreen(
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
                                 IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(20.dp)) {
-                                    Icon(Icons.Default.Close, contentDescription = "清除", tint = Slate400, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_cancel), tint = Slate400, modifier = Modifier.size(16.dp))
                                 }
                             }
                         },
@@ -624,10 +625,10 @@ fun RecordsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val types = listOf(
-                        "all" to "全部",
-                        "expense" to "支出",
-                        "income" to "收入",
-                        "transfer" to "自转"
+                        "all" to stringResource(R.string.type_all),
+                        "expense" to stringResource(R.string.type_expense),
+                        "income" to stringResource(R.string.type_income),
+                        "transfer" to stringResource(R.string.type_transfer)
                     )
                     types.forEach { (typeKey, typeLabel) ->
                         val isSelected = selectedType == typeKey
@@ -1218,6 +1219,7 @@ fun TransactionCard(
     tx: TransactionRecord,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val emoji = CategoryUiHelper.getCategoryEmoji(tx.category, tx.type)
     val catColor = CategoryUiHelper.getCategoryColor(tx.category)
 
@@ -1234,7 +1236,7 @@ fun TransactionCard(
     }
 
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         color = Color.White,
         shadowElevation = 0.5.dp,
         border = BorderStroke(1.dp, Slate100),
@@ -1242,147 +1244,156 @@ fun TransactionCard(
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
+            // 主行：分类 Emoji + 商户/备注 + 金额显示
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Emoji 图标背景圆圈
+                // Emoji 图标背景圆圈 (40.dp)
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(40.dp)
                         .background(catColor.copy(alpha = 0.12f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(text = emoji, fontSize = 20.sp)
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
-                Column(modifier = Modifier.weight(1f)) {
+                // 商户/备注 (单行加粗，超出省略)
+                val localizedCat = CategoryUiHelper.getLocalizedCategoryName(context, tx.category)
+                val merchantTitle = tx.note.ifBlank { localizedCat }
+                Text(
+                    text = merchantTitle,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Slate900,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // 金额显示 (加粗单行靠右)
+                Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = tx.note.ifBlank { tx.category },
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Slate900,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        text = "$amountPrefix MYR ${String.format(Locale.US, "%.2f", tx.amount)}",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = amountColor,
+                        maxLines = 1
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // 分类胶囊
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Slate100
-                        ) {
-                            Text(
-                                text = tx.category,
-                                fontSize = 11.sp,
-                                color = Slate600,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                        // 来源微型胶囊 (短标签、微型图标，低调优雅，不挤占金额与商户)
-                        val badgeDisplay = if (tx.badgeText.isNotBlank()) tx.badgeText else tx.sourceLabel
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Slate100
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                            ) {
-                                if (tx.badgeEmoji.isNotBlank()) {
-                                    Text(
-                                        text = tx.badgeEmoji,
-                                        fontSize = 10.sp,
-                                        modifier = Modifier.padding(end = 2.dp)
-                                    )
-                                }
-                                Text(
-                                    text = badgeDisplay,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Slate600
-                                )
-                                if (tx.isEdited) {
-                                    Text(
-                                        text = " ✎",
-                                        fontSize = 9.sp,
-                                        color = Slate400
-                                    )
-                                }
-                            }
-                        }
-                        // 账户信息
-                        if (tx.accountName != "未指定") {
-                            Text(
-                                text = tx.accountName,
-                                fontSize = 11.sp,
-                                color = Slate400,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        // 日期
+                    if (tx.type == "transfer") {
                         Text(
-                            text = tx.date,
-                            fontSize = 11.sp,
-                            color = Slate400
-                        )
-                        // 服务器已确认同步徽标
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = Emerald50
-                        ) {
-                            Text(
-                                text = "· " + stringResource(R.string.sync_status_synced),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Emerald700,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
-                    if (tx.tags.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = tx.tags,
+                            text = stringResource(R.string.type_transfer),
                             fontSize = 10.sp,
-                            color = PrimaryTeal,
+                            color = Sky500,
                             fontWeight = FontWeight.Medium
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // 金额显示
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "$amountPrefix MYR ${String.format(Locale.US, "%.2f", tx.amount)}",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = amountColor
-                )
-                if (tx.type == "transfer") {
+            // 次行：元数据流式排布 (对齐商户起始位置：paddingStart = 50.dp)
+            // 使用 FlowRow 保证小屏、大字号、多语言长文本自然折行，绝不互相挤爆！
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 50.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                @OptIn(ExperimentalLayoutApi::class)
+                FlowRow(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // 1. 来源与渠道专属 Brand Badge (Maybank / TNG / PB / Grab / 手动 等)
+                    SourceBrandBadge(
+                        source = tx.source,
+                        channel = tx.channel,
+                        note = tx.note,
+                        isEdited = tx.isEdited,
+                        fallbackBadgeText = tx.badgeText,
+                        fallbackBadgeEmoji = tx.badgeEmoji,
+                        fallbackBadgeColor = tx.badgeColor
+                    )
+
+                    // 2. 分类微胶囊 (若主标题已是备注，则展示分类)
+                    val localizedCategory = CategoryUiHelper.getLocalizedCategoryName(context, tx.category)
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Slate100
+                    ) {
+                        Text(
+                            text = localizedCategory,
+                            fontSize = 11.sp,
+                            color = Slate600,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+
+                    // 3. 账户信息 (若已指定)
+                    if (tx.accountName.isNotBlank() && tx.accountName != "未指定" && tx.accountName != "未指定账户") {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Slate100
+                        ) {
+                            Text(
+                                text = tx.accountName,
+                                fontSize = 11.sp,
+                                color = Slate500,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    // 4. 日期
                     Text(
-                        text = "内部互转",
-                        fontSize = 10.sp,
-                        color = Sky500,
-                        fontWeight = FontWeight.Medium
+                        text = tx.date,
+                        fontSize = 11.sp,
+                        color = Slate400,
+                        modifier = Modifier.align(Alignment.CenterVertically)
                     )
                 }
+
+                // 右侧独立同步状态徽标
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = Emerald50,
+                    modifier = Modifier.padding(start = 6.dp)
+                ) {
+                    Text(
+                        text = "· " + stringResource(R.string.sync_status_synced),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Emerald700,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                }
+            }
+
+            if (tx.tags.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = tx.tags,
+                    fontSize = 10.sp,
+                    color = PrimaryTeal,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(start = 50.dp)
+                )
             }
         }
     }

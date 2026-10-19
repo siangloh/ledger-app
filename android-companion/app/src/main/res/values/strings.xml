@@ -72,10 +72,10 @@
     <string name="income_main">💼 主业收入</string>
     <string name="income_side">📈 副业/理财</string>
     <string name="show_all_categories">展开全部分类</string>
-    <string name="collapse_categories">收起部分分类</string>
+    <string name="collapse_categories">收起 ▴</string>
 
     <!-- Records Screen -->
-    <string name="records_title">交易明细</string>
+    <string name="records_title">账本流水明细</string>
     <string name="records_search_hint">搜索商户、分类或备注...</string>
     <string name="all_types">全部类型</string>
     <string name="records_total_fmt">已展示全部 %1$d 笔记录</string>
@@ -103,7 +103,7 @@
     <string name="transfer_btn">账户间转账</string>
 
     <!-- More Tools Screen -->
-    <string name="tools_title">更多工具与管理</string>
+    <string name="tools_title">工具与设置</string>
     <string name="tools_subtitle">待办收件箱 · 智能OCR · 周期记账 · 自动化</string>
     <string name="full_ledger_hub">全功能账务大厅 (高级管理)</string>
     <string name="full_ledger_desc">全景维护订阅大厅、负债车房贷、固定收支与分类报表</string>
@@ -130,7 +130,7 @@
     <string name="server_url_label">服务器地址</string>
     <string name="api_key_label">自动记账 API Key</string>
     <string name="edit_config_btn">修改服务器配置</string>
-    <string name="language_settings_title">🌐 界面语言 (Language)</string>
+    <string name="language_settings_title">界面语言</string>
     <string name="language_select_dialog_title">切换界面语言</string>
     <string name="lang_zh">中文 (简体)</string>
     <string name="lang_en">English</string>
@@ -317,5 +317,41 @@
     <string name="source_merged_badge">🔗 已合并通知去重凭据</string>
     <string name="action_save">保存</string>
     <string name="action_cancel">取消</string>
+
+    <!-- 流水明细与类型 -->
+    <string name="type_all">全部</string>
+    <string name="type_expense">支出</string>
+    <string name="type_income">收入</string>
+    <string name="type_transfer">自转</string>
+
+    <!-- 记一笔表单 -->
+    <string name="add_more_categories_fmt">更多分类 (%1$d) ▾</string>
+    <string name="expand_details">展开 ▾</string>
+    <string name="add_account_settlement">结算账户</string>
+    <string name="add_account_from">转出账户</string>
+    <string name="add_account_to">转入账户</string>
+    <string name="add_no_accounts_configured">暂无已配置账户，将使用默认账户记录</string>
+    <string name="add_extra_details_title">补充商户备注、标签与记账日期</string>
+    <string name="language_switch_btn">切换</string>
+
+    <!-- 预算扩展 -->
+    <string name="budget_no_budget_desc">，设立最高开支额度可计算每日安全预算</string>
+    <string name="budget_categories_title_fmt">分类支出预算 (%1$d)</string>
+    <string name="budget_add_category_btn">添加分类</string>
+    <string name="budget_no_categories_hint">暂无分类预算，点击「添加分类」为餐饮、购物等单独设置上限</string>
+
+    <!-- 账户转账 Toast -->
+    <string name="accounts_min_transfer_toast">请先添加至少两个可用账户再进行互转</string>
+
+    <!-- 记录来源多语言标签 -->
+    <string name="source_label_manual">手动记账</string>
+    <string name="source_label_notification">手机通知</string>
+    <string name="source_label_import">文件导入</string>
+    <string name="source_label_api">API 接入</string>
+    <string name="source_label_nlp">智能记账</string>
+    <string name="source_label_recurring">固定收支</string>
+    <string name="source_label_split_bill">AA分账</string>
+    <string name="source_label_reconciliation">对账平账</string>
+    <string name="source_label_unknown">未知/历史</string>
 </resources>
 

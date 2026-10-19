@@ -72,10 +72,10 @@
     <string name="income_main">💼 Primary Career</string>
     <string name="income_side">📈 Side Hustle / Investments</string>
     <string name="show_all_categories">Show All Categories</string>
-    <string name="collapse_categories">Show Less</string>
+    <string name="collapse_categories">Collapse ▴</string>
 
     <!-- Records Screen -->
-    <string name="records_title">Transaction History</string>
+    <string name="records_title">Transaction Records</string>
     <string name="records_search_hint">Search merchant, category, or note...</string>
     <string name="all_types">All Types</string>
     <string name="records_total_fmt">Showing all %1$d transactions</string>
@@ -103,8 +103,8 @@
     <string name="transfer_btn">Transfer Between Accounts</string>
 
     <!-- More Tools Screen -->
-    <string name="tools_title">More Tools</string>
-    <string name="tools_subtitle">Inbox · Smart OCR · Subscriptions · Automation</string>
+    <string name="tools_title">Tools &amp; Settings</string>
+    <string name="tools_subtitle">Inbox · Smart OCR · Recurring · Automation</string>
     <string name="full_ledger_hub">Full Ledger Hub</string>
     <string name="full_ledger_desc">Manage subscriptions, loans, recurring budgets and reports</string>
     <string name="enter_full_ledger">Open Full Ledger Hub</string>
@@ -130,7 +130,7 @@
     <string name="server_url_label">Server URL</string>
     <string name="api_key_label">Auto-Track API Key</string>
     <string name="edit_config_btn">Edit Connection</string>
-    <string name="language_settings_title">🌐 Interface Language</string>
+    <string name="language_settings_title">Language</string>
     <string name="language_select_dialog_title">Select Language</string>
     <string name="lang_zh">中文 (简体)</string>
     <string name="lang_en">English</string>
@@ -317,5 +317,41 @@
     <string name="source_merged_badge">🔗 Merged notification evidence retained</string>
     <string name="action_save">Save</string>
     <string name="action_cancel">Cancel</string>
+
+    <!-- Records & Types -->
+    <string name="type_all">All</string>
+    <string name="type_expense">Expense</string>
+    <string name="type_income">Income</string>
+    <string name="type_transfer">Transfer</string>
+
+    <!-- Add Transaction Form -->
+    <string name="add_more_categories_fmt">More Categories (%1$d) ▾</string>
+    <string name="expand_details">Expand ▾</string>
+    <string name="add_account_settlement">Settlement Account</string>
+    <string name="add_account_from">From Account</string>
+    <string name="add_account_to">To Account</string>
+    <string name="add_no_accounts_configured">No account configured yet. Default account will be used.</string>
+    <string name="add_extra_details_title">Notes, Tags &amp; Date</string>
+    <string name="language_switch_btn">Switch</string>
+
+    <!-- Budget Extensions -->
+    <string name="budget_no_budget_desc">, set a monthly ceiling to track your daily safe spending</string>
+    <string name="budget_categories_title_fmt">Category Budgets (%1$d)</string>
+    <string name="budget_add_category_btn">Add Category</string>
+    <string name="budget_no_categories_hint">No category budgets yet. Tap \'Add Category\' to set limits for dining, shopping, etc.</string>
+
+    <!-- Account Transfer Toast -->
+    <string name="accounts_min_transfer_toast">Please add at least two active accounts before transferring.</string>
+
+    <!-- Record Source Multi-Language Labels -->
+    <string name="source_label_manual">Manual</string>
+    <string name="source_label_notification">Notification</string>
+    <string name="source_label_import">File Import</string>
+    <string name="source_label_api">API</string>
+    <string name="source_label_nlp">Smart Record</string>
+    <string name="source_label_recurring">Recurring</string>
+    <string name="source_label_split_bill">Split Bill</string>
+    <string name="source_label_reconciliation">Reconciliation</string>
+    <string name="source_label_unknown">History</string>
 </resources>
 

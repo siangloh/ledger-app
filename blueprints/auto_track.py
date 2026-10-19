@@ -105,8 +105,13 @@ def api_auto_track():
         except Exception:
             pass
 
-    if not text:
-        text = request.form.get('text') or request.form.get('body') or request.form.get('message') or ""
+    package_name = (
+        (data.get('package_name') if isinstance(data, dict) else None)
+        or (data.get('packageName') if isinstance(data, dict) else None)
+        or request.args.get('package_name')
+        or request.form.get('package_name')
+        or ""
+    ).strip()
 
     if not text and raw_payload and len(raw_payload.strip()) > 3:
         if raw_payload.strip().startswith('{'):
@@ -766,7 +771,8 @@ def api_auto_track():
             if parsed.get('category') in ('其他', '未分类', '待分类', '') and sub.get('category'):
                 parsed['category'] = sub['category']
 
-        channel_val = parsed.get('channel') or 'generic'
+        from services.source_tracking_service import normalize_channel
+        channel_val = normalize_channel(parsed.get('channel'), raw_text=text, package_name=package_name) or 'generic'
         source_ref_val = content_hash[:16]
         cur = db.execute(
             'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, channel, source_ref, created_at) '
@@ -1132,7 +1138,10 @@ def api_native_overview():
 
     period = request.args.get('period', 'month')
     selected_month = request.args.get('month')
-    res = get_native_overview_summary(user_id=user_id, period=period, selected_month=selected_month, db=db)
+    lang = request.args.get('lang') or request.headers.get('Accept-Language', 'zh')[:2].lower()
+    if lang not in ('zh', 'en', 'ms'):
+        lang = 'zh'
+    res = get_native_overview_summary(user_id=user_id, period=period, selected_month=selected_month, db=db, lang=lang)
     return jsonify(res)
 
 
@@ -1206,6 +1215,10 @@ def api_native_transactions():
         except (ValueError, TypeError):
             limit = 50
 
+        lang = request.args.get('lang') or request.headers.get('Accept-Language', 'zh')[:2].lower()
+        if lang not in ('zh', 'en', 'ms'):
+            lang = 'zh'
+
         res = get_native_transactions_list(
             user_id=user_id,
             tx_type=tx_type,
@@ -1221,7 +1234,8 @@ def api_native_transactions():
             channel=channel,
             page=page,
             limit=limit,
-            db=db
+            db=db,
+            lang=lang
         )
         return jsonify(res)
 

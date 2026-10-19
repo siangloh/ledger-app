@@ -48,6 +48,7 @@ CHANNEL_DEFINITIONS = {
         'id': 'maybank',
         'name': 'Maybank MAE',
         'icon': 'fa-building-columns',
+        'emoji': '🟡',
         'color': '#f59e0b',
         'short_label': 'Maybank'
     },
@@ -55,6 +56,7 @@ CHANNEL_DEFINITIONS = {
         'id': 'tng',
         'name': "Touch 'n Go eWallet",
         'icon': 'fa-wallet',
+        'emoji': '🔵',
         'color': '#0284c7',
         'short_label': 'TNG'
     },
@@ -62,6 +64,7 @@ CHANNEL_DEFINITIONS = {
         'id': 'grab',
         'name': 'GrabPay',
         'icon': 'fa-car-side',
+        'emoji': '🟢',
         'color': '#10b981',
         'short_label': 'Grab'
     },
@@ -69,6 +72,7 @@ CHANNEL_DEFINITIONS = {
         'id': 'public_bank',
         'name': 'Public Bank (MyPB)',
         'icon': 'fa-landmark',
+        'emoji': '🔴',
         'color': '#ef4444',
         'short_label': 'Public Bank'
     },
@@ -76,13 +80,31 @@ CHANNEL_DEFINITIONS = {
         'id': 'shopee',
         'name': 'ShopeePay',
         'icon': 'fa-bag-shopping',
+        'emoji': '🟠',
         'color': '#f97316',
         'short_label': 'Shopee'
+    },
+    'cimb': {
+        'id': 'cimb',
+        'name': 'CIMB Bank',
+        'icon': 'fa-building-columns',
+        'emoji': '🔴',
+        'color': '#ed1c24',
+        'short_label': 'CIMB'
+    },
+    'duitnow': {
+        'id': 'duitnow',
+        'name': 'DuitNow',
+        'icon': 'fa-qrcode',
+        'emoji': '🌸',
+        'color': '#db2777',
+        'short_label': 'DuitNow'
     },
     'bank_card': {
         'id': 'bank_card',
         'name': '银行卡动账短信',
         'icon': 'fa-credit-card',
+        'emoji': '💳',
         'color': '#6366f1',
         'short_label': '卡短信'
     },
@@ -90,10 +112,82 @@ CHANNEL_DEFINITIONS = {
         'id': 'generic',
         'name': '手机通知/短信',
         'icon': 'fa-bell',
+        'emoji': '📱',
         'color': '#64748b',
         'short_label': '通知'
     }
 }
+
+
+def normalize_channel(
+    raw_channel: Optional[str],
+    raw_text: Optional[str] = None,
+    package_name: Optional[str] = None
+) -> Optional[str]:
+    """
+    统一将任意渠道名称、包名或文本推导出的渠道归一化为标准的 channel id。
+    如 'Public Bank' -> 'public_bank', 'TnG' -> 'tng', 'Maybank' -> 'maybank'。
+    """
+    if package_name:
+        pkg = package_name.strip().lower()
+        if any(k in pkg for k in ['com.v2.cbe', 'maybank', 'mae']):
+            return 'maybank'
+        if any(k in pkg for k in ['tngdigital', 'tng', 'ewallet']):
+            return 'tng'
+        if any(k in pkg for k in ['publicbank', 'public_bank', 'mypb']):
+            return 'public_bank'
+        if 'grab' in pkg:
+            return 'grab'
+        if 'shopee' in pkg:
+            return 'shopee'
+        if 'cimb' in pkg:
+            return 'cimb'
+        if 'rhb' in pkg:
+            return 'rhb'
+        if 'hongleong' in pkg or 'hlb' in pkg:
+            return 'hong_leong'
+
+    c = (raw_channel or '').strip().lower()
+    if c:
+        if c in ('maybank', 'mae', 'm2u', 'maybank2u'):
+            return 'maybank'
+        if c in ('tng', 'touchngo', 'touch n go', "touch 'n go", 'tng ewallet', 'tng e-wallet'):
+            return 'tng'
+        if c in ('public_bank', 'public bank', 'mypb', 'pbb', 'publicbank'):
+            return 'public_bank'
+        if c in ('grab', 'grabpay'):
+            return 'grab'
+        if c in ('shopee', 'shopeepay'):
+            return 'shopee'
+        if c in ('cimb', 'cimb octo', 'cimb clicks'):
+            return 'cimb'
+        if c in ('rhb', 'rhb mobile'):
+            return 'rhb'
+        if c in ('hong_leong', 'hong leong', 'hlb'):
+            return 'hong_leong'
+        if c in ('duitnow', 'duitnow qr'):
+            return 'duitnow'
+        if c in ('bank', 'bank_card', '卡短信', '银行卡动账短信'):
+            return 'bank_card'
+        if c in ('generic', 'notification', '手机通知'):
+            return 'generic'
+
+    if raw_text:
+        t = raw_text.lower()
+        if any(k in t for k in ['maybank', 'mae', 'm2u']):
+            return 'maybank'
+        if any(k in t for k in ['touchngo', 'tng', "touch 'n go", 'touch n go', 'ewallet', 'toll payment', 'paydirect']):
+            return 'tng'
+        if any(k in t for k in ['mypb', 'public bank', 'pbb', 'publicbank']):
+            return 'public_bank'
+        if 'grab' in t:
+            return 'grab'
+        if 'shopee' in t:
+            return 'shopee'
+        if 'cimb' in t:
+            return 'cimb'
+
+    return None
 
 
 def normalize_source(raw_source: Optional[str]) -> str:
@@ -117,19 +211,26 @@ def normalize_source(raw_source: Optional[str]) -> str:
 def format_source_display(
     source: Optional[str],
     channel: Optional[str] = None,
-    lang: str = 'zh'
+    lang: str = 'zh',
+    note: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     计算并在界面中呈现低调、清晰的记录来源元数据胶囊。
     包含来源分类、渠道图标、渠道短标签与无障碍说明。
+    支持按 lang (zh/en/ms) 输出对应语言的标签，杜绝多语言混杂。
+    若 channel 为空或 generic，自动结合 note 智能推导所属金融渠道。
     """
     from core.i18n import t
 
     norm_source = normalize_source(source)
-    chan_id = (channel or '').strip().lower()
-    chan_info = CHANNEL_DEFINITIONS.get(chan_id)
+    chan_id = normalize_channel(channel)
+    if (not chan_id or chan_id == 'generic') and note:
+        inferred = normalize_channel(None, raw_text=note)
+        if inferred:
+            chan_id = inferred
+    chan_info = CHANNEL_DEFINITIONS.get(chan_id) if chan_id else None
 
-    # 1. 基础来源标签与图标
+    # 1. 基础来源标签与图标 (支持多语言本地化)
     labels = {
         SOURCE_MANUAL: (t('records.src_manual', '手动记录', lang=lang), '✍️', 'fa-pen-to-square', '#64748b'),
         SOURCE_NOTIFICATION: (t('records.src_notification', '手机通知', lang=lang), '📱', 'fa-bell', '#0f766e'),
@@ -148,12 +249,16 @@ def format_source_display(
     if norm_source == SOURCE_NOTIFICATION and chan_info:
         badge_text = chan_info['short_label']
         badge_icon = chan_info['icon']
+        badge_emoji = emoji
         badge_color = chan_info['color']
+        channel_emoji = chan_info.get('emoji', '')
         full_label = f"{t('records.src_notification', '手机通知', lang=lang)} · {chan_info['name']}"
     else:
         badge_text = base_label
         badge_icon = fa_icon
+        badge_emoji = emoji
         badge_color = color
+        channel_emoji = ''
         full_label = base_label
 
     return {
@@ -163,7 +268,8 @@ def format_source_display(
         'channel_label': chan_info['name'] if chan_info else None,
         'badge_text': badge_text,
         'badge_icon': badge_icon,
-        'badge_emoji': emoji,
+        'badge_emoji': badge_emoji,
+        'channel_emoji': channel_emoji,
         'badge_color': badge_color,
         'full_label': full_label,
         'is_notification': norm_source == SOURCE_NOTIFICATION,

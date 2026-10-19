@@ -498,7 +498,7 @@ fun AddTransactionScreen(
                             Text(stringResource(R.string.add_category), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate900)
                             if (currentCats.size > 8) {
                                 Text(
-                                    text = if (showAllCategories) "收起 ▴" else "更多分类 (${currentCats.size}) ▾",
+                                    text = if (showAllCategories) stringResource(R.string.collapse_categories) else stringResource(R.string.add_more_categories_fmt, currentCats.size),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = PrimaryTeal,
@@ -614,7 +614,7 @@ fun AddTransactionScreen(
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        text = if (draft.txType == "transfer") "转出账户" else "结算账户",
+                        text = if (draft.txType == "transfer") stringResource(R.string.add_account_from) else stringResource(R.string.add_account_settlement),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
@@ -622,7 +622,7 @@ fun AddTransactionScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     if (accounts.isEmpty()) {
-                        Text("暂无已配置账户，将使用默认账户记录", fontSize = 12.sp, color = Slate400)
+                        Text(stringResource(R.string.add_no_accounts_configured), fontSize = 12.sp, color = Slate400)
                     } else {
                         Row(
                             modifier = Modifier
@@ -658,7 +658,7 @@ fun AddTransactionScreen(
                     // 如果是账户互转，选择转入账户
                     if (draft.txType == "transfer") {
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("转入账户", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                        Text(stringResource(R.string.add_account_to), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate900)
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier
@@ -713,13 +713,13 @@ fun AddTransactionScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "补充商户备注、标签与记账日期",
+                            text = stringResource(R.string.add_extra_details_title),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate800
                         )
                         Text(
-                            text = if (hasDetails) "收起 ▴" else "展开 ▾",
+                            text = if (hasDetails) stringResource(R.string.collapse_categories) else stringResource(R.string.expand_details),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = PrimaryTeal

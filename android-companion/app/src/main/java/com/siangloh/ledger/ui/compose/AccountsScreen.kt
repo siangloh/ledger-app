@@ -182,13 +182,16 @@ fun AccountsScreen() {
                 val canTransfer = accountsList.size >= 2
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
                         onClick = {
                             if (!canTransfer) {
-                                Toast.makeText(context, "请先添加至少两个可用账户再进行互转", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.accounts_min_transfer_toast), Toast.LENGTH_SHORT).show()
                             } else {
                                 showTransferDialog = true
                             }
@@ -199,23 +202,33 @@ fun AccountsScreen() {
                             disabledContainerColor = Slate200
                         ),
                         shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp)
+                            .fillMaxHeight()
+                            .defaultMinSize(minHeight = 44.dp)
                     ) {
-                        Icon(
-                            Icons.Default.SwapHoriz,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = if (canTransfer) Color.White else Slate400
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            stringResource(R.string.transfer_btn),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (canTransfer) Color.White else Slate400
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Default.SwapHoriz,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = if (canTransfer) Color.White else Slate400
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stringResource(R.string.transfer_btn),
+                                fontSize = 12.sp,
+                                lineHeight = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (canTransfer) Color.White else Slate400,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                maxLines = 2
+                            )
+                        }
                     }
 
                     OutlinedButton(
@@ -223,13 +236,28 @@ fun AccountsScreen() {
                         shape = RoundedCornerShape(12.dp),
                         border = BorderStroke(1.dp, Slate200),
                         colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp)
+                            .fillMaxHeight()
+                            .defaultMinSize(minHeight = 44.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Slate800, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.add_account_btn), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = Slate800, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stringResource(R.string.add_account_btn),
+                                fontSize = 12.sp,
+                                lineHeight = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Slate800,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                maxLines = 2
+                            )
+                        }
                     }
                 }
             }
