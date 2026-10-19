@@ -340,47 +340,82 @@ object NativeLedgerApi {
         }
     }
 
-    fun parseTransactionsPageJson(json: JSONObject, fallbackPage: Int = 1, fallbackLimit: Int = 50): TransactionsPage {
-        val itemsArr = json.optJSONArray("items") ?: JSONArray()
-        val list = mutableListOf<TransactionRecord>()
-        for (i in 0 until itemsArr.length()) {
-            val obj = itemsArr.getJSONObject(i)
-            list.add(
-                TransactionRecord(
-                    id = obj.optLong("id"),
-                    date = obj.optString("date"),
-                    type = obj.optString("type", "expense"),
-                    category = obj.optString("category", "其他"),
-                    amount = obj.optDouble("amount", 0.0),
-                    note = obj.optString("note", ""),
-                    tags = obj.optString("tags", ""),
-                    accountId = if (obj.has("account_id") && !obj.isNull("account_id")) obj.optInt("account_id") else null,
-                    accountName = obj.optString("account_name", "未指定"),
-                    accountType = obj.optString("account_type", ""),
-                    source = obj.optString("source", "unknown"),
-                    channel = if (obj.has("channel") && !obj.isNull("channel")) obj.optString("channel") else null,
-                    sourceLabel = obj.optString("source_label", "未知/历史"),
-                    channelLabel = if (obj.has("channel_label") && !obj.isNull("channel_label")) obj.optString("channel_label") else null,
-                    badgeText = obj.optString("badge_text", ""),
-                    badgeEmoji = obj.optString("badge_emoji", ""),
-                    badgeColor = obj.optString("badge_color", "#94a3b8"),
-                    importBatchId = if (obj.has("import_batch_id") && !obj.isNull("import_batch_id")) obj.optString("import_batch_id") else null,
-                    sourceRef = if (obj.has("source_ref") && !obj.isNull("source_ref")) obj.optString("source_ref") else null,
-                    createdAt = if (obj.has("created_at") && !obj.isNull("created_at")) obj.optString("created_at") else null,
-                    updatedAt = if (obj.has("updated_at") && !obj.isNull("updated_at")) obj.optString("updated_at") else null,
-                    lastEditSource = if (obj.has("last_edit_source") && !obj.isNull("last_edit_source")) obj.optString("last_edit_source") else null,
-                    isEdited = obj.optBoolean("is_edited", false),
-                    hasMergedEvidence = obj.optBoolean("has_merged_evidence", false)
-                )
-            )
+    fun parseTransactionsPageJson(json: JSONObject?, fallbackPage: Int = 1, fallbackLimit: Int = 50): TransactionsPage {
+        if (json == null) {
+            return TransactionsPage(emptyList(), 0, fallbackPage, fallbackLimit, false)
         }
-        return TransactionsPage(
-            items = list,
-            totalCount = json.optInt("total_count", list.size),
-            page = json.optInt("page", fallbackPage),
-            limit = json.optInt("limit", fallbackLimit),
-            hasMore = json.optBoolean("has_more", false)
-        )
+        return try {
+            val itemsArr = json.optJSONArray("items") ?: org.json.JSONArray()
+            val list = mutableListOf<TransactionRecord>()
+            for (i in 0 until itemsArr.length()) {
+                try {
+                    val obj = itemsArr.optJSONObject(i) ?: continue
+                    val amtRaw = if (obj.isNull("amount")) 0.0 else obj.optDouble("amount", 0.0)
+                    val amt = if (amtRaw.isNaN() || amtRaw.isInfinite()) 0.0 else amtRaw
+
+                    val accountId = if (obj.has("account_id") && !obj.isNull("account_id")) obj.optInt("account_id") else null
+                    val channel = if (obj.has("channel") && !obj.isNull("channel")) {
+                        obj.optString("channel").takeIf { it.isNotBlank() && it != "null" }
+                    } else null
+                    val channelLabel = if (obj.has("channel_label") && !obj.isNull("channel_label")) {
+                        obj.optString("channel_label").takeIf { it.isNotBlank() && it != "null" }
+                    } else null
+                    val importBatchId = if (obj.has("import_batch_id") && !obj.isNull("import_batch_id")) {
+                        obj.optString("import_batch_id").takeIf { it.isNotBlank() && it != "null" }
+                    } else null
+                    val sourceRef = if (obj.has("source_ref") && !obj.isNull("source_ref")) {
+                        obj.optString("source_ref").takeIf { it.isNotBlank() && it != "null" }
+                    } else null
+                    val createdAt = if (obj.has("created_at") && !obj.isNull("created_at")) {
+                        obj.optString("created_at").takeIf { it.isNotBlank() && it != "null" }
+                    } else null
+                    val updatedAt = if (obj.has("updated_at") && !obj.isNull("updated_at")) {
+                        obj.optString("updated_at").takeIf { it.isNotBlank() && it != "null" }
+                    } else null
+                    val lastEditSource = if (obj.has("last_edit_source") && !obj.isNull("last_edit_source")) {
+                        obj.optString("last_edit_source").takeIf { it.isNotBlank() && it != "null" }
+                    } else null
+
+                    list.add(
+                        TransactionRecord(
+                            id = obj.optLong("id", 0L),
+                            date = obj.optString("date", "").takeIf { it != "null" } ?: "",
+                            type = obj.optString("type", "expense").takeIf { it != "null" } ?: "expense",
+                            category = obj.optString("category", "其他").takeIf { it != "null" } ?: "其他",
+                            amount = amt,
+                            note = obj.optString("note", "").takeIf { it != "null" } ?: "",
+                            tags = obj.optString("tags", "").takeIf { it != "null" } ?: "",
+                            accountId = accountId,
+                            accountName = obj.optString("account_name", "未指定").takeIf { it != "null" } ?: "未指定",
+                            accountType = obj.optString("account_type", "").takeIf { it != "null" } ?: "",
+                            source = obj.optString("source", "unknown").takeIf { it != "null" } ?: "unknown",
+                            channel = channel,
+                            sourceLabel = obj.optString("source_label", "未知/历史").takeIf { it != "null" } ?: "未知/历史",
+                            channelLabel = channelLabel,
+                            badgeText = obj.optString("badge_text", "").takeIf { it != "null" } ?: "",
+                            badgeEmoji = obj.optString("badge_emoji", "").takeIf { it != "null" } ?: "",
+                            badgeColor = obj.optString("badge_color", "#94a3b8").takeIf { it != "null" } ?: "#94a3b8",
+                            importBatchId = importBatchId,
+                            sourceRef = sourceRef,
+                            createdAt = createdAt,
+                            updatedAt = updatedAt,
+                            lastEditSource = lastEditSource,
+                            isEdited = obj.optBoolean("is_edited", false),
+                            hasMergedEvidence = obj.optBoolean("has_merged_evidence", false)
+                        )
+                    )
+                } catch (_: Exception) {}
+            }
+            TransactionsPage(
+                items = list,
+                totalCount = if (json.isNull("total_count")) list.size else json.optInt("total_count", list.size),
+                page = if (json.isNull("page")) fallbackPage else json.optInt("page", fallbackPage),
+                limit = if (json.isNull("limit")) fallbackLimit else json.optInt("limit", fallbackLimit),
+                hasMore = json.optBoolean("has_more", false)
+            )
+        } catch (e: Exception) {
+            TransactionsPage(emptyList(), 0, fallbackPage, fallbackLimit, false)
+        }
     }
 
     suspend fun addTransaction(

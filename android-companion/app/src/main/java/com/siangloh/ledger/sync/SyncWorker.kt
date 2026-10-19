@@ -20,6 +20,8 @@ class SyncWorker(
         private const val TAG = "LedgerSyncWorker"
         private const val WORK_NAME = "ledger_background_sync"
 
+        private val notifRetryMap = java.util.concurrent.ConcurrentHashMap<Long, Int>()
+
         fun enqueueSync(context: Context) {
             val wifiOnly = NetworkHelper.isWifiOnlySync(context)
             val constraints = Constraints.Builder()
@@ -86,6 +88,7 @@ class SyncWorker(
                         kotlinx.coroutines.runBlocking {
                             if (success || verdict == "rejected_promo" || verdict == "duplicate_ignored" || verdict == "on_hold" || verdict == "ignored_internal_transfer") {
                                 db.pendingNotificationDao().delete(notif.id)
+                                notifRetryMap.remove(notif.id)
                                 val finalOutcome = when (verdict) {
                                     "rejected_promo" -> "synced_rejected_promo"
                                     "duplicate_ignored" -> "synced_duplicate_ignored"
@@ -111,8 +114,17 @@ class SyncWorker(
                                     )
                                 }
                             } else {
-                                db.pendingNotificationDao().markAsPending(notif.id)
+                                val retries = notifRetryMap.getOrDefault(notif.id, 0) + 1
+                                notifRetryMap[notif.id] = retries
+                                if (retries >= 3) {
+                                    Log.w(TAG, "Notification ${notif.id} failed $retries times, removing from pending queue.")
+                                    db.pendingNotificationDao().delete(notif.id)
+                                    notifRetryMap.remove(notif.id)
+                                } else {
+                                    db.pendingNotificationDao().markAsPending(notif.id)
+                                }
                             }
+                            Unit
                         }
                         latch.countDown()
                     }

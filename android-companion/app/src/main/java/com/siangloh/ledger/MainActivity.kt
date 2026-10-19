@@ -197,6 +197,9 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    @Volatile
+    private var lastAutoSyncTriggerTime: Long = 0L
+
     private fun registerNetworkCallback() {
         try {
             val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager ?: return
@@ -207,7 +210,10 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 override fun onCapabilitiesChanged(network: android.net.Network, capabilities: android.net.NetworkCapabilities) {
-                    if (capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+                    val now = System.currentTimeMillis()
+                    if (capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED) &&
+                        capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                        (now - lastAutoSyncTriggerTime > 20_000L)) {
                         triggerAutoSyncIfPending()
                     }
                 }
@@ -223,6 +229,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun triggerAutoSyncIfPending() {
+        val now = System.currentTimeMillis()
+        if (now - lastAutoSyncTriggerTime < 15_000L) return
+        lastAutoSyncTriggerTime = now
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 if (!NetworkHelper.canSyncNow(this@MainActivity)) return@launch

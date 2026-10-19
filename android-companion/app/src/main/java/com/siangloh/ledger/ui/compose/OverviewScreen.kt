@@ -142,105 +142,141 @@ fun formatFriendlyTime(rawIso: String, context: Context? = null): String {
 }
 
 fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache: Boolean): OverviewData {
-    val json = JSONObject(result)
-    val totalSpending = json.optDouble("total_spending", 0.0)
-    val expenseAmount = json.optDouble("expense_amount", 0.0)
-    val transferAmount = json.optDouble("transfer_amount", 0.0)
-    val uncategorizedCount = json.optInt("uncategorized_count", 0)
-    val uncategorizedAmount = json.optDouble("uncategorized_amount", 0.0)
-
-    val sparkArray = json.optJSONArray("sparkline")
-    val sparkList = mutableListOf<SparklinePoint>()
-    if (sparkArray != null) {
-        for (i in 0 until sparkArray.length()) {
-            val item = sparkArray.getJSONObject(i)
-            sparkList.add(
-                SparklinePoint(
-                    date = item.optString("date"),
-                    amount = item.optDouble("amount")
-                )
-            )
+    return try {
+        if (result.isBlank()) {
+            return OverviewData(isListening = isListeningActual, isOfflineCache = isOfflineCache)
         }
-    }
+        val json = JSONObject(result)
+        val totalSpendingRaw = if (json.isNull("total_spending")) 0.0 else json.optDouble("total_spending", 0.0)
+        val totalSpending = if (totalSpendingRaw.isNaN() || totalSpendingRaw.isInfinite()) 0.0 else totalSpendingRaw
 
-    val txArray = json.optJSONArray("recent_transactions")
-    val txList = mutableListOf<TransactionItem>()
-    if (txArray != null) {
-        for (i in 0 until txArray.length()) {
-            val item = txArray.getJSONObject(i)
-            txList.add(
-                TransactionItem(
-                    id = item.optLong("id"),
-                    date = item.optString("date"),
-                    type = item.optString("type"),
-                    category = item.optString("category"),
-                    amount = item.optDouble("amount"),
-                    note = item.optString("note"),
-                    source = item.optString("source")
-                )
-            )
+        val expenseAmountRaw = if (json.isNull("expense_amount")) 0.0 else json.optDouble("expense_amount", 0.0)
+        val expenseAmount = if (expenseAmountRaw.isNaN() || expenseAmountRaw.isInfinite()) 0.0 else expenseAmountRaw
+
+        val transferAmountRaw = if (json.isNull("transfer_amount")) 0.0 else json.optDouble("transfer_amount", 0.0)
+        val transferAmount = if (transferAmountRaw.isNaN() || transferAmountRaw.isInfinite()) 0.0 else transferAmountRaw
+
+        val uncategorizedCount = if (json.isNull("uncategorized_count")) 0 else json.optInt("uncategorized_count", 0)
+
+        val uncategorizedAmountRaw = if (json.isNull("uncategorized_amount")) 0.0 else json.optDouble("uncategorized_amount", 0.0)
+        val uncategorizedAmount = if (uncategorizedAmountRaw.isNaN() || uncategorizedAmountRaw.isInfinite()) 0.0 else uncategorizedAmountRaw
+
+        val sparkArray = json.optJSONArray("sparkline")
+        val sparkList = mutableListOf<SparklinePoint>()
+        if (sparkArray != null) {
+            for (i in 0 until sparkArray.length()) {
+                try {
+                    val item = sparkArray.optJSONObject(i) ?: continue
+                    val amtRaw = if (item.isNull("amount")) 0.0 else item.optDouble("amount", 0.0)
+                    val amt = if (amtRaw.isNaN() || amtRaw.isInfinite()) 0.0 else amtRaw
+                    val d = item.optString("date", "")
+                    if (d.isNotBlank() && d != "null") {
+                        sparkList.add(SparklinePoint(date = d, amount = amt))
+                    }
+                } catch (_: Exception) {}
+            }
         }
-    }
 
-    val listeningObj = json.optJSONObject("listening_status")
-    val lastActive = listeningObj?.optString("last_active_time") ?: "今天"
-
-    val uncatArray = json.optJSONArray("uncategorized_items")
-    val uncatList = mutableListOf<UncategorizedItem>()
-    if (uncatArray != null) {
-        for (i in 0 until uncatArray.length()) {
-            val item = uncatArray.getJSONObject(i)
-            val isPending = item.optBoolean("is_pending_on_hold", false)
-            val srcType = item.optString("source_type", if (isPending) "pending" else "transaction")
-            val reviewReason = item.optString("review_reason", if (isPending) "on_hold_transfer" else "unclear_category")
-            val onHoldReason = item.optString("on_hold_reason", "")
-            val dupObj = item.optJSONObject("suspected_duplicate")
-            val dupId = if (item.has("suspected_duplicate_id") && !item.isNull("suspected_duplicate_id")) item.optLong("suspected_duplicate_id") else null
-
-            uncatList.add(
-                UncategorizedItem(
-                    id = item.optLong("id"),
-                    date = item.optString("date"),
-                    amount = item.optDouble("amount"),
-                    note = item.optString("note"),
-                    category = item.optString("category"),
-                    isPendingOnHold = isPending,
-                    sourceType = srcType,
-                    reviewReason = reviewReason,
-                    onHoldReason = onHoldReason,
-                    suspectedDuplicateId = dupId,
-                    suspectedDuplicateNote = dupObj?.optString("note"),
-                    suspectedDuplicateAmount = if (dupObj != null && dupObj.has("amount")) dupObj.optDouble("amount") else null,
-                    suspectedDuplicateCategory = dupObj?.optString("category"),
-                    suspectedDuplicateDate = dupObj?.optString("date")
-                )
-            )
+        val txArray = json.optJSONArray("recent_transactions")
+        val txList = mutableListOf<TransactionItem>()
+        if (txArray != null) {
+            for (i in 0 until txArray.length()) {
+                try {
+                    val item = txArray.optJSONObject(i) ?: continue
+                    val amtRaw = if (item.isNull("amount")) 0.0 else item.optDouble("amount", 0.0)
+                    val amt = if (amtRaw.isNaN() || amtRaw.isInfinite()) 0.0 else amtRaw
+                    txList.add(
+                        TransactionItem(
+                            id = item.optLong("id", 0L),
+                            date = item.optString("date", "").takeIf { it != "null" } ?: "",
+                            type = item.optString("type", "expense").takeIf { it != "null" } ?: "expense",
+                            category = item.optString("category", "其他").takeIf { it != "null" } ?: "其他",
+                            amount = amt,
+                            note = item.optString("note", "").takeIf { it != "null" } ?: "",
+                            source = item.optString("source", "unknown").takeIf { it != "null" } ?: "unknown"
+                        )
+                    )
+                } catch (_: Exception) {}
+            }
         }
-    }
 
-    val catArray = json.optJSONArray("categories")
-    val catList = mutableListOf<String>()
-    if (catArray != null) {
-        for (i in 0 until catArray.length()) {
-            val c = catArray.optString(i)
-            if (c.isNotBlank()) catList.add(c)
+        val listeningObj = json.optJSONObject("listening_status")
+        val lastActive = listeningObj?.optString("last_active_time")?.takeIf { it.isNotBlank() && it != "null" } ?: "今天"
+
+        val uncatArray = json.optJSONArray("uncategorized_items")
+        val uncatList = mutableListOf<UncategorizedItem>()
+        if (uncatArray != null) {
+            for (i in 0 until uncatArray.length()) {
+                try {
+                    val item = uncatArray.optJSONObject(i) ?: continue
+                    val isPending = item.optBoolean("is_pending_on_hold", false)
+                    val srcType = item.optString("source_type", if (isPending) "pending" else "transaction").takeIf { it != "null" } ?: "transaction"
+                    val reviewReason = item.optString("review_reason", if (isPending) "on_hold_transfer" else "unclear_category").takeIf { it != "null" } ?: "unclear_category"
+                    val onHoldReason = item.optString("on_hold_reason", "").takeIf { it != "null" } ?: ""
+                    val dupObj = item.optJSONObject("suspected_duplicate")
+                    val dupId = if (item.has("suspected_duplicate_id") && !item.isNull("suspected_duplicate_id")) item.optLong("suspected_duplicate_id") else null
+                    val amtRaw = if (item.isNull("amount")) 0.0 else item.optDouble("amount", 0.0)
+                    val amt = if (amtRaw.isNaN() || amtRaw.isInfinite()) 0.0 else amtRaw
+
+                    val dupAmt = if (dupObj != null && dupObj.has("amount") && !dupObj.isNull("amount")) {
+                        val dRaw = dupObj.optDouble("amount", 0.0)
+                        if (dRaw.isNaN() || dRaw.isInfinite()) null else dRaw
+                    } else null
+
+                    uncatList.add(
+                        UncategorizedItem(
+                            id = item.optLong("id", 0L),
+                            date = item.optString("date", "").takeIf { it != "null" } ?: "",
+                            amount = amt,
+                            note = item.optString("note", "").takeIf { it != "null" } ?: "",
+                            category = item.optString("category", "待分类").takeIf { it != "null" } ?: "待分类",
+                            isPendingOnHold = isPending,
+                            sourceType = srcType,
+                            reviewReason = reviewReason,
+                            onHoldReason = onHoldReason,
+                            suspectedDuplicateId = dupId,
+                            suspectedDuplicateNote = dupObj?.optString("note")?.takeIf { it != "null" },
+                            suspectedDuplicateAmount = dupAmt,
+                            suspectedDuplicateCategory = dupObj?.optString("category")?.takeIf { it != "null" },
+                            suspectedDuplicateDate = dupObj?.optString("date")?.takeIf { it != "null" }
+                        )
+                    )
+                } catch (_: Exception) {}
+            }
         }
-    }
 
-    return OverviewData(
-        totalSpending = totalSpending,
-        expenseAmount = expenseAmount,
-        transferAmount = transferAmount,
-        uncategorizedCount = uncategorizedCount,
-        uncategorizedAmount = uncategorizedAmount,
-        uncategorizedItems = uncatList,
-        categories = catList,
-        sparkline = sparkList,
-        recentTransactions = txList,
-        lastActiveTime = lastActive,
-        isListening = isListeningActual,
-        isOfflineCache = isOfflineCache
-    )
+        val catArray = json.optJSONArray("categories")
+        val catList = mutableListOf<String>()
+        if (catArray != null) {
+            for (i in 0 until catArray.length()) {
+                try {
+                    val c = catArray.optString(i)
+                    if (c.isNotBlank() && c != "null") catList.add(c)
+                } catch (_: Exception) {}
+            }
+        }
+
+        OverviewData(
+            totalSpending = totalSpending,
+            expenseAmount = expenseAmount,
+            transferAmount = transferAmount,
+            uncategorizedCount = uncategorizedCount,
+            uncategorizedAmount = uncategorizedAmount,
+            uncategorizedItems = uncatList,
+            categories = catList,
+            sparkline = sparkList,
+            recentTransactions = txList,
+            lastActiveTime = lastActive,
+            isListening = isListeningActual,
+            isOfflineCache = isOfflineCache
+        )
+    } catch (_: Exception) {
+        OverviewData(
+            lastActiveTime = "刚刚",
+            isListening = isListeningActual,
+            isOfflineCache = isOfflineCache
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -281,9 +317,7 @@ fun OverviewScreen(
 
     val initialCache = remember {
         val username = NetworkHelper.getUsername(context)
-        val cacheKey = "cache_${username}_${period}_${currentMonthStr}"
-        val sp = context.getSharedPreferences("ledger_overview_cache", Context.MODE_PRIVATE)
-        val cached = sp.getString(cacheKey, null)
+        val cached = com.siangloh.ledger.data.LocalDataStore.getOverview(context, username, period, currentMonthStr)
         if (!cached.isNullOrBlank()) {
             try {
                 parseOverviewJson(cached, isListeningActual, isOfflineCache = true)
@@ -315,18 +349,68 @@ fun OverviewScreen(
         }
     }
 
+    fun prefetchAdjacentOverview(targetMonth: String, currentPeriod: String) {
+        if (currentPeriod != "month") return
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                val username = NetworkHelper.getUsername(context)
+                val serverUrl = NetworkHelper.getServerUrl(context)
+                val apiKey = NetworkHelper.getApiKey(context)
+                val prevM = shiftMonthString(targetMonth, -1)
+                val nextM = shiftMonthString(targetMonth, 1)
+
+                for (adjMonth in listOf(prevM, nextM)) {
+                    val existing = com.siangloh.ledger.data.LocalDataStore.getOverview(context, username, currentPeriod, adjMonth)
+                    if (existing.isNullOrBlank()) {
+                        val queryParams = mutableListOf("period=$currentPeriod", "month=$adjMonth")
+                        if (username.isNotEmpty()) queryParams.add("username=$username")
+                        val urlStr = "$serverUrl/api/native/overview?" + queryParams.joinToString("&")
+                        val url = URL(urlStr)
+                        val conn = url.openConnection() as HttpURLConnection
+                        conn.requestMethod = "GET"
+                        conn.setRequestProperty("User-Agent", "LedgerAppCompanion/1.0 (Android; Dalvik)")
+                        if (apiKey.isNotEmpty()) conn.setRequestProperty("X-API-KEY", apiKey)
+                        conn.connectTimeout = 6000
+                        conn.readTimeout = 6000
+                        if (conn.responseCode in 200..299) {
+                            val text = conn.inputStream.bufferedReader().use { it.readText() }
+                            com.siangloh.ledger.data.LocalDataStore.saveOverview(context, username, currentPeriod, adjMonth, text)
+                        }
+                        conn.disconnect()
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     fun refreshData() {
         val username = NetworkHelper.getUsername(context)
-        val cachePrefs = context.getSharedPreferences("ledger_overview_cache", Context.MODE_PRIVATE)
-        val cacheKey = "cache_${username}_${period}_${currentMonthStr}"
-        val cachedJson = cachePrefs.getString(cacheKey, null)
+        val todayMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
+        val isFutureMonth = period == "month" && currentMonthStr > todayMonthStr
+
+        val cachedJson = com.siangloh.ledger.data.LocalDataStore.getOverview(context, username, period, currentMonthStr)
         if (!cachedJson.isNullOrBlank()) {
             try {
                 overviewData = parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = true)
                 isLoading = false
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+                if (isFutureMonth) {
+                    overviewData = OverviewData(lastActiveTime = "刚刚", isListening = isListeningActual)
+                    isLoading = false
+                } else {
+                    isLoading = true
+                }
+            }
         } else {
-            isLoading = true
+            if (isFutureMonth) {
+                // 未来月份且尚无缓存：0ms 瞬间呈现空态（RM 0.00），后台静默校验，杜绝卡顿与 delay
+                overviewData = OverviewData(lastActiveTime = "刚刚", isListening = isListeningActual)
+                isLoading = false
+            } else {
+                // 过去或当前月份未命中缓存：清空上一月残留数据，避免出现月份标题与金额不一致的残留幻象
+                overviewData = OverviewData(lastActiveTime = overviewData.lastActiveTime, isListening = isListeningActual)
+                isLoading = true
+            }
         }
 
         coroutineScope.launch {
@@ -361,12 +445,9 @@ fun OverviewScreen(
                     }
                 }
 
-                val cachePrefs = context.getSharedPreferences("ledger_overview_cache", Context.MODE_PRIVATE)
-                val cacheKey = "cache_${username}_${period}_${currentMonthStr}"
-
                 if (result != null) {
                     try {
-                        cachePrefs.edit().putString(cacheKey, result).apply()
+                        com.siangloh.ledger.data.LocalDataStore.saveOverview(context, username, period, currentMonthStr, result)
                     } catch (_: Exception) {}
                     val parsed = withContext(Dispatchers.Default) {
                         parseOverviewJson(result, isListeningActual, isOfflineCache = false)
@@ -374,16 +455,25 @@ fun OverviewScreen(
                     overviewData = parsed
                     hasNetworkError = false
                     networkErrorMessage = ""
+                    // 异步双向预取相邻月份（上一月与下一月），提前预热缓存，彻底消除后续切月 delay
+                    if (period == "month") {
+                        prefetchAdjacentOverview(currentMonthStr, period)
+                    }
                 } else {
-                    hasNetworkError = true
-                    val cachedJson = cachePrefs.getString(cacheKey, null)
-                    if (!cachedJson.isNullOrBlank()) {
+                    val cachedJsonRetry = com.siangloh.ledger.data.LocalDataStore.getOverview(context, username, period, currentMonthStr)
+                    if (!cachedJsonRetry.isNullOrBlank()) {
                         val parsed = withContext(Dispatchers.Default) {
-                            parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = true)
+                            parseOverviewJson(cachedJsonRetry, isListeningActual, isOfflineCache = true)
                         }
                         overviewData = parsed
+                        hasNetworkError = true
                         networkErrorMessage = "网络连接受阻，已呈现最近快照数据"
+                    } else if (isFutureMonth) {
+                        overviewData = OverviewData(lastActiveTime = "刚刚", isListening = isListeningActual)
+                        hasNetworkError = false
+                        networkErrorMessage = ""
                     } else {
+                        hasNetworkError = true
                         // 无网络且无缓存：回退至本地 Room 未同步队列
                         val db = AppDatabase.getInstance(context)
                         val offlineTxs = withContext(Dispatchers.IO) {
@@ -414,17 +504,19 @@ fun OverviewScreen(
                     }
                 }
             } catch (e: Exception) {
-                hasNetworkError = true
-                val cachePrefs = context.getSharedPreferences("ledger_overview_cache", Context.MODE_PRIVATE)
-                val username = NetworkHelper.getUsername(context)
-                val cacheKey = "cache_${username}_${period}_${currentMonthStr}"
-                val cachedJson = cachePrefs.getString(cacheKey, null)
-                if (!cachedJson.isNullOrBlank()) {
-                    val parsed = withContext(Dispatchers.Default) {
-                        parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = true)
+                if (isFutureMonth) {
+                    overviewData = OverviewData(lastActiveTime = "刚刚", isListening = isListeningActual)
+                    hasNetworkError = false
+                } else {
+                    hasNetworkError = true
+                    val cachedJsonRetry = com.siangloh.ledger.data.LocalDataStore.getOverview(context, username, period, currentMonthStr)
+                    if (!cachedJsonRetry.isNullOrBlank()) {
+                        val parsed = withContext(Dispatchers.Default) {
+                            parseOverviewJson(cachedJsonRetry, isListeningActual, isOfflineCache = true)
+                        }
+                        overviewData = parsed
+                        networkErrorMessage = "网络连接异常，已呈现最近快照数据"
                     }
-                    overviewData = parsed
-                    networkErrorMessage = "网络连接异常，已呈现最近快照数据"
                 }
             } finally {
                 isLoading = false

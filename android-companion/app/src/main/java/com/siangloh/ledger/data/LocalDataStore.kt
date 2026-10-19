@@ -23,7 +23,8 @@ object LocalDataStore {
         try {
             val sp = context.getSharedPreferences(PREF_OVERVIEW, Context.MODE_PRIVATE)
             val key = "overview_${username.orEmpty()}_${period.orEmpty()}_${month.orEmpty()}"
-            sp.edit().putString(key, json).apply()
+            val legacyKey = "cache_${username.orEmpty()}_${period.orEmpty()}_${month.orEmpty()}"
+            sp.edit().putString(key, json).putString(legacyKey, json).apply()
         } catch (e: Exception) {
             Log.w(TAG, "Failed to save overview cache: ${e.message}")
         }
@@ -33,7 +34,8 @@ object LocalDataStore {
         return try {
             val sp = context.getSharedPreferences(PREF_OVERVIEW, Context.MODE_PRIVATE)
             val key = "overview_${username.orEmpty()}_${period.orEmpty()}_${month.orEmpty()}"
-            sp.getString(key, null)
+            val legacyKey = "cache_${username.orEmpty()}_${period.orEmpty()}_${month.orEmpty()}"
+            sp.getString(key, null) ?: sp.getString(legacyKey, null)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to get overview cache: ${e.message}")
             null

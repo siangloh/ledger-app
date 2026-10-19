@@ -135,19 +135,22 @@ fun RecordsScreen(
     }
 
 
-    fun prefetchAdjacentMonth(monthStr: String, type: String) {
+    fun prefetchAdjacentMonths(monthStr: String, type: String) {
         scope.launch(Dispatchers.IO) {
             try {
                 val prevMonth = shiftMonthString(monthStr, -1)
-                val existingCache = LocalDataStore.getRecords(context, prevMonth, type, "", 1)
-                if (existingCache.isNullOrBlank()) {
-                    NativeLedgerApi.getTransactions(
-                        context = context,
-                        type = type,
-                        month = prevMonth,
-                        page = 1,
-                        limit = 50
-                    )
+                val nextMonth = shiftMonthString(monthStr, 1)
+                for (targetMonth in listOf(prevMonth, nextMonth)) {
+                    val existingCache = LocalDataStore.getRecords(context, targetMonth, type, "", 1)
+                    if (existingCache.isNullOrBlank()) {
+                        NativeLedgerApi.getTransactions(
+                            context = context,
+                            type = type,
+                            month = targetMonth,
+                            page = 1,
+                            limit = 50
+                        )
+                    }
                 }
             } catch (_: Exception) {}
         }
@@ -156,6 +159,9 @@ fun RecordsScreen(
     fun loadData(resetPage: Boolean = true) {
         val targetPage = if (resetPage) 1 else (currentPage + 1)
         val effMonth = if (filterStartDate.isNullOrBlank() && filterEndDate.isNullOrBlank()) selectedMonth else null
+        val todayMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
+        val isFutureMonth = effMonth != null && effMonth > todayMonthStr
+
         if (resetPage) {
             val isSimpleMonthQuery = targetPage == 1 && effMonth != null && filterCategory == null && filterAccountId == null && filterMinAmount == null && filterMaxAmount == null && filterSource == null && filterChannel == null
             val cachedJson = if (isSimpleMonthQuery) {
@@ -170,12 +176,27 @@ fun RecordsScreen(
                     hasMore = pageObj.hasMore
                     isLoading = false
                 } catch (_: Exception) {
+                    if (isFutureMonth) {
+                        transactions = emptyList()
+                        totalCount = 0
+                        hasMore = false
+                        isLoading = false
+                    } else {
+                        transactions = emptyList()
+                        isLoading = true
+                    }
+                }
+            } else {
+                if (isFutureMonth) {
+                    // 未来空月份：0ms 秒开呈现空流水占位，绝不进入长延迟骨架屏阻塞
+                    transactions = emptyList()
+                    totalCount = 0
+                    hasMore = false
+                    isLoading = false
+                } else {
                     transactions = emptyList()
                     isLoading = true
                 }
-            } else {
-                transactions = emptyList()
-                isLoading = true
             }
             loadPending()
         } else {
@@ -206,7 +227,7 @@ fun RecordsScreen(
                 if (resetPage) {
                     transactions = page.items
                     if (targetPage == 1 && effMonth != null && filterStartDate.isNullOrBlank() && filterEndDate.isNullOrBlank()) {
-                        prefetchAdjacentMonth(effMonth, selectedType)
+                        prefetchAdjacentMonths(effMonth, selectedType)
                     }
                 } else {
                     val existingIds = transactions.map { it.id }.toSet()
@@ -217,7 +238,9 @@ fun RecordsScreen(
                 hasMore = page.hasMore
             }.onFailure { err ->
                 if (err !is kotlinx.coroutines.CancellationException) {
-                    Toast.makeText(context, "加载流水失败：${err.message}", Toast.LENGTH_SHORT).show()
+                    if (!isFutureMonth) {
+                        Toast.makeText(context, "加载流水失败：${err.message}", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
