@@ -2791,6 +2791,36 @@ function renderPendingTransactions(items, meta) {
       `;
     }
 
+    let matchBoxHtml = '';
+    if (item.matched_subscription) {
+      const sub = item.matched_subscription;
+      if (sub.target_to_cancel) {
+        matchBoxHtml = `
+          <div style="margin-top: 8px; padding: 8px 12px; background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; font-size: 12px; color: #991B1B; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16px;">⚠️</span>
+            <div>
+              <strong>【打算退订拦截预警】</strong> 检测到此前已标记打算退订的订阅【${escapeHtml(sub.name)}】发生扣款 (${sym} ${Number(sub.cost).toFixed(2)})！请核实是否已在服务商处解绑。
+            </div>
+          </div>
+        `;
+      } else {
+        matchBoxHtml = `
+          <div style="margin-top: 8px; padding: 6px 10px; background: #F0FDFA; border: 1px solid #5EEAD4; border-radius: 8px; font-size: 12px; color: #0F766E; display: flex; align-items: center; gap: 6px;">
+            <span>💡</span>
+            <span>已智能匹配固定订阅: <strong>${escapeHtml(sub.name)}</strong> (${sym} ${Number(sub.cost).toFixed(2)} / ${escapeHtml(sub.billing_cycle)}) · 确认后自动顺延下期扣款日</span>
+          </div>
+        `;
+      }
+    } else if (item.matched_installment) {
+      const inst = item.matched_installment;
+      matchBoxHtml = `
+        <div style="margin-top: 8px; padding: 6px 10px; background: #F0FDFA; border: 1px solid #5EEAD4; border-radius: 8px; font-size: 12px; color: #0F766E; display: flex; align-items: center; gap: 6px;">
+          <span>💡</span>
+          <span>已智能匹配分期计划: <strong>${escapeHtml(inst.title)}</strong> (第 <strong>${inst.next_period}</strong>/${inst.tenure_months} 期 · ${sym} ${Number(inst.monthly_amount).toFixed(2)}) · 确认后自动递增已还期数</span>
+        </div>
+      `;
+    }
+
     // 区分操作按钮：若是疑似重复，提供“合并”和“标记非重复”
     let actionsHtml = '';
     if (isDuplicate) {
@@ -2836,6 +2866,7 @@ function renderPendingTransactions(items, meta) {
             <div class="pending-tx-route">${escapePendingHtml(fromChannel)} ➔ ${escapePendingHtml(toTarget)}</div>
             <div class="pending-tx-reason">${reasonDesc}</div>
             ${comparisonBoxHtml}
+            ${matchBoxHtml}
           </div>
           <div class="pending-tx-amount">${amtStr}</div>
         </div>

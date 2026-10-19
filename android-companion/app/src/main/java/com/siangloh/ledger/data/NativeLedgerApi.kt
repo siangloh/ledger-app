@@ -138,6 +138,23 @@ data class ToolsSummary(
     val totalRemainingInst: Double
 )
 
+data class TransactionMatchRecord(
+    val txId: Long,
+    val txDate: String,
+    val txAmount: Double,
+    val txCategory: String,
+    val txNote: String,
+    val matchedSubId: Int? = null,
+    val matchedSubName: String? = null,
+    val matchedSubCost: Double? = null,
+    val matchedSubNextBilling: String? = null,
+    val matchedSubTargetToCancel: Boolean = false,
+    val matchedInstId: Int? = null,
+    val matchedInstTitle: String? = null,
+    val matchedInstNextPeriod: Int? = null,
+    val matchedInstTenure: Int? = null
+)
+
 data class BudgetItemRecord(
     val category: String,
     val limit: Double,
@@ -1477,6 +1494,109 @@ object NativeLedgerApi {
             }
         } catch (e: Exception) {
             Log.e(TAG, "deleteSavedFilter error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getSubscriptionMatches(context: Context): Result<List<TransactionMatchRecord>> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/subscriptions/matches" + if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "GET")
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                val arr = json.optJSONArray("matches") ?: JSONArray()
+                val list = mutableListOf<TransactionMatchRecord>()
+                for (i in 0 until arr.length()) {
+                    val m = arr.getJSONObject(i)
+                    val tx = m.optJSONObject("transaction") ?: JSONObject()
+                    val sub = m.optJSONObject("subscription")
+                    val inst = m.optJSONObject("installment")
+
+                    list.add(
+                        TransactionMatchRecord(
+                            txId = tx.optLong("id", 0L),
+                            txDate = tx.optString("date", ""),
+                            txAmount = tx.optDouble("amount", 0.0),
+                            txCategory = tx.optString("category", ""),
+                            txNote = tx.optString("note", ""),
+                            matchedSubId = sub?.optInt("id"),
+                            matchedSubName = sub?.optString("name"),
+                            matchedSubCost = sub?.optDouble("cost"),
+                            matchedSubNextBilling = sub?.optString("next_billing_date"),
+                            matchedSubTargetToCancel = sub?.optBoolean("target_to_cancel", false) ?: false,
+                            matchedInstId = inst?.optInt("id"),
+                            matchedInstTitle = inst?.optString("title"),
+                            matchedInstNextPeriod = inst?.optInt("next_period"),
+                            matchedInstTenure = inst?.optInt("tenure_months")
+                        )
+                    )
+                }
+                Result.success(list)
+            } else {
+                Result.failure(Exception(json.optString("message", "加载流水匹配候选失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getSubscriptionMatches error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun applySubscriptionMatch(context: Context, subId: Int, txId: Long?): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/subscriptions/$subId/apply-match" + if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "POST")
+            val payload = JSONObject().apply {
+                if (txId != null) put("tx_id", txId)
+            }.toString()
+            conn.outputStream.bufferedWriter().use { it.write(payload) }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                Result.success(true)
+            } else {
+                Result.failure(Exception(json.optString("message", "顺延订阅扣款日失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "applySubscriptionMatch error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun applyInstallmentMatch(context: Context, instId: Int, txId: Long?): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/installments/$instId/apply-match" + if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "POST")
+            val payload = JSONObject().apply {
+                if (txId != null) put("tx_id", txId)
+            }.toString()
+            conn.outputStream.bufferedWriter().use { it.write(payload) }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                Result.success(true)
+            } else {
+                Result.failure(Exception(json.optString("message", "推进分期计划失败")))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "applyInstallmentMatch error: ${e.message}", e)
             Result.failure(e)
         }
     }

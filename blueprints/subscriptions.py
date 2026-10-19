@@ -1,9 +1,14 @@
 from decimal import Decimal
 from datetime import datetime, date
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 
 from core.db import get_db, get_current_user_id, bump_data_version
 from core.i18n import t
+from services.subscription_matching_service import (
+    scan_unmatched_transactions,
+    apply_subscription_match,
+    apply_installment_match
+)
 from subscription_tracker import (
     BillingCycle,
     SubscriptionStatus,
@@ -293,3 +298,41 @@ def api_delete_subscription(sub_id):
     bump_data_version('subscription_delete', user_id=user_id)
     flash(t('subscriptions.deleted_success', '已删除该订阅服务记录'), 'success')
     return redirect(url_for('subscriptions_page'))
+
+
+@subscriptions_bp.route('/api/subscriptions/matches', methods=['GET'], endpoint='api_subscription_matches')
+def api_subscription_matches():
+    """检索近期支出流水与活跃订阅/分期计划的智能配对候选"""
+    user_id = get_current_user_id()
+    db = get_db()
+    limit = request.args.get('limit', 50, type=int)
+    matches = scan_unmatched_transactions(user_id=user_id, limit=limit, db=db)
+    return jsonify({
+        'ok': True,
+        'matches': matches,
+        'count': len(matches)
+    })
+
+
+@subscriptions_bp.route('/api/subscriptions/<int:sub_id>/apply-match', methods=['POST'], endpoint='api_apply_subscription_match')
+def api_apply_subscription_match(sub_id: int):
+    """确认将指定交易与订阅匹配，自动将该订阅顺延至下一计费周期"""
+    user_id = get_current_user_id()
+    db = get_db()
+    data = request.get_json(silent=True) or request.form or {}
+    tx_id = data.get('tx_id') or data.get('transaction_id')
+    res = apply_subscription_match(user_id=user_id, sub_id=sub_id, tx_id=int(tx_id) if tx_id else None, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@subscriptions_bp.route('/api/installments/<int:inst_id>/apply-match', methods=['POST'], endpoint='api_apply_installment_match')
+def api_apply_installment_match(inst_id: int):
+    """确认将指定交易与分期计划匹配，自动递增已还期数并在还清时标记完成"""
+    user_id = get_current_user_id()
+    db = get_db()
+    data = request.get_json(silent=True) or request.form or {}
+    tx_id = data.get('tx_id') or data.get('transaction_id')
+    res = apply_installment_match(user_id=user_id, inst_id=inst_id, tx_id=int(tx_id) if tx_id else None, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code

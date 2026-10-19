@@ -834,6 +834,11 @@ fun SubscriptionsCard(
     onOpenManage: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var showMatchDialog by remember { mutableStateOf(false) }
+    var isLoadingMatches by remember { mutableStateOf(false) }
+    var matchRecords by remember { mutableStateOf<List<TransactionMatchRecord>>(emptyList()) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -934,17 +939,196 @@ fun SubscriptionsCard(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
-                    OutlinedButton(
-                        onClick = onOpenManage,
-                        modifier = Modifier.fillMaxWidth().height(36.dp),
-                        shape = RoundedCornerShape(8.dp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("前往订阅中心维护与新增周期扣款", fontSize = 12.sp, color = PrimaryTeal)
+                        OutlinedButton(
+                            onClick = onOpenManage,
+                            modifier = Modifier.weight(1f).height(38.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, PrimaryTeal)
+                        ) {
+                            Text("订阅大厅", fontSize = 12.sp, color = PrimaryTeal)
+                        }
+                        Button(
+                            onClick = {
+                                isLoadingMatches = true
+                                showMatchDialog = true
+                                scope.launch {
+                                    val res = NativeLedgerApi.getSubscriptionMatches(context)
+                                    isLoadingMatches = false
+                                    matchRecords = res.getOrDefault(emptyList())
+                                }
+                            },
+                            modifier = Modifier.weight(1f).height(38.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("智能匹配流水", fontSize = 12.sp, color = Color.White)
+                        }
                     }
                 }
             }
         }
+    }
+
+    if (showMatchDialog) {
+        AlertDialog(
+            onDismissRequest = { showMatchDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("智能流水配对候选", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                }
+            },
+            text = {
+                if (isLoadingMatches) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = PrimaryTeal)
+                    }
+                } else if (matchRecords.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "🎉 暂无待匹配流水，所有近期扣费均已对齐或已关联！",
+                            fontSize = 13.sp,
+                            color = Slate500,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 380.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(matchRecords) { match ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(containerColor = Slate50),
+                                border = BorderStroke(1.dp, Slate200)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "📅 ${match.txDate} · ${match.txNote.ifEmpty { "支出" }}",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Slate800,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Text(
+                                            text = "- RM ${String.format(Locale.getDefault(), "%.2f", match.txAmount)}",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = ExpenseRed
+                                        )
+                                    }
+
+                                    if (match.matchedSubId != null) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        if (match.matchedSubTargetToCancel) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = Color(0xFFFEE2E2),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(
+                                                    text = "⚠️【打算退订拦截预警】已标记退订但发生扣款！",
+                                                    fontSize = 11.sp,
+                                                    color = Color(0xFFB91C1C),
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        } else {
+                                            Text(
+                                                text = "💡 匹配订阅: ${match.matchedSubName} · 下期: ${match.matchedSubNextBilling ?: "-"}",
+                                                fontSize = 11.sp,
+                                                color = PrimaryTeal
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Button(
+                                            onClick = {
+                                                scope.launch {
+                                                    val res = NativeLedgerApi.applySubscriptionMatch(context, match.matchedSubId, match.txId)
+                                                    if (res.isSuccess) {
+                                                        Toast.makeText(context, "已成功顺延订阅下期扣款日", Toast.LENGTH_SHORT).show()
+                                                        matchRecords = matchRecords.filter { it.txId != match.txId }
+                                                    } else {
+                                                        Toast.makeText(context, "操作失败: ${res.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier.fillMaxWidth().height(32.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text("顺延下期扣款日", fontSize = 11.sp, color = Color.White)
+                                        }
+                                    } else if (match.matchedInstId != null) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "💡 匹配分期: ${match.matchedInstTitle} (第 ${match.matchedInstNextPeriod}/${match.matchedInstTenure} 期)",
+                                            fontSize = 11.sp,
+                                            color = PrimaryTeal
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Button(
+                                            onClick = {
+                                                scope.launch {
+                                                    val res = NativeLedgerApi.applyInstallmentMatch(context, match.matchedInstId, match.txId)
+                                                    if (res.isSuccess) {
+                                                        Toast.makeText(context, "已成功推进分期还款进度", Toast.LENGTH_SHORT).show()
+                                                        matchRecords = matchRecords.filter { it.txId != match.txId }
+                                                    } else {
+                                                        Toast.makeText(context, "操作失败: ${res.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier.fillMaxWidth().height(32.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text("记录当期分期已还", fontSize = 11.sp, color = Color.White)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showMatchDialog = false }) {
+                    Text("关闭", color = PrimaryTeal, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
     }
 }
 

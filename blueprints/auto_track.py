@@ -68,6 +68,12 @@ from services.saved_filters_service import (
     update_saved_filter,
     delete_saved_filter
 )
+from services.subscription_matching_service import (
+    match_transaction,
+    apply_subscription_match,
+    apply_installment_match,
+    scan_unmatched_transactions
+)
 
 auto_track_bp = Blueprint('auto_track', __name__)
 
@@ -740,6 +746,26 @@ def api_auto_track():
                     'parsed': parsed
                 }), 200
 
+        # 智能匹配周期订阅与分期计划
+        match_info = match_transaction(
+            user_id=target_user_id,
+            amount=parsed['amount'],
+            note=parsed.get('note') or '',
+            merchant=parsed.get('merchant') or '',
+            raw_text=text,
+            tx_date=parsed.get('date'),
+            db=db
+        )
+        if match_info.get('subscription'):
+            sub = match_info['subscription']
+            # 若订阅标记为打算退订，触发拦截高亮预警
+            if sub.get('target_to_cancel'):
+                notification_title = "⚠️【打算退订预警】"
+                notification_body = f"已标记打算退订的【{sub['name']}】发生扣款 {money_filter(parsed['amount'])}！请检查是否已在服务商处解绑"
+            # 若当前分类为默认/未分类，自动同步为订阅专属分类
+            if parsed.get('category') in ('其他', '未分类', '待分类', '') and sub.get('category'):
+                parsed['category'] = sub['category']
+
         cur = db.execute(
             'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
             'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -777,8 +803,31 @@ def api_auto_track():
 
         type_text = '支出' if parsed['type'] == 'expense' else '收入' if parsed['type'] == 'income' else '储蓄'
         note_str = f" ({parsed['note']})" if parsed['note'] else ""
-        notification_title = "自动记账成功 💸"
-        notification_body = f"已自动记入【{type_text} · {parsed['category']}】{money_filter(parsed['amount'])}{note_str}"
+        if not match_info.get('subscription') or not match_info['subscription'].get('target_to_cancel'):
+            notification_title = "自动记账成功 💸"
+            notification_body = f"已自动记入【{type_text} · {parsed['category']}】{money_filter(parsed['amount'])}{note_str}"
+
+        # 自动顺延匹配的订阅或递增分期期数
+        if match_info.get('subscription') and match_info['subscription'].get('confidence') in ('exact', 'high'):
+            try:
+                apply_subscription_match(
+                    user_id=target_user_id,
+                    sub_id=match_info['subscription']['id'],
+                    tx_id=cur.lastrowid,
+                    db=db
+                )
+            except Exception as e:
+                logger.debug("Failed to apply subscription match in auto_track: %s", e)
+        elif match_info.get('installment') and match_info['installment'].get('confidence') in ('exact', 'high'):
+            try:
+                apply_installment_match(
+                    user_id=target_user_id,
+                    inst_id=match_info['installment']['id'],
+                    tx_id=cur.lastrowid,
+                    db=db
+                )
+            except Exception as e:
+                logger.debug("Failed to apply installment match in auto_track: %s", e)
 
         budget_alert = None
         if parsed['type'] == 'expense':
@@ -790,6 +839,8 @@ def api_auto_track():
             'message': f"成功自动记账：{parsed['note']} {money_filter(parsed['amount'])} ({parsed['category']})",
             'transaction_id': cur.lastrowid,
             'parsed': parsed,
+            'matched_subscription': match_info.get('subscription'),
+            'matched_installment': match_info.get('installment'),
             'notification_title': notification_title,
             'notification_body': notification_body,
             'budget_alert': budget_alert
@@ -1003,7 +1054,7 @@ def api_llm_samples_reset():
 
 
 def _resolve_native_user(db):
-    req_key = request.headers.get('X-API-KEY')
+    req_key = request.headers.get('X-API-KEY') or request.headers.get('X-Auto-Track-Key')
     data = (request.get_json(silent=True) or request.form) if (request.is_json or request.form) else {}
     if not req_key and isinstance(data, dict):
         req_key = data.get('key')
@@ -1223,6 +1274,53 @@ def api_native_saved_filter_item(filter_id: int):
         order_num=order_num,
         db=db
     )
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/subscriptions/matches', methods=['GET'], endpoint='api_native_subscription_matches')
+@csrf.exempt
+def api_native_subscription_matches():
+    """伴侣端智能获取近期支出与活跃订阅/分期计划的匹配候选"""
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+    limit = request.args.get('limit', 50, type=int)
+    matches = scan_unmatched_transactions(user_id=user_id, limit=limit, db=db)
+    return jsonify({
+        'ok': True,
+        'matches': matches,
+        'count': len(matches)
+    })
+
+
+@auto_track_bp.route('/api/native/subscriptions/<int:sub_id>/apply-match', methods=['POST'], endpoint='api_native_apply_subscription_match')
+@csrf.exempt
+def api_native_apply_subscription_match(sub_id: int):
+    """伴侣端确认将指定交易与订阅匹配并顺延扣款日"""
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+    data = request.get_json(silent=True) or request.form or {}
+    tx_id = data.get('tx_id') or data.get('transaction_id')
+    res = apply_subscription_match(user_id=user_id, sub_id=sub_id, tx_id=int(tx_id) if tx_id else None, db=db)
+    status_code = 200 if res.get('ok') else 400
+    return jsonify(res), status_code
+
+
+@auto_track_bp.route('/api/native/installments/<int:inst_id>/apply-match', methods=['POST'], endpoint='api_native_apply_installment_match')
+@csrf.exempt
+def api_native_apply_installment_match(inst_id: int):
+    """伴侣端确认将指定交易与分期计划匹配并递增期数"""
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+    data = request.get_json(silent=True) or request.form or {}
+    tx_id = data.get('tx_id') or data.get('transaction_id')
+    res = apply_installment_match(user_id=user_id, inst_id=inst_id, tx_id=int(tx_id) if tx_id else None, db=db)
     status_code = 200 if res.get('ok') else 400
     return jsonify(res), status_code
 

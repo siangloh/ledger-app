@@ -7,6 +7,11 @@ from core.extensions import csrf
 from core.config import is_valid_api_key, get_user_id_from_api_key
 from core.db import get_db, get_current_user_id, bump_data_version, get_categories
 from core.utils import check_and_record_budget_alerts
+from services.subscription_matching_service import (
+    match_transaction,
+    apply_subscription_match,
+    apply_installment_match
+)
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +140,19 @@ def get_pending_transactions():
                 it['suspected_duplicate'] = None
         else:
             it['suspected_duplicate'] = None
+
+        # 智能匹配周期订阅与分期计划
+        match_info = match_transaction(
+            user_id=user_id,
+            amount=float(it.get('amount') or 0.0),
+            note=it.get('note') or '',
+            merchant=it.get('merchant') or '',
+            raw_text=it.get('raw_text') or '',
+            tx_date=it.get('date'),
+            db=db
+        )
+        it['matched_subscription'] = match_info.get('subscription')
+        it['matched_installment'] = match_info.get('installment')
 
         items.append(it)
 
@@ -282,6 +300,36 @@ def confirm_pending_transaction(pending_id: int):
     ))
     new_tx_id = cur.lastrowid
     db.commit()
+
+    # 检查是否匹配订阅或分期，并自动递增期数/更新下期扣款日
+    sub_id = data.get('sub_id')
+    installment_id = data.get('installment_id')
+    row_dict = dict(row)
+    if not sub_id and not installment_id:
+        match_info = match_transaction(
+            user_id=user_id,
+            amount=float(row_dict.get('amount') or 0.0),
+            note=tx_note,
+            merchant=row_dict.get('merchant') or '',
+            raw_text=row_dict.get('raw_text') or '',
+            tx_date=tx_date,
+            db=db
+        )
+        if match_info.get('subscription') and match_info['subscription'].get('confidence') in ('exact', 'high'):
+            sub_id = match_info['subscription']['id']
+        elif match_info.get('installment') and match_info['installment'].get('confidence') in ('exact', 'high'):
+            installment_id = match_info['installment']['id']
+
+    if sub_id:
+        try:
+            apply_subscription_match(user_id=user_id, sub_id=int(sub_id), tx_id=new_tx_id, db=db)
+        except Exception as e:
+            logger.debug("Failed to apply subscription match on confirm: %s", e)
+    elif installment_id:
+        try:
+            apply_installment_match(user_id=user_id, inst_id=int(installment_id), tx_id=new_tx_id, db=db)
+        except Exception as e:
+            logger.debug("Failed to apply installment match on confirm: %s", e)
 
     bump_data_version('add', {
         'id': new_tx_id,

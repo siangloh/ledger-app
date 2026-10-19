@@ -16,6 +16,9 @@
   </div>
 
   <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+    <button type="button" class="btn btn-ghost btn-sm" onclick="openScanMatchesModal()" style="border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 4px;" title="{{ t('subscriptions.scan_matches_hint', '智能检索近期流水与活跃订阅/分期计划的匹配候选') }}">
+      <span>🔍</span> {{ t('subscriptions.scan_matches', '智能匹配流水') }}
+    </button>
     <button type="button" class="btn btn-primary btn-sm" onclick="openModal('modalAddSub')">
       <span>✨</span> {{ t('subscriptions.btn_add', '+ 新增订阅服务') }}
     </button>
@@ -640,6 +643,122 @@ window.filterSubscriptions = function (type, btn) {
       r.style.display = isCancel ? '' : 'none';
     }
   });
+};
+
+window.openScanMatchesModal = function () {
+  fetch('/api/subscriptions/matches', {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+    .then(r => r.json())
+    .then(data => {
+      const matches = (data && data.matches) ? data.matches : [];
+      let html = '<div style="max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; text-align: left; padding: 4px;">';
+
+      if (matches.length === 0) {
+        html += '<p style="text-align: center; color: var(--muted); padding: 24px 0;">🎉 暂无待匹配流水，所有近期扣费均已对齐或已关联！</p>';
+      } else {
+        matches.forEach(m => {
+          const tx = m.transaction;
+          const sub = m.subscription;
+          const inst = m.installment;
+
+          html += `
+            <div style="padding: 10px 14px; background: var(--surface-soft); border-radius: 8px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <div>
+                <div style="font-size: 13.5px; font-weight: 600; color: var(--navy);">
+                  📅 ${tx.date} · <strong>${tx.note || '支出'}</strong> (${tx.category || '未分类'})
+                </div>
+                <div style="font-size: 14px; font-weight: 700; color: #e11d48; margin: 2px 0;">
+                  - RM ${Number(tx.amount).toFixed(2)}
+                </div>
+          `;
+
+          if (sub) {
+            html += `
+                <div style="font-size: 11.5px; color: #0F766E; margin-top: 2px;">
+                  💡 匹配订阅: <strong>${sub.name}</strong> (RM ${Number(sub.cost).toFixed(2)} / ${sub.billing_cycle}) · 下期: ${sub.next_billing_date}
+                </div>
+              </div>
+              <button type="button" class="btn btn-primary btn-sm" onclick="applySubMatchFromModal(${sub.id}, ${tx.id})" style="background: #0F766E; border-color: #0F766E; font-size: 12px; padding: 4px 12px;">
+                顺延下期
+              </button>
+            `;
+          } else if (inst) {
+            html += `
+                <div style="font-size: 11.5px; color: #0F766E; margin-top: 2px;">
+                  💡 匹配分期: <strong>${inst.title}</strong> (第 ${inst.next_period}/${inst.tenure_months} 期)
+                </div>
+              </div>
+              <button type="button" class="btn btn-primary btn-sm" onclick="applyInstMatchFromModal(${inst.id}, ${tx.id})" style="background: #0F766E; border-color: #0F766E; font-size: 12px; padding: 4px 12px;">
+                记录当期
+              </button>
+            `;
+          }
+          html += '</div>';
+        });
+      }
+      html += '</div>';
+
+      Swal.fire({
+        title: '🔍 智能流水配对候选',
+        html: html,
+        showConfirmButton: false,
+        showCloseButton: true,
+        width: 520
+      });
+    });
+};
+
+window.applySubMatchFromModal = function (subId, txId) {
+  fetch('/api/subscriptions/' + subId + '/apply-match', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({ tx_id: txId })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        Swal.fire({
+          icon: 'success',
+          title: data.message || '匹配成功',
+          timer: 1500,
+          showConfirmButton: false
+        }).then(() => {
+          location.reload();
+        });
+      } else {
+        Swal.fire({ icon: 'error', title: data.message || '操作失败' });
+      }
+    });
+};
+
+window.applyInstMatchFromModal = function (instId, txId) {
+  fetch('/api/installments/' + instId + '/apply-match', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({ tx_id: txId })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        Swal.fire({
+          icon: 'success',
+          title: data.message || '匹配成功',
+          timer: 1500,
+          showConfirmButton: false
+        }).then(() => {
+          location.reload();
+        });
+      } else {
+        Swal.fire({ icon: 'error', title: data.message || '操作失败' });
+      }
+    });
 };
 </script>
 {% endblock %}

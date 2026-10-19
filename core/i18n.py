@@ -721,6 +721,12 @@ TRANSLATIONS = {
         'subscriptions.form_note_ph': '如：家庭组4人分摊 / 绑定的虚拟卡号等',
         'subscriptions.save_sub': '保存订阅',
         'subscriptions.save_changes': '保存修改',
+        'subscriptions.scan_matches': '智能匹配流水',
+        'subscriptions.scan_matches_hint': '扫描近期未匹配的交易流水，与进行中的订阅或分期计划智能对齐并一键顺延期数。',
+        'subscriptions.matched_sub_hint': '命中订阅计划',
+        'subscriptions.matched_inst_hint': '命中分期计划',
+        'subscriptions.target_to_cancel_warn': '🚨 警告：该项目已被标记为【打算退订】，请核实是否已发生非预期扣款！',
+        'subscriptions.apply_match_success': '匹配成功！已更新下期扣款日或分期期数。',
 
         # 固定收支
         'recurring.title': '固定 / 重复收支',
@@ -1936,6 +1942,12 @@ TRANSLATIONS = {
         'subscriptions.form_note_ph': 'e.g. Family plan 4 people / Virtual card',
         'subscriptions.save_sub': 'Save Subscription',
         'subscriptions.save_changes': 'Save Changes',
+        'subscriptions.scan_matches': 'Smart Match Records',
+        'subscriptions.scan_matches_hint': 'Scan recent unmatched transactions against active subscriptions or installments, rolling dates or periods with 1 click.',
+        'subscriptions.matched_sub_hint': 'Matched Subscription',
+        'subscriptions.matched_inst_hint': 'Matched Installment',
+        'subscriptions.target_to_cancel_warn': '🚨 Warning: This item was marked as [Target to Cancel]. Please verify if an unexpected charge occurred!',
+        'subscriptions.apply_match_success': 'Match applied! Next billing date or installment period updated.',
 
         # Recurring
         'recurring.title': 'Recurring Transactions',
@@ -3151,6 +3163,12 @@ TRANSLATIONS = {
         'subscriptions.form_note_ph': 'cth. Pelan keluarga 4 orang / Kad maya',
         'subscriptions.save_sub': 'Simpan Langganan',
         'subscriptions.save_changes': 'Simpan Perubahan',
+        'subscriptions.scan_matches': 'Padanan Pintar Transaksi',
+        'subscriptions.scan_matches_hint': 'Imbas transaksi belum dipadankan terkini dan padankan dengan langganan atau pelan ansuran aktif.',
+        'subscriptions.matched_sub_hint': 'Dipadankan Langganan',
+        'subscriptions.matched_inst_hint': 'Dipadankan Ansuran',
+        'subscriptions.target_to_cancel_warn': '🚨 Amaran: Item ini ditandakan sebagai [Niat Batalkan]. Sila sahkan jika caj tidak dijangka berlaku!',
+        'subscriptions.apply_match_success': 'Padanan berjaya digunakan! Tarikh bil atau tempoh ansuran dikemas kini.',
 
         # Transaksi Berulang
         'recurring.title': 'Transaksi Berulang',
@@ -4366,6 +4384,12 @@ TRANSLATIONS = {
         'subscriptions.form_note_ph': '如：家庭組4人分攤 / 綁定的虛擬卡號等',
         'subscriptions.save_sub': '保存訂閱',
         'subscriptions.save_changes': '保存修改',
+        'subscriptions.scan_matches': '智慧匹配流水',
+        'subscriptions.scan_matches_hint': '掃描近期未匹配的交易流水，與進行中的訂閱或分期計劃智慧對齊並一鍵順延期數。',
+        'subscriptions.matched_sub_hint': '命中訂閱計劃',
+        'subscriptions.matched_inst_hint': '命中分期計劃',
+        'subscriptions.target_to_cancel_warn': '🚨 警告：該項目已被標記為【打算退訂】，請核實是否已發生非預期扣款！',
+        'subscriptions.apply_match_success': '匹配成功！已更新下期扣款日或分期期數。',
 
         # 固定收支
         'recurring.title': '固定 / 重複收支',
