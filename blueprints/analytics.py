@@ -6,8 +6,55 @@ from core.db import get_db, get_current_user_id
 from core.utils import shift_month
 from core.i18n import t, get_current_locale
 from services.poster_service import get_monthly_poster_data
+from services.cashflow_analysis_service import (
+    get_monthly_cashflow_summary, update_bill_payment, update_bill, confirm_scheduled_transaction,
+)
 
 analytics_bp = Blueprint('analytics', __name__)
+
+
+@analytics_bp.route('/analytics/cashflow')
+def cashflow_page():
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'ok': False, 'message': 'Unauthorized'}), 401
+    month = request.args.get('month') or date.today().strftime('%Y-%m')
+    try:
+        report = get_monthly_cashflow_summary(user_id, month, get_db(), request.args.get('currency'))
+    except ValueError as error:
+        return jsonify({'ok': False, 'message': str(error)}), 400
+    return render_template('cashflow_analysis.html', report=report)
+
+
+@analytics_bp.route('/api/analytics/cashflow', methods=['GET', 'POST'])
+def cashflow_api():
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'ok': False, 'message': 'Unauthorized'}), 401
+    db = get_db()
+    try:
+        if request.method == 'POST':
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                raise ValueError('Expected a JSON object')
+            if payload.get('action') == 'confirm':
+                result = confirm_scheduled_transaction(user_id, int(payload.get('transaction_id', 0)), db,
+                                                       undo=payload.get('undo') is True)
+            elif payload.get('action') == 'bill':
+                result = update_bill(user_id, payload.get('month'), payload.get('bill_key'), db,
+                                     cancelled=payload.get('cancelled') is True,
+                                     duplicate_of=payload.get('duplicate_of'), amount=payload.get('amount'))
+            else:
+                result = update_bill_payment(user_id, payload.get('month'), payload.get('bill_key'),
+                                         int(payload.get('transaction_id', 0)), db,
+                                         unlink=payload.get('unlink') is True, refund=payload.get('refund') is True)
+        else:
+            result = get_monthly_cashflow_summary(user_id, request.args.get('month') or date.today().strftime('%Y-%m'),
+                                                  db, request.args.get('currency'))
+        return jsonify(result)
+    except (ValueError, TypeError) as error:
+        db.rollback()
+        return jsonify({'ok': False, 'message': str(error)}), 400
 
 
 def get_category_insights_data(db, time_range='all', start_date=None, end_date=None, user_id=None):

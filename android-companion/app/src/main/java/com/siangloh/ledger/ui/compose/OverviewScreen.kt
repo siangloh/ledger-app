@@ -305,7 +305,9 @@ fun OverviewScreen(
     onScanReceipt: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onNavigateToWeb: () -> Unit = onNavigateToRecords,
-    onQuickAdd: () -> Unit = onNavigateToAdd
+    onQuickAdd: () -> Unit = onNavigateToAdd,
+    onNavigateToCashflow: (String) -> Unit = {},
+    cashflowRevision: Int = 0
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -690,6 +692,10 @@ fun OverviewScreen(
                         expenseAmount = overviewData.expenseAmount,
                         transferAmount = overviewData.transferAmount
                     )
+                }
+
+                if (period == "month") {
+                    item { CashflowSummaryCard(currentMonthStr, cashflowRevision) { onNavigateToCashflow(currentMonthStr) } }
                 }
 
                 if (overviewData.uncategorizedCount > 0) {

@@ -1023,6 +1023,10 @@ def init_db(app_logger=None):
             logger.debug("Core index migration notice: %s", e)
     db.commit()
 
+    from services.cashflow_analysis_service import init_cashflow_schema
+    init_cashflow_schema(db)
+    db.commit()
+
     # 确保 admin 用户具备默认分类
     init_user_default_categories(db, admin_id)
     db.close()

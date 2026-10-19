@@ -1,0 +1,15 @@
+{% extends layout|default('base.html') %}
+{% block title %}{{ t('cashflow.title') }}{% endblock %}
+{% block content %}
+<section class="panel cashflow-panel" data-cashflow data-month="{{ report.month }}" data-currency="{{ report.currency }}" data-detail="1">
+  <script type="application/json" data-cashflow-initial>{{ report|tojson }}</script>
+  <a href="{{ url_for('index', month=report.month) }}">← {{ t('cashflow.back') }}</a>
+  <h2>{{ t('cashflow.title') }}</h2>
+  <form method="get" class="cashflow-controls">
+    <label>{{ t('cashflow.month') }} <input type="month" name="month" value="{{ report.month }}" min="2000-01" max="2099-12" required></label>
+    <label>{{ t('cashflow.currency') }} <select name="currency">{% for code in report.currencies %}<option {% if code == report.currency %}selected{% endif %}>{{ code }}</option>{% endfor %}</select></label>
+    <button type="submit">{{ t('cashflow.refresh') }}</button>
+  </form>
+  <div class="cashflow-content" aria-live="polite">{{ t('cashflow.loading') }}</div>
+</section>
+{% endblock %}

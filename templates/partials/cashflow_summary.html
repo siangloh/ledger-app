@@ -1,0 +1,5 @@
+<section class="panel cashflow-panel" data-cashflow data-month="{{ month }}">
+  <h3>{{ t('cashflow.title') }} · {{ month }}</h3>
+  <div class="cashflow-content" aria-live="polite">{{ t('cashflow.loading') }}</div>
+  <a href="{{ url_for('analytics.cashflow_page', month=month) }}">{{ t('cashflow.open') }}</a>
+</section>

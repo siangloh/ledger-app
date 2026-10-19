@@ -301,6 +301,18 @@ def apply_subscription_match(
     old_date_str = sub_row['next_billing_date']
     new_date_str = old_date_str
 
+    if tx_id:
+        from services.cashflow_analysis_service import record_source_payment
+        try:
+            fresh = record_source_payment(user_id, 'subscription', sub_row, old_date_str, tx_id, db)
+        except ValueError as error:
+            return {'ok': False, 'message': str(error)}
+        if fresh in ('retry', 'partial'):
+            return {'ok': True, 'subscription_id': sub_id, 'name': sub_row['name'],
+                    'previous_billing_date': old_date_str, 'next_billing_date': old_date_str,
+                    'new_next_billing_date': old_date_str, 'partial': fresh == 'partial',
+                    'message': 'Partial payment recorded' if fresh == 'partial' else 'Payment already linked'}
+
     if auto_roll:
         try:
             curr_date = datetime.strptime(str(old_date_str)[:10], "%Y-%m-%d").date()
@@ -382,6 +394,19 @@ def apply_installment_match(
     new_paid = min(tenure, current_paid + 1)
     new_status = 'completed' if new_paid >= tenure else 'active'
     now_month = date.today().strftime('%Y-%m')
+
+    if tx_id:
+        from services.cashflow_analysis_service import record_source_payment, _at_month
+        first_due = date.fromisoformat(inst_row['first_due_date'][:10])
+        due = _at_month(first_due, current_paid, first_due.day).isoformat()
+        try:
+            fresh = record_source_payment(user_id, 'installment', inst_row, due, tx_id, db)
+        except ValueError as error:
+            return {'ok': False, 'message': str(error)}
+        if fresh in ('retry', 'partial'):
+            return {'ok': True, 'installment_id': inst_id, 'paid_periods': current_paid,
+                    'tenure_months': tenure, 'partial': fresh == 'partial',
+                    'message': 'Partial payment recorded' if fresh == 'partial' else 'Payment already linked'}
 
     db.execute(
         """

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +41,8 @@ fun MainAppScreen(
     onOpenWebUrl: (String) -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf(initialTab) }
+    var cashflowMonth by rememberSaveable { mutableStateOf<String?>(null) }
+    var cashflowRevision by remember { mutableIntStateOf(0) }
     val saveableStateHolder = rememberSaveableStateHolder()
 
     val navItems = listOf(
@@ -112,7 +115,9 @@ fun MainAppScreen(
                             onNavigateToAccounts = { selectedTab = 3 },
                             onNavigateToTools = { selectedTab = 4 },
                             onScanReceipt = onScanReceipt,
-                            onOpenSettings = onOpenSettings
+                            onOpenSettings = onOpenSettings,
+                            onNavigateToCashflow = { cashflowMonth = it },
+                            cashflowRevision = cashflowRevision
                         )
                     }
                     1 -> {
@@ -139,6 +144,9 @@ fun MainAppScreen(
                         )
                     }
                 }
+            }
+            if (selectedTab == 0) {
+                cashflowMonth?.let { month -> CashflowAnalysisScreen(month) { cashflowMonth = null; cashflowRevision++ } }
             }
         }
     }

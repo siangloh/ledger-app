@@ -1,0 +1,21 @@
+.cashflow-panel { margin: 16px 0; }
+.cashflow-controls, .cashflow-stats { display: flex; flex-wrap: wrap; gap: 16px; }
+.cashflow-controls { align-items: end; }
+.cashflow-controls label { display: grid; gap: 6px; }
+.cashflow-stats > div { flex: 1 1 170px; padding: 12px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; min-width: 0; overflow-wrap: anywhere; }
+.cashflow-stats strong { display: block; font-size: 1.2rem; margin-top: 8px; }
+.cashflow-bar { display: flex; height: 18px; border-radius: 8px; overflow: hidden; background: #e2e8f0; margin: 12px 0; }
+.cashflow-bar > span { min-width: 0; }
+.cashflow-bar .spent { background: #0f766e; }
+.cashflow-bar .reserved { background: #d97706; }
+.cashflow-bar .available { background: #94a3b8; }
+.cashflow-warning { color: #b45309; }
+.cashflow-content details { padding: 12px 0; border-bottom: 1px solid var(--line, #e2e8f0); }
+.cashflow-content summary { cursor: pointer; overflow-wrap: anywhere; }
+.cashflow-content table { width: 100%; table-layout: fixed; }
+.cashflow-content th, .cashflow-content td { padding: 10px 6px; overflow-wrap: anywhere; white-space: normal; }
+.cashflow-content button { min-height: 44px; white-space: normal; margin: 6px; }
+.cashflow-content select { width: 100%; max-width: 100%; }
+.cashflow-muted { color: var(--muted, #64748b); font-size: .9rem; }
+.privacy-mode .cashflow-content { filter: blur(8px); pointer-events: none; user-select: none; }
+@media(max-width: 500px) { .cashflow-content th, .cashflow-content td { padding: 8px 3px; font-size: .85rem; } }

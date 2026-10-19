@@ -353,5 +353,56 @@
     <string name="source_label_split_bill">AA分账</string>
     <string name="source_label_reconciliation">对账平账</string>
     <string name="source_label_unknown">未知/历史</string>
+
+    <string name="cf_title">收支分析</string>
+    <string name="cf_open">查看收支分析 →</string>
+    <string name="cf_income">实际收入</string>
+    <string name="cf_expense">实际总支出</string>
+    <string name="cf_net">实际收支结余</string>
+    <string name="cf_reserved">本月固定开销待付预留</string>
+    <string name="cf_available">扣除预留后预计可用</string>
+    <string name="cf_usage">收入使用情况</string>
+    <string name="cf_fixed">固定开销支付进度</string>
+    <string name="cf_planned">计划应付</string>
+    <string name="cf_paid">已支付</string>
+    <string name="cf_pending">待支付</string>
+    <string name="cf_partial">部分支付</string>
+    <string name="cf_overdue">逾期</string>
+    <string name="cf_prior">历史已确认账单逾期（未扣入本月预留）</string>
+    <string name="cf_income_platforms">收入平台／账户</string>
+    <string name="cf_expense_platforms">支出平台／账户</string>
+    <string name="cf_expense_categories">支出分类</string>
+    <string name="cf_income_percent">占收入</string>
+    <string name="cf_total_percent">占该类总额</string>
+    <string name="cf_unknown">未指定账户</string>
+    <string name="cf_empty">暂无记录</string>
+    <string name="cf_no_ratio">本期收入非正数，无法计算占比</string>
+    <string name="cf_disclaimer">预计可用不是银行余额或保证可花金额。按自然月、所选币种统计；无币种交易按账本币种处理，不虚构汇率。</string>
+    <string name="cf_estimate">预留为保守估计：计划未匹配不代表未付款；当前计划无法证明历史金额，跨模块可能重复。请核对并关联付款，或取消／标记重复账单。</string>
+    <string name="cf_refresh">刷新</string>
+    <string name="cf_error">加载失败，请重试</string>
+    <string name="cf_back">返回</string>
+    <string name="cf_transactions">交易明细</string>
+    <string name="cf_link">关联付款交易</string>
+    <string name="cf_unlink">解除关联</string>
+    <string name="cf_cancel">取消此期账单</string>
+    <string name="cf_duplicate">标记为另一账单的重复项</string>
+    <string name="cf_bill_key">账单标识</string>
+    <string name="cf_transaction_id">交易编号</string>
+    <string name="cf_saved">已更新</string>
+    <string name="cf_loading">加载中…</string>
+    <string name="cf_deficit">预计缺口</string>
+    <string name="cf_updated">报告日期</string>
+    <string name="cf_cached">离线缓存，数据可能已过期</string>
+    <string name="cf_month">月份</string>
+    <string name="cf_currency">币种</string>
+    <string name="cf_refund">关联退款交易</string>
+    <string name="cf_restore">恢复此期账单</string>
+    <string name="cf_inactive">已取消／已合并账单</string>
+    <string name="cf_edit_amount">更新本期应付金额</string>
+    <string name="cf_scheduled">自动生成待确认（未计实际收支）</string>
+    <string name="cf_confirm">确认实际发生</string>
+    <string name="cf_undo_confirm">撤销实际发生确认</string>
+
 </resources>
 

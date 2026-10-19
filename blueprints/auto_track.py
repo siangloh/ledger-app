@@ -1145,6 +1145,41 @@ def api_native_overview():
     return jsonify(res)
 
 
+@auto_track_bp.route('/api/native/cashflow-analysis', methods=['GET', 'POST'])
+@csrf.exempt
+def api_native_cashflow_analysis():
+    from services.cashflow_analysis_service import (
+        get_monthly_cashflow_summary, update_bill_payment, update_bill, confirm_scheduled_transaction,
+    )
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+    try:
+        if request.method == 'POST':
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                raise ValueError('Expected a JSON object')
+            if payload.get('action') == 'confirm':
+                result = confirm_scheduled_transaction(user_id, int(payload.get('transaction_id', 0)), db,
+                                                       undo=payload.get('undo') is True)
+            elif payload.get('action') == 'bill':
+                result = update_bill(user_id, payload.get('month'), payload.get('bill_key'), db,
+                                     cancelled=payload.get('cancelled') is True,
+                                     duplicate_of=payload.get('duplicate_of'), amount=payload.get('amount'))
+            else:
+                result = update_bill_payment(user_id, payload.get('month'), payload.get('bill_key'),
+                                         int(payload.get('transaction_id', 0)), db,
+                                         unlink=payload.get('unlink') is True, refund=payload.get('refund') is True)
+        else:
+            result = get_monthly_cashflow_summary(user_id, request.args.get('month') or date.today().strftime('%Y-%m'),
+                                                  db, request.args.get('currency'))
+        return jsonify(result)
+    except (ValueError, TypeError) as error:
+        db.rollback()
+        return jsonify({'ok': False, 'message': str(error)}), 400
+
+
 @auto_track_bp.route('/api/native/quick-categorize', methods=['POST'], endpoint='api_native_quick_categorize')
 @csrf.exempt
 def api_native_quick_categorize():

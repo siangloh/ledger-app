@@ -353,5 +353,56 @@
     <string name="source_label_split_bill">Split Bill</string>
     <string name="source_label_reconciliation">Reconciliation</string>
     <string name="source_label_unknown">History</string>
+
+    <string name="cf_title">Cashflow analysis</string>
+    <string name="cf_open">View cashflow analysis →</string>
+    <string name="cf_income">Actual income</string>
+    <string name="cf_expense">Actual expenses</string>
+    <string name="cf_net">Actual net cashflow</string>
+    <string name="cf_reserved">Unpaid fixed expenses this month</string>
+    <string name="cf_available">Projected available after reserves</string>
+    <string name="cf_usage">Income usage</string>
+    <string name="cf_fixed">Fixed expense payment progress</string>
+    <string name="cf_planned">Scheduled</string>
+    <string name="cf_paid">Paid</string>
+    <string name="cf_pending">Pending</string>
+    <string name="cf_partial">Partially paid</string>
+    <string name="cf_overdue">Overdue</string>
+    <string name="cf_prior">Earlier recorded overdue bills (outside this month’s reserve)</string>
+    <string name="cf_income_platforms">Income by platform / account</string>
+    <string name="cf_expense_platforms">Expenses by platform / account</string>
+    <string name="cf_expense_categories">Expenses by category</string>
+    <string name="cf_income_percent">Of income</string>
+    <string name="cf_total_percent">Of section total</string>
+    <string name="cf_unknown">Unassigned account</string>
+    <string name="cf_empty">No records</string>
+    <string name="cf_no_ratio">Income is not positive; ratios are unavailable</string>
+    <string name="cf_disclaimer">Projected available is not a bank balance or guaranteed spending allowance. Calendar month, selected currency; transactions without a currency use the ledger currency. No assumed FX rates.</string>
+    <string name="cf_estimate">Reserves are conservative estimates: an unmatched plan is not proof of non-payment. Current schedules cannot prove historical amounts and may overlap across modules. Review and link payments, or cancel / mark duplicate bills.</string>
+    <string name="cf_refresh">Refresh</string>
+    <string name="cf_error">Could not load; retry</string>
+    <string name="cf_back">Back</string>
+    <string name="cf_transactions">Transactions</string>
+    <string name="cf_link">Link payment transaction</string>
+    <string name="cf_unlink">Unlink</string>
+    <string name="cf_cancel">Cancel this bill</string>
+    <string name="cf_duplicate">Mark as duplicate of another bill</string>
+    <string name="cf_bill_key">Bill key</string>
+    <string name="cf_transaction_id">Transaction ID</string>
+    <string name="cf_saved">Updated</string>
+    <string name="cf_loading">Loading…</string>
+    <string name="cf_deficit">Projected shortfall</string>
+    <string name="cf_updated">Report date</string>
+    <string name="cf_cached">Offline cache; data may be out of date</string>
+    <string name="cf_month">Month</string>
+    <string name="cf_currency">Currency</string>
+    <string name="cf_refund">Link refund transaction</string>
+    <string name="cf_restore">Restore this bill</string>
+    <string name="cf_inactive">Cancelled / duplicate bills</string>
+    <string name="cf_edit_amount">Update amount due for this bill</string>
+    <string name="cf_scheduled">Scheduled entries awaiting confirmation (excluded from actuals)</string>
+    <string name="cf_confirm">Confirm actually occurred</string>
+    <string name="cf_undo_confirm">Undo occurrence confirmation</string>
+
 </resources>
 

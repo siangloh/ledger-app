@@ -5008,6 +5008,12 @@ TRANSLATIONS = {
 }
 
 
+from core.cashflow_i18n import translations as _cashflow_translations
+
+for _lang, _labels in _cashflow_translations().items():
+    TRANSLATIONS[_lang].update(_labels)
+
+
 def get_supported_languages():
     """返回支持的语言列表字典清单"""
     return list(SUPPORTED_LANGUAGES.values())

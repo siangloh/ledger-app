@@ -353,5 +353,56 @@
     <string name="source_label_split_bill">Kongsi Bil</string>
     <string name="source_label_reconciliation">Penyelarasan</string>
     <string name="source_label_unknown">Sejarah</string>
+
+    <string name="cf_title">Analisis aliran tunai</string>
+    <string name="cf_open">Lihat analisis aliran tunai →</string>
+    <string name="cf_income">Pendapatan sebenar</string>
+    <string name="cf_expense">Perbelanjaan sebenar</string>
+    <string name="cf_net">Baki aliran tunai sebenar</string>
+    <string name="cf_reserved">Perbelanjaan tetap belum dibayar bulan ini</string>
+    <string name="cf_available">Anggaran tersedia selepas rizab</string>
+    <string name="cf_usage">Penggunaan pendapatan</string>
+    <string name="cf_fixed">Kemajuan bayaran perbelanjaan tetap</string>
+    <string name="cf_planned">Dijadualkan</string>
+    <string name="cf_paid">Dibayar</string>
+    <string name="cf_pending">Belum dibayar</string>
+    <string name="cf_partial">Dibayar sebahagian</string>
+    <string name="cf_overdue">Tertunggak</string>
+    <string name="cf_prior">Bil terdahulu direkod tertunggak (di luar rizab bulan ini)</string>
+    <string name="cf_income_platforms">Pendapatan mengikut platform / akaun</string>
+    <string name="cf_expense_platforms">Perbelanjaan mengikut platform / akaun</string>
+    <string name="cf_expense_categories">Perbelanjaan mengikut kategori</string>
+    <string name="cf_income_percent">Daripada pendapatan</string>
+    <string name="cf_total_percent">Daripada jumlah bahagian</string>
+    <string name="cf_unknown">Akaun tidak ditetapkan</string>
+    <string name="cf_empty">Tiada rekod</string>
+    <string name="cf_no_ratio">Pendapatan tidak positif; nisbah tidak tersedia</string>
+    <string name="cf_disclaimer">Anggaran tersedia bukan baki bank atau elaun terjamin. Bulan kalendar dan mata wang dipilih; transaksi tanpa mata wang menggunakan mata wang lejar. Tiada kadar tukaran andaian.</string>
+    <string name="cf_estimate">Rizab ialah anggaran konservatif: pelan tanpa padanan bukan bukti belum dibayar. Jadual semasa tidak membuktikan amaun sejarah dan mungkin bertindih. Semak dan pautkan bayaran, atau batalkan / tandakan bil pendua.</string>
+    <string name="cf_refresh">Muat semula</string>
+    <string name="cf_error">Gagal dimuatkan; cuba lagi</string>
+    <string name="cf_back">Kembali</string>
+    <string name="cf_transactions">Transaksi</string>
+    <string name="cf_link">Pautkan transaksi bayaran</string>
+    <string name="cf_unlink">Nyahpaut</string>
+    <string name="cf_cancel">Batalkan bil ini</string>
+    <string name="cf_duplicate">Tandakan sebagai pendua bil lain</string>
+    <string name="cf_bill_key">Pengenal bil</string>
+    <string name="cf_transaction_id">ID transaksi</string>
+    <string name="cf_saved">Dikemas kini</string>
+    <string name="cf_loading">Memuatkan…</string>
+    <string name="cf_deficit">Anggaran kekurangan</string>
+    <string name="cf_updated">Tarikh laporan</string>
+    <string name="cf_cached">Cache luar talian; data mungkin lapuk</string>
+    <string name="cf_month">Bulan</string>
+    <string name="cf_currency">Mata wang</string>
+    <string name="cf_refund">Pautkan transaksi bayaran balik</string>
+    <string name="cf_restore">Pulihkan bil ini</string>
+    <string name="cf_inactive">Bil dibatalkan / pendua</string>
+    <string name="cf_edit_amount">Kemas kini amaun bil ini</string>
+    <string name="cf_scheduled">Entri berjadual menunggu pengesahan (tidak dikira sebagai sebenar)</string>
+    <string name="cf_confirm">Sahkan telah berlaku</string>
+    <string name="cf_undo_confirm">Batalkan pengesahan berlaku</string>
+
 </resources>
 
