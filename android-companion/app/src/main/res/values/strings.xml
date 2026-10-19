@@ -404,5 +404,15 @@
     <string name="cf_confirm">确认实际发生</string>
     <string name="cf_undo_confirm">撤销实际发生确认</string>
 
+    <string name="cf_tab_all">全部概览</string>
+    <string name="cf_tab_overview">资金流向</string>
+    <string name="cf_tab_expense">支出饼图</string>
+    <string name="cf_tab_income">收入分布</string>
+    <string name="cf_tab_bills">固定开销</string>
+    <string name="cf_donut_center_expense">总支出</string>
+    <string name="cf_donut_center_income">总收入</string>
+    <string name="cf_donut_center_net">结余</string>
+    <string name="cf_fixed_progress">履约率</string>
+
 </resources>
 

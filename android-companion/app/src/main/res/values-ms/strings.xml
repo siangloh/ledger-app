@@ -404,5 +404,15 @@
     <string name="cf_confirm">Sahkan telah berlaku</string>
     <string name="cf_undo_confirm">Batalkan pengesahan berlaku</string>
 
+    <string name="cf_tab_all">Papan Pemuka</string>
+    <string name="cf_tab_overview">Agihan</string>
+    <string name="cf_tab_expense">Perbelanjaan</string>
+    <string name="cf_tab_income">Pendapatan</string>
+    <string name="cf_tab_bills">Bil Tetap</string>
+    <string name="cf_donut_center_expense">Perbelanjaan</string>
+    <string name="cf_donut_center_income">Pendapatan</string>
+    <string name="cf_donut_center_net">Baki Bersih</string>
+    <string name="cf_fixed_progress">Selesai</string>
+
 </resources>
 

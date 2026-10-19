@@ -404,5 +404,15 @@
     <string name="cf_confirm">Confirm actually occurred</string>
     <string name="cf_undo_confirm">Undo occurrence confirmation</string>
 
+    <string name="cf_tab_all">Dashboard</string>
+    <string name="cf_tab_overview">Allocation</string>
+    <string name="cf_tab_expense">Expenses</string>
+    <string name="cf_tab_income">Income</string>
+    <string name="cf_tab_bills">Fixed Bills</string>
+    <string name="cf_donut_center_expense">Expenses</string>
+    <string name="cf_donut_center_income">Income</string>
+    <string name="cf_donut_center_net">Net</string>
+    <string name="cf_fixed_progress">Settled</string>
+
 </resources>
 
