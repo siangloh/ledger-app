@@ -11,6 +11,8 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.text.SimpleDateFormat
+import java.util.*
 
 data class TransactionRecord(
     val id: Long,
@@ -279,10 +281,27 @@ object NativeLedgerApi {
     ): Result<TransactionsPage> = withContext(Dispatchers.IO) {
         val cacheKey = "${month.orEmpty()}_${type.orEmpty()}_${category.orEmpty()}_${search.orEmpty().trim()}_a${accountId ?: 0}_s${startDate.orEmpty()}_e${endDate.orEmpty()}_min${minAmount ?: 0.0}_max${maxAmount ?: 0.0}_src${source.orEmpty()}_chan${channel.orEmpty()}_p${page}_l${limit}"
         val now = System.currentTimeMillis()
+        val todayMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
+        if (!month.isNullOrBlank() && month > todayMonthStr) {
+            // 未来月份：天然无流水，0ms 返回空页，严禁请求网络
+            return@withContext Result.success(TransactionsPage(emptyList(), 0, 1, limit, false))
+        }
+
         if (!forceRefresh) {
             val mem = recordsCache[cacheKey]
-            if (mem != null && (now - mem.first < 20_000L)) {
+            if (mem != null && (now - mem.first < 300_000L)) {
                 return@withContext Result.success(mem.second)
+            }
+            val isSimpleMonthQuery = page == 1 && category == null && accountId == null && minAmount == null && maxAmount == null && source == null && channel == null && startDate == null && endDate == null
+            if (isSimpleMonthQuery) {
+                val cached = LocalDataStore.getRecords(context, month, type, search ?: "", page)
+                if (!cached.isNullOrBlank()) {
+                    try {
+                        val pageResult = parseTransactionsPageJson(JSONObject(cached), page, limit)
+                        recordsCache[cacheKey] = Pair(now, pageResult)
+                        return@withContext Result.success(pageResult)
+                    } catch (_: Exception) {}
+                }
             }
         }
 
@@ -547,8 +566,19 @@ object NativeLedgerApi {
 
     suspend fun getAccounts(context: Context, forceRefresh: Boolean = false): Result<AccountsSummary> = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
-        if (!forceRefresh && cachedAccounts != null && (now - cachedAccountsTimestamp < 60_000L)) {
-            return@withContext Result.success(cachedAccounts!!)
+        if (!forceRefresh) {
+            if (cachedAccounts != null && (now - cachedAccountsTimestamp < 300_000L)) {
+                return@withContext Result.success(cachedAccounts!!)
+            }
+            val localJson = LocalDataStore.getAccounts(context)
+            if (!localJson.isNullOrBlank()) {
+                try {
+                    val summary = parseAccountsSummaryJson(JSONObject(localJson))
+                    cachedAccounts = summary
+                    cachedAccountsTimestamp = now
+                    return@withContext Result.success(summary)
+                } catch (_: Exception) {}
+            }
         }
 
         try {
@@ -672,10 +702,47 @@ object NativeLedgerApi {
         }
     }
 
+    fun parseCategoriesJson(json: JSONObject): CategoriesResult {
+        val expenseArr = json.optJSONArray("expense_categories") ?: JSONArray()
+        val incomeArr = json.optJSONArray("income_categories") ?: JSONArray()
+        val savingsArr = json.optJSONArray("savings_categories") ?: JSONArray()
+
+        val expenses = mutableListOf<CategoryRecord>()
+        for (i in 0 until expenseArr.length()) {
+            val obj = expenseArr.getJSONObject(i)
+            expenses.add(CategoryRecord(obj.optInt("id"), obj.optString("name"), "expense"))
+        }
+
+        val incomes = mutableListOf<CategoryRecord>()
+        for (i in 0 until incomeArr.length()) {
+            val obj = incomeArr.getJSONObject(i)
+            incomes.add(CategoryRecord(obj.optInt("id"), obj.optString("name"), "income"))
+        }
+
+        val savings = mutableListOf<CategoryRecord>()
+        for (i in 0 until savingsArr.length()) {
+            val obj = savingsArr.getJSONObject(i)
+            savings.add(CategoryRecord(obj.optInt("id"), obj.optString("name"), "savings"))
+        }
+
+        return CategoriesResult(expenses, incomes, savings)
+    }
+
     suspend fun getCategories(context: Context, forceRefresh: Boolean = false): Result<CategoriesResult> = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
-        if (!forceRefresh && cachedCategories != null && (now - cachedCategoriesTimestamp < 300_000L)) {
-            return@withContext Result.success(cachedCategories!!)
+        if (!forceRefresh) {
+            if (cachedCategories != null && (now - cachedCategoriesTimestamp < 300_000L)) {
+                return@withContext Result.success(cachedCategories!!)
+            }
+            val localJson = LocalDataStore.getCategories(context)
+            if (!localJson.isNullOrBlank()) {
+                try {
+                    val catRes = parseCategoriesJson(JSONObject(localJson))
+                    cachedCategories = catRes
+                    cachedCategoriesTimestamp = now
+                    return@withContext Result.success(catRes)
+                } catch (_: Exception) {}
+            }
         }
 
         try {
@@ -691,42 +758,41 @@ object NativeLedgerApi {
             conn.disconnect()
 
             val json = JSONObject(respBody)
-            val expenseArr = json.optJSONArray("expense_categories") ?: JSONArray()
-            val incomeArr = json.optJSONArray("income_categories") ?: JSONArray()
-            val savingsArr = json.optJSONArray("savings_categories") ?: JSONArray()
-
-            val expenses = mutableListOf<CategoryRecord>()
-            for (i in 0 until expenseArr.length()) {
-                val obj = expenseArr.getJSONObject(i)
-                expenses.add(CategoryRecord(obj.optInt("id"), obj.optString("name"), "expense"))
-            }
-
-            val incomes = mutableListOf<CategoryRecord>()
-            for (i in 0 until incomeArr.length()) {
-                val obj = incomeArr.getJSONObject(i)
-                incomes.add(CategoryRecord(obj.optInt("id"), obj.optString("name"), "income"))
-            }
-
-            val savings = mutableListOf<CategoryRecord>()
-            for (i in 0 until savingsArr.length()) {
-                val obj = savingsArr.getJSONObject(i)
-                savings.add(CategoryRecord(obj.optInt("id"), obj.optString("name"), "savings"))
-            }
-
-            val catRes = CategoriesResult(expenses, incomes, savings)
+            LocalDataStore.saveCategories(context, respBody)
+            val catRes = parseCategoriesJson(json)
             cachedCategories = catRes
             cachedCategoriesTimestamp = now
             Result.success(catRes)
         } catch (e: Exception) {
             Log.e(TAG, "getCategories error: ${e.message}", e)
-            Result.failure(e)
+            val localJson = LocalDataStore.getCategories(context)
+            if (!localJson.isNullOrBlank()) {
+                try {
+                    Result.success(parseCategoriesJson(JSONObject(localJson)))
+                } catch (_: Exception) {
+                    Result.failure(e)
+                }
+            } else {
+                Result.failure(e)
+            }
         }
     }
 
     suspend fun getToolsSummary(context: Context, forceRefresh: Boolean = false): Result<ToolsSummary> = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
-        if (!forceRefresh && cachedTools != null && (now - cachedToolsTimestamp < 60_000L)) {
-            return@withContext Result.success(cachedTools!!)
+        if (!forceRefresh) {
+            if (cachedTools != null && (now - cachedToolsTimestamp < 300_000L)) {
+                return@withContext Result.success(cachedTools!!)
+            }
+            val localJson = LocalDataStore.getTools(context)
+            if (!localJson.isNullOrBlank()) {
+                try {
+                    val toolsRes = parseToolsSummaryJson(JSONObject(localJson))
+                    cachedTools = toolsRes
+                    cachedToolsTimestamp = now
+                    return@withContext Result.success(toolsRes)
+                } catch (_: Exception) {}
+            }
         }
 
         try {

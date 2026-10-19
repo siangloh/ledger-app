@@ -156,11 +156,21 @@ fun RecordsScreen(
         }
     }
 
-    fun loadData(resetPage: Boolean = true) {
+    fun loadData(resetPage: Boolean = true, forceRefresh: Boolean = false) {
         val targetPage = if (resetPage) 1 else (currentPage + 1)
         val effMonth = if (filterStartDate.isNullOrBlank() && filterEndDate.isNullOrBlank()) selectedMonth else null
         val todayMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
         val isFutureMonth = effMonth != null && effMonth > todayMonthStr
+
+        // 1. 未来空月份：0ms 秒开呈现空流水占位，绝不请求网络（除非用户强制刷新）
+        if (isFutureMonth) {
+            transactions = emptyList()
+            totalCount = 0
+            hasMore = false
+            isLoading = false
+            loadPending()
+            if (!forceRefresh) return
+        }
 
         if (resetPage) {
             val isSimpleMonthQuery = targetPage == 1 && effMonth != null && filterCategory == null && filterAccountId == null && filterMinAmount == null && filterMaxAmount == null && filterSource == null && filterChannel == null
@@ -175,28 +185,18 @@ fun RecordsScreen(
                     totalCount = pageObj.totalCount
                     hasMore = pageObj.hasMore
                     isLoading = false
-                } catch (_: Exception) {
-                    if (isFutureMonth) {
-                        transactions = emptyList()
-                        totalCount = 0
-                        hasMore = false
-                        isLoading = false
-                    } else {
-                        transactions = emptyList()
-                        isLoading = true
+                    loadPending()
+                    // 核心：若非强制刷新，只要本地有快照（或在 5 分钟新鲜期内），直接消费本地存储，严禁发起网络请求！
+                    if (!forceRefresh) {
+                        return
                     }
-                }
-            } else {
-                if (isFutureMonth) {
-                    // 未来空月份：0ms 秒开呈现空流水占位，绝不进入长延迟骨架屏阻塞
-                    transactions = emptyList()
-                    totalCount = 0
-                    hasMore = false
-                    isLoading = false
-                } else {
+                } catch (_: Exception) {
                     transactions = emptyList()
                     isLoading = true
                 }
+            } else {
+                transactions = emptyList()
+                isLoading = true
             }
             loadPending()
         } else {
@@ -218,7 +218,8 @@ fun RecordsScreen(
                 source = filterSource,
                 channel = filterChannel,
                 page = targetPage,
-                limit = 50
+                limit = 50,
+                forceRefresh = forceRefresh
             )
             isLoading = false
             isLoadingMore = false
@@ -246,13 +247,26 @@ fun RecordsScreen(
         }
     }
 
-    // 监听后台/WiFi 自动同步完成广播，实时静默刷新离线队列与流水明细
-    DisposableEffect(Unit) {
-        val filter = android.content.IntentFilter("com.siangloh.ledger.SYNC_COMPLETED")
+    // 监听后台定期全量同步广播 (DATA_SYNCED) 与同步队列完成广播 (SYNC_COMPLETED)，实时静默刷新离线队列与流水明细
+    DisposableEffect(selectedMonth, selectedType, debouncedSearchQuery) {
+        val filter = android.content.IntentFilter().apply {
+            addAction("com.siangloh.ledger.SYNC_COMPLETED")
+            addAction("com.siangloh.ledger.DATA_SYNCED")
+        }
         val receiver = object : android.content.BroadcastReceiver() {
             override fun onReceive(ctx: android.content.Context?, intent: android.content.Intent?) {
                 loadPending()
-                loadData(resetPage = true)
+                val effMonth = if (filterStartDate.isNullOrBlank() && filterEndDate.isNullOrBlank()) selectedMonth else null
+                val cachedJson = LocalDataStore.getRecords(context, effMonth, selectedType, debouncedSearchQuery, 1)
+                if (!cachedJson.isNullOrBlank()) {
+                    try {
+                        val pageObj = NativeLedgerApi.parseTransactionsPageJson(JSONObject(cachedJson))
+                        transactions = pageObj.items
+                        totalCount = pageObj.totalCount
+                        hasMore = pageObj.hasMore
+                        isLoading = false
+                    } catch (_: Exception) {}
+                }
             }
         }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {

@@ -383,34 +383,40 @@ fun OverviewScreen(
         }
     }
 
-    fun refreshData() {
+    fun refreshData(forceRefresh: Boolean = false) {
         val username = NetworkHelper.getUsername(context)
         val todayMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
         val isFutureMonth = period == "month" && currentMonthStr > todayMonthStr
 
+        // 1. 未来月份：天然 0.00 空态，严禁请求网络（除非用户强制刷新）
+        if (isFutureMonth) {
+            overviewData = OverviewData(lastActiveTime = "刚刚", isListening = isListeningActual)
+            isLoading = false
+            hasNetworkError = false
+            networkErrorMessage = ""
+            if (!forceRefresh) return
+        }
+
         val cachedJson = com.siangloh.ledger.data.LocalDataStore.getOverview(context, username, period, currentMonthStr)
+        val isFresh = com.siangloh.ledger.data.LocalDataStore.isOverviewFresh(context, username, period, currentMonthStr)
+
+        // 2. 本地缓存命中：立即呈现
         if (!cachedJson.isNullOrBlank()) {
             try {
-                overviewData = parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = true)
+                overviewData = parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = !isFresh)
                 isLoading = false
-            } catch (_: Exception) {
-                if (isFutureMonth) {
-                    overviewData = OverviewData(lastActiveTime = "刚刚", isListening = isListeningActual)
-                    isLoading = false
-                } else {
-                    isLoading = true
+                hasNetworkError = false
+                networkErrorMessage = ""
+                // 核心：若非用户主动点击刷新，只要本地有缓存，100% 消费本地快照，直接 return 绝不访问网络！
+                if (!forceRefresh) {
+                    return
                 }
-            }
-        } else {
-            if (isFutureMonth) {
-                // 未来月份且尚无缓存：0ms 瞬间呈现空态（RM 0.00），后台静默校验，杜绝卡顿与 delay
-                overviewData = OverviewData(lastActiveTime = "刚刚", isListening = isListeningActual)
-                isLoading = false
-            } else {
-                // 过去或当前月份未命中缓存：清空上一月残留数据，避免出现月份标题与金额不一致的残留幻象
-                overviewData = OverviewData(lastActiveTime = overviewData.lastActiveTime, isListening = isListeningActual)
+            } catch (_: Exception) {
                 isLoading = true
             }
+        } else {
+            overviewData = OverviewData(lastActiveTime = overviewData.lastActiveTime, isListening = isListeningActual)
+            isLoading = true
         }
 
         coroutineScope.launch {
@@ -525,7 +531,37 @@ fun OverviewScreen(
     }
 
     LaunchedEffect(period, currentMonthStr) {
-        refreshData()
+        refreshData(forceRefresh = false)
+    }
+
+    // 监听后台定期全量同步广播 (DATA_SYNCED) 与同步队列完成广播 (SYNC_COMPLETED)，静默从本地存储更新 UI
+    DisposableEffect(period, currentMonthStr) {
+        val filter = android.content.IntentFilter().apply {
+            addAction("com.siangloh.ledger.DATA_SYNCED")
+            addAction("com.siangloh.ledger.SYNC_COMPLETED")
+        }
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: android.content.Context?, intent: android.content.Intent?) {
+                val username = NetworkHelper.getUsername(context)
+                val newCachedJson = com.siangloh.ledger.data.LocalDataStore.getOverview(context, username, period, currentMonthStr)
+                if (!newCachedJson.isNullOrBlank()) {
+                    try {
+                        overviewData = parseOverviewJson(newCachedJson, isListeningActual, isOfflineCache = false)
+                        isLoading = false
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(receiver, filter)
+        }
+        onDispose {
+            try {
+                context.unregisterReceiver(receiver)
+            } catch (_: Exception) {}
+        }
     }
 
     Scaffold(
@@ -567,7 +603,7 @@ fun OverviewScreen(
                         )
                         context.startActivity(intent)
                     },
-                    onRefresh = { refreshData() },
+                    onRefresh = { refreshData(forceRefresh = true) },
                     onSettings = onOpenSettings
                 )
             }
@@ -580,7 +616,7 @@ fun OverviewScreen(
                         border = BorderStroke(1.dp, Color(0xFFFDE68A)),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { refreshData() }
+                            .clickable { refreshData(forceRefresh = true) }
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -818,7 +854,7 @@ fun OverviewScreen(
 
                     if (isSuccess) {
                         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                        refreshData()
+                        refreshData(forceRefresh = true)
                     } else {
                         Toast.makeText(context, "操作失败: $msg", Toast.LENGTH_SHORT).show()
                     }
@@ -848,7 +884,7 @@ fun OverviewScreen(
                             db.pendingTransactionDao().updateCategory(tx.id, newCategory)
                         }
                         Toast.makeText(context, "已更新离线账单分类为【$newCategory】", Toast.LENGTH_SHORT).show()
-                        refreshData()
+                        refreshData(forceRefresh = true)
                     } else {
                         val serverUrl = NetworkHelper.getServerUrl(context)
                         val apiKey = NetworkHelper.getApiKey(context)
@@ -895,7 +931,7 @@ fun OverviewScreen(
                         // U2: 真实校验结果再提示反馈
                         if (isSuccess) {
                             Toast.makeText(context, "已修改为【$newCategory】", Toast.LENGTH_SHORT).show()
-                            refreshData()
+                            refreshData(forceRefresh = true)
                         } else {
                             Toast.makeText(context, "保存失败: $errorMsg", Toast.LENGTH_LONG).show()
                         }

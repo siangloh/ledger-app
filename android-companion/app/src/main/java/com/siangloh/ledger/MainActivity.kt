@@ -44,6 +44,7 @@ import com.siangloh.ledger.ui.AppSelectionActivity
 import com.siangloh.ledger.ui.NotificationLogActivity
 import com.siangloh.ledger.ui.QuickAddActivity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.File
@@ -101,6 +102,14 @@ class MainActivity : AppCompatActivity() {
         showNativeComposeMode()
         handleIncomingIntent(intent)
         registerNetworkCallback()
+
+        // 核心优化：进 App 时一次性全量拉取当前用户所有核心数据（近3月概览、近2月流水、账户、分类、小工具）存入本地
+        // 之后界面交互 100% 消费本地快照（0ms 瞬开，0 网络延迟），后续切月绝不再向在线数据库发送请求
+        lifecycleScope.launch(Dispatchers.IO) {
+            com.siangloh.ledger.data.LocalDataStore.syncAllUserData(this@MainActivity)
+        }
+        // 启动每 5 分钟在后台静默同步一次的定时协程
+        startPeriodicDataSyncLoop()
     }
 
     private fun ensureWebViewInitialized() {
@@ -178,6 +187,24 @@ class MainActivity : AppCompatActivity() {
         tryReconnectNotificationListener()
         // 智能节电同步：避免每次切前台都无脑拉起 WorkManager 唤醒网络
         checkAndEnqueueSyncIfNeeded()
+        // 切回前台时，若全量数据已过 5 分钟新鲜期，在后台静默全量同步一次
+        if (!com.siangloh.ledger.data.LocalDataStore.isFullSyncFresh(this)) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                com.siangloh.ledger.data.LocalDataStore.syncAllUserData(this@MainActivity)
+            }
+        }
+    }
+
+    private fun startPeriodicDataSyncLoop() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                kotlinx.coroutines.delay(com.siangloh.ledger.data.LocalDataStore.DEFAULT_FRESHNESS_TTL_MS)
+                if (NetworkHelper.isOnline(this@MainActivity)) {
+                    Log.d(TAG, "5-minute periodic timer: silently syncing user data from online db in background...")
+                    com.siangloh.ledger.data.LocalDataStore.syncAllUserData(this@MainActivity, force = true)
+                }
+            }
+        }
     }
 
     override fun onDestroy() {
