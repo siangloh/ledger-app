@@ -134,6 +134,7 @@ fun RecordsScreen(
         }
     }
 
+
     fun prefetchAdjacentMonth(monthStr: String, type: String) {
         scope.launch(Dispatchers.IO) {
             try {
@@ -219,6 +220,25 @@ fun RecordsScreen(
                     Toast.makeText(context, "加载流水失败：${err.message}", Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+    }
+
+    // 监听后台/WiFi 自动同步完成广播，实时静默刷新离线队列与流水明细
+    DisposableEffect(Unit) {
+        val filter = android.content.IntentFilter("com.siangloh.ledger.SYNC_COMPLETED")
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: android.content.Context?, intent: android.content.Intent?) {
+                loadPending()
+                loadData(resetPage = true)
+            }
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(receiver, filter)
+        }
+        onDispose {
+            try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
         }
     }
 

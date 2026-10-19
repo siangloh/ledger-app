@@ -175,8 +175,8 @@ class NotificationService : NotificationListenerService() {
             return
         }
 
-        // 5. 通过 Phase-1 检验，尝试发送给后端（或离线加入 Room 队列）
-        if (NetworkHelper.isOnline(this)) {
+        // 5. 通过 Phase-1 检验，尝试发送给后端（或离线/等待WiFi时加入 Room 队列）
+        if (NetworkHelper.canSyncNow(this)) {
             Log.i(TAG, "Posting transaction notification to backend...")
             NetworkHelper.postNotificationAsync(fullContent, this) { success, msg, verdict ->
                 serviceScope.launch {

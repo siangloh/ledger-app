@@ -62,6 +62,7 @@ class MainActivity : AppCompatActivity() {
     private var pendingReceiptPhotoUri: Uri? = null
     private var pendingScannedReceiptText: String? = null
     private var isWebViewInitialized = false
+    private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
 
     companion object {
         private const val TAG = "LedgerMainActivity"
@@ -99,6 +100,7 @@ class MainActivity : AppCompatActivity() {
         sp.edit().putString("default_view_mode", "compose").apply()
         showNativeComposeMode()
         handleIncomingIntent(intent)
+        registerNetworkCallback()
     }
 
     private fun ensureWebViewInitialized() {
@@ -179,6 +181,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        networkCallback?.let {
+            try {
+                val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+                cm?.unregisterNetworkCallback(it)
+            } catch (_: Exception) {}
+            networkCallback = null
+        }
         if (isWebViewInitialized) {
             try {
                 webView.stopLoading()
@@ -186,6 +195,48 @@ class MainActivity : AppCompatActivity() {
             } catch (_: Exception) {}
         }
         super.onDestroy()
+    }
+
+    private fun registerNetworkCallback() {
+        try {
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager ?: return
+            val callback = object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) {
+                    Log.d(TAG, "Network or WiFi became available, checking for pending sync...")
+                    triggerAutoSyncIfPending()
+                }
+
+                override fun onCapabilitiesChanged(network: android.net.Network, capabilities: android.net.NetworkCapabilities) {
+                    if (capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+                        triggerAutoSyncIfPending()
+                    }
+                }
+            }
+            networkCallback = callback
+            val request = android.net.NetworkRequest.Builder()
+                .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+            cm.registerNetworkCallback(request, callback)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register network callback: ${e.message}")
+        }
+    }
+
+    private fun triggerAutoSyncIfPending() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                if (!NetworkHelper.canSyncNow(this@MainActivity)) return@launch
+                val db = com.siangloh.ledger.data.AppDatabase.getInstance(this@MainActivity)
+                val hasPendingTxs = db.pendingTransactionDao().getSyncableTransactions().isNotEmpty()
+                val hasPendingNotifs = db.pendingNotificationDao().getPendingNotifications().isNotEmpty()
+                if (hasPendingTxs || hasPendingNotifs) {
+                    Log.i(TAG, "WiFi/Network connected with pending items. Triggering SyncWorker...")
+                    SyncWorker.enqueueSync(this@MainActivity)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "triggerAutoSyncIfPending error: ${e.message}")
+            }
+        }
     }
 
     private fun checkAndEnqueueSyncIfNeeded() {
@@ -554,11 +605,14 @@ class MainActivity : AppCompatActivity() {
         val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
         val defaultMode = sp.getString("default_view_mode", "compose") ?: "compose"
         val modeText = if (defaultMode == "web") "🏛️ 全功能账本大厅" else "📊 极简原生视图"
+        val isWifiOnly = NetworkHelper.isWifiOnlySync(this)
+        val syncScopeLabel = if (isWifiOnly) "仅在 WiFi 下自动同步" else "任何网络均可自动同步"
         val options = arrayOf(
             "🏛️ 切换至全功能账本大厅",
             "📊 切换至极简原生视图",
             "📱 默认启动视图设置 (当前: $modeText)",
             "🌐 界面语言设置 (当前: $langLabel)",
+            "📶 自动同步网络设置 (当前: $syncScopeLabel)",
             "⚡ 离线快速记账",
             "👤 绑定记账用户 (当前: $currentBound)",
             "🌐 服务器地址设置 (当前: $currentServer)",
@@ -575,13 +629,20 @@ class MainActivity : AppCompatActivity() {
                     1 -> showNativeComposeMode()
                     2 -> showDefaultViewModeDialog()
                     3 -> showLanguageDialog()
-                    4 -> startActivity(Intent(this, QuickAddActivity::class.java))
-                    5 -> showUsernameDialog()
-                    6 -> showServerUrlDialog()
-                    7 -> showApiKeyDialog()
-                    8 -> startActivity(Intent(this, AppSelectionActivity::class.java))
-                    9 -> startActivity(Intent(this, NotificationLogActivity::class.java))
-                    10 -> {
+                    4 -> {
+                        val newSetting = !isWifiOnly
+                        NetworkHelper.setWifiOnlySync(this, newSetting)
+                        SyncWorker.enqueueSync(this)
+                        val notice = if (newSetting) "已开启【仅在 WiFi 下自动同步】\n离线或移动网络下将安全保存在手机，连上 WiFi 时自动上传。" else "已切换为【任何网络均可自动同步】"
+                        Toast.makeText(this, notice, Toast.LENGTH_LONG).show()
+                    }
+                    5 -> startActivity(Intent(this, QuickAddActivity::class.java))
+                    6 -> showUsernameDialog()
+                    7 -> showServerUrlDialog()
+                    8 -> showApiKeyDialog()
+                    9 -> startActivity(Intent(this, AppSelectionActivity::class.java))
+                    10 -> startActivity(Intent(this, NotificationLogActivity::class.java))
+                    11 -> {
                         SyncWorker.enqueueSync(this)
                         Toast.makeText(this, "已发起后台同步请求", Toast.LENGTH_SHORT).show()
                     }

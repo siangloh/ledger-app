@@ -21,8 +21,9 @@ class SyncWorker(
         private const val WORK_NAME = "ledger_background_sync"
 
         fun enqueueSync(context: Context) {
+            val wifiOnly = NetworkHelper.isWifiOnlySync(context)
             val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
                 .build()
 
             val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
@@ -32,13 +33,18 @@ class SyncWorker(
 
             WorkManager.getInstance(context).enqueueUniqueWork(
                 WORK_NAME,
-                ExistingWorkPolicy.KEEP,
+                ExistingWorkPolicy.REPLACE,
                 syncRequest
             )
         }
     }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        if (!NetworkHelper.canSyncNow(applicationContext)) {
+            Log.i(TAG, "Cannot sync now (waiting for WiFi or network condition). Retrying later.")
+            return@withContext Result.retry()
+        }
+
         Log.i(TAG, "Starting background sync...")
         val db = AppDatabase.getInstance(applicationContext)
 
@@ -53,6 +59,12 @@ class SyncWorker(
                         if (syncedIds.isNotEmpty()) {
                             db.pendingTransactionDao().markAsSynced(syncedIds)
                             db.pendingTransactionDao().deleteSynced()
+                            com.siangloh.ledger.data.NativeLedgerApi.invalidateCache()
+                            try {
+                                val intent = android.content.Intent("com.siangloh.ledger.SYNC_COMPLETED")
+                                intent.setPackage(applicationContext.packageName)
+                                applicationContext.sendBroadcast(intent)
+                            } catch (_: Exception) {}
                         }
                         failedMap.forEach { (fid, ferr) ->
                             db.pendingTransactionDao().markAsFailed(fid, ferr)

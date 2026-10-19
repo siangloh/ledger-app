@@ -423,14 +423,17 @@ fun MoreToolsScreen(
         ServerConfigDialog(
             initialUrl = currentServerUrl,
             initialKey = currentApiKey,
+            initialWifiOnly = NetworkHelper.isWifiOnlySync(context),
             onDismiss = { showServerConfigDialog = false },
-            onSave = { newUrl, newKey ->
+            onSave = { newUrl, newKey, newWifiOnly ->
                 NetworkHelper.setServerUrl(context, newUrl)
                 NetworkHelper.setApiKey(context, newKey)
+                NetworkHelper.setWifiOnlySync(context, newWifiOnly)
+                com.siangloh.ledger.sync.SyncWorker.enqueueSync(context)
                 currentServerUrl = newUrl
                 currentApiKey = newKey
                 showServerConfigDialog = false
-                Toast.makeText(context, "配置已更新", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "配置与同步规则已更新", Toast.LENGTH_SHORT).show()
                 refreshAll()
             }
         )
@@ -1870,11 +1873,13 @@ fun QuickCategorizeDialog(
 fun ServerConfigDialog(
     initialUrl: String,
     initialKey: String,
+    initialWifiOnly: Boolean = false,
     onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit
+    onSave: (String, String, Boolean) -> Unit
 ) {
     var url by remember { mutableStateOf(initialUrl) }
     var key by remember { mutableStateOf(initialKey) }
+    var wifiOnly by remember { mutableStateOf(initialWifiOnly) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1882,7 +1887,7 @@ fun ServerConfigDialog(
         titleContentColor = Slate900,
         textContentColor = Slate800,
         title = {
-            Text("修改服务器连接", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
+            Text("修改服务器与同步配置", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1901,12 +1906,40 @@ fun ServerConfigDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Slate50,
+                    border = BorderStroke(1.dp, Slate200),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { wifiOnly = !wifiOnly }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("仅在 WiFi 下自动同步", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                            Text("无 WiFi 时先存入手机本地；连上 WiFi 时自动上传到云端", fontSize = 11.sp, color = Slate500)
+                        }
+                        Switch(
+                            checked = wifiOnly,
+                            onCheckedChange = { wifiOnly = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = PrimaryTeal
+                            )
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    onSave(url.trim(), key.trim())
+                    onSave(url.trim(), key.trim(), wifiOnly)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
             ) {

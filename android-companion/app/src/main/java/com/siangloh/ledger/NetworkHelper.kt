@@ -98,6 +98,23 @@ object NetworkHelper {
         }
     }
 
+    private const val KEY_SYNC_WIFI_ONLY = "sync_wifi_only"
+
+    fun isWifiOnlySync(context: Context? = null): Boolean {
+        val ctx = context ?: cachedContext ?: return false
+        return try {
+            ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_SYNC_WIFI_ONLY, false)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun setWifiOnlySync(context: Context, enabled: Boolean) {
+        val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        sp.edit().putBoolean(KEY_SYNC_WIFI_ONLY, enabled).apply()
+    }
+
     fun isOnline(context: Context): Boolean {
         init(context)
         return try {
@@ -108,6 +125,27 @@ object NetworkHelper {
         } catch (e: Exception) {
             false
         }
+    }
+
+    fun isWifi(context: Context): Boolean {
+        init(context)
+        return try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+            val activeNetwork = cm.activeNetwork ?: return false
+            val capabilities = cm.getNetworkCapabilities(activeNetwork) ?: return false
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun canSyncNow(context: Context): Boolean {
+        if (!isOnline(context)) return false
+        if (isWifiOnlySync(context)) {
+            return isWifi(context)
+        }
+        return true
     }
 
     fun postNotificationAsync(text: String, context: Context? = null, callback: ((Boolean, String, String?) -> Unit)? = null) {

@@ -241,6 +241,50 @@ fun AddTransactionScreen(
 
                             isSaving = true
                             scope.launch {
+                                val canUploadOnline = NetworkHelper.canSyncNow(context)
+                                if (!canUploadOnline) {
+                                    // 处于无网络或等待 WiFi 的离线状态：零延迟（0ms）直接存入本地 Room，不阻塞等待网络超时
+                                    try {
+                                        withContext(Dispatchers.IO) {
+                                            val db = AppDatabase.getInstance(context)
+                                            val rawNote = draft.note.trim().ifBlank {
+                                                if (draft.txType == "transfer") "内部转账" else draft.selectedCategory
+                                            }
+                                            db.pendingTransactionDao().insert(
+                                                PendingTransaction(
+                                                    date = draft.dateStr,
+                                                    type = draft.txType,
+                                                    group_name = if (draft.txType == "income") draft.incomeGroup else "personal",
+                                                    category = draft.selectedCategory,
+                                                    amount = amt,
+                                                    note = rawNote,
+                                                    source = "offline_manual",
+                                                    sync_status = "pending",
+                                                    account_id = draft.selectedAccountId?.toLong(),
+                                                    to_account_id = draft.selectedToAccountId?.toLong(),
+                                                    tags = draft.tags.trim()
+                                                )
+                                            )
+                                        }
+                                        SyncWorker.enqueueSync(context)
+                                        val wifiOnly = NetworkHelper.isWifiOnlySync(context)
+                                        val tip = if (wifiOnly) {
+                                            "💾 已保存至本地！连上 WiFi 后将自动上传同步到云端。"
+                                        } else {
+                                            "💾 当前离线，已保存至本地！连上网络后将自动上传同步到云端。"
+                                        }
+                                        Toast.makeText(context, tip, Toast.LENGTH_LONG).show()
+                                        draft.clear(context)
+                                        isSaving = false
+                                        onFinished()
+                                    } catch (localErr: Exception) {
+                                        isSaving = false
+                                        Toast.makeText(context, "本地保存失败：${localErr.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                    return@launch
+                                }
+
+                                // 允许在线提交状态：直接提交至云端数据库
                                 val res = NativeLedgerApi.addTransaction(
                                     context = context,
                                     type = draft.txType,
@@ -263,7 +307,7 @@ fun AddTransactionScreen(
                                         // 服务端业务拒绝（如账户无效、余额不足、未登录等），明确提示用户，不伪称断网
                                         Toast.makeText(context, "⚠️ 提交未通过：${err.message}", Toast.LENGTH_LONG).show()
                                     } else if (!NetworkHelper.isOnline(context) || err is IOException || err.message?.contains("Unable to resolve host") == true) {
-                                        // 真实的离线状态：存入本地 Room 离线表，等待联网自动同步
+                                        // 真实的离线状态或网络突发波动：安全存入本地 Room 离线表，等待联网自动同步
                                         try {
                                             withContext(Dispatchers.IO) {
                                                 val db = AppDatabase.getInstance(context)
