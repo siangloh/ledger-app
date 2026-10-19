@@ -416,8 +416,15 @@ def get_native_transactions_list(
         params.append(tx_type)
 
     if month and len(month.split('-')) == 2:
-        where_clauses.append("t.date LIKE ?")
-        params.append(f"{month}%")
+        try:
+            y, m = map(int, month.split('-'))
+            last_day = monthrange(y, m)[1]
+            where_clauses.append("t.date >= ? AND t.date <= ?")
+            params.extend([f"{month}-01", f"{month}-{last_day:02d}"])
+        except Exception:
+            where_clauses.append("t.date LIKE ?")
+            params.append(f"{month}%")
+
 
     if start:
         where_clauses.append("t.date >= ?")

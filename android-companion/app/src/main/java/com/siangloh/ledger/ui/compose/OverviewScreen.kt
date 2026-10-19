@@ -316,12 +316,23 @@ fun OverviewScreen(
     }
 
     fun refreshData() {
-        isLoading = true
+        val username = NetworkHelper.getUsername(context)
+        val cachePrefs = context.getSharedPreferences("ledger_overview_cache", Context.MODE_PRIVATE)
+        val cacheKey = "cache_${username}_${period}_${currentMonthStr}"
+        val cachedJson = cachePrefs.getString(cacheKey, null)
+        if (!cachedJson.isNullOrBlank()) {
+            try {
+                overviewData = parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = true)
+                isLoading = false
+            } catch (_: Exception) {}
+        } else {
+            isLoading = true
+        }
+
         coroutineScope.launch {
             try {
                 val serverUrl = NetworkHelper.getServerUrl(context)
                 val apiKey = NetworkHelper.getApiKey(context)
-                val username = NetworkHelper.getUsername(context)
 
                 val queryParams = mutableListOf("period=$period", "month=$currentMonthStr")
                 if (username.isNotEmpty()) queryParams.add("username=$username")

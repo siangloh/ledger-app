@@ -134,10 +134,48 @@ fun RecordsScreen(
         }
     }
 
+    fun prefetchAdjacentMonth(monthStr: String, type: String) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val prevMonth = shiftMonthString(monthStr, -1)
+                val existingCache = LocalDataStore.getRecords(context, prevMonth, type, "", 1)
+                if (existingCache.isNullOrBlank()) {
+                    NativeLedgerApi.getTransactions(
+                        context = context,
+                        type = type,
+                        month = prevMonth,
+                        page = 1,
+                        limit = 50
+                    )
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     fun loadData(resetPage: Boolean = true) {
         val targetPage = if (resetPage) 1 else (currentPage + 1)
+        val effMonth = if (filterStartDate.isNullOrBlank() && filterEndDate.isNullOrBlank()) selectedMonth else null
         if (resetPage) {
-            if (transactions.isEmpty()) isLoading = true
+            val isSimpleMonthQuery = targetPage == 1 && effMonth != null && filterCategory == null && filterAccountId == null && filterMinAmount == null && filterMaxAmount == null && filterSource == null && filterChannel == null
+            val cachedJson = if (isSimpleMonthQuery) {
+                LocalDataStore.getRecords(context, effMonth, selectedType, debouncedSearchQuery, 1)
+            } else null
+
+            if (!cachedJson.isNullOrBlank()) {
+                try {
+                    val pageObj = NativeLedgerApi.parseTransactionsPageJson(JSONObject(cachedJson))
+                    transactions = pageObj.items
+                    totalCount = pageObj.totalCount
+                    hasMore = pageObj.hasMore
+                    isLoading = false
+                } catch (_: Exception) {
+                    transactions = emptyList()
+                    isLoading = true
+                }
+            } else {
+                transactions = emptyList()
+                isLoading = true
+            }
             loadPending()
         } else {
             isLoadingMore = true
@@ -147,7 +185,7 @@ fun RecordsScreen(
             val res = NativeLedgerApi.getTransactions(
                 context = context,
                 type = selectedType,
-                month = if (filterStartDate.isNullOrBlank() && filterEndDate.isNullOrBlank()) selectedMonth else null,
+                month = effMonth,
                 category = filterCategory,
                 search = debouncedSearchQuery,
                 accountId = filterAccountId,
@@ -166,6 +204,9 @@ fun RecordsScreen(
                 currentPage = targetPage
                 if (resetPage) {
                     transactions = page.items
+                    if (targetPage == 1 && effMonth != null && filterStartDate.isNullOrBlank() && filterEndDate.isNullOrBlank()) {
+                        prefetchAdjacentMonth(effMonth, selectedType)
+                    }
                 } else {
                     val existingIds = transactions.map { it.id }.toSet()
                     val newItems = page.items.filter { it.id !in existingIds }
