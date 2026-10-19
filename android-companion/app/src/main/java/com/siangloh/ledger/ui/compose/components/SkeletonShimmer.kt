@@ -77,7 +77,115 @@ fun SkeletonCircle(
 }
 
 // =============================================================================
-// 1. 概览页骨架屏 (Overview Skeleton Screen)
+// 1. 概览页局部卡片骨架屏 (Component-Level Skeletons)
+// 保证顶部状态栏与周期选择器 (PeriodSelector) 始终常驻显示，仅对下方数据卡片展示骨架
+// =============================================================================
+@Composable
+fun SpendingHeroCardSkeleton(
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFF0F172A),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SkeletonBox(modifier = Modifier.size(width = 80.dp, height = 14.dp))
+                SkeletonBox(modifier = Modifier.size(width = 90.dp, height = 12.dp))
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            SkeletonBox(modifier = Modifier.size(width = 190.dp, height = 32.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                SkeletonBox(modifier = Modifier.size(width = 110.dp, height = 14.dp))
+                SkeletonBox(modifier = Modifier.size(width = 110.dp, height = 14.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun SpendingTrendSkeleton(
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, Slate200),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SkeletonBox(modifier = Modifier.size(width = 90.dp, height = 16.dp))
+                SkeletonBox(modifier = Modifier.size(width = 110.dp, height = 14.dp))
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            SkeletonBox(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(90.dp),
+                shape = RoundedCornerShape(8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun RecentTransactionsSkeleton(
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        SkeletonBox(modifier = Modifier.size(width = 110.dp, height = 18.dp))
+        repeat(3) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Slate100),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SkeletonCircle(size = 40.dp)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        SkeletonBox(modifier = Modifier.size(width = 120.dp, height = 15.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
+                        SkeletonBox(modifier = Modifier.size(width = 80.dp, height = 11.dp))
+                    }
+                    SkeletonBox(modifier = Modifier.size(width = 75.dp, height = 18.dp))
+                }
+            }
+        }
+    }
+}
+
+// =============================================================================
+// 全屏冷启动备用骨架屏 (Overview Fullscreen Skeleton)
 // =============================================================================
 @Composable
 fun OverviewSkeletonScreen(

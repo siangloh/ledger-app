@@ -249,10 +249,17 @@ object LocalDataStore {
             val prevMonth = shiftMonth(today, -1)
             val prev2Month = shiftMonth(today, -2)
 
-            // 1. 批量同步当月与近两月 Overview (覆盖 95% 以上切月场景)
-            for (m in listOf(today, prevMonth, prev2Month)) {
+            // 1. 批量预载当前月、上月、前月、近3个月与年度 Overview (覆盖 100% 概览时期切换)
+            val overviewQueries = listOf(
+                Pair("month", today),
+                Pair("month", prevMonth),
+                Pair("month", prev2Month),
+                Pair("3m", today),
+                Pair("year", today)
+            )
+            for ((p, m) in overviewQueries) {
                 try {
-                    val queryParams = mutableListOf("period=month", "month=$m")
+                    val queryParams = mutableListOf("period=$p", "month=$m")
                     if (username.isNotEmpty()) queryParams.add("username=$username")
                     val urlStr = "$serverUrl/api/native/overview?" + queryParams.joinToString("&")
                     val url = URL(urlStr)
@@ -264,11 +271,11 @@ object LocalDataStore {
                     conn.readTimeout = 15000
                     if (conn.responseCode in 200..299) {
                         val text = conn.inputStream.bufferedReader().use { it.readText() }
-                        saveOverview(context, username, "month", m, text)
+                        saveOverview(context, username, p, m, text)
                     }
                     conn.disconnect()
                 } catch (e: Exception) {
-                    Log.w(TAG, "Preload overview for $m failed: ${e.message}")
+                    Log.w(TAG, "Preload overview for $p-$m failed: ${e.message}")
                 }
             }
 

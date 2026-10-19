@@ -43,6 +43,9 @@ import com.siangloh.ledger.R
 import com.siangloh.ledger.NetworkHelper
 import com.siangloh.ledger.data.AppDatabase
 import com.siangloh.ledger.ui.compose.components.OverviewSkeletonScreen
+import com.siangloh.ledger.ui.compose.components.SpendingHeroCardSkeleton
+import com.siangloh.ledger.ui.compose.components.SpendingTrendSkeleton
+import com.siangloh.ledger.ui.compose.components.RecentTransactionsSkeleton
 import com.siangloh.ledger.ui.compose.theme.*
 import com.siangloh.ledger.ui.overlay.InstantReviewManager
 import kotlinx.coroutines.Dispatchers
@@ -415,7 +418,8 @@ fun OverviewScreen(
                 isLoading = true
             }
         } else {
-            overviewData = OverviewData(lastActiveTime = overviewData.lastActiveTime, isListening = isListeningActual)
+            // 切换时期（如切换到 近3个月 或 年度）未命中缓存时：
+            // 绝不能直接把 overviewData 清空！保留已有状态，仅在后台发起拉取，避免界面突兀跳动
             isLoading = true
         }
 
@@ -577,16 +581,13 @@ fun OverviewScreen(
             }
         }
     ) { paddingValues ->
-        if (isLoading && overviewData.recentTransactions.isEmpty() && overviewData.totalSpending == 0.0) {
-            OverviewSkeletonScreen(modifier = Modifier.padding(paddingValues))
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 // 1. Status Bar Header (● Listening 状态与待分类角标)
@@ -657,125 +658,139 @@ fun OverviewScreen(
                 )
             }
 
-            item {
-                // 3. ExpenseMY Style Dark Hero Card
-                SpendingHeroCard(
-                    totalSpending = overviewData.totalSpending,
-                    expenseAmount = overviewData.expenseAmount,
-                    transferAmount = overviewData.transferAmount
-                )
-            }
-
-            if (overviewData.uncategorizedCount > 0) {
+            // 3. 内容区局部动态数据：仅在数据为空且加载中时，对特定组件展示骨架屏！
+            // 顶栏状态与周期切换 Tab 始终保持可见可交互，杜绝整屏骨架白闪！
+            if (isLoading && overviewData.recentTransactions.isEmpty() && overviewData.totalSpending == 0.0) {
                 item {
-                    // 4. Inbox Zero Banner (U3: 点击唤出待整理与待确认转账全量面板)
-                    UncategorizedInboxBanner(
-                        count = overviewData.uncategorizedCount,
-                        amount = overviewData.uncategorizedAmount,
-                        onClick = {
-                            showUncategorizedSheet = true
-                        }
-                    )
+                    SpendingHeroCardSkeleton()
                 }
-            }
-
-            if (overviewData.sparkline.isNotEmpty()) {
                 item {
-                    // 5. Spending Trend Sparkline
-                    SpendingTrendSection(
-                        sparkline = overviewData.sparkline,
-                        total = overviewData.totalSpending
-                    )
+                    SpendingTrendSkeleton()
                 }
-            }
-
-            item {
-                // 6. Recent Transactions Section Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.recent_transactions),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Slate900
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onNavigateToRecords() }
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.view_all_records),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = PrimaryTeal
-                        )
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = PrimaryTeal
-                        )
-                    }
-                }
-            }
-
-            // 7. Recent Transactions List Items
-            if (overviewData.recentTransactions.isEmpty()) {
                 item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (isLoading) "..." else stringResource(R.string.no_transactions_yet),
-                            color = Slate400,
-                            fontSize = 14.sp
-                        )
-                    }
+                    RecentTransactionsSkeleton()
                 }
             } else {
-                items(overviewData.recentTransactions) { tx ->
-                    TransactionCardItem(
-                        tx = tx,
-                        onClick = {
-                            selectedTxForCategorize = tx
-                            showCategorizeDialog = true
-                        }
+                item {
+                    // 3. ExpenseMY Style Dark Hero Card
+                    SpendingHeroCard(
+                        totalSpending = overviewData.totalSpending,
+                        expenseAmount = overviewData.expenseAmount,
+                        transferAmount = overviewData.transferAmount
                     )
                 }
-            }
 
-            if (overviewData.recentTransactions.isNotEmpty()) {
+                if (overviewData.uncategorizedCount > 0) {
+                    item {
+                        // 4. Inbox Zero Banner (U3: 点击唤出待整理与待确认转账全量面板)
+                        UncategorizedInboxBanner(
+                            count = overviewData.uncategorizedCount,
+                            amount = overviewData.uncategorizedAmount,
+                            onClick = {
+                                showUncategorizedSheet = true
+                            }
+                        )
+                    }
+                }
+
+                if (overviewData.sparkline.isNotEmpty()) {
+                    item {
+                        // 5. Spending Trend Sparkline
+                        SpendingTrendSection(
+                            sparkline = overviewData.sparkline,
+                            total = overviewData.totalSpending
+                        )
+                    }
+                }
+
                 item {
-                    OutlinedButton(
-                        onClick = onNavigateToRecords,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.3f))
+                    // 6. Recent Transactions Section Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ReceiptLong,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = PrimaryTeal
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = stringResource(R.string.view_all_records_detail),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = PrimaryTeal
+                            text = stringResource(R.string.recent_transactions),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate900
                         )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onNavigateToRecords() }
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.view_all_records),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = PrimaryTeal
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = PrimaryTeal
+                            )
+                        }
+                    }
+                }
+
+                // 7. Recent Transactions List Items
+                if (overviewData.recentTransactions.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (isLoading) "..." else stringResource(R.string.no_transactions_yet),
+                                color = Slate400,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                } else {
+                    items(overviewData.recentTransactions) { tx ->
+                        TransactionCardItem(
+                            tx = tx,
+                            onClick = {
+                                selectedTxForCategorize = tx
+                                showCategorizeDialog = true
+                            }
+                        )
+                    }
+                }
+
+                if (overviewData.recentTransactions.isNotEmpty()) {
+                    item {
+                        OutlinedButton(
+                            onClick = onNavigateToRecords,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.3f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ReceiptLong,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = PrimaryTeal
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.view_all_records_detail),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = PrimaryTeal
+                            )
+                        }
                     }
                 }
             }
@@ -785,7 +800,6 @@ fun OverviewScreen(
             }
         }
     }
-}
 
     // U3: Uncategorized Items Review Bottom Sheet
     if (showUncategorizedSheet) {
