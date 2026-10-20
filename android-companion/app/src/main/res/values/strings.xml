@@ -355,7 +355,7 @@
     <string name="source_label_unknown">未知/历史</string>
 
     <string name="cf_title">收支分析</string>
-    <string name="cf_open">查看收支分析 →</string>
+    <string name="cf_open">查看收支详情 →</string>
     <string name="cf_income">实际收入</string>
     <string name="cf_expense">实际总支出</string>
     <string name="cf_net">实际收支结余</string>
@@ -457,10 +457,27 @@
     <string name="cfu_save">保存</string>
     <string name="cfu_mark">标记</string>
     <string name="cfu_tx_count">%1$d 笔交易</string>
-    <string name="cfu_show_charts">查看每日支出与分配图 ↓</string>
-    <string name="cfu_hide_charts">收起详细图表 ↑</string>
+    <string name="cfu_show_charts">查看每日支出 ↓</string>
+    <string name="cfu_hide_charts">收起每日支出 ↑</string>
     <string name="cfu_tap_details">点击下方分类或账户，查看对应流水。</string>
     <string name="cfu_formula">预计可用 = 收入 − 实际支出 − 本月待付预留。此金额不是银行余额。</string>
     <string name="cfu_transfers">转账</string>
+    <string name="cfd_summary_title">月度收支</string>
+    <string name="cfd_details_title">收支详情</string>
+    <string name="cfd_usage_short">已支出 %1$s · 待付预留 %2$s · 预计可用 %3$s</string>
+    <string name="cfd_estimate_note">预计可用不是账户余额；待付预留需核对付款。</string>
+    <string name="cfd_details_totals">本月收入 %1$s\n实际支出 %2$s</string>
+    <string name="cfd_income_title">收入从哪里来？</string>
+    <string name="cfd_expense_title">钱花在哪里？</string>
+    <string name="cfd_income_share">占本月收入 %1$s</string>
+    <string name="cfd_income_basis">每项显示入账账户、金额和占总收入比例。</string>
+    <string name="cfd_expense_basis">分类下的百分比为占支出比例；另列占收入比例，方便判断负担。</string>
+    <string name="cfd_fixed_share">本月计划固定开销占收入 %1$s</string>
+    <string name="cfd_show_distribution">查看占比图 ↓</string>
+    <string name="cfd_hide_distribution">收起占比图 ↑</string>
+    <string name="cfd_assign_accounts">未指定账户的收入无法区分平台。可在流水中补充入账账户，之后会自动归入对应来源。</string>
+    <string name="cfd_schedule_hint">固定开销包含待核对的计划金额；请按实际付款记录确认。</string>
+    <string name="cfd_show_method">查看统计口径 ↓</string>
+    <string name="cfd_hide_method">收起统计说明 ↑</string>
 </resources>
 

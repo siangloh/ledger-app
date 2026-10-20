@@ -355,7 +355,7 @@
     <string name="source_label_unknown">History</string>
 
     <string name="cf_title">Cashflow analysis</string>
-    <string name="cf_open">View cashflow analysis →</string>
+    <string name="cf_open">View cashflow details →</string>
     <string name="cf_income">Actual income</string>
     <string name="cf_expense">Actual expenses</string>
     <string name="cf_net">Actual net cashflow</string>
@@ -457,10 +457,27 @@
     <string name="cfu_save">Save</string>
     <string name="cfu_mark">Mark</string>
     <string name="cfu_tx_count">%1$d transactions</string>
-    <string name="cfu_show_charts">Show daily spending and allocation ↓</string>
-    <string name="cfu_hide_charts">Hide detailed charts ↑</string>
+    <string name="cfu_show_charts">Show daily spending ↓</string>
+    <string name="cfu_hide_charts">Hide daily spending ↑</string>
     <string name="cfu_tap_details">Tap a category or account below to view its transactions.</string>
     <string name="cfu_formula">Projected available = income − actual spending − unpaid reserves this month. This is not a bank balance.</string>
     <string name="cfu_transfers">Transfers</string>
+    <string name="cfd_summary_title">Monthly cashflow</string>
+    <string name="cfd_details_title">Cashflow details</string>
+    <string name="cfd_usage_short">Spent %1$s · reserved %2$s · available %3$s</string>
+    <string name="cfd_estimate_note">Projected available is not your account balance. Verify unpaid reserves.</string>
+    <string name="cfd_details_totals">Month income %1$s\nActual spending %2$s</string>
+    <string name="cfd_income_title">Where did income come from?</string>
+    <string name="cfd_expense_title">Where did the money go?</string>
+    <string name="cfd_income_share">Of monthly income: %1$s</string>
+    <string name="cfd_income_basis">Each account shows its income amount and share of total income.</string>
+    <string name="cfd_expense_basis">Each category shows its share of expenses, plus its share of income to show the burden.</string>
+    <string name="cfd_fixed_share">Scheduled fixed bills use %1$s of monthly income</string>
+    <string name="cfd_show_distribution">Show distribution chart ↓</string>
+    <string name="cfd_hide_distribution">Hide distribution chart ↑</string>
+    <string name="cfd_assign_accounts">Income without an account cannot be split by platform. Assign its account in Records to see the source here.</string>
+    <string name="cfd_schedule_hint">Fixed bills include unverified scheduled amounts. Confirm using actual payment records.</string>
+    <string name="cfd_show_method">How these figures are calculated ↓</string>
+    <string name="cfd_hide_method">Hide calculation notes ↑</string>
 </resources>
 

@@ -355,7 +355,7 @@
     <string name="source_label_unknown">Sejarah</string>
 
     <string name="cf_title">Analisis aliran tunai</string>
-    <string name="cf_open">Lihat analisis aliran tunai →</string>
+    <string name="cf_open">Lihat butiran aliran tunai →</string>
     <string name="cf_income">Pendapatan sebenar</string>
     <string name="cf_expense">Perbelanjaan sebenar</string>
     <string name="cf_net">Baki aliran tunai sebenar</string>
@@ -457,10 +457,27 @@
     <string name="cfu_save">Simpan</string>
     <string name="cfu_mark">Tandakan</string>
     <string name="cfu_tx_count">%1$d transaksi</string>
-    <string name="cfu_show_charts">Lihat perbelanjaan harian dan agihan ↓</string>
-    <string name="cfu_hide_charts">Sembunyikan carta terperinci ↑</string>
+    <string name="cfu_show_charts">Lihat perbelanjaan harian ↓</string>
+    <string name="cfu_hide_charts">Sembunyikan perbelanjaan harian ↑</string>
     <string name="cfu_tap_details">Ketik kategori atau akaun di bawah untuk melihat transaksi.</string>
     <string name="cfu_formula">Anggaran tersedia = pendapatan − perbelanjaan sebenar − rizab belum dibayar bulan ini. Ini bukan baki bank.</string>
     <string name="cfu_transfers">Pindahan</string>
+    <string name="cfd_summary_title">Aliran tunai bulanan</string>
+    <string name="cfd_details_title">Butiran aliran tunai</string>
+    <string name="cfd_usage_short">Dibelanja %1$s · rizab %2$s · tersedia %3$s</string>
+    <string name="cfd_estimate_note">Anggaran tersedia bukan baki akaun. Semak rizab belum dibayar.</string>
+    <string name="cfd_details_totals">Pendapatan bulan %1$s\nPerbelanjaan sebenar %2$s</string>
+    <string name="cfd_income_title">Dari mana pendapatan diterima?</string>
+    <string name="cfd_expense_title">Ke mana wang dibelanjakan?</string>
+    <string name="cfd_income_share">Daripada pendapatan bulan: %1$s</string>
+    <string name="cfd_income_basis">Setiap akaun menunjukkan jumlah dan bahagian daripada jumlah pendapatan.</string>
+    <string name="cfd_expense_basis">Setiap kategori menunjukkan bahagian perbelanjaan serta bahagian pendapatan untuk menilai beban.</string>
+    <string name="cfd_fixed_share">Bil tetap dijadualkan menggunakan %1$s pendapatan bulan</string>
+    <string name="cfd_show_distribution">Lihat carta agihan ↓</string>
+    <string name="cfd_hide_distribution">Sembunyikan carta agihan ↑</string>
+    <string name="cfd_assign_accounts">Pendapatan tanpa akaun tidak dapat diasingkan mengikut platform. Tetapkan akaun dalam Rekod untuk melihat sumbernya di sini.</string>
+    <string name="cfd_schedule_hint">Bil tetap termasuk jumlah berjadual belum disahkan. Sahkan menggunakan rekod bayaran sebenar.</string>
+    <string name="cfd_show_method">Cara angka ini dikira ↓</string>
+    <string name="cfd_hide_method">Sembunyikan nota pengiraan ↑</string>
 </resources>
 

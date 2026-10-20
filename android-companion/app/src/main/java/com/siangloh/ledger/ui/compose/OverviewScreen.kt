@@ -685,17 +685,16 @@ fun OverviewScreen(
                     RecentTransactionsSkeleton()
                 }
             } else {
-                item {
-                    // 3. ExpenseMY Style Dark Hero Card
-                    SpendingHeroCard(
-                        totalSpending = overviewData.totalSpending,
-                        expenseAmount = overviewData.expenseAmount,
-                        transferAmount = overviewData.transferAmount
-                    )
-                }
-
                 if (period == "month") {
                     item { CashflowSummaryCard(currentMonthStr, cashflowRevision) { onNavigateToCashflow(currentMonthStr) } }
+                } else {
+                    item {
+                        SpendingHeroCard(
+                            totalSpending = overviewData.totalSpending,
+                            expenseAmount = overviewData.expenseAmount,
+                            transferAmount = overviewData.transferAmount
+                        )
+                    }
                 }
 
                 if (overviewData.uncategorizedCount > 0) {
