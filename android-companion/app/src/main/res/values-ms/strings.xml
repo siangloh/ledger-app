@@ -414,5 +414,8 @@
     <string name="cf_donut_center_net">Baki Bersih</string>
     <string name="cf_fixed_progress">Selesai</string>
 
+    <string name="undo_transaction_unsynced">Transaksi ini belum disegerakkan. Padam melalui Rekod.</string>
+    <string name="undo_transaction_success">Dibatalkan. Transaksi dipindahkan ke tong kitar semula.</string>
+    <string name="undo_transaction_failed">Pembatalan gagal. Cuba lagi atau semak Rekod.</string>
 </resources>
 

@@ -9,6 +9,7 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import com.siangloh.ledger.NetworkHelper
+import com.siangloh.ledger.R
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -42,56 +43,58 @@ object TransactionUndo {
 
     private const val TAG = "TransactionUndo"
 
-    /**
-     * ⚠️ 假设的后端接口：POST {serverUrl}/api/native/undo-transaction
-     * body: { key, transaction_id, username }，返回 { ok: Boolean, message: String }
-     * 如果你的后端路径或参数不同，只需要改这里。
-     */
+    /** Recoverable, authenticated deletion; repeated requests are safe. */
     private const val UNDO_PATH = "/api/native/undo-transaction"
 
     fun undo(context: Context, transactionId: Long, onDone: () -> Unit = {}) {
         if (transactionId <= 0) {
-            toast(context, "这笔账单尚未同步，请到流水里删除")
+            toast(context, context.getString(R.string.undo_transaction_unsynced))
             onDone()
             return
         }
         Thread {
             var ok = false
-            var msg = ""
+            var conn: HttpURLConnection? = null
             try {
                 val serverUrl = NetworkHelper.getServerUrl(context)
                 val apiKey = NetworkHelper.getApiKey(context)
                 val username = NetworkHelper.getUsername(context)
 
-                val conn = URL(serverUrl + UNDO_PATH).openConnection() as HttpURLConnection
-                conn.connectTimeout = 6000
-                conn.readTimeout = 6000
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                if (apiKey.isNotEmpty()) conn.setRequestProperty("X-API-KEY", apiKey)
-                conn.doOutput = true
+                val connection = URL(serverUrl.trimEnd('/') + UNDO_PATH).openConnection() as HttpURLConnection
+                conn = connection
+                connection.connectTimeout = 6000
+                connection.readTimeout = 6000
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                if (apiKey.isNotEmpty()) connection.setRequestProperty("X-API-KEY", apiKey)
+                connection.doOutput = true
                 val payload = JSONObject().apply {
                     put("key", apiKey)
                     put("transaction_id", transactionId)
                     if (username.isNotEmpty()) put("username", username)
                 }.toString()
-                conn.outputStream.bufferedWriter().use { it.write(payload) }
+                connection.outputStream.bufferedWriter().use { it.write(payload) }
 
-                val code = conn.responseCode
+                val code = connection.responseCode
                 if (code in 200..299) {
-                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    val body = connection.inputStream.bufferedReader().use { it.readText() }
                     val json = JSONObject(body)
                     ok = json.optBoolean("ok", false)
-                    msg = json.optString("message", "")
                 } else {
-                    msg = "HTTP $code"
+                    Log.w(TAG, "Undo rejected: HTTP $code")
                 }
-                conn.disconnect()
+                if (ok) {
+                    // A deleted transaction changes every derived financial view.
+                    for (prefs in listOf("cashflow_reports", "ledger_overview_cache", "ledger_records_cache", "ledger_accounts_cache", "ledger_sync_prefs")) {
+                        context.getSharedPreferences(prefs, Context.MODE_PRIVATE).edit().clear().apply()
+                    }
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "Undo failed: ${e.message}", e)
-                msg = e.message ?: "网络异常"
+            } finally {
+                conn?.disconnect()
             }
-            toast(context, if (ok) "已撤销这笔账单" else "撤销失败：$msg")
+            toast(context, context.getString(if (ok) R.string.undo_transaction_success else R.string.undo_transaction_failed))
             onDone()
         }.start()
     }

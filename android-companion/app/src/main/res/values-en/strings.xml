@@ -414,5 +414,8 @@
     <string name="cf_donut_center_net">Net</string>
     <string name="cf_fixed_progress">Settled</string>
 
+    <string name="undo_transaction_unsynced">This transaction is not synced yet. Remove it from Records.</string>
+    <string name="undo_transaction_success">Undone. Transaction moved to the recycle bin.</string>
+    <string name="undo_transaction_failed">Undo failed. Retry or check Records.</string>
 </resources>
 

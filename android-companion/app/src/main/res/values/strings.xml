@@ -414,5 +414,8 @@
     <string name="cf_donut_center_net">结余</string>
     <string name="cf_fixed_progress">履约率</string>
 
+    <string name="undo_transaction_unsynced">这笔账单尚未同步，请到流水里删除</string>
+    <string name="undo_transaction_success">已撤销，账单已移入回收站</string>
+    <string name="undo_transaction_failed">撤销失败，请重试或到流水检查</string>
 </resources>
 

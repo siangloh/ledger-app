@@ -744,6 +744,19 @@ def update_native_transaction_full(user_id: Any, tx_id: int, data: Dict[str, Any
     return {'ok': True, 'message': '交易记录已更新'}
 
 
+def undo_native_transaction(user_id: Any, tx_id: int, db: Any = None) -> Dict[str, Any]:
+    """Retry-safe undo using the same recoverable deletion as the records UI."""
+    if not user_id or db is None:
+        return {'ok': False, 'message': 'Unauthorized'}
+    row = db.execute('SELECT deleted_at FROM transactions WHERE id = ? AND user_id = ?',
+                     (tx_id, str(user_id))).fetchone()
+    if row is None:
+        return {'ok': False, 'message': 'Transaction not found'}
+    if row['deleted_at'] is not None:
+        return {'ok': True, 'already_undone': True}
+    return delete_native_transaction(user_id=user_id, tx_id=tx_id, db=db)
+
+
 def delete_native_transaction(user_id: Any, tx_id: int, db: Any = None) -> Dict[str, Any]:
     if not db or not user_id:
         return {'ok': False, 'message': '未授权或数据库连接失败'}

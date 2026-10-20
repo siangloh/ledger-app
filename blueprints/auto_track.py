@@ -1381,6 +1381,24 @@ def api_native_apply_installment_match(inst_id: int):
 
 
 
+@auto_track_bp.route('/api/native/undo-transaction', methods=['POST'])
+@csrf.exempt
+def api_native_undo_transaction():
+    from services.native_api_service import undo_native_transaction
+    db = get_db()
+    user_id, err = _resolve_native_user(db)
+    if err:
+        return jsonify({'ok': False, 'message': err[0]}), err[1]
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'ok': False, 'message': 'Expected a JSON object'}), 400
+    tx_id = data.get('transaction_id')
+    if isinstance(tx_id, bool) or not isinstance(tx_id, int) or tx_id <= 0:
+        return jsonify({'ok': False, 'message': 'Invalid transaction_id'}), 400
+    result = undo_native_transaction(user_id=user_id, tx_id=tx_id, db=db)
+    return jsonify(result), 200 if result.get('ok') else 404
+
+
 @auto_track_bp.route('/api/native/transactions/<int:tx_id>', methods=['PUT', 'POST', 'DELETE'], endpoint='api_native_transaction_item')
 @csrf.exempt
 def api_native_transaction_item(tx_id: int):
