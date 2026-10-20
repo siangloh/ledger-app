@@ -393,7 +393,7 @@
     <string name="cf_loading">加载中…</string>
     <string name="cf_deficit">预计缺口</string>
     <string name="cf_updated">报告日期</string>
-    <string name="cf_cached">离线缓存，数据可能已过期</string>
+    <string name="cf_cached">已显示保存的报告，刷新后可获取最新数据</string>
     <string name="cf_month">月份</string>
     <string name="cf_currency">币种</string>
     <string name="cf_refund">关联退款交易</string>
@@ -405,10 +405,10 @@
     <string name="cf_undo_confirm">撤销实际发生确认</string>
 
     <string name="cf_tab_all">全部概览</string>
-    <string name="cf_tab_overview">资金流向</string>
-    <string name="cf_tab_expense">支出饼图</string>
-    <string name="cf_tab_income">收入分布</string>
-    <string name="cf_tab_bills">固定开销</string>
+    <string name="cf_tab_overview">概览</string>
+    <string name="cf_tab_expense">支出</string>
+    <string name="cf_tab_income">收入</string>
+    <string name="cf_tab_bills">账单</string>
     <string name="cf_donut_center_expense">总支出</string>
     <string name="cf_donut_center_income">总收入</string>
     <string name="cf_donut_center_net">结余</string>
@@ -417,5 +417,50 @@
     <string name="undo_transaction_unsynced">这笔账单尚未同步，请到流水里删除</string>
     <string name="undo_transaction_success">已撤销，账单已移入回收站</string>
     <string name="undo_transaction_failed">撤销失败，请重试或到流水检查</string>
+    <string name="cfu_vs_month"> 较上月</string>
+    <string name="cfu_available">可用</string>
+    <string name="cfu_excluded">已排除转账</string>
+    <string name="cfu_no_income">暂无收入记录</string>
+    <string name="cfu_deficit_badge">存在预计缺口</string>
+    <string name="cfu_limited">预留后余款较少</string>
+    <string name="cfu_positive">预留后仍有余款</string>
+    <string name="cfu_no_income_detail">本月暂无收入记录，请先核对收入是否已入账。</string>
+    <string name="cfu_over_detail">支出与待付预留已超出收入 %1$s。</string>
+    <string name="cfu_used_detail">支出与待付预留占收入的 %1$s。</string>
+    <string name="cfu_insights">本月重点</string>
+    <string name="cfu_largest">最大支出：%1$s，%2$s（占支出 %3$s）</string>
+    <string name="cfu_avg">日均支出：%1$s（不含转账）</string>
+    <string name="cfu_forecast">按当前速度，月底支出约 %1$s，仅供参考。</string>
+    <string name="cfu_forecast_warning">加上待付账单，可能超出收入。</string>
+    <string name="cfu_pending_detail">尚有固定账单 %1$s 待核对付款。</string>
+    <string name="cfu_daily">每日支出</string>
+    <string name="cfu_day">%1$d日</string>
+    <string name="cfu_peak_day">最高：%1$d日</string>
+    <string name="cfu_avg_label">┄ 日均 %1$s</string>
+    <string name="cfu_active_days">有支出 %1$d 天 · 不含转账</string>
+    <string name="cfu_compare">资金分配</string>
+    <string name="cfu_top">主要支出分类</string>
+    <string name="cfu_see_all">查看全部 →</string>
+    <string name="cfu_see_bills">核对账单 →</string>
+    <string name="cfu_unverified">尚未关联付款记录，不一定代表未付款。</string>
+    <string name="cfu_due">到期 </string>
+    <string name="cfu_awaiting">未确认付款 · 待核对 </string>
+    <string name="cfu_paid">已付 </string>
+    <string name="cfu_pending"> · 待付 </string>
+    <string name="cfu_retry">重试</string>
+    <string name="cfu_consumption">消费</string>
+    <string name="cfu_categories">个分类</string>
+    <string name="cfu_platforms">个账户</string>
+    <string name="cfu_include_transfers">包含转账</string>
+    <string name="cfu_confirmed">已确认的定期交易</string>
+    <string name="cfu_linked">已关联的付款</string>
+    <string name="cfu_save">保存</string>
+    <string name="cfu_mark">标记</string>
+    <string name="cfu_tx_count">%1$d 笔交易</string>
+    <string name="cfu_show_charts">查看每日支出与分配图 ↓</string>
+    <string name="cfu_hide_charts">收起详细图表 ↑</string>
+    <string name="cfu_tap_details">点击下方分类或账户，查看对应流水。</string>
+    <string name="cfu_formula">预计可用 = 收入 − 实际支出 − 本月待付预留。此金额不是银行余额。</string>
+    <string name="cfu_transfers">转账</string>
 </resources>
 

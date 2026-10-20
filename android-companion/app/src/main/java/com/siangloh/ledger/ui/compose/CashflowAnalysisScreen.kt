@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -287,13 +288,10 @@ private fun BillSegmentBar(paid: Double, pending: Double, planned: Double, heigh
 
 @Composable
 private fun LegendDot(color: Color, label: String, value: String, labelColor: Color = Slate500, valueColor: Color = Slate900) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(color))
-            Spacer(Modifier.width(5.dp))
-            Text(label, fontSize = 11.sp, color = labelColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = valueColor, modifier = Modifier.padding(start = 13.dp))
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+        Text(label, modifier = Modifier.weight(1f), fontSize = 12.sp, color = labelColor)
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = valueColor)
     }
 }
 
@@ -313,16 +311,14 @@ private fun SectionCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Slate900)
                 if (trailing != null) {
-                    Text(
-                        trailing,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (onTrailingClick != null) PrimaryTeal else Slate500,
-                        modifier = if (onTrailingClick != null) Modifier.clickable { onTrailingClick() } else Modifier
-                    )
+                    if (onTrailingClick != null) {
+                        TextButton(onClick = onTrailingClick, contentPadding = PaddingValues(0.dp)) {
+                            Text(trailing, fontSize = 13.sp, color = PrimaryTeal)
+                        }
+                    } else Text(trailing, fontSize = 13.sp, color = Slate500)
                 }
             }
             content()
@@ -362,7 +358,7 @@ private fun RankedBarRow(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(formatPct(slice.percent), fontSize = 11.sp, color = Slate500)
-                        DeltaText(change, upIsBad = true, suffix = " 较上月", fontSize = 10.sp, onDark = false)
+                        DeltaText(change, upIsBad = true, suffix = stringResource(R.string.cfu_vs_month), fontSize = 10.sp, onDark = false)
                     }
                 }
                 Text(formatMoney(currency, slice.amount), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
@@ -481,13 +477,13 @@ fun CashflowSummaryCard(month: String, revision: Int = 0, onOpen: () -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(30.dp).clip(CircleShape).background(Teal50), contentAlignment = Alignment.Center) { Text("📊", fontSize = 15.sp) }
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.cf_title) + " · " + month, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
                 }
-                Text(stringResource(R.string.cf_open) + " →", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = PrimaryTeal)
+                Text(stringResource(R.string.cf_open), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = PrimaryTeal)
             }
 
             val result = data
@@ -528,7 +524,7 @@ fun CashflowSummaryCard(month: String, revision: Int = 0, onOpen: () -> Unit) {
                     Column(horizontalAlignment = Alignment.End) {
                         Text(stringResource(R.string.cf_income) + " " + formatMoney(currency, income), fontSize = 11.sp, color = IncomeGreen, fontWeight = FontWeight.SemiBold)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            DeltaText(pctChange(expense, prev?.optDouble("expense", 0.0)), upIsBad = true, suffix = " 较上月", fontSize = 10.sp, onDark = false)
+                            DeltaText(pctChange(expense, prev?.optDouble("expense", 0.0)), upIsBad = true, suffix = stringResource(R.string.cfu_vs_month), fontSize = 10.sp, onDark = false)
                             Text(stringResource(R.string.cf_expense) + " " + formatMoney(currency, expense), fontSize = 11.sp, color = ExpenseRed, fontWeight = FontWeight.SemiBold)
                         }
                     }
@@ -536,10 +532,10 @@ fun CashflowSummaryCard(month: String, revision: Int = 0, onOpen: () -> Unit) {
 
                 if (income > 0) {
                     AllocationBar(income, expense, reserved, available, track = Slate100)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         LegendDot(ExpenseColor, stringResource(R.string.cf_expense), formatPct(d.optDouble("expense_percent", 0.0)), Slate500, Slate900)
                         LegendDot(ReservedColor, stringResource(R.string.cf_pending), formatPct(d.optDouble("reserve_percent", 0.0)), Slate500, Slate900)
-                        LegendDot(AvailableColor, "可用", formatPct(d.optDouble("available_percent", 0.0)), Slate500, Slate900)
+                        LegendDot(AvailableColor, stringResource(R.string.cfu_available), formatPct(d.optDouble("available_percent", 0.0)), Slate500, Slate900)
                     }
                 } else {
                     Text(stringResource(R.string.cf_no_ratio), fontSize = 12.sp, color = Slate500)
@@ -549,7 +545,7 @@ fun CashflowSummaryCard(month: String, revision: Int = 0, onOpen: () -> Unit) {
                     HorizontalDivider(color = Slate200)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(stringResource(R.string.cf_expense_categories), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
-                        if (transfer > 0) Text("已排除转账", fontSize = 10.sp, color = Slate500)
+                        if (transfer > 0) Text(stringResource(R.string.cfu_excluded), fontSize = 10.sp, color = Slate500)
                     }
                     val maxAmt = topCats.maxOf { it.amount }
                     topCats.forEach { c ->
@@ -568,7 +564,7 @@ fun CashflowSummaryCard(month: String, revision: Int = 0, onOpen: () -> Unit) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(stringResource(R.string.cf_fixed), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
                         Text(
-                            if (paid <= 0) "尚未付款 · 待付 " + formatMoney(currency, reserved)
+                            if (paid <= 0) stringResource(R.string.cfu_awaiting) + formatMoney(currency, reserved)
                             else formatMoney(currency, paid) + " / " + formatMoney(currency, planned),
                             fontSize = 12.sp, color = if (paid <= 0) WarningAmber else Slate500
                         )
@@ -584,12 +580,12 @@ fun CashflowSummaryCard(month: String, revision: Int = 0, onOpen: () -> Unit) {
 // 概览 Tab 组件
 // =========================================================================
 @Composable
-private fun HeroStat(label: String, value: String, color: Color, change: Double? = null, upIsBad: Boolean = false) {
-    Column {
+private fun HeroStat(label: String, value: String, color: Color, change: Double? = null, upIsBad: Boolean = false, modifier: Modifier = Modifier) {
+    Column(modifier) {
         Text(label, color = Slate500, fontSize = 11.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(2.dp))
         Text(value, color = color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-        DeltaText(change, upIsBad, suffix = " 较上月", fontSize = 10.sp, onDark = false)
+        DeltaText(change, upIsBad, suffix = stringResource(R.string.cfu_vs_month), fontSize = 10.sp, onDark = false)
     }
 }
 
@@ -610,10 +606,9 @@ private fun SummaryHeroCard(data: JSONObject, prev: JSONObject?) {
         else -> Teal50 to PrimaryTeal
     }
     val insight = when {
-        income <= 0 -> "本月暂无收入记录，仅显示支出情况"
-        deficit > 0 -> "⚠️ 支出与待付已超出收入 " + formatMoney(currency, deficit)
-        usedPct >= 80 -> "已使用 " + formatPct(usedPct) + " 的收入，请留意开销"
-        else -> "状况良好，已使用 " + formatPct(usedPct) + " 的收入"
+        income <= 0 -> stringResource(R.string.cfu_no_income_detail)
+        deficit > 0 -> stringResource(R.string.cfu_over_detail, formatMoney(currency, deficit))
+        else -> stringResource(R.string.cfu_used_detail, formatPct(usedPct))
     }
 
     Card(
@@ -634,6 +629,7 @@ private fun SummaryHeroCard(data: JSONObject, prev: JSONObject?) {
             ) {
                 Text(
                     stringResource(if (deficit > 0) R.string.cf_deficit else R.string.cf_available),
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
                     color = Slate500,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -643,10 +639,11 @@ private fun SummaryHeroCard(data: JSONObject, prev: JSONObject?) {
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(badgeBg)
+                        .widthIn(max = 145.dp)
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
-                        if (deficit > 0) "超支警告" else if (usedPct >= 80) "预算吃紧" else "现金流健康",
+                        if (income <= 0) stringResource(R.string.cfu_no_income) else if (deficit > 0) stringResource(R.string.cfu_deficit_badge) else if (usedPct >= 80) stringResource(R.string.cfu_limited) else stringResource(R.string.cfu_positive),
                         color = badgeText,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
@@ -661,6 +658,7 @@ private fun SummaryHeroCard(data: JSONObject, prev: JSONObject?) {
                 fontWeight = FontWeight.ExtraBold
             )
 
+            Text(stringResource(R.string.cfu_formula), fontSize = 12.sp, color = Slate500)
             Text(insight, color = badgeText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
 
             if (income > 0) {
@@ -671,18 +669,20 @@ private fun SummaryHeroCard(data: JSONObject, prev: JSONObject?) {
                     }
                     AllocationBar(income, expense, reserved, available, barHeight = 14.dp, track = Slate100)
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     LegendDot(ExpenseColor, stringResource(R.string.cf_expense), formatPct(data.optDouble("expense_percent", 0.0)), Slate500, Slate900)
                     LegendDot(ReservedColor, stringResource(R.string.cf_pending), formatPct(data.optDouble("reserve_percent", 0.0)), Slate500, Slate900)
-                    LegendDot(AvailableColor, "可用", formatPct(data.optDouble("available_percent", 0.0)), Slate500, Slate900)
+                    LegendDot(AvailableColor, stringResource(R.string.cfu_available), formatPct(data.optDouble("available_percent", 0.0)), Slate500, Slate900)
                 }
             }
 
             HorizontalDivider(color = Slate200)
 
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                HeroStat(stringResource(R.string.cf_income), formatMoney(currency, income), IncomeGreen, pctChange(income, prev?.optDouble("income", 0.0)), upIsBad = false)
-                HeroStat(stringResource(R.string.cf_expense), formatMoney(currency, expense), ExpenseRed, pctChange(expense, prev?.optDouble("expense", 0.0)), upIsBad = true)
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HeroStat(stringResource(R.string.cf_income), formatMoney(currency, income), IncomeGreen, pctChange(income, prev?.optDouble("income", 0.0)), modifier = Modifier.weight(1f))
+                    HeroStat(stringResource(R.string.cf_expense), formatMoney(currency, expense), ExpenseRed, pctChange(expense, prev?.optDouble("expense", 0.0)), upIsBad = true, modifier = Modifier.weight(1f))
+                }
                 HeroStat(stringResource(R.string.cf_net), formatMoney(currency, net), if (net >= 0) IncomeGreen else ExpenseRed)
             }
         }
@@ -691,7 +691,7 @@ private fun SummaryHeroCard(data: JSONObject, prev: JSONObject?) {
 
 /** 本月结论：几句话讲清楚 */
 @Composable
-private fun InsightsCard(data: JSONObject, prev: JSONObject?, daily: DoubleArray, todayDay: Int?) {
+private fun InsightsCard(data: JSONObject, daily: DoubleArray, todayDay: Int?) {
     val currency = data.optString("currency")
     val income = data.optDouble("income", 0.0)
     val reserved = data.optDouble("reserved", 0.0)
@@ -699,27 +699,21 @@ private fun InsightsCard(data: JSONObject, prev: JSONObject?, daily: DoubleArray
     val total = daily.sum()
     val elapsed = todayDay ?: daily.size
     val avg = if (elapsed > 0) total / elapsed else 0.0
-    val expense = data.optDouble("expense", 0.0)
-    val change = pctChange(expense, prev?.optDouble("expense", 0.0))
-
+    val context = LocalContext.current
     val lines = buildList {
-        if (top != null) add("🏆" to "最大支出是「${top.label}」" + formatMoney(currency, top.amount) + "，占 " + formatPct(top.percent))
-        if (total > 0) add("📆" to "日均消费 " + formatMoney(currency, avg) + "（不含转账）")
+        if (top != null) add("🏆" to context.getString(R.string.cfu_largest, top.label, formatMoney(currency, top.amount), formatPct(top.percent)))
+        if (total > 0) add("📆" to context.getString(R.string.cfu_avg, formatMoney(currency, avg)))
         if (todayDay != null && todayDay >= 3 && todayDay < daily.size && total > 0) {
             val projected = total / todayDay * daily.size
             val warn = income > 0 && projected + reserved > income
-            add((if (warn) "⚠️" else "📈") to "照目前速度，月底约花 " + formatMoney(currency, projected) +
-                if (warn) "，加上待付将超出收入" else "")
+            add((if (warn) "⚠️" else "📈") to (context.getString(R.string.cfu_forecast, formatMoney(currency, projected)) +
+                if (warn) " " + context.getString(R.string.cfu_forecast_warning) else ""))
         }
-        if (change != null) {
-            val dir = if (change > 0) "多花" else "少花"
-            add((if (change > 0) "🔺" else "🔻") to "比上月" + dir + " " + DecimalFormat("0.#").format(kotlin.math.abs(change)) + "%（上月 " + formatMoney(currency, prev?.optDouble("expense", 0.0) ?: 0.0) + "）")
-        }
-        if (reserved > 0) add("🧾" to "还有 " + formatMoney(currency, reserved) + " 的固定账单待付")
+        if (reserved > 0) add("🧾" to context.getString(R.string.cfu_pending_detail, formatMoney(currency, reserved)))
     }
     if (lines.isEmpty()) return
 
-    SectionCard(title = "本月结论") {
+    SectionCard(title = stringResource(R.string.cfu_insights)) {
         lines.forEach { (emoji, text) ->
             Row(verticalAlignment = Alignment.Top) {
                 Text(emoji, fontSize = 15.sp)
@@ -744,8 +738,8 @@ private fun DailySpendingCard(daily: DoubleArray, currency: String, todayDay: In
     val future = Slate200
 
     SectionCard(
-        title = "每日支出",
-        trailing = sel?.let { "${it + 1}日 " + formatMoney(currency, daily[it]) } ?: maxDay?.let { "最高 ${it}日" }
+        title = stringResource(R.string.cfu_daily),
+        trailing = sel?.let { stringResource(R.string.cfu_day, it + 1) + " " + formatMoney(currency, daily[it]) } ?: maxDay?.let { stringResource(R.string.cfu_peak_day, it) }
     ) {
         if (total <= 0) {
             Text(stringResource(R.string.cf_empty), fontSize = 13.sp, color = Slate500)
@@ -799,11 +793,11 @@ private fun DailySpendingCard(daily: DoubleArray, currency: String, todayDay: In
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            listOf(1, 8, 15, 22, n).forEach { Text("${it}日", fontSize = 10.sp, color = Slate500) }
+            listOf(1, 8, 15, 22, n).forEach { Text(stringResource(R.string.cfu_day, it), fontSize = 10.sp, color = Slate500) }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("┄ 日均 " + formatMoney(currency, avg), fontSize = 11.sp, color = peak, fontWeight = FontWeight.SemiBold)
-            Text("有消费 ${daily.count { it > 0 }} 天 · 不含转账", fontSize = 11.sp, color = Slate500)
+            Text(stringResource(R.string.cfu_avg_label, formatMoney(currency, avg)), fontSize = 11.sp, color = peak, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.cfu_active_days, daily.count { it > 0 }), fontSize = 11.sp, color = Slate500)
         }
     }
 }
@@ -813,13 +807,13 @@ private fun DailySpendingCard(daily: DoubleArray, currency: String, todayDay: In
 private fun ComparisonBarChart(data: JSONObject) {
     val currency = data.optString("currency")
     val bars = listOf(
-        Triple("收入", data.optDouble("income", 0.0).coerceAtLeast(0.0), IncomeGreen),
-        Triple("支出", data.optDouble("expense", 0.0).coerceAtLeast(0.0), ExpenseColor),
-        Triple("待付", data.optDouble("reserved", 0.0).coerceAtLeast(0.0), ReservedColor),
-        Triple("可用", data.optDouble("available", 0.0).coerceAtLeast(0.0), AvailableColor)
+        Triple(stringResource(R.string.cf_income), data.optDouble("income", 0.0).coerceAtLeast(0.0), IncomeGreen),
+        Triple(stringResource(R.string.cf_expense), data.optDouble("expense", 0.0).coerceAtLeast(0.0), ExpenseColor),
+        Triple(stringResource(R.string.cf_pending), data.optDouble("reserved", 0.0).coerceAtLeast(0.0), ReservedColor),
+        Triple(stringResource(R.string.cfu_available), data.optDouble("available", 0.0).coerceAtLeast(0.0), AvailableColor)
     )
     val maxV = bars.maxOf { it.second }
-    SectionCard(title = "资金对比", trailing = currency) {
+    SectionCard(title = stringResource(R.string.cfu_compare), trailing = currency) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Bottom) {
             bars.forEach { (label, value, color) ->
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -851,8 +845,8 @@ private fun TopExpensePreviewCard(
     val transfer = transferAmount(data)
     val prevMap = prevCategoryAmounts(prev)
     SectionCard(
-        title = "支出 Top " + slices.size.coerceAtLeast(1),
-        trailing = if (slices.isNotEmpty()) "查看全部 →" else null,
+        title = stringResource(R.string.cfu_top),
+        trailing = if (slices.isNotEmpty()) stringResource(R.string.cfu_see_all) else null,
         onTrailingClick = onSeeAll
     ) {
         if (slices.isEmpty()) {
@@ -865,7 +859,7 @@ private fun TopExpensePreviewCard(
                 })
             }
             if (transfer > 0) {
-                Text("已排除转账 " + formatMoney(currency, transfer) + "（不属于消费）", fontSize = 11.sp, color = Slate500)
+                Text(stringResource(R.string.cfu_excluded) + " " + formatMoney(currency, transfer), fontSize = 11.sp, color = Slate500)
             }
         }
     }
@@ -879,14 +873,14 @@ private fun BillsSnapshotCard(data: JSONObject, onOpen: () -> Unit) {
     val pending = data.optDouble("reserved", 0.0)
     val overdueCount = data.rows("prior_overdue").size
     if (planned <= 0 && overdueCount == 0) return
-    SectionCard(title = stringResource(R.string.cf_fixed), trailing = "查看账单 →", onTrailingClick = onOpen) {
+    SectionCard(title = stringResource(R.string.cf_fixed), trailing = stringResource(R.string.cfu_see_bills), onTrailingClick = onOpen) {
         BillSegmentBar(paid, pending, planned, height = 10.dp)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(stringResource(R.string.cf_paid) + " " + formatMoney(currency, paid), fontSize = 12.sp, color = IncomeGreen, fontWeight = FontWeight.SemiBold)
             Text(stringResource(R.string.cf_pending) + " " + formatMoney(currency, pending), fontSize = 12.sp, color = WarningAmber, fontWeight = FontWeight.SemiBold)
         }
         if (paid <= 0 && pending > 0) {
-            Text("本月固定账单尚未付款", fontSize = 11.sp, color = Slate500)
+            Text(stringResource(R.string.cfu_unverified), fontSize = 11.sp, color = Slate500)
         }
         if (overdueCount > 0) {
             Surface(shape = RoundedCornerShape(10.dp), color = Color(0xFFFEF2F2), border = BorderStroke(1.dp, Color(0xFFFECDD3))) {
@@ -922,6 +916,7 @@ private fun BreakdownCard(
             Text(stringResource(R.string.cf_empty), style = MaterialTheme.typography.bodyMedium, color = Slate500)
             return@SectionCard
         }
+        Text(stringResource(R.string.cfu_tap_details), fontSize = 12.sp, color = Slate500)
         val active = selectedIndex?.let { slices.getOrNull(it) }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             CashflowDonutChart(
@@ -1003,7 +998,7 @@ private fun BillRow(bill: JSONObject, currency: String, overdue: Boolean, enable
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(bill.optString("title"), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate900, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("到期 " + bill.optString("due_date"), fontSize = 11.sp, color = if (overdue) DangerColor else Slate500)
+                    Text(stringResource(R.string.cfu_due) + bill.optString("due_date"), fontSize = 11.sp, color = if (overdue) DangerColor else Slate500)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(formatMoney(currency, amount), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
@@ -1018,8 +1013,8 @@ private fun BillRow(bill: JSONObject, currency: String, overdue: Boolean, enable
             BarTrack(if (amount > 0) (paid / amount).toFloat() else 0f, accent, height = 6.dp, track = Slate200)
             if (!isPaid) {
                 Text(
-                    if (paid <= 0) "尚未付款 · 待付 " + formatMoney(currency, pending)
-                    else "已付 " + formatMoney(currency, paid) + " · 待付 " + formatMoney(currency, pending),
+                    if (paid <= 0) stringResource(R.string.cfu_awaiting) + formatMoney(currency, pending)
+                    else stringResource(R.string.cfu_paid) + formatMoney(currency, paid) + stringResource(R.string.cfu_pending) + formatMoney(currency, pending),
                     fontSize = 11.sp, color = Slate500
                 )
             }
@@ -1058,36 +1053,28 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
     var correctedAmount by remember { mutableStateOf("") }
     var selectedTab by rememberSaveable { mutableStateOf(CashflowDashboardTab.OVERVIEW) }
     var includeTransfer by rememberSaveable { mutableStateOf(false) }
+    var showCharts by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(month, currency, refresh) {
-        val cached = CashflowRepository.getCached(context, month, currency)
-        if (cached != null) {
-            result = cached
-            if (prevData == null) {
-                prevData = CashflowRepository.getCached(context, shiftMonth(month, -1), currency)?.data
-            }
-            loading = false
-            failed = false
-            if (refresh == 0) return@LaunchedEffect
-        } else {
-            loading = true
-        }
-
+        result = CashflowRepository.getCached(context, month, currency)
+        prevData = CashflowRepository.getCached(context, shiftMonth(month, -1), currency)?.data
+        loading = true
         failed = false
         selection = null
+        selectedBill = null
         try {
-            result = CashflowRepository.load(context, month, currency, forceRefresh = refresh > 0)
+            result = CashflowRepository.load(context, month, currency, forceRefresh = true)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
             android.util.Log.w("Cashflow", "Analysis unavailable", error)
-            if (result == null) failed = true
+            failed = true
         } finally {
             loading = false
         }
-        if (result != null) {
+        if (result != null && prevData == null) {
             try {
-                prevData = CashflowRepository.load(context, shiftMonth(month, -1), currency, forceRefresh = refresh > 0).data
+                prevData = CashflowRepository.load(context, shiftMonth(month, -1), currency).data
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -1098,15 +1085,10 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
 
     fun changeMonth(delta: Int) {
         val newMonth = shiftMonth(month, delta)
-        val cached = CashflowRepository.getCached(context, newMonth, currency)
-        if (cached != null) {
-            result = cached
-            prevData = CashflowRepository.getCached(context, shiftMonth(newMonth, -1), currency)?.data
-            loading = false
-            failed = false
-        } else {
-            loading = true
-        }
+        result = CashflowRepository.getCached(context, newMonth, currency)
+        prevData = CashflowRepository.getCached(context, shiftMonth(newMonth, -1), currency)?.data
+        loading = true
+        failed = false
         month = newMonth
     }
 
@@ -1121,6 +1103,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                 throw error
             } catch (error: Exception) {
                 android.util.Log.w("Cashflow", "Update failed", error)
+                android.widget.Toast.makeText(context, context.getString(R.string.cf_error), android.widget.Toast.LENGTH_LONG).show()
             } finally {
                 busy = false
             }
@@ -1137,8 +1120,8 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                     Spacer(Modifier.height(4.dp))
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cf_back), tint = Slate900) }
-                        Text(stringResource(R.string.cf_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                        IconButton(onClick = { refresh++ }, enabled = !loading) { Icon(Icons.Default.Refresh, contentDescription = null, tint = Slate600) }
+                        Text(stringResource(R.string.cf_title), modifier = Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                        IconButton(onClick = { refresh++ }, enabled = !loading) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cf_refresh), tint = Slate600) }
                     }
 
                     Surface(
@@ -1165,12 +1148,10 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                         onClick = {
                                             val target = code
                                             val cached = CashflowRepository.getCached(context, month, target)
-                                            if (cached != null) {
-                                                result = cached
-                                                prevData = CashflowRepository.getCached(context, shiftMonth(month, -1), target)?.data
-                                                loading = false
-                                                failed = false
-                                            }
+                                            result = cached
+                                            prevData = CashflowRepository.getCached(context, shiftMonth(month, -1), target)?.data
+                                            loading = true
+                                            failed = false
                                             currency = target
                                         },
                                         label = { Text(code) },
@@ -1206,7 +1187,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                         Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFFEF2F2), border = BorderStroke(1.dp, Color(0xFFFECDD3)), modifier = Modifier.fillMaxWidth()) {
                             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(stringResource(R.string.cf_error), color = ExpenseRed, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                                TextButton(onClick = { refresh++ }) { Text("重试", color = PrimaryTeal) }
+                                TextButton(onClick = { refresh++ }) { Text(stringResource(R.string.cfu_retry), color = PrimaryTeal) }
                             }
                         }
                     }
@@ -1216,7 +1197,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                     val data = report.data
                     val cur = data.optString("currency")
                     val isOnline = !report.cached
-                    val prev = prevData?.takeIf { it.optString("currency") == cur }
+                    val prev = prevData?.takeIf { it.optString("currency") == cur && it.optString("month") == shiftMonth(month, -1) }
                     val daily = dailyExpense(data, month)
                     val todayDay = todayDayIfCurrent(month)
 
@@ -1224,7 +1205,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = Slate100,
-                            modifier = Modifier.fillMaxWidth().height(44.dp)
+                            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxSize().padding(3.dp),
@@ -1245,19 +1226,18 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                         modifier = Modifier
                                             .weight(1f)
                                             .fillMaxHeight()
-                                            .clickable { selectedTab = tab }
+                                            .selectable(selected = isSelected, role = androidx.compose.ui.semantics.Role.Tab) { selectedTab = tab }
                                     ) {
                                         Box(
                                             contentAlignment = Alignment.Center,
-                                            modifier = Modifier.fillMaxSize().padding(horizontal = 2.dp)
+                                            modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 10.dp)
                                         ) {
                                             Text(
                                                 text = stringResource(labelRes),
                                                 color = if (isSelected) PrimaryTeal else Slate600,
                                                 fontSize = 13.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                textAlign = TextAlign.Center,
-                                                maxLines = 1
+                                                textAlign = TextAlign.Center
                                             )
                                         }
                                     }
@@ -1270,9 +1250,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                         // ================= 概览 =================
                         CashflowDashboardTab.OVERVIEW -> {
                             item { SummaryHeroCard(data, prev) }
-                            item { InsightsCard(data, prev, daily, todayDay) }
-                            item { DailySpendingCard(daily, cur, todayDay) }
-                            item { ComparisonBarChart(data) }
+                            item { InsightsCard(data, daily, todayDay) }
                             item {
                                 TopExpensePreviewCard(
                                     data = data, prev = prev,
@@ -1281,6 +1259,15 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                 )
                             }
                             item { BillsSnapshotCard(data, onOpen = { selectedTab = CashflowDashboardTab.BILLS }) }
+                            item {
+                                TextButton(onClick = { showCharts = !showCharts }, modifier = Modifier.fillMaxWidth()) {
+                                    Text(stringResource(if (showCharts) R.string.cfu_hide_charts else R.string.cfu_show_charts))
+                                }
+                            }
+                            if (showCharts) {
+                                item { DailySpendingCard(daily, cur, todayDay) }
+                                item { ComparisonBarChart(data) }
+                            }
                         }
 
                         // ================= 支出 =================
@@ -1289,22 +1276,22 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                 val transfer = transferAmount(data)
                                 BreakdownCard(
                                     title = stringResource(R.string.cf_expense_categories),
-                                    totalLabel = if (includeTransfer) stringResource(R.string.cf_donut_center_expense) else "消费",
+                                    totalLabel = if (includeTransfer) stringResource(R.string.cf_donut_center_expense) else stringResource(R.string.cfu_consumption),
                                     currency = cur,
                                     slices = expenseSlices(data, includeTransfer),
-                                    unitLabel = "类",
+                                    unitLabel = stringResource(R.string.cfu_categories),
                                     prevMap = prevCategoryAmounts(prev),
                                     headerExtra = if (transfer > 0) {
                                         {
                                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                                 Text(
-                                                    "转账 " + formatMoney(cur, transfer),
+                                                    stringResource(R.string.cfu_transfers) + " " + formatMoney(cur, transfer),
                                                     fontSize = 12.sp, color = Slate500
                                                 )
                                                 FilterChip(
                                                     selected = includeTransfer,
                                                     onClick = { includeTransfer = !includeTransfer },
-                                                    label = { Text("含转账") },
+                                                    label = { Text(stringResource(R.string.cfu_include_transfers)) },
                                                     colors = FilterChipDefaults.filterChipColors(
                                                         containerColor = Color.White,
                                                         labelColor = Slate700,
@@ -1335,7 +1322,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                     totalLabel = stringResource(R.string.cf_donut_center_income),
                                     currency = cur,
                                     slices = incomeSlices(data),
-                                    unitLabel = "渠道",
+                                    unitLabel = stringResource(R.string.cfu_platforms),
                                     onItemClick = { selection = it }
                                 )
                             }
@@ -1390,7 +1377,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                             val confirmed = data.rows("confirmed_transactions")
                             if (confirmed.isNotEmpty()) {
                                 item {
-                                    SectionCard(title = "已确认的定期交易") {
+                                    SectionCard(title = stringResource(R.string.cfu_confirmed)) {
                                         confirmed.forEach { tx ->
                                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                                 Text(tx.optString("note").ifEmpty { "#" + tx.optInt("id") }, fontSize = 14.sp, color = Slate900, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1448,9 +1435,9 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
         ModalBottomSheet(onDismissRequest = { selection = null }, containerColor = Color.White) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column {
+                    Column(Modifier.weight(1f).padding(end = 12.dp)) {
                         Text(sel.title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                        Text("${txs.size} 笔交易", fontSize = 12.sp, color = Slate500)
+                        Text(stringResource(R.string.cfu_tx_count, txs.size), fontSize = 12.sp, color = Slate500)
                     }
                     Text(formatMoney(cur, sum), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = PrimaryTeal)
                 }
@@ -1465,7 +1452,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                         Column(Modifier.weight(1f)) {
-                                            Text(tx.optString("note").ifEmpty { tx.optString("category") }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate900, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(tx.optString("note").ifEmpty { tx.optString("category") }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
                                             Text(tx.optString("date"), fontSize = 11.sp, color = Slate500)
                                         }
                                         Text(
@@ -1503,7 +1490,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(bill.optString("title"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                            Text("到期 " + bill.optString("due_date"), fontSize = 12.sp, color = Slate500)
+                            Text(stringResource(R.string.cfu_due) + bill.optString("due_date"), fontSize = 12.sp, color = Slate500)
                         }
                         Text(formatMoney(cur, amount), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Slate900)
                     }
@@ -1518,7 +1505,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
 
                 val linked = result?.data?.rows("payment_links")?.filter { it.optString("bill_key") == billKey } ?: emptyList()
                 if (linked.isNotEmpty()) {
-                    SheetSection("已关联支付") {
+                    SheetSection(stringResource(R.string.cfu_linked)) {
                         linked.forEach { link ->
                             SheetActionRow(text = "#" + link.optInt("transaction_id"), action = stringResource(R.string.cf_unlink), enabled = isOnline && !busy) {
                                 update(JSONObject().put("bill_key", billKey).put("transaction_id", link.optInt("transaction_id")).put("unlink", true))
@@ -1575,7 +1562,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                             enabled = isOnline && !busy && correctedAmount.toDoubleOrNull()?.let { it >= 0 && it.isFinite() } == true,
                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                             onClick = { update(JSONObject().put("action", "bill").put("bill_key", billKey).put("amount", correctedAmount)) }
-                        ) { Text("保存") }
+                        ) { Text(stringResource(R.string.cfu_save)) }
                     }
                 }
 
@@ -1583,7 +1570,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                 if (others.isNotEmpty()) {
                     SheetSection(stringResource(R.string.cf_duplicate)) {
                         others.forEach { other ->
-                            SheetActionRow(text = other.optString("title") + " · " + other.optString("due_date"), action = "标记", enabled = isOnline && !busy) {
+                            SheetActionRow(text = other.optString("title") + " · " + other.optString("due_date"), action = stringResource(R.string.cfu_mark), enabled = isOnline && !busy) {
                                 update(JSONObject().put("action", "bill").put("bill_key", billKey).put("duplicate_of", other.optString("bill_key")))
                             }
                         }

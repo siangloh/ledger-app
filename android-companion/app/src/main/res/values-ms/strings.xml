@@ -393,7 +393,7 @@
     <string name="cf_loading">Memuatkan…</string>
     <string name="cf_deficit">Anggaran kekurangan</string>
     <string name="cf_updated">Tarikh laporan</string>
-    <string name="cf_cached">Cache luar talian; data mungkin lapuk</string>
+    <string name="cf_cached">Memaparkan laporan tersimpan. Muat semula untuk data terkini.</string>
     <string name="cf_month">Bulan</string>
     <string name="cf_currency">Mata wang</string>
     <string name="cf_refund">Pautkan transaksi bayaran balik</string>
@@ -405,10 +405,10 @@
     <string name="cf_undo_confirm">Batalkan pengesahan berlaku</string>
 
     <string name="cf_tab_all">Papan Pemuka</string>
-    <string name="cf_tab_overview">Agihan</string>
-    <string name="cf_tab_expense">Perbelanjaan</string>
+    <string name="cf_tab_overview">Ringkasan</string>
+    <string name="cf_tab_expense">Belanja</string>
     <string name="cf_tab_income">Pendapatan</string>
-    <string name="cf_tab_bills">Bil Tetap</string>
+    <string name="cf_tab_bills">Bil</string>
     <string name="cf_donut_center_expense">Perbelanjaan</string>
     <string name="cf_donut_center_income">Pendapatan</string>
     <string name="cf_donut_center_net">Baki Bersih</string>
@@ -417,5 +417,50 @@
     <string name="undo_transaction_unsynced">Transaksi ini belum disegerakkan. Padam melalui Rekod.</string>
     <string name="undo_transaction_success">Dibatalkan. Transaksi dipindahkan ke tong kitar semula.</string>
     <string name="undo_transaction_failed">Pembatalan gagal. Cuba lagi atau semak Rekod.</string>
+    <string name="cfu_vs_month"> berbanding bulan lalu</string>
+    <string name="cfu_available">Tersedia</string>
+    <string name="cfu_excluded">Pindahan dikecualikan</string>
+    <string name="cfu_no_income">Tiada pendapatan direkodkan</string>
+    <string name="cfu_deficit_badge">Anggaran kekurangan</string>
+    <string name="cfu_limited">Baki terhad selepas rizab</string>
+    <string name="cfu_positive">Baki positif selepas rizab</string>
+    <string name="cfu_no_income_detail">Tiada pendapatan bulan ini. Semak sama ada semua pendapatan telah direkodkan.</string>
+    <string name="cfu_over_detail">Perbelanjaan dan rizab belum dibayar melebihi pendapatan sebanyak %1$s.</string>
+    <string name="cfu_used_detail">Perbelanjaan dan rizab belum dibayar menggunakan %1$s pendapatan.</string>
+    <string name="cfu_insights">Ringkasan bulan ini</string>
+    <string name="cfu_largest">Perbelanjaan terbesar: %1$s, %2$s (%3$s perbelanjaan)</string>
+    <string name="cfu_avg">Purata harian: %1$s (tidak termasuk pindahan)</string>
+    <string name="cfu_forecast">Pada kadar ini, perbelanjaan hujung bulan mungkin %1$s. Anggaran sahaja.</string>
+    <string name="cfu_forecast_warning">Dengan bil belum dibayar, jumlah mungkin melebihi pendapatan.</string>
+    <string name="cfu_pending_detail">Bayaran bil tetap sebanyak %1$s masih perlu disahkan.</string>
+    <string name="cfu_daily">Perbelanjaan harian</string>
+    <string name="cfu_day">Hari %1$d</string>
+    <string name="cfu_peak_day">Tertinggi: hari %1$d</string>
+    <string name="cfu_avg_label">┄ Purata %1$s</string>
+    <string name="cfu_active_days">Perbelanjaan pada %1$d hari · pindahan dikecualikan</string>
+    <string name="cfu_compare">Agihan wang</string>
+    <string name="cfu_top">Kategori perbelanjaan utama</string>
+    <string name="cfu_see_all">Lihat semua →</string>
+    <string name="cfu_see_bills">Semak bil →</string>
+    <string name="cfu_unverified">Belum dipautkan kepada bayaran; ini tidak semestinya bermakna belum dibayar.</string>
+    <string name="cfu_due">Tarikh akhir </string>
+    <string name="cfu_awaiting">Bayaran belum disahkan · baki </string>
+    <string name="cfu_paid">Dibayar </string>
+    <string name="cfu_pending"> · baki </string>
+    <string name="cfu_retry">Cuba lagi</string>
+    <string name="cfu_consumption">Perbelanjaan</string>
+    <string name="cfu_categories">kategori</string>
+    <string name="cfu_platforms">akaun</string>
+    <string name="cfu_include_transfers">Termasuk pindahan</string>
+    <string name="cfu_confirmed">Catatan berkala disahkan</string>
+    <string name="cfu_linked">Bayaran dipautkan</string>
+    <string name="cfu_save">Simpan</string>
+    <string name="cfu_mark">Tandakan</string>
+    <string name="cfu_tx_count">%1$d transaksi</string>
+    <string name="cfu_show_charts">Lihat perbelanjaan harian dan agihan ↓</string>
+    <string name="cfu_hide_charts">Sembunyikan carta terperinci ↑</string>
+    <string name="cfu_tap_details">Ketik kategori atau akaun di bawah untuk melihat transaksi.</string>
+    <string name="cfu_formula">Anggaran tersedia = pendapatan − perbelanjaan sebenar − rizab belum dibayar bulan ini. Ini bukan baki bank.</string>
+    <string name="cfu_transfers">Pindahan</string>
 </resources>
 

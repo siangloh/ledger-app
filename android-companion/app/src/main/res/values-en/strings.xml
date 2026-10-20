@@ -393,7 +393,7 @@
     <string name="cf_loading">Loading…</string>
     <string name="cf_deficit">Projected shortfall</string>
     <string name="cf_updated">Report date</string>
-    <string name="cf_cached">Offline cache; data may be out of date</string>
+    <string name="cf_cached">Showing a saved report. Refresh for the latest data.</string>
     <string name="cf_month">Month</string>
     <string name="cf_currency">Currency</string>
     <string name="cf_refund">Link refund transaction</string>
@@ -405,10 +405,10 @@
     <string name="cf_undo_confirm">Undo occurrence confirmation</string>
 
     <string name="cf_tab_all">Dashboard</string>
-    <string name="cf_tab_overview">Allocation</string>
+    <string name="cf_tab_overview">Overview</string>
     <string name="cf_tab_expense">Expenses</string>
     <string name="cf_tab_income">Income</string>
-    <string name="cf_tab_bills">Fixed Bills</string>
+    <string name="cf_tab_bills">Bills</string>
     <string name="cf_donut_center_expense">Expenses</string>
     <string name="cf_donut_center_income">Income</string>
     <string name="cf_donut_center_net">Net</string>
@@ -417,5 +417,50 @@
     <string name="undo_transaction_unsynced">This transaction is not synced yet. Remove it from Records.</string>
     <string name="undo_transaction_success">Undone. Transaction moved to the recycle bin.</string>
     <string name="undo_transaction_failed">Undo failed. Retry or check Records.</string>
+    <string name="cfu_vs_month"> vs last month</string>
+    <string name="cfu_available">Available</string>
+    <string name="cfu_excluded">Transfers excluded</string>
+    <string name="cfu_no_income">No income recorded</string>
+    <string name="cfu_deficit_badge">Projected shortfall</string>
+    <string name="cfu_limited">Limited after reserves</string>
+    <string name="cfu_positive">Positive after reserves</string>
+    <string name="cfu_no_income_detail">No income recorded for this month. Check whether all income has been added.</string>
+    <string name="cfu_over_detail">Spending and unpaid reserves exceed income by %1$s.</string>
+    <string name="cfu_used_detail">Spending and unpaid reserves use %1$s of income.</string>
+    <string name="cfu_insights">This month at a glance</string>
+    <string name="cfu_largest">Largest expense: %1$s, %2$s (%3$s of expenses)</string>
+    <string name="cfu_avg">Daily average: %1$s (excluding transfers)</string>
+    <string name="cfu_forecast">At this pace, month-end spending may reach %1$s. Estimate only.</string>
+    <string name="cfu_forecast_warning">With unpaid bills, this may exceed income.</string>
+    <string name="cfu_pending_detail">Fixed bills of %1$s still need payment verification.</string>
+    <string name="cfu_daily">Daily spending</string>
+    <string name="cfu_day">Day %1$d</string>
+    <string name="cfu_peak_day">Peak: day %1$d</string>
+    <string name="cfu_avg_label">┄ Average %1$s</string>
+    <string name="cfu_active_days">Spending on %1$d days · transfers excluded</string>
+    <string name="cfu_compare">Money allocation</string>
+    <string name="cfu_top">Top expense categories</string>
+    <string name="cfu_see_all">View all →</string>
+    <string name="cfu_see_bills">Review bills →</string>
+    <string name="cfu_unverified">No payment linked yet; this does not necessarily mean unpaid.</string>
+    <string name="cfu_due">Due </string>
+    <string name="cfu_awaiting">Payment unverified · remaining </string>
+    <string name="cfu_paid">Paid </string>
+    <string name="cfu_pending"> · remaining </string>
+    <string name="cfu_retry">Retry</string>
+    <string name="cfu_consumption">Spending</string>
+    <string name="cfu_categories">categories</string>
+    <string name="cfu_platforms">accounts</string>
+    <string name="cfu_include_transfers">Include transfers</string>
+    <string name="cfu_confirmed">Confirmed recurring entries</string>
+    <string name="cfu_linked">Linked payments</string>
+    <string name="cfu_save">Save</string>
+    <string name="cfu_mark">Mark</string>
+    <string name="cfu_tx_count">%1$d transactions</string>
+    <string name="cfu_show_charts">Show daily spending and allocation ↓</string>
+    <string name="cfu_hide_charts">Hide detailed charts ↑</string>
+    <string name="cfu_tap_details">Tap a category or account below to view its transactions.</string>
+    <string name="cfu_formula">Projected available = income − actual spending − unpaid reserves this month. This is not a bank balance.</string>
+    <string name="cfu_transfers">Transfers</string>
 </resources>
 
