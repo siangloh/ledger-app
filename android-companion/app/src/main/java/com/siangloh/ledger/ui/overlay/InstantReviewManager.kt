@@ -22,18 +22,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
@@ -42,16 +39,16 @@ import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.siangloh.ledger.MainActivity
 import com.siangloh.ledger.R
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
 
 object InstantReviewManager {
 
     private const val TAG = "InstantReviewManager"
-    private const val CHANNEL_ID = "instant_expense_channel"
+    private const val QUIET_CHANNEL_ID = "instant_expense_quiet"
     private val notifIdGenerator = AtomicInteger(2000)
+
+    /** 分类名为空或属于这些“兜底分类”时，视为系统没把握，只进待整理，不打扰用户 */
+    private val UNSURE_CATEGORIES = setOf("", "其他", "未分类", "待分类")
 
     val COMMON_CATEGORIES = listOf(
         "餐饮" to "🍔",
@@ -65,40 +62,55 @@ object InstantReviewManager {
         "其他" to "🏷️"
     )
 
+    /**
+     * 自动记账成功后的轻提示。
+     * - 有把握（商户/分类都明确）：显示小提示条（无悬浮窗权限则发静音通知），可「改分类」或「撤销」
+     * - 没把握：什么都不弹，交易已在服务端进入「待整理」
+     */
     fun showInstantReview(
         context: Context,
         merchant: String,
         amount: Double,
         predictedCategory: String,
         channel: String,
-        transactionId: Long
+        transactionId: Long,
+        currency: String = "RM"
     ) {
-        val cleanMerchant = merchant.ifBlank { "待确认商户" }
-        val cleanCategory = predictedCategory.ifBlank { "餐饮" }
+        val cleanMerchant = merchant.trim()
+        val cleanCategory = predictedCategory.trim()
+
+        val confident = cleanMerchant.isNotEmpty() && cleanCategory !in UNSURE_CATEGORIES
+        if (!confident) {
+            Log.i(TAG, "Low confidence (merchant='$cleanMerchant', category='$cleanCategory'): left in review inbox, no popup")
+            return
+        }
 
         Handler(Looper.getMainLooper()).post {
             try {
                 if (Settings.canDrawOverlays(context)) {
-                    Log.i(TAG, "Showing ExpenseMY-style floating card overlay for: $cleanMerchant")
-                    showFloatingOverlay(context, cleanMerchant, amount, cleanCategory, channel, transactionId)
+                    showFloatingToast(context, cleanMerchant, amount, cleanCategory, transactionId, currency)
                 } else {
-                    Log.i(TAG, "Floating overlay permission not granted. Falling back to Heads-up Notification.")
-                    showHeadsUpNotification(context, cleanMerchant, amount, cleanCategory, channel, transactionId)
+                    showQuietNotification(context, cleanMerchant, amount, cleanCategory, channel, transactionId, currency)
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to display instant review UI: ${e.message}, falling back to notification")
-                showHeadsUpNotification(context, cleanMerchant, amount, cleanCategory, channel, transactionId)
+                Log.w(TAG, "Failed to display instant review UI: ${e.message}, falling back to quiet notification")
+                try {
+                    showQuietNotification(context, cleanMerchant, amount, cleanCategory, channel, transactionId, currency)
+                } catch (_: Exception) {}
             }
         }
     }
 
-    private fun showFloatingOverlay(
+    // ------------------------------------------------------------------
+    // 悬浮小提示条
+    // ------------------------------------------------------------------
+    private fun showFloatingToast(
         context: Context,
         merchant: String,
         amount: Double,
         initialCategory: String,
-        channel: String,
-        transactionId: Long
+        transactionId: Long,
+        currency: String
     ) {
         val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -113,8 +125,7 @@ object InstantReviewManager {
             WindowManager.LayoutParams.WRAP_CONTENT,
             layoutType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
@@ -122,267 +133,75 @@ object InstantReviewManager {
         }
 
         val composeView = ComposeView(context)
-
-        // Floating card lifecycle mock setup for Compose in WindowManager
         val lifecycleOwner = OverlayLifecycleOwner()
         lifecycleOwner.performRestore(null)
         lifecycleOwner.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_START)
         lifecycleOwner.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_RESUME)
-
         composeView.setViewTreeLifecycleOwner(lifecycleOwner)
         composeView.setViewTreeViewModelStoreOwner(lifecycleOwner)
         composeView.setViewTreeSavedStateRegistryOwner(lifecycleOwner)
 
         var isDismissed = false
         fun dismiss() {
-            if (!isDismissed) {
-                isDismissed = true
-                try {
-                    windowManager.removeView(composeView)
-                } catch (_: Exception) {}
-            }
+            if (isDismissed) return
+            isDismissed = true
+            try { windowManager.removeView(composeView) } catch (_: Exception) {}
+            try { composeView.disposeComposition() } catch (_: Exception) {}
+            try {
+                lifecycleOwner.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_PAUSE)
+                lifecycleOwner.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_STOP)
+                lifecycleOwner.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_DESTROY)
+            } catch (_: Exception) {}
         }
 
         composeView.setContent {
-            var selectedCategory by remember { mutableStateOf(initialCategory) }
-            var rememberMerchant by remember { mutableStateOf(true) }
-            var isVisible by remember { mutableStateOf(true) }
-
-            // 6秒无操作自动确认并关闭
-            LaunchedEffect(Unit) {
-                kotlinx.coroutines.delay(6500)
-                isVisible = false
-                kotlinx.coroutines.delay(300)
-                dismiss()
-            }
-
-            AnimatedVisibility(
-                visible = isVisible,
-                enter = slideInVertically(initialOffsetY = { -it }, animationSpec = tween(300)) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { -it }, animationSpec = tween(250)) + fadeOut()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    Card(
-                        shape = RoundedCornerShape(22.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFF0F172A)
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                        ) {
-                            // Top Tag: Channel badge + Close button
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    com.siangloh.ledger.ui.compose.components.SourceBrandBadge(
-                                        source = "notification",
-                                        channel = channel,
-                                        note = merchant
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "· 识别成功",
-                                        color = Color(0xFF94A3B8),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = {
-                                        isVisible = false
-                                        dismiss()
-                                    },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Close",
-                                        tint = Color(0xFF94A3B8),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Merchant & Amount
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = merchant,
-                                        color = Color.White,
-                                        fontSize = 17.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1
-                                    )
-                                    Text(
-                                        text = "已自动归入【$selectedCategory】",
-                                        color = Color(0xFF38BDF8),
-                                        fontSize = 12.sp
-                                    )
-                                }
-
-                                Text(
-                                    text = "RM ${String.format("%.2f", amount)}",
-                                    color = Color(0xFF34D399),
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Horizontal scroll of quick category chips
-                            Text(
-                                text = "快速切换分类:",
-                                color = Color(0xFF64748B),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            val displayCategories = remember(initialCategory) {
-                                val list = COMMON_CATEGORIES.toMutableList()
-                                if (initialCategory.isNotBlank() && list.none { it.first == initialCategory }) {
-                                    list.add(0, initialCategory to "🏷️")
-                                }
-                                list
-                            }
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                displayCategories.forEach { (catName, emoji) ->
-                                    val isSelected = catName == selectedCategory
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = if (isSelected) Color(0xFF2563EB) else Color(0xFF1E293B),
-                                        modifier = Modifier.clickable {
-                                            selectedCategory = catName
-                                            // 立即触发后台异步分类更新
-                                            sendQuickCategorizeRequest(context, transactionId, catName, merchant, rememberMerchant)
-                                        }
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(text = emoji, fontSize = 13.sp)
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(
-                                                text = catName,
-                                                color = if (isSelected) Color.White else Color(0xFFCBD5E1),
-                                                fontSize = 13.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Bottom actions
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.clickable { rememberMerchant = !rememberMerchant }
-                                ) {
-                                    Checkbox(
-                                        checked = rememberMerchant,
-                                        onCheckedChange = { rememberMerchant = it },
-                                        colors = CheckboxDefaults.colors(
-                                            checkedColor = Color(0xFF10B981),
-                                            uncheckedColor = Color(0xFF64748B)
-                                        ),
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "记住此商户规则",
-                                        color = Color(0xFF94A3B8),
-                                        fontSize = 12.sp
-                                    )
-                                }
-
-                                Button(
-                                    onClick = {
-                                        sendQuickCategorizeRequest(context, transactionId, selectedCategory, merchant, rememberMerchant)
-                                        isVisible = false
-                                        dismiss()
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                                    shape = RoundedCornerShape(12.dp),
-                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                                    modifier = Modifier.height(34.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Confirm",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("确认", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
+            InstantReviewToast(
+                merchant = merchant,
+                amount = amount,
+                currency = currency,
+                initialCategory = initialCategory,
+                canUndo = transactionId > 0,
+                onCommit = { category, saveRule ->
+                    // 只在用户真的改了分类时，才发一次请求（以最终选择为准）
+                    if (category != initialCategory) {
+                        sendQuickCategorizeRequest(context, transactionId, category, merchant, saveRule)
                     }
-                }
-            }
+                },
+                onUndo = { TransactionUndo.undo(context.applicationContext, transactionId) },
+                onFinished = { dismiss() }
+            )
         }
 
         windowManager.addView(composeView, params)
     }
 
-    private fun showHeadsUpNotification(
+    // ------------------------------------------------------------------
+    // 没有悬浮窗权限时：静音通知（不响、不震动、不弹横幅），15 秒自动消失
+    // ------------------------------------------------------------------
+    private fun showQuietNotification(
         context: Context,
         merchant: String,
         amount: Double,
         category: String,
         channel: String,
-        transactionId: Long
+        transactionId: Long,
+        currency: String
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notifChannel = NotificationChannel(
-                CHANNEL_ID,
-                "付款即时识别与分类",
-                NotificationManager.IMPORTANCE_HIGH
+                QUIET_CHANNEL_ID,
+                "自动记账提示",
+                NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "付完款后在通知栏快速确认商户和修正分类"
-                enableVibration(true)
+                description = "自动记账后的静音提示，可在此撤销"
+                setShowBadge(false)
             }
             notificationManager.createNotificationChannel(notifChannel)
         }
 
         val notifId = notifIdGenerator.incrementAndGet()
 
-        // Content intent: open App
         val contentIntent = PendingIntent.getActivity(
             context,
             notifId,
@@ -390,33 +209,28 @@ object InstantReviewManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        val suffix = channel.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
+        val builder = NotificationCompat.Builder(context, QUIET_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("已自动记账: $merchant")
-            .setContentText("RM ${String.format("%.2f", amount)} · 预选分类: $category (${channel.ifBlank { "已扣款" }})")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setContentTitle("已记账 · $merchant")
+            .setContentText("$currency ${String.format("%.2f", amount)} · $category$suffix")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setAutoCancel(true)
+            .setTimeoutAfter(15_000)
             .setContentIntent(contentIntent)
 
-        // Add 3 high-frequency quick action buttons: [🍔 餐饮] [🚗 交通] [🛒 杂货]
-        val quickCats = listOf("餐饮" to "🍔 餐饮", "交通" to "🚗 交通", "杂货" to "🛒 杂货")
-        quickCats.forEachIndexed { idx, (catKey, label) ->
-            val actionIntent = Intent(context, QuickCategoryReceiver::class.java).apply {
-                action = QuickCategoryReceiver.ACTION_CATEGORIZE
-                putExtra(QuickCategoryReceiver.EXTRA_TRANSACTION_ID, transactionId)
-                putExtra(QuickCategoryReceiver.EXTRA_CATEGORY, catKey)
-                putExtra(QuickCategoryReceiver.EXTRA_MERCHANT, merchant)
-                putExtra(QuickCategoryReceiver.EXTRA_REMEMBER, true)
-                putExtra(QuickCategoryReceiver.EXTRA_NOTIFICATION_ID, notifId)
+        if (transactionId > 0) {
+            val undoIntent = Intent(context, UndoTransactionReceiver::class.java).apply {
+                putExtra(UndoTransactionReceiver.EXTRA_TRANSACTION_ID, transactionId)
+                putExtra(UndoTransactionReceiver.EXTRA_NOTIFICATION_ID, notifId)
             }
-            val actionPendingIntent = PendingIntent.getBroadcast(
+            val undoPending = PendingIntent.getBroadcast(
                 context,
-                notifId * 10 + idx,
-                actionIntent,
+                notifId * 10,
+                undoIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            builder.addAction(0, label, actionPendingIntent)
+            builder.addAction(0, "撤销", undoPending)
         }
 
         notificationManager.notify(notifId, builder.build())
@@ -427,7 +241,7 @@ object InstantReviewManager {
         transactionId: Long,
         category: String,
         merchant: String,
-        remember: Boolean
+        saveRule: Boolean
     ) {
         if (transactionId <= 0) return
         val intent = Intent(context, QuickCategoryReceiver::class.java).apply {
@@ -435,9 +249,212 @@ object InstantReviewManager {
             putExtra(QuickCategoryReceiver.EXTRA_TRANSACTION_ID, transactionId)
             putExtra(QuickCategoryReceiver.EXTRA_CATEGORY, category)
             putExtra(QuickCategoryReceiver.EXTRA_MERCHANT, merchant)
-            putExtra(QuickCategoryReceiver.EXTRA_REMEMBER, remember)
+            putExtra(QuickCategoryReceiver.EXTRA_REMEMBER, saveRule)
         }
         context.sendBroadcast(intent)
+    }
+}
+
+// ======================================================================
+// 小提示条 UI：白底 + 主题色，默认只有一行，不需要用户“确认”
+// ======================================================================
+private val ToastTeal = Color(0xFF0F766E)
+private val ToastTealSubtle = Color(0xFFF0FDFA)
+private val ToastText = Color(0xFF0F172A)
+private val ToastSubText = Color(0xFF64748B)
+private val ToastChip = Color(0xFFF1F5F9)
+
+@Composable
+private fun InstantReviewToast(
+    merchant: String,
+    amount: Double,
+    currency: String,
+    initialCategory: String,
+    canUndo: Boolean,
+    onCommit: (category: String, saveRule: Boolean) -> Unit,
+    onUndo: () -> Unit,
+    onFinished: () -> Unit
+) {
+    var visible by remember { mutableStateOf(true) }
+    var expanded by remember { mutableStateOf(false) }
+    var closing by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(initialCategory) }
+    var saveRule by remember { mutableStateOf(true) }
+
+    fun close() {
+        if (closing) return
+        closing = true
+        onCommit(selected, saveRule)
+        visible = false
+    }
+
+    fun undo() {
+        if (closing) return
+        closing = true
+        onUndo()
+        visible = false
+    }
+
+    // 收起时 3 秒后自动消失；展开改分类时给更长的时间，且每次操作都会重新计时
+    LaunchedEffect(expanded, selected, saveRule) {
+        kotlinx.coroutines.delay(if (expanded) 8000 else 3000)
+        close()
+    }
+
+    // 退出动画结束后再移除窗口
+    LaunchedEffect(visible) {
+        if (!visible) {
+            kotlinx.coroutines.delay(300)
+            onFinished()
+        }
+    }
+
+    val emojiMap = remember { InstantReviewManager.COMMON_CATEGORIES.toMap() }
+    val categories = remember(initialCategory) {
+        val list = InstantReviewManager.COMMON_CATEGORIES.toMutableList()
+        if (list.none { it.first == initialCategory }) list.add(0, initialCategory to "🏷️")
+        list
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically(initialOffsetY = { -it }, animationSpec = tween(250)) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { -it }, animationSpec = tween(250)) + fadeOut()
+    ) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(40.dp).clip(CircleShape).background(ToastTealSubtle),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(emojiMap[selected] ?: "🏷️", fontSize = 20.sp)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            merchant,
+                            color = ToastText,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            "✓ 已记账 · $selected",
+                            color = ToastTeal,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "$currency ${String.format("%.2f", amount)}",
+                        color = ToastText,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (expanded) {
+                        TextButton(
+                            onClick = { close() },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("完成", color = ToastTeal, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        TextButton(
+                            onClick = { expanded = true },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("改分类", color = ToastSubText, fontSize = 13.sp)
+                        }
+                    }
+                    if (canUndo) {
+                        TextButton(
+                            onClick = { undo() },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("撤销", color = ToastTeal, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                AnimatedVisibility(visible = expanded) {
+                    Column {
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            categories.forEach { (name, emoji) ->
+                                val isSel = name == selected
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSel) ToastTeal else ToastChip,
+                                    modifier = Modifier.clickable { selected = name }
+                                ) {
+                                    Row(
+                                        Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(emoji, fontSize = 13.sp)
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            name,
+                                            color = if (isSel) Color.White else ToastText,
+                                            fontSize = 13.sp,
+                                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 只有真的改了分类，才问要不要记住规则
+                        if (selected != initialCategory) {
+                            Spacer(Modifier.height(6.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable { saveRule = !saveRule }
+                            ) {
+                                Checkbox(
+                                    checked = saveRule,
+                                    onCheckedChange = { saveRule = it },
+                                    colors = CheckboxDefaults.colors(checkedColor = ToastTeal),
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Text(
+                                    "以后「$merchant」都归为 $selected",
+                                    color = ToastSubText,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
