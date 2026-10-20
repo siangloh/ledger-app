@@ -21,6 +21,7 @@ from core.config import (
     AUTO_TRACK_DEBUG_LOG
 )
 from services.notification_service import parse_auto_track_notification
+from services.notification_dedup_service import find_recent_notification
 from services.ai_service import classify_notification_with_llm
 from core.utils import money_filter, check_and_record_budget_alerts
 from core.extensions import csrf
@@ -218,12 +219,8 @@ def api_auto_track():
     except Exception as e:
         logger.debug("Table check processed_notifications: %s", e)
 
-    # 1. 检查已处理通知库 (完全相同的通知原文直接秒级拦截，应对网络重试或离线队列重放)
-    existing_notif = db.execute('''
-        SELECT id, transaction_id, created_at FROM processed_notifications
-        WHERE user_id = ? AND content_hash = ?
-        ORDER BY id DESC LIMIT 1
-    ''', (str(target_user_id), content_hash)).fetchone()
+    # 1. Content-only retries expire after two hours; text alone cannot identify a payment forever.
+    existing_notif = find_recent_notification(db, target_user_id, content_hash)
 
     if existing_notif:
         if AUTO_TRACK_DEBUG_LOG:
@@ -257,11 +254,7 @@ def api_auto_track():
             db.rollback()
         except Exception as e:
             logger.debug("[AUTO_TRACK] db.rollback on concurrent wait notice: %s", e)
-        existing_after = db.execute('''
-            SELECT id, transaction_id, created_at FROM processed_notifications
-            WHERE user_id = ? AND content_hash = ?
-            ORDER BY id DESC LIMIT 1
-        ''', (str(target_user_id), content_hash)).fetchone()
+        existing_after = find_recent_notification(db, target_user_id, content_hash)
         if existing_after:
             return jsonify({
                 'ok': True,
