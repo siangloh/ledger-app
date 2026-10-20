@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,12 +53,12 @@ fun RecordsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var selectedType by remember { mutableStateOf("all") } // 'all', 'expense', 'income', 'transfer'
-    var selectedMonth by remember {
+    var selectedType by rememberSaveable { mutableStateOf("all") } // 'all', 'expense', 'income', 'transfer'
+    var selectedMonth by rememberSaveable {
         mutableStateOf(SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date()))
     }
-    var searchQuery by remember { mutableStateOf("") }
-    var debouncedSearchQuery by remember { mutableStateOf("") }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var debouncedSearchQuery by rememberSaveable { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var currentPage by remember { mutableStateOf(1) }
     var hasMore by remember { mutableStateOf(false) }
@@ -80,15 +81,15 @@ fun RecordsScreen(
 
     // 筛选预设与多维度高级筛选状态
     var savedFilters by remember { mutableStateOf<List<SavedFilterRecord>>(emptyList()) }
-    var activeFilterId by remember { mutableStateOf<Int?>(null) }
-    var filterCategory by remember { mutableStateOf<String?>(null) }
-    var filterAccountId by remember { mutableStateOf<Int?>(null) }
-    var filterMinAmount by remember { mutableStateOf<Double?>(null) }
-    var filterMaxAmount by remember { mutableStateOf<Double?>(null) }
-    var filterStartDate by remember { mutableStateOf<String?>(null) }
-    var filterEndDate by remember { mutableStateOf<String?>(null) }
-    var filterSource by remember { mutableStateOf<String?>(null) }
-    var filterChannel by remember { mutableStateOf<String?>(null) }
+    var activeFilterId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var filterCategory by rememberSaveable { mutableStateOf<String?>(null) }
+    var filterAccountId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var filterMinAmount by rememberSaveable { mutableStateOf<Double?>(null) }
+    var filterMaxAmount by rememberSaveable { mutableStateOf<Double?>(null) }
+    var filterStartDate by rememberSaveable { mutableStateOf<String?>(null) }
+    var filterEndDate by rememberSaveable { mutableStateOf<String?>(null) }
+    var filterSource by rememberSaveable { mutableStateOf<String?>(null) }
+    var filterChannel by rememberSaveable { mutableStateOf<String?>(null) }
     var showAdvancedFilterSheet by remember { mutableStateOf(false) }
     var showSavePresetDialog by remember { mutableStateOf(false) }
     var availableCategories by remember { mutableStateOf<List<String>>(emptyList()) }

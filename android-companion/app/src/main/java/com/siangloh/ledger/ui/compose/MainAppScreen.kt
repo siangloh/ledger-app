@@ -1,7 +1,10 @@
 package com.siangloh.ledger.ui.compose
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,6 +19,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -40,10 +45,16 @@ fun MainAppScreen(
     onOpenSettings: () -> Unit = {},
     onOpenWebUrl: (String) -> Unit = {}
 ) {
-    var selectedTab by remember { mutableStateOf(initialTab) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(initialTab) }
     var cashflowMonth by rememberSaveable { mutableStateOf<String?>(null) }
+    var cashflowVisible by rememberSaveable { mutableStateOf(false) }
     var cashflowRevision by remember { mutableIntStateOf(0) }
     val saveableStateHolder = rememberSaveableStateHolder()
+    val detailParallax by animateFloatAsState(
+        targetValue = if (cashflowVisible && selectedTab == 0) -0.08f else 0f,
+        animationSpec = tween(300, easing = FastOutSlowInEasing), label = "detailParallax")
+
+    BackHandler(enabled = selectedTab != 0 && !cashflowVisible) { selectedTab = 0 }
 
     val navItems = listOf(
         NavItem(stringResource(R.string.nav_overview), Icons.Default.Dashboard),
@@ -71,7 +82,7 @@ fun MainAppScreen(
 
                         NavigationBarItem(
                             selected = isSelected,
-                            onClick = { selectedTab = index },
+                            onClick = { if (cashflowVisible) { cashflowVisible = false; cashflowRevision++ }; selectedTab = index },
                             icon = {
                                 Icon(
                                     imageVector = item.icon,
@@ -104,49 +115,72 @@ fun MainAppScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = paddingValues.calculateBottomPadding())
+                .clipToBounds()
         ) {
-            saveableStateHolder.SaveableStateProvider(selectedTab) {
-                when (selectedTab) {
-                    0 -> {
-                        OverviewScreen(
-                            showBottomBar = false,
-                            onNavigateToRecords = { selectedTab = 1 },
-                            onNavigateToAdd = { selectedTab = 2 },
-                            onNavigateToAccounts = { selectedTab = 3 },
-                            onNavigateToTools = { selectedTab = 4 },
-                            onScanReceipt = onScanReceipt,
-                            onOpenSettings = onOpenSettings,
-                            onNavigateToCashflow = { cashflowMonth = it },
-                            cashflowRevision = cashflowRevision
-                        )
-                    }
-                    1 -> {
-                        RecordsScreen(
-                            onNavigateToAdd = { selectedTab = 2 }
-                        )
-                    }
-                    2 -> {
-                        AddTransactionScreen(
-                            onFinished = {
-                                selectedTab = 1
-                            }
-                        )
-                    }
-                    3 -> {
-                        AccountsScreen()
-                    }
-                    4 -> {
-                        MoreToolsScreen(
-                            onScanReceipt = onScanReceipt,
-                            onNavigateToAdd = { selectedTab = 2 },
-                            onOpenSettings = onOpenSettings,
-                            onOpenWebUrl = onOpenWebUrl
-                        )
+            AnimatedContent(
+                targetState = selectedTab,
+                modifier = Modifier.fillMaxSize().graphicsLayer {
+                    translationX = detailParallax * size.width
+                    alpha = 1f + detailParallax * 2f
+                },
+                transitionSpec = {
+                    val forward = targetState > initialState
+                    (slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { if (forward) it else -it } +
+                        fadeIn(tween(220))) togetherWith
+                        (slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { if (forward) -it / 4 else it / 4 } +
+                            fadeOut(tween(180)))
+                },
+                label = "mainPageSlide"
+            ) { page ->
+                saveableStateHolder.SaveableStateProvider(page) {
+                    when (page) {
+                        0 -> {
+                            OverviewScreen(
+                                showBottomBar = false,
+                                onNavigateToRecords = { selectedTab = 1 },
+                                onNavigateToAdd = { selectedTab = 2 },
+                                onNavigateToAccounts = { selectedTab = 3 },
+                                onNavigateToTools = { selectedTab = 4 },
+                                onScanReceipt = onScanReceipt,
+                                onOpenSettings = onOpenSettings,
+                                onNavigateToCashflow = { cashflowMonth = it; cashflowVisible = true },
+                                cashflowRevision = cashflowRevision
+                            )
+                        }
+                        1 -> {
+                            RecordsScreen(
+                                onNavigateToAdd = { selectedTab = 2 }
+                            )
+                        }
+                        2 -> {
+                            AddTransactionScreen(
+                                onFinished = {
+                                    selectedTab = 1
+                                }
+                            )
+                        }
+                        3 -> {
+                            AccountsScreen()
+                        }
+                        4 -> {
+                            MoreToolsScreen(
+                                onScanReceipt = onScanReceipt,
+                                onNavigateToAdd = { selectedTab = 2 },
+                                onOpenSettings = onOpenSettings,
+                                onOpenWebUrl = onOpenWebUrl
+                            )
+                        }
                     }
                 }
             }
-            if (selectedTab == 0) {
-                cashflowMonth?.let { month -> CashflowAnalysisScreen(month) { cashflowMonth = null; cashflowRevision++ } }
+            AnimatedVisibility(
+                visible = selectedTab == 0 && cashflowVisible && cashflowMonth != null,
+                enter = slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200)),
+                exit = slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(220))
+            ) {
+                cashflowMonth?.let { month ->
+                    CashflowAnalysisScreen(month) { cashflowVisible = false; cashflowRevision++ }
+                }
             }
         }
     }

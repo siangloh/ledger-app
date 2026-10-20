@@ -1,8 +1,13 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 
 package com.siangloh.ledger.ui.compose
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -39,6 +44,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -736,10 +742,8 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
     var selectedBill by remember { mutableStateOf<JSONObject?>(null) }
     var busy by remember { mutableStateOf(false) }
     var correctedAmount by remember { mutableStateOf("") }
-    var selectedTab by rememberSaveable { mutableStateOf(CashflowDashboardTab.INCOME) }
-    val activeTab = if (selectedTab == CashflowDashboardTab.OVERVIEW) CashflowDashboardTab.INCOME else selectedTab
-    val detailScroll = androidx.compose.foundation.lazy.rememberLazyListState()
-    LaunchedEffect(selectedTab) { detailScroll.scrollToItem(0) }
+    val detailPages = listOf(CashflowDashboardTab.INCOME, CashflowDashboardTab.EXPENSE, CashflowDashboardTab.BILLS)
+    val pager = rememberPagerState(pageCount = { detailPages.size })
     var includeTransfer by rememberSaveable { mutableStateOf(false) }
     var showCharts by rememberSaveable { mutableStateOf(false) }
     var showMethod by rememberSaveable { mutableStateOf(false) }
@@ -801,88 +805,81 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
 
     MaterialTheme(colorScheme = LightColorScheme) {
         Surface(Modifier.fillMaxSize(), color = Slate50) {
-            LazyColumn(
-                state = detailScroll,
-                modifier = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                item {
-                    Spacer(Modifier.height(4.dp))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cf_back), tint = Slate900) }
-                        Text(stringResource(R.string.cfd_details_title), modifier = Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                        IconButton(onClick = { refresh++ }, enabled = !loading) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cf_refresh), tint = Slate600) }
-                    }
+            Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp)) {
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cf_back), tint = Slate900) }
+                    Text(stringResource(R.string.cfd_details_title), modifier = Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                    IconButton(onClick = { refresh++ }, enabled = !loading) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cf_refresh), tint = Slate600) }
+                }
 
-                    Surface(
-                        Modifier.fillMaxWidth().height(48.dp).padding(top = 4.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White,
-                        border = BorderStroke(1.dp, Slate200)
-                    ) {
-                        Row(Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { changeMonth(-1) }) { Icon(Icons.Default.ChevronLeft, stringResource(R.string.prev_month), tint = Slate600) }
-                            Text(month, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                            IconButton(onClick = { changeMonth(1) }) { Icon(Icons.Default.ChevronRight, stringResource(R.string.next_month), tint = Slate600) }
-                        }
+                Surface(
+                    Modifier.fillMaxWidth().height(48.dp).padding(top = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Slate200)
+                ) {
+                    Row(Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { changeMonth(-1) }) { Icon(Icons.Default.ChevronLeft, stringResource(R.string.prev_month), tint = Slate600) }
+                        Text(month, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                        IconButton(onClick = { changeMonth(1) }) { Icon(Icons.Default.ChevronRight, stringResource(R.string.next_month), tint = Slate600) }
                     }
+                }
 
-                    result?.data?.optJSONArray("currencies")?.let { codes ->
-                        if (codes.length() > 1) {
-                            Spacer(Modifier.height(8.dp))
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items((0 until codes.length()).map { codes.getString(it) }) { code ->
-                                    val isSelected = code == currency.ifEmpty { result?.data?.optString("currency") ?: "" }
-                                    FilterChip(
+                result?.data?.optJSONArray("currencies")?.let { codes ->
+                    if (codes.length() > 1) {
+                        Spacer(Modifier.height(8.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items((0 until codes.length()).map { codes.getString(it) }) { code ->
+                                val isSelected = code == currency.ifEmpty { result?.data?.optString("currency") ?: "" }
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        val target = code
+                                        val cached = CashflowRepository.getCached(context, month, target)
+                                        result = cached
+                                        prevData = CashflowRepository.getCached(context, shiftMonth(month, -1), target)?.data
+                                        loading = true
+                                        failed = false
+                                        currency = target
+                                    },
+                                    label = { Text(code) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        containerColor = Color.White,
+                                        labelColor = Slate700,
+                                        selectedContainerColor = Teal50,
+                                        selectedLabelColor = PrimaryTeal
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
                                         selected = isSelected,
-                                        onClick = {
-                                            val target = code
-                                            val cached = CashflowRepository.getCached(context, month, target)
-                                            result = cached
-                                            prevData = CashflowRepository.getCached(context, shiftMonth(month, -1), target)?.data
-                                            loading = true
-                                            failed = false
-                                            currency = target
-                                        },
-                                        label = { Text(code) },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            containerColor = Color.White,
-                                            labelColor = Slate700,
-                                            selectedContainerColor = Teal50,
-                                            selectedLabelColor = PrimaryTeal
-                                        ),
-                                        border = FilterChipDefaults.filterChipBorder(
-                                            enabled = true,
-                                            selected = isSelected,
-                                            borderColor = Slate200,
-                                            selectedBorderColor = PrimaryTeal,
-                                            borderWidth = 1.dp
-                                        )
+                                        borderColor = Slate200,
+                                        selectedBorderColor = PrimaryTeal,
+                                        borderWidth = 1.dp
                                     )
-                                }
-                            }
-                        }
-                    }
-
-                    if (result?.cached == true) {
-                        Spacer(Modifier.height(6.dp))
-                        Text(stringResource(R.string.cf_cached), fontSize = 11.sp, color = WarningAmber)
-                    }
-                    if (loading) {
-                        Spacer(Modifier.height(12.dp))
-                        LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)), color = Teal700, trackColor = Slate200)
-                    }
-                    if (failed) {
-                        Spacer(Modifier.height(10.dp))
-                        Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFFEF2F2), border = BorderStroke(1.dp, Color(0xFFFECDD3)), modifier = Modifier.fillMaxWidth()) {
-                            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(stringResource(R.string.cf_error), color = ExpenseRed, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                                TextButton(onClick = { refresh++ }) { Text(stringResource(R.string.cfu_retry), color = PrimaryTeal) }
+                                )
                             }
                         }
                     }
                 }
 
+                if (result?.cached == true) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(stringResource(R.string.cf_cached), fontSize = 11.sp, color = WarningAmber)
+                }
+                if (loading) {
+                    Spacer(Modifier.height(12.dp))
+                    LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)), color = Teal700, trackColor = Slate200)
+                }
+                if (failed) {
+                    Spacer(Modifier.height(10.dp))
+                    Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFFEF2F2), border = BorderStroke(1.dp, Color(0xFFFECDD3)), modifier = Modifier.fillMaxWidth()) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(stringResource(R.string.cf_error), color = ExpenseRed, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { refresh++ }) { Text(stringResource(R.string.cfu_retry), color = PrimaryTeal) }
+                        }
+                    }
+                }
                 result?.let { report ->
                     val data = report.data
                     val cur = data.optString("currency")
@@ -890,234 +887,220 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                     val prev = prevData?.takeIf { it.optString("currency") == cur && it.optString("month") == shiftMonth(month, -1) }
                     val daily = dailyExpense(data, month)
                     val todayDay = todayDayIfCurrent(month)
-
-                    item {
-                        Text(stringResource(R.string.cfd_details_totals, formatMoney(cur, data.optDouble("income")),
-                            formatMoney(cur, data.optDouble("expense"))), fontSize = 12.sp, color = Slate600)
-                    }
-                    item {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Slate100,
-                            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxSize().padding(3.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                val tabs = listOf(
-                                    CashflowDashboardTab.INCOME to R.string.cf_tab_income,
-                                    CashflowDashboardTab.EXPENSE to R.string.cf_tab_expense,
-                                    CashflowDashboardTab.BILLS to R.string.cf_tab_bills
-                                )
-                                tabs.forEach { (tab, labelRes) ->
-                                    val isSelected = activeTab == tab
-                                    Surface(
-                                        shape = RoundedCornerShape(9.dp),
-                                        color = if (isSelected) Color.White else Color.Transparent,
-                                        shadowElevation = if (isSelected) 1.5.dp else 0.dp,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .fillMaxHeight()
-                                            .selectable(selected = isSelected, role = androidx.compose.ui.semantics.Role.Tab) { selectedTab = tab }
-                                    ) {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 10.dp)
-                                        ) {
-                                            Text(
-                                                text = stringResource(labelRes),
-                                                color = if (isSelected) PrimaryTeal else Slate600,
-                                                fontSize = 13.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                textAlign = TextAlign.Center
-                                            )
-                                        }
-                                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text(stringResource(R.string.cfd_details_totals, formatMoney(cur, data.optDouble("income")),
+                        formatMoney(cur, data.optDouble("expense"))), fontSize = 12.sp, color = Slate600)
+                    Spacer(Modifier.height(12.dp))
+                    BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = 52.dp)
+                        .clip(RoundedCornerShape(12.dp)).background(Slate100)) {
+                        val width = maxWidth / detailPages.size
+                        val position = (pager.currentPage + pager.currentPageOffsetFraction).coerceIn(0f, (detailPages.size - 1).toFloat())
+                        Box(Modifier.matchParentSize()) {
+                            Box(Modifier.offset(x = width * position).width(width).fillMaxHeight().padding(3.dp)
+                                .background(Color.White, RoundedCornerShape(9.dp)))
+                        }
+                        Row(Modifier.fillMaxWidth()) {
+                            val labels = listOf(R.string.cf_tab_income, R.string.cf_tab_expense, R.string.cf_tab_bills)
+                            detailPages.forEachIndexed { index, _ ->
+                                val selected = pager.currentPage == index
+                                val emphasis = 1f - kotlin.math.abs(position - index).coerceIn(0f, 1f)
+                                Box(Modifier.weight(1f).selectable(selected = selected,
+                                    role = androidx.compose.ui.semantics.Role.Tab,
+                                    onClick = { scope.launch { pager.animateScrollToPage(index, animationSpec = tween(300, easing = FastOutSlowInEasing)) } })
+                                    .padding(horizontal = 4.dp, vertical = 14.dp), contentAlignment = Alignment.Center) {
+                                    Text(stringResource(labels[index]), fontSize = 13.sp,
+                                        color = androidx.compose.ui.graphics.lerp(Slate600, PrimaryTeal, emphasis),
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, textAlign = TextAlign.Center)
                                 }
                             }
                         }
                     }
-
-                    when (activeTab) {
-                        // ================= 支出 =================
-                        CashflowDashboardTab.EXPENSE -> {
-                            item {
-                                val transfer = transferAmount(data)
-                                BreakdownCard(
-                                    title = stringResource(R.string.cfd_expense_title),
-                                    totalLabel = if (includeTransfer) stringResource(R.string.cf_donut_center_expense) else stringResource(R.string.cfu_consumption),
-                                    currency = cur,
-                                    slices = expenseSlices(data, includeTransfer),
-                                    unitLabel = stringResource(R.string.cfu_categories),
-                                    showIncomeShare = true,
-                                    prevMap = prevCategoryAmounts(prev),
-                                    headerExtra = if (transfer > 0) {
-                                        {
-                                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                Text(
-                                                    stringResource(R.string.cfu_transfers) + " " + formatMoney(cur, transfer),
-                                                    fontSize = 12.sp, color = Slate500
-                                                )
-                                                FilterChip(
-                                                    selected = includeTransfer,
-                                                    onClick = { includeTransfer = !includeTransfer },
-                                                    label = { Text(stringResource(R.string.cfu_include_transfers)) },
-                                                    colors = FilterChipDefaults.filterChipColors(
-                                                        containerColor = Color.White,
-                                                        labelColor = Slate700,
-                                                        selectedContainerColor = Teal50,
-                                                        selectedLabelColor = PrimaryTeal
-                                                    ),
-                                                    border = FilterChipDefaults.filterChipBorder(
-                                                        enabled = true,
-                                                        selected = includeTransfer,
-                                                        borderColor = Slate200,
-                                                        selectedBorderColor = PrimaryTeal,
-                                                        borderWidth = 1.dp
-                                                    )
-                                                )
-                                            }
-                                        }
-                                    } else null,
-                                    onItemClick = { selection = it }
-                                )
-                            }
-                            item {
-                                TextButton(onClick = { showCharts = !showCharts }, modifier = Modifier.fillMaxWidth()) {
-                                    Text(stringResource(if (showCharts) R.string.cfu_hide_charts else R.string.cfu_show_charts))
-                                }
-                            }
-                            if (showCharts) item { DailySpendingCard(daily, cur, todayDay) }
-                        }
-
-                        // ================= 收入 =================
-                        CashflowDashboardTab.OVERVIEW, CashflowDashboardTab.INCOME -> {
-                            item {
-                                BreakdownCard(
-                                    title = stringResource(R.string.cfd_income_title),
-                                    totalLabel = stringResource(R.string.cf_donut_center_income),
-                                    currency = cur,
-                                    slices = incomeSlices(data),
-                                    unitLabel = stringResource(R.string.cfu_platforms),
-                                    headerExtra = {
-                                        if (data.rows("income_platforms").any { it.optString("key").isBlank() }) {
-                                            Text(stringResource(R.string.cfd_assign_accounts), fontSize = 12.sp, color = Slate600)
-                                        }
-                                    },
-                                    onItemClick = { selection = it }
-                                )
-                            }
-                        }
-
-                        // ================= 账单 =================
-                        CashflowDashboardTab.BILLS -> {
-                            item {
-                                if (data.optDouble("income") > 0) Text(stringResource(R.string.cfd_fixed_share,
-                                    formatPct(data.optDouble("planned") / data.optDouble("income") * 100)), color = Slate600, fontSize = 12.sp)
-                            }
-                            if (data.optBoolean("schedule_estimated")) item {
-                                Text(stringResource(R.string.cfd_schedule_hint), color = WarningAmber, fontSize = 12.sp)
-                            }
-                            item { BillProgressHero(data) }
-
-                            val overdue = data.rows("prior_overdue")
-                            val bills = data.rows("bills")
-                            val unpaid = bills.filter { it.optDouble("pending", 0.0) > 0.0 }
-                            val settled = bills.filter { it.optDouble("pending", 0.0) <= 0.0 }
-                            val pick: (JSONObject) -> Unit = { bill ->
-                                selectedBill = bill
-                                correctedAmount = bill.optString("amount")
-                            }
-
-                            item { BillGroup(stringResource(R.string.cf_prior), overdue, cur, true, isOnline && !busy, pick) }
-                            item { BillGroup(stringResource(R.string.cf_pending), unpaid, cur, false, isOnline && !busy, pick) }
-                            item { BillGroup(stringResource(R.string.cf_paid), settled, cur, false, isOnline && !busy, pick) }
-
-                            if (bills.isEmpty() && overdue.isEmpty()) {
-                                item {
-                                    SectionCard(title = stringResource(R.string.cf_fixed)) {
-                                        Text(stringResource(R.string.cf_empty), color = Slate500)
-                                    }
-                                }
-                            }
-
-                            val scheduled = data.rows("scheduled_transactions")
-                            if (scheduled.isNotEmpty()) {
-                                item {
-                                    SectionCard(title = stringResource(R.string.cf_scheduled)) {
-                                        scheduled.forEach { tx ->
-                                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                                Column(Modifier.weight(1f)) {
-                                                    Text(tx.optString("note").ifEmpty { "#" + tx.optInt("id") }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate900, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    Text(tx.optString("date") + " · " + formatMoney(cur, tx.optDouble("amount", 0.0)), fontSize = 11.sp, color = Slate500)
+                    HorizontalPager(state = pager, modifier = Modifier.weight(1f).fillMaxWidth(),
+                        key = { detailPages[it].name }, beyondBoundsPageCount = 1) { page ->
+                        // Each page owns a saveable vertical position; report loading is shared above the pager.
+                        val scroll = androidx.compose.foundation.lazy.rememberLazyListState()
+                        LazyColumn(state = scroll, modifier = Modifier.fillMaxSize()
+                            .then(if (page == pager.currentPage) Modifier else Modifier.clearAndSetSemantics {}),
+                            contentPadding = PaddingValues(vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            when (detailPages[page]) {
+                                // ================= 支出 =================
+                                CashflowDashboardTab.EXPENSE -> {
+                                    item {
+                                        val transfer = transferAmount(data)
+                                        BreakdownCard(
+                                            title = stringResource(R.string.cfd_expense_title),
+                                            totalLabel = if (includeTransfer) stringResource(R.string.cf_donut_center_expense) else stringResource(R.string.cfu_consumption),
+                                            currency = cur,
+                                            slices = expenseSlices(data, includeTransfer),
+                                            unitLabel = stringResource(R.string.cfu_categories),
+                                            showIncomeShare = true,
+                                            prevMap = prevCategoryAmounts(prev),
+                                            headerExtra = if (transfer > 0) {
+                                                {
+                                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                        Text(
+                                                            stringResource(R.string.cfu_transfers) + " " + formatMoney(cur, transfer),
+                                                            fontSize = 12.sp, color = Slate500
+                                                        )
+                                                        FilterChip(
+                                                            selected = includeTransfer,
+                                                            onClick = { includeTransfer = !includeTransfer },
+                                                            label = { Text(stringResource(R.string.cfu_include_transfers)) },
+                                                            colors = FilterChipDefaults.filterChipColors(
+                                                                containerColor = Color.White,
+                                                                labelColor = Slate700,
+                                                                selectedContainerColor = Teal50,
+                                                                selectedLabelColor = PrimaryTeal
+                                                            ),
+                                                            border = FilterChipDefaults.filterChipBorder(
+                                                                enabled = true,
+                                                                selected = includeTransfer,
+                                                                borderColor = Slate200,
+                                                                selectedBorderColor = PrimaryTeal,
+                                                                borderWidth = 1.dp
+                                                            )
+                                                        )
+                                                    }
                                                 }
-                                                FilledTonalButton(
-                                                    enabled = isOnline && !busy,
-                                                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = Teal50, contentColor = PrimaryTeal),
-                                                    onClick = { update(JSONObject().put("action", "confirm").put("transaction_id", tx.optInt("id"))) }
-                                                ) { Text(stringResource(R.string.cf_confirm), fontSize = 12.sp) }
+                                            } else null,
+                                            onItemClick = { selection = it }
+                                        )
+                                    }
+                                    item {
+                                        TextButton(onClick = { showCharts = !showCharts }, modifier = Modifier.fillMaxWidth()) {
+                                            Text(stringResource(if (showCharts) R.string.cfu_hide_charts else R.string.cfu_show_charts))
+                                        }
+                                    }
+                                    if (showCharts) item { DailySpendingCard(daily, cur, todayDay) }
+                                }
+
+                                // ================= 收入 =================
+                                CashflowDashboardTab.OVERVIEW, CashflowDashboardTab.INCOME -> {
+                                    item {
+                                        BreakdownCard(
+                                            title = stringResource(R.string.cfd_income_title),
+                                            totalLabel = stringResource(R.string.cf_donut_center_income),
+                                            currency = cur,
+                                            slices = incomeSlices(data),
+                                            unitLabel = stringResource(R.string.cfu_platforms),
+                                            headerExtra = {
+                                                if (data.rows("income_platforms").any { it.optString("key").isBlank() }) {
+                                                    Text(stringResource(R.string.cfd_assign_accounts), fontSize = 12.sp, color = Slate600)
+                                                }
+                                            },
+                                            onItemClick = { selection = it }
+                                        )
+                                    }
+                                }
+
+                                // ================= 账单 =================
+                                CashflowDashboardTab.BILLS -> {
+                                    item {
+                                        if (data.optDouble("income") > 0) Text(stringResource(R.string.cfd_fixed_share,
+                                            formatPct(data.optDouble("planned") / data.optDouble("income") * 100)), color = Slate600, fontSize = 12.sp)
+                                    }
+                                    if (data.optBoolean("schedule_estimated")) item {
+                                        Text(stringResource(R.string.cfd_schedule_hint), color = WarningAmber, fontSize = 12.sp)
+                                    }
+                                    item { BillProgressHero(data) }
+
+                                    val overdue = data.rows("prior_overdue")
+                                    val bills = data.rows("bills")
+                                    val unpaid = bills.filter { it.optDouble("pending", 0.0) > 0.0 }
+                                    val settled = bills.filter { it.optDouble("pending", 0.0) <= 0.0 }
+                                    val pick: (JSONObject) -> Unit = { bill ->
+                                        selectedBill = bill
+                                        correctedAmount = bill.optString("amount")
+                                    }
+
+                                    item { BillGroup(stringResource(R.string.cf_prior), overdue, cur, true, isOnline && !busy, pick) }
+                                    item { BillGroup(stringResource(R.string.cf_pending), unpaid, cur, false, isOnline && !busy, pick) }
+                                    item { BillGroup(stringResource(R.string.cf_paid), settled, cur, false, isOnline && !busy, pick) }
+
+                                    if (bills.isEmpty() && overdue.isEmpty()) {
+                                        item {
+                                            SectionCard(title = stringResource(R.string.cf_fixed)) {
+                                                Text(stringResource(R.string.cf_empty), color = Slate500)
                                             }
                                         }
                                     }
-                                }
-                            }
 
-                            val confirmed = data.rows("confirmed_transactions")
-                            if (confirmed.isNotEmpty()) {
-                                item {
-                                    SectionCard(title = stringResource(R.string.cfu_confirmed)) {
-                                        confirmed.forEach { tx ->
-                                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                                Text(tx.optString("note").ifEmpty { "#" + tx.optInt("id") }, fontSize = 14.sp, color = Slate900, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                TextButton(
-                                                    enabled = isOnline && !busy,
-                                                    onClick = { update(JSONObject().put("action", "confirm").put("transaction_id", tx.optInt("id")).put("undo", true)) }
-                                                ) { Text(stringResource(R.string.cf_undo_confirm), fontSize = 12.sp, color = PrimaryTeal) }
+                                    val scheduled = data.rows("scheduled_transactions")
+                                    if (scheduled.isNotEmpty()) {
+                                        item {
+                                            SectionCard(title = stringResource(R.string.cf_scheduled)) {
+                                                scheduled.forEach { tx ->
+                                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                                        Column(Modifier.weight(1f)) {
+                                                            Text(tx.optString("note").ifEmpty { "#" + tx.optInt("id") }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate900, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                            Text(tx.optString("date") + " · " + formatMoney(cur, tx.optDouble("amount", 0.0)), fontSize = 11.sp, color = Slate500)
+                                                        }
+                                                        FilledTonalButton(
+                                                            enabled = isOnline && !busy,
+                                                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = Teal50, contentColor = PrimaryTeal),
+                                                            onClick = { update(JSONObject().put("action", "confirm").put("transaction_id", tx.optInt("id"))) }
+                                                        ) { Text(stringResource(R.string.cf_confirm), fontSize = 12.sp) }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
-                                }
-                            }
 
-                            val inactive = data.rows("inactive_bills")
-                            if (inactive.isNotEmpty()) {
-                                item {
-                                    SectionCard(title = stringResource(R.string.cf_inactive)) {
-                                        inactive.forEach { bill ->
-                                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                                Text(bill.optString("title") + " · " + bill.optString("due_date"), fontSize = 13.sp, color = Slate500, modifier = Modifier.weight(1f))
-                                                TextButton(enabled = isOnline && !busy, onClick = { update(JSONObject().put("action", "bill").put("bill_key", bill.optString("bill_key"))) }) {
-                                                    Text(stringResource(R.string.cf_restore), color = PrimaryTeal)
+                                    val confirmed = data.rows("confirmed_transactions")
+                                    if (confirmed.isNotEmpty()) {
+                                        item {
+                                            SectionCard(title = stringResource(R.string.cfu_confirmed)) {
+                                                confirmed.forEach { tx ->
+                                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                                        Text(tx.optString("note").ifEmpty { "#" + tx.optInt("id") }, fontSize = 14.sp, color = Slate900, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        TextButton(
+                                                            enabled = isOnline && !busy,
+                                                            onClick = { update(JSONObject().put("action", "confirm").put("transaction_id", tx.optInt("id")).put("undo", true)) }
+                                                        ) { Text(stringResource(R.string.cf_undo_confirm), fontSize = 12.sp, color = PrimaryTeal) }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    val inactive = data.rows("inactive_bills")
+                                    if (inactive.isNotEmpty()) {
+                                        item {
+                                            SectionCard(title = stringResource(R.string.cf_inactive)) {
+                                                inactive.forEach { bill ->
+                                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                                        Text(bill.optString("title") + " · " + bill.optString("due_date"), fontSize = 13.sp, color = Slate500, modifier = Modifier.weight(1f))
+                                                        TextButton(enabled = isOnline && !busy, onClick = { update(JSONObject().put("action", "bill").put("bill_key", bill.optString("bill_key"))) }) {
+                                                            Text(stringResource(R.string.cf_restore), color = PrimaryTeal)
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
-                    }
-
-                    item {
-                        Column(Modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            TextButton(onClick = { showMethod = !showMethod }) {
-                                Text(stringResource(if (showMethod) R.string.cfd_hide_method else R.string.cfd_show_method))
-                            }
-                            if (showMethod) {
-                                Text(stringResource(R.string.cf_disclaimer), fontSize = 11.sp, color = Slate500)
-                                if (data.optBoolean("schedule_estimated")) {
-                                    Text(stringResource(R.string.cf_estimate), fontSize = 11.sp, color = WarningAmber)
+                            item {
+                                Column(Modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    TextButton(onClick = { showMethod = !showMethod }) {
+                                        Text(stringResource(if (showMethod) R.string.cfd_hide_method else R.string.cfd_show_method))
+                                    }
+                                    if (showMethod) {
+                                        Text(stringResource(R.string.cf_disclaimer), fontSize = 11.sp, color = Slate500)
+                                        if (data.optBoolean("schedule_estimated")) {
+                                            Text(stringResource(R.string.cf_estimate), fontSize = 11.sp, color = WarningAmber)
+                                        }
+                                    }
+                                    Text(
+                                        stringResource(R.string.cf_updated) + ": " + reportTime(data.optString("updated_at"), LocalContext.current.resources.configuration.locales[0]),
+                                        fontSize = 11.sp, color = Slate500
+                                    )
                                 }
                             }
-                            Text(
-                                stringResource(R.string.cf_updated) + ": " + reportTime(data.optString("updated_at"), LocalContext.current.resources.configuration.locales[0]),
-                                fontSize = 11.sp, color = Slate500
-                            )
+                            item { Spacer(Modifier.height(18.dp)) }
                         }
                     }
                 }
-
-                item { Spacer(Modifier.height(32.dp)) }
             }
         }
 
