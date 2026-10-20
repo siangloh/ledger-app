@@ -1,9 +1,6 @@
 package com.siangloh.ledger.ui.compose
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
 import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -327,7 +324,6 @@ fun OverviewScreen(
         }
     }
 
-    var hasOverlayPermission by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     var isListeningActual by remember {
         mutableStateOf(NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName))
     }
@@ -356,7 +352,6 @@ fun OverviewScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                hasOverlayPermission = Settings.canDrawOverlays(context)
                 isListeningActual = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
             }
         }
@@ -604,23 +599,13 @@ fun OverviewScreen(
         ) {
             item {
                 Spacer(modifier = Modifier.height(4.dp))
-                // 1. Status Bar Header (● Listening 状态与待分类角标)
-                ListeningStatusHeader(
-                    isListening = overviewData.isListening,
-                    lastActive = overviewData.lastActiveTime,
-                    isOfflineCache = overviewData.isOfflineCache,
-                    toReviewCount = overviewData.uncategorizedCount,
-                    hasOverlayPermission = hasOverlayPermission,
-                    onRequestOverlayPermission = {
-                        val intent = Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:${context.packageName}")
-                        )
-                        context.startActivity(intent)
-                    },
-                    onRefresh = { refreshData(forceRefresh = true) },
-                    onSettings = onOpenSettings
-                )
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.nav_overview), modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Slate900)
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.overview_open_settings), tint = Slate600)
+                    }
+                }
             }
 
             if (hasNetworkError) {
@@ -970,152 +955,6 @@ fun OverviewScreen(
                 }
             }
         )
-    }
-}
-
-@Composable
-fun ListeningStatusHeader(
-    isListening: Boolean,
-    lastActive: String,
-    isOfflineCache: Boolean,
-    toReviewCount: Int,
-    hasOverlayPermission: Boolean,
-    onRequestOverlayPermission: () -> Unit,
-    onRefresh: () -> Unit,
-    onSettings: () -> Unit
-) {
-    val context = LocalContext.current
-    var isOverlayDismissed by remember {
-        mutableStateOf(
-            context.getSharedPreferences("ledger_overview_prefs", Context.MODE_PRIVATE)
-                .getBoolean("overlay_banner_dismissed", false)
-        )
-    }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "alpha"
-    )
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Left: 监听状态与同步时间 (清晰区分常驻服务与数据同步时间)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(if (isListening) PrimaryTealSubtle else Slate100)
-                    .clickable { onRefresh() }
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(if (isListening) Emerald500.copy(alpha = pulseAlpha) else Slate400)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Column {
-                    Text(
-                        text = if (isListening) stringResource(R.string.status_listening_active) else stringResource(R.string.status_listening_paused),
-                        color = if (isListening) PrimaryTeal else Slate600,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = if (isOfflineCache) "${stringResource(R.string.status_offline_prefix)} ${formatFriendlyTime(lastActive, context)}" else "${stringResource(R.string.status_synced_prefix)} · ${stringResource(R.string.sync_status_just_now)}",
-                        color = Slate500,
-                        fontSize = 10.sp
-                    )
-                }
-            }
-
-            // Right: To Review Count Badge + Settings
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (toReviewCount > 0) {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color(0xFFFEF3C7),
-                        modifier = Modifier.padding(end = 6.dp)
-                    ) {
-                        Text(
-                            text = "⚠️ " + stringResource(R.string.pending_review_badge, toReviewCount),
-                            color = Amber500,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-
-                IconButton(
-                    onClick = onSettings,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
-                        tint = Slate600,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-
-        if (!hasOverlayPermission && !isOverlayDismissed) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = PrimaryTealSubtle,
-                border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.2f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onRequestOverlayPermission() }
-                    ) {
-                        Text(
-                            text = stringResource(R.string.enable_overlay_banner),
-                            color = PrimaryTeal,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            isOverlayDismissed = true
-                            context.getSharedPreferences("ledger_overview_prefs", Context.MODE_PRIVATE)
-                                .edit().putBoolean("overlay_banner_dismissed", true).apply()
-                        },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = stringResource(R.string.common_close),
-                            tint = Slate400,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 

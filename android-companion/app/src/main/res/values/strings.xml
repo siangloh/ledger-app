@@ -479,5 +479,6 @@
     <string name="cfd_schedule_hint">固定开销包含待核对的计划金额；请按实际付款记录确认。</string>
     <string name="cfd_show_method">查看统计口径 ↓</string>
     <string name="cfd_hide_method">收起统计说明 ↑</string>
+    <string name="overview_open_settings">打开设置</string>
 </resources>
 

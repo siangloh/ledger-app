@@ -479,5 +479,6 @@
     <string name="cfd_schedule_hint">Fixed bills include unverified scheduled amounts. Confirm using actual payment records.</string>
     <string name="cfd_show_method">How these figures are calculated ↓</string>
     <string name="cfd_hide_method">Hide calculation notes ↑</string>
+    <string name="overview_open_settings">Open settings</string>
 </resources>
 

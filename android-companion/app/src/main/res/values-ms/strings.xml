@@ -479,5 +479,6 @@
     <string name="cfd_schedule_hint">Bil tetap termasuk jumlah berjadual belum disahkan. Sahkan menggunakan rekod bayaran sebenar.</string>
     <string name="cfd_show_method">Cara angka ini dikira ↓</string>
     <string name="cfd_hide_method">Sembunyikan nota pengiraan ↑</string>
+    <string name="overview_open_settings">Buka tetapan</string>
 </resources>
 
