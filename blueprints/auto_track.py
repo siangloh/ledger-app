@@ -1,11 +1,12 @@
 import os
 import re
 import hashlib
+import json
 import logging
 import threading
 from datetime import datetime, date
 from urllib.parse import unquote
-from flask import Blueprint, request, jsonify, render_template, session, send_from_directory, current_app
+from flask import Blueprint, request, jsonify, render_template, session, send_from_directory, current_app, after_this_request
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,9 @@ from core.config import (
     AUTO_TRACK_DEBUG_LOG
 )
 from services.notification_service import parse_auto_track_notification
-from services.notification_dedup_service import find_recent_notification
+from services.notification_dedup_service import (
+    find_recent_notification, find_notification_receipt, save_notification_receipt,
+)
 from services.ai_service import classify_notification_with_llm
 from core.utils import money_filter, check_and_record_budget_alerts
 from core.extensions import csrf
@@ -202,7 +205,28 @@ def api_auto_track():
     # 幂等防重门禁 (Idempotency & Concurrency Guard - 执行于任何大模型之前)
     # ---------------------------------------------------------
     clean_text = re.sub(r'\s+', ' ', text.strip().lower())
-    content_hash = hashlib.sha256(clean_text.encode('utf-8')).hexdigest()
+    hash_input = package_name + '\n' + clean_text if package_name else clean_text
+    content_hash = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
+    payload = request.get_json(silent=True)
+    event_id = payload.get('notification_event_id') if isinstance(payload, dict) else None
+    if event_id is not None:
+        if not isinstance(event_id, str) or not re.fullmatch(r'[A-Za-z0-9:_-]{1,160}', event_id):
+            return jsonify({'ok': False, 'message': 'Invalid notification_event_id'}), 400
+        receipt = find_notification_receipt(db, target_user_id, event_id)
+        if receipt:
+            if receipt['content_hash'] != content_hash:
+                return jsonify({'ok': False, 'message': 'Notification ID reused with different content'}), 409
+            replay = json.loads(receipt['response_json'])
+            replay['verdict'] = 'duplicate_ignored'
+            return jsonify(replay), 200
+
+        @after_this_request
+        def remember_notification_response(response):
+            result = response.get_json(silent=True)
+            if response.status_code in (200, 201) and isinstance(result, dict) and result.get('ok'):
+                save_notification_receipt(db, target_user_id, event_id, content_hash, json.dumps(result))
+            return response
+
 
     try:
         db.execute('''
@@ -219,7 +243,7 @@ def api_auto_track():
     except Exception as e:
         logger.debug("Table check processed_notifications: %s", e)
 
-    # 1. Content-only retries expire after two hours; text alone cannot identify a payment forever.
+    # 1. Content-only retries expire after thirty seconds; text alone cannot identify a payment forever.
     existing_notif = find_recent_notification(db, target_user_id, content_hash)
 
     if existing_notif:
@@ -358,17 +382,14 @@ def api_auto_track():
         is_dup = False
         reason = ""
 
-        # 场景 A: 10 分钟 (600秒) 以内的紧邻交易
-        if time_diff_sec <= 600:
+        # Only a short 30-second burst may be considered a duplicate.
+        if time_diff_sec <= 30:
             if cand_note_lower == new_note_lower or (cand_note_lower and cand_note_lower in new_note_lower) or (new_note_lower and new_note_lower in cand_note_lower):
                 is_dup = True
-                reason = "10分钟内相同/相似商户交易"
+                reason = "30秒内相同/相似商户交易"
             elif cand_note_lower in GENERIC_CHANNEL_NAMES or new_note_lower in GENERIC_CHANNEL_NAMES:
                 is_dup = True
-                reason = "10分钟内电子钱包与银行卡双通道重复通知"
-            elif time_diff_sec <= 300:
-                is_dup = True
-                reason = "5分钟内同金额重复扣款"
+                reason = "30秒内电子钱包与银行卡双通道重复通知"
 
             if is_dup:
                 if cand_note_lower in GENERIC_CHANNEL_NAMES and new_note_lower not in GENERIC_CHANNEL_NAMES and new_note:
@@ -380,11 +401,6 @@ def api_auto_track():
                     except Exception as e:
                         logger.debug("Failed to enrich transaction note: %s", e)
 
-        # 场景 B: 2 小时 (7200秒) 以内的相同商户交易
-        elif time_diff_sec <= 7200:
-            if cand_note_lower == new_note_lower and cand_note_lower:
-                is_dup = True
-                reason = "2小时内相同商户相同金额重复"
 
         if is_dup:
             if is_owner:

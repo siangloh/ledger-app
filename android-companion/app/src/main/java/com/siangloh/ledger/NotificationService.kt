@@ -96,28 +96,19 @@ class NotificationService : NotificationListenerService() {
             .trim()
 
         if (fullContent.isBlank()) return
+        val eventId = java.util.UUID.nameUUIDFromBytes(
+            (sbn.key + ":" + sbn.postTime + ":" + fullContent).toByteArray(Charsets.UTF_8)
+        ).toString()
 
         // 0. 短时重复通知拦截 (例如系统进度更新、通知栏触碰刷新造成的重复触发)
         val cacheKey = "$pkgName:$fullContent"
         val now = System.currentTimeMillis()
         val lastSeen = recentNotifications[cacheKey]
-        if (lastSeen != null && (now - lastSeen) < 60_000L) {
+        if (lastSeen != null && (now - lastSeen) < 30_000L) {
             Log.d(TAG, "Suppressed duplicate notification from system update: $cacheKey")
             return
         }
         recentNotifications[cacheKey] = now
-
-        // 0.1 同一应用短时间内连续多阶段通知（例如 支付中 -> 支付成功 / 后续追加参考号），15秒内相同金额视为同一笔交易拦截
-        val amountMatch = AMOUNT_REGEX.find(fullContent)?.value?.replace(" ", "")?.uppercase()
-        if (amountMatch != null) {
-            val amountKey = "$pkgName:amt:$amountMatch"
-            val lastAmountSeen = recentNotifications[amountKey]
-            if (lastAmountSeen != null && (now - lastAmountSeen) < 15_000L) {
-                Log.d(TAG, "Suppressed duplicate notification with identical amount within 15s from [$pkgName]: $amountMatch")
-                return
-            }
-            recentNotifications[amountKey] = now
-        }
 
         if (recentNotifications.size > 200) {
             val cutoff = now - 300_000L
@@ -178,7 +169,7 @@ class NotificationService : NotificationListenerService() {
         // 5. 通过 Phase-1 检验，尝试发送给后端（或离线/等待WiFi时加入 Room 队列）
         if (NetworkHelper.canSyncNow(this)) {
             Log.i(TAG, "Posting transaction notification to backend (package: $pkgName)...")
-            NetworkHelper.postNotificationAsync(fullContent, this, packageName = pkgName) { success, msg, verdict ->
+            NetworkHelper.postNotificationAsync(fullContent, this, packageName = pkgName, notificationEventId = eventId) { success, msg, verdict ->
                 serviceScope.launch {
                     val finalOutcome = when (verdict) {
                         "rejected_promo" -> "synced_rejected_promo"
@@ -186,7 +177,7 @@ class NotificationService : NotificationListenerService() {
                         "on_hold" -> "synced_on_hold"
                         "ignored_internal_transfer" -> "synced_internal_transfer"
                         else -> if (success) "synced_success" else {
-                            queueOfflineNotification(pkgName, fullContent)
+                            queueOfflineNotification(pkgName, fullContent, eventId)
                             "queued_offline"
                         }
                     }
@@ -230,7 +221,7 @@ class NotificationService : NotificationListenerService() {
             // 离线状态：直接加入本地 pending_notifications 数据库并触发 WorkManager
             Log.i(TAG, "Device offline: queuing notification in local database...")
             serviceScope.launch {
-                queueOfflineNotification(pkgName, fullContent)
+                queueOfflineNotification(pkgName, fullContent, eventId)
                 insertLogAndPrune(
                     db,
                     NotificationLog(
@@ -263,9 +254,9 @@ class NotificationService : NotificationListenerService() {
         super.onDestroy()
     }
 
-    private suspend fun queueOfflineNotification(pkgName: String, text: String) {
+    private suspend fun queueOfflineNotification(pkgName: String, text: String, eventId: String) {
         val db = AppDatabase.getInstance(this)
-        val pendingCount = db.pendingNotificationDao().countPendingWithText(text)
+        val pendingCount = db.pendingNotificationDao().countPendingWithEventId(eventId)
         if (pendingCount > 0) {
             Log.d(TAG, "Notification already exists in offline queue, skip duplicate enqueue.")
             return
@@ -274,6 +265,7 @@ class NotificationService : NotificationListenerService() {
             PendingNotification(
                 packageName = pkgName,
                 rawText = text,
+                eventId = eventId,
                 sync_status = "pending"
             )
         )

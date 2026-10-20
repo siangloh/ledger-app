@@ -9,6 +9,7 @@ data class PendingNotification(
     val id: Long = 0,
     val packageName: String,
     val rawText: String,
+    @androidx.room.ColumnInfo(defaultValue = "''") val eventId: String = "",
     val timestamp: Long = System.currentTimeMillis(),
     val sync_status: String = "pending" // "pending", "synced", "failed"
 )

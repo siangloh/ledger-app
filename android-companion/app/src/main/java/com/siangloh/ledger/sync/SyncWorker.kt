@@ -84,7 +84,11 @@ class SyncWorker(
                 for (notif in pendingNotifs) {
                     db.pendingNotificationDao().markAsSyncing(notif.id)
                     val latch = CountDownLatch(1)
-                    NetworkHelper.postNotificationAsync(notif.rawText, applicationContext, packageName = notif.packageName) { success, msg, verdict ->
+                    NetworkHelper.postNotificationAsync(notif.rawText, applicationContext, packageName = notif.packageName,
+                        notificationEventId = notif.eventId.ifBlank {
+                            val device = android.provider.Settings.Secure.getString(applicationContext.contentResolver, android.provider.Settings.Secure.ANDROID_ID)
+                            java.util.UUID.nameUUIDFromBytes((device + ":" + notif.id + ":" + notif.timestamp + ":" + notif.rawText).toByteArray(Charsets.UTF_8)).toString()
+                        }) { success, msg, verdict ->
                         kotlinx.coroutines.runBlocking {
                             if (success || verdict == "rejected_promo" || verdict == "duplicate_ignored" || verdict == "on_hold" || verdict == "ignored_internal_transfer") {
                                 db.pendingNotificationDao().delete(notif.id)

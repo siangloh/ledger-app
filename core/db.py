@@ -1025,6 +1025,8 @@ def init_db(app_logger=None):
 
     from services.cashflow_analysis_service import init_cashflow_schema
     init_cashflow_schema(db)
+    from services.notification_dedup_service import init_notification_receipts
+    init_notification_receipts(db)
     db.commit()
 
     # 确保 admin 用户具备默认分类

@@ -152,6 +152,7 @@ object NetworkHelper {
         text: String,
         context: Context? = null,
         packageName: String? = null,
+        notificationEventId: String? = null,
         callback: ((Boolean, String, String?) -> Unit)? = null
     ) {
         networkExecutor.execute {
@@ -183,6 +184,7 @@ object NetworkHelper {
                 val jsonPayload = JSONObject().apply {
                     put("key", key)
                     put("text", text)
+                    if (!notificationEventId.isNullOrBlank()) put("notification_event_id", notificationEventId)
                     if (!packageName.isNullOrBlank()) {
                         put("package_name", packageName)
                     }
