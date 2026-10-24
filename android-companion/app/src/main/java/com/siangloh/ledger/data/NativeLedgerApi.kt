@@ -844,6 +844,48 @@ object NativeLedgerApi {
         LocalLedgerRepository.getSubscriptionMatches(context)
     }
 
+    suspend fun saveSubscription(
+        context: Context,
+        id: Int?,
+        name: String,
+        category: String,
+        cost: Double,
+        currency: String = "MYR",
+        nextBillingDate: String = "每月1号",
+        autoRenew: Boolean = true
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        cachedTools = null
+        LocalLedgerRepository.saveSubscription(context, id, name, category, cost, currency, nextBillingDate, autoRenew)
+    }
+
+    suspend fun deleteSubscription(context: Context, id: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        cachedTools = null
+        LocalLedgerRepository.deleteSubscription(context, id)
+    }
+
+    suspend fun saveInstallment(
+        context: Context,
+        id: Int?,
+        title: String,
+        totalAmount: Double,
+        tenureMonths: Int,
+        paidPeriods: Int,
+        monthlyAmount: Double? = null
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        cachedTools = null
+        LocalLedgerRepository.saveInstallment(context, id, title, totalAmount, tenureMonths, paidPeriods, monthlyAmount)
+    }
+
+    suspend fun payInstallmentPeriod(context: Context, id: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        cachedTools = null
+        LocalLedgerRepository.payInstallmentPeriod(context, id)
+    }
+
+    suspend fun deleteInstallment(context: Context, id: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        cachedTools = null
+        LocalLedgerRepository.deleteInstallment(context, id)
+    }
+
     suspend fun applySubscriptionMatch(context: Context, subId: Int, txId: Long?): Result<Boolean> = withContext(Dispatchers.IO) {
         LocalLedgerRepository.applySubscriptionMatch(context, subId, txId)
     }

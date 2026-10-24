@@ -95,6 +95,8 @@ fun MoreToolsScreen(
     var showRecycleBinDialog by remember { mutableStateOf(false) }
     var showCategoryRulesDialog by remember { mutableStateOf(false) }
     var showBudgetDialog by remember { mutableStateOf(false) }
+    var showSubscriptionDialog by remember { mutableStateOf(false) }
+    var showInstallmentDialog by remember { mutableStateOf(false) }
 
 
     fun refreshAll() {
@@ -294,7 +296,7 @@ fun MoreToolsScreen(
                     totalMonthly = toolsSummary?.totalMonthlySub ?: 0.0,
                     errorMessage = toolsError,
                     onRetry = { refreshAll() },
-                    onOpenManage = { onOpenWebUrl("/subscriptions") }
+                    onOpenManage = { showSubscriptionDialog = true }
                 )
             }
 
@@ -305,7 +307,7 @@ fun MoreToolsScreen(
                     totalRemaining = toolsSummary?.totalRemainingInst ?: 0.0,
                     errorMessage = toolsError,
                     onRetry = { refreshAll() },
-                    onOpenManage = { onOpenWebUrl("/liabilities") }
+                    onOpenManage = { showInstallmentDialog = true }
                 )
             }
 
@@ -447,6 +449,27 @@ fun MoreToolsScreen(
         BudgetManagementDialog(
             onDismiss = {
                 showBudgetDialog = false
+                refreshAll()
+            }
+        )
+    }
+
+    if (showSubscriptionDialog) {
+        SubscriptionManagementDialog(
+            subscriptions = toolsSummary?.subscriptions ?: emptyList(),
+            userCategories = userCategories,
+            onDismiss = {
+                showSubscriptionDialog = false
+                refreshAll()
+            }
+        )
+    }
+
+    if (showInstallmentDialog) {
+        InstallmentManagementDialog(
+            installments = toolsSummary?.installments ?: emptyList(),
+            onDismiss = {
+                showInstallmentDialog = false
                 refreshAll()
             }
         )
@@ -844,12 +867,16 @@ fun SubscriptionsCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { if (subscriptions.isNotEmpty()) expanded = !expanded },
+                    .fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { if (subscriptions.isNotEmpty()) expanded = !expanded },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -881,17 +908,22 @@ fun SubscriptionsCard(
                     }
                 }
 
-                if (errorMessage != null) {
-                    TextButton(onClick = onRetry) {
-                        Text("重试", fontSize = 13.sp, color = PrimaryBlue, fontWeight = FontWeight.Bold)
-                    }
-                } else if (subscriptions.isNotEmpty()) {
-                    IconButton(onClick = { expanded = !expanded }) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onOpenManage) {
                         Icon(
-                            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = Slate500
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "添加订阅",
+                            tint = PrimaryTeal
                         )
+                    }
+                    if (subscriptions.isNotEmpty()) {
+                        IconButton(onClick = { expanded = !expanded }) {
+                            Icon(
+                                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = Slate500
+                            )
+                        }
                     }
                 }
             }
@@ -908,11 +940,12 @@ fun SubscriptionsCard(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(Slate50, RoundedCornerShape(8.dp))
+                                .clickable { onOpenManage() }
                                 .padding(10.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = sub.name,
                                     fontSize = 14.sp,
@@ -925,12 +958,19 @@ fun SubscriptionsCard(
                                     color = Slate500
                                 )
                             }
-                            Text(
-                                text = String.format(Locale.getDefault(), "RM %.2f", sub.cost),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Slate800
-                            )
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = String.format(Locale.getDefault(), "RM %.2f", sub.cost),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Slate800
+                                )
+                                Text(
+                                    text = "点击编辑/管理",
+                                    fontSize = 10.sp,
+                                    color = Slate400
+                                )
+                            }
                         }
                     }
 
@@ -1136,12 +1176,16 @@ fun InstallmentsCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { if (installments.isNotEmpty()) expanded = !expanded },
+                    .fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { if (installments.isNotEmpty()) expanded = !expanded },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -1173,17 +1217,22 @@ fun InstallmentsCard(
                     }
                 }
 
-                if (errorMessage != null) {
-                    TextButton(onClick = onRetry) {
-                        Text("重试", fontSize = 13.sp, color = PrimaryBlue, fontWeight = FontWeight.Bold)
-                    }
-                } else if (installments.isNotEmpty()) {
-                    IconButton(onClick = { expanded = !expanded }) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onOpenManage) {
                         Icon(
-                            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = Slate500
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "添加分期/债务",
+                            tint = Color(0xFFD97706)
                         )
+                    }
+                    if (installments.isNotEmpty()) {
+                        IconButton(onClick = { expanded = !expanded }) {
+                            Icon(
+                                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = Slate500
+                            )
+                        }
                     }
                 }
             }
@@ -1200,11 +1249,12 @@ fun InstallmentsCard(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(Slate50, RoundedCornerShape(8.dp))
+                                .clickable { onOpenManage() }
                                 .padding(10.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = inst.title,
                                     fontSize = 14.sp,
@@ -1225,14 +1275,13 @@ fun InstallmentsCard(
                                     color = ExpenseRed
                                 )
                                 Text(
-                                    text = "待还",
+                                    text = "点击编辑/还款",
                                     fontSize = 10.sp,
                                     color = Slate400
                                 )
                             }
                         }
                     }
-
                 }
             }
         }
@@ -3673,4 +3722,587 @@ fun BudgetManagementDialog(
 }
 
 
+// -----------------------------------------------------------------------------
+// Dialog: 周期记账与订阅管理中心 (Subscription Management Dialog)
+// -----------------------------------------------------------------------------
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SubscriptionManagementDialog(
+    subscriptions: List<SubscriptionRecord>,
+    userCategories: List<String>,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var editingSub by remember { mutableStateOf<SubscriptionRecord?>(null) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.88f),
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(PrimaryTealSubtle),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Repeat, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "订阅与周期记账", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                }
+                IconButton(onClick = { showAddDialog = true }, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Default.Add, contentDescription = "添加", tint = PrimaryTeal)
+                }
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                val totalCost = subscriptions.sumOf { it.cost }
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Slate50,
+                    border = BorderStroke(1.dp, Slate200),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "月度固定支出概览", fontSize = 13.sp, color = Slate600)
+                        Text(
+                            text = String.format(Locale.getDefault(), "RM %.2f / 月", totalCost),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryTeal
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (subscriptions.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Text("暂无订阅，点击右上角「+」即可自定义添加", color = Slate400, fontSize = 13.sp, textAlign = TextAlign.Center)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(subscriptions) { sub ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { editingSub = sub },
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                border = BorderStroke(1.dp, Slate200)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = sub.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "分类: ${sub.category} · 扣款: ${sub.nextBillingDate}",
+                                            fontSize = 11.sp,
+                                            color = Slate500
+                                        )
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = String.format(Locale.getDefault(), "RM %.2f", sub.cost),
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Slate900
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        IconButton(onClick = { editingSub = sub }, modifier = Modifier.size(36.dp)) {
+                                            Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Slate400, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+            ) {
+                Text(stringResource(R.string.common_close), color = Color.White)
+            }
+        }
+    )
+
+    // 新增/编辑订阅子弹窗
+    val activeSub = editingSub
+    if (showAddDialog || activeSub != null) {
+        var nameInput by remember { mutableStateOf(activeSub?.name ?: "") }
+        var costInput by remember { mutableStateOf(if (activeSub != null) String.format(Locale.getDefault(), "%.2f", activeSub.cost) else "") }
+        var categoryInput by remember { mutableStateOf(activeSub?.category ?: if (userCategories.isNotEmpty()) userCategories.first() else "日常") }
+        var dateInput by remember { mutableStateOf(activeSub?.nextBillingDate ?: "每月1号") }
+
+        AlertDialog(
+            onDismissRequest = {
+                showAddDialog = false
+                editingSub = null
+            },
+            containerColor = Color.White,
+            title = {
+                Text(
+                    text = if (activeSub != null) "编辑订阅项目" else "添加新的订阅/固定支出",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = nameInput,
+                        onValueChange = { nameInput = it },
+                        label = { Text("项目名称 (如: Netflix, iCloud, 宽带)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = costInput,
+                        onValueChange = { costInput = it },
+                        label = { Text("周期扣费金额 (MYR)") },
+                        placeholder = { Text("0.00") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = categoryInput,
+                        onValueChange = { categoryInput = it },
+                        label = { Text("记账分类 (如: 娱乐, 账单)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = dateInput,
+                        onValueChange = { dateInput = it },
+                        label = { Text("下次扣款周期 (如: 每月15号)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (activeSub != null) {
+                        TextButton(
+                            onClick = {
+                                isSubmitting = true
+                                scope.launch {
+                                    val res = NativeLedgerApi.deleteSubscription(context, activeSub.id)
+                                    isSubmitting = false
+                                    res.onSuccess {
+                                        Toast.makeText(context, "已删除订阅", Toast.LENGTH_SHORT).show()
+                                        editingSub = null
+                                    }.onFailure {
+                                        Toast.makeText(context, "删除失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            enabled = !isSubmitting,
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        ) {
+                            Text("删除", color = ExpenseRed)
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            val n = nameInput.trim()
+                            val c = costInput.toDoubleOrNull() ?: 0.0
+                            val cat = categoryInput.trim().ifEmpty { "账单" }
+                            val dt = dateInput.trim().ifEmpty { "每月1号" }
+                            if (n.isEmpty() || c <= 0.0) {
+                                Toast.makeText(context, "请输入有效的名称和扣费金额", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            isSubmitting = true
+                            scope.launch {
+                                val res = NativeLedgerApi.saveSubscription(
+                                    context = context,
+                                    id = activeSub?.id,
+                                    name = n,
+                                    category = cat,
+                                    cost = c,
+                                    currency = "MYR",
+                                    nextBillingDate = dt,
+                                    autoRenew = true
+                                )
+                                isSubmitting = false
+                                res.onSuccess {
+                                    Toast.makeText(context, "订阅已保存", Toast.LENGTH_SHORT).show()
+                                    showAddDialog = false
+                                    editingSub = null
+                                }.onFailure {
+                                    Toast.makeText(context, "保存失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        enabled = !isSubmitting,
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                    ) {
+                        Text("保存", color = Color.White)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showAddDialog = false
+                        editingSub = null
+                    },
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text(stringResource(R.string.common_cancel), color = Slate600)
+                }
+            }
+        )
+    }
+}
+
+
+// -----------------------------------------------------------------------------
+// Dialog: 分期付款与债务管理中心 (Installment Management Dialog)
+// -----------------------------------------------------------------------------
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun InstallmentManagementDialog(
+    installments: List<InstallmentRecord>,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var editingInst by remember { mutableStateOf<InstallmentRecord?>(null) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.88f),
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFEF3C7)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.DateRange, contentDescription = null, tint = Color(0xFFD97706), modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "分期与债务追踪", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                }
+                IconButton(onClick = { showAddDialog = true }, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Default.Add, contentDescription = "添加", tint = Color(0xFFD97706))
+                }
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                val totalRemaining = installments.sumOf { it.remainingAmount }
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Slate50,
+                    border = BorderStroke(1.dp, Slate200),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "累计剩余待还总额", fontSize = 13.sp, color = Slate600)
+                        Text(
+                            text = String.format(Locale.getDefault(), "RM %.2f", totalRemaining),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = ExpenseRed
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (installments.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Text("暂无分期或债务记录，点击右上角「+」即可自定义添加", color = Slate400, fontSize = 13.sp, textAlign = TextAlign.Center)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(installments) { inst ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { editingInst = inst },
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                border = BorderStroke(1.dp, Slate200)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = inst.title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                                        Text(
+                                            text = String.format(Locale.getDefault(), "RM %.2f", inst.remainingAmount),
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = ExpenseRed
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "进度: ${inst.paidPeriods}/${inst.tenureMonths} 期 · 月供 RM ${String.format(Locale.getDefault(), "%.2f", inst.monthlyAmount)}",
+                                            fontSize = 11.sp,
+                                            color = Slate500
+                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            TextButton(
+                                                onClick = {
+                                                    scope.launch {
+                                                        isSubmitting = true
+                                                        val res = NativeLedgerApi.payInstallmentPeriod(context, inst.id)
+                                                        isSubmitting = false
+                                                        res.onSuccess {
+                                                            Toast.makeText(context, "已成功打卡本期还款", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+                                                },
+                                                enabled = inst.paidPeriods < inst.tenureMonths && !isSubmitting
+                                            ) {
+                                                Text("打卡本期", fontSize = 12.sp, color = PrimaryTeal, fontWeight = FontWeight.Bold)
+                                            }
+                                            IconButton(onClick = { editingInst = inst }, modifier = Modifier.size(36.dp)) {
+                                                Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Slate400, modifier = Modifier.size(16.dp))
+                                            }
+                                        }
+                                    }
+                                    val progressPct = if (inst.tenureMonths > 0) (inst.paidPeriods.toFloat() / inst.tenureMonths.toFloat()).coerceIn(0f, 1f) else 0f
+                                    LinearProgressIndicator(
+                                        progress = { progressPct },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(4.dp)
+                                            .clip(RoundedCornerShape(2.dp)),
+                                        color = if (progressPct >= 1f) IncomeGreen else Color(0xFFD97706),
+                                        trackColor = Slate100
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+            ) {
+                Text(stringResource(R.string.common_close), color = Color.White)
+            }
+        }
+    )
+
+    // 新增/编辑分期子弹窗
+    val activeInst = editingInst
+    if (showAddDialog || activeInst != null) {
+        var titleInput by remember { mutableStateOf(activeInst?.title ?: "") }
+        var totalAmountInput by remember { mutableStateOf(if (activeInst != null) String.format(Locale.getDefault(), "%.2f", activeInst.totalAmount) else "") }
+        var tenureInput by remember { mutableStateOf(activeInst?.tenureMonths?.toString() ?: "12") }
+        var paidInput by remember { mutableStateOf(activeInst?.paidPeriods?.toString() ?: "0") }
+        var monthlyInput by remember { mutableStateOf(if (activeInst != null) String.format(Locale.getDefault(), "%.2f", activeInst.monthlyAmount) else "") }
+
+        AlertDialog(
+            onDismissRequest = {
+                showAddDialog = false
+                editingInst = null
+            },
+            containerColor = Color.White,
+            title = {
+                Text(
+                    text = if (activeInst != null) "编辑分期项目" else "添加新的分期/借款",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = titleInput,
+                        onValueChange = { titleInput = it },
+                        label = { Text("分期/债务名称 (如: iPhone 免息分期)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = totalAmountInput,
+                        onValueChange = { totalAmountInput = it },
+                        label = { Text("总欠款金额 (MYR)") },
+                        placeholder = { Text("0.00") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = tenureInput,
+                            onValueChange = { tenureInput = it },
+                            label = { Text("总期数") },
+                            placeholder = { Text("12") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = paidInput,
+                            onValueChange = { paidInput = it },
+                            label = { Text("已还期数") },
+                            placeholder = { Text("0") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    OutlinedTextField(
+                        value = monthlyInput,
+                        onValueChange = { monthlyInput = it },
+                        label = { Text("月供金额 (留空按期数自动计算)") },
+                        placeholder = { Text("可选") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (activeInst != null) {
+                        TextButton(
+                            onClick = {
+                                isSubmitting = true
+                                scope.launch {
+                                    val res = NativeLedgerApi.deleteInstallment(context, activeInst.id)
+                                    isSubmitting = false
+                                    res.onSuccess {
+                                        Toast.makeText(context, "已删除分期记录", Toast.LENGTH_SHORT).show()
+                                        editingInst = null
+                                    }.onFailure {
+                                        Toast.makeText(context, "删除失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            enabled = !isSubmitting,
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        ) {
+                            Text("删除", color = ExpenseRed)
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            val t = titleInput.trim()
+                            val tot = totalAmountInput.toDoubleOrNull() ?: 0.0
+                            val ten = tenureInput.toIntOrNull() ?: 12
+                            val pd = paidInput.toIntOrNull() ?: 0
+                            val mo = monthlyInput.toDoubleOrNull()
+                            if (t.isEmpty() || tot <= 0.0 || ten <= 0) {
+                                Toast.makeText(context, "请输入有效的分期名称、总金额及期数", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            isSubmitting = true
+                            scope.launch {
+                                val res = NativeLedgerApi.saveInstallment(
+                                    context = context,
+                                    id = activeInst?.id,
+                                    title = t,
+                                    totalAmount = tot,
+                                    tenureMonths = ten,
+                                    paidPeriods = pd,
+                                    monthlyAmount = mo
+                                )
+                                isSubmitting = false
+                                res.onSuccess {
+                                    Toast.makeText(context, "分期记录已保存", Toast.LENGTH_SHORT).show()
+                                    showAddDialog = false
+                                    editingInst = null
+                                }.onFailure {
+                                    Toast.makeText(context, "保存失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        enabled = !isSubmitting,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                    ) {
+                        Text("保存", color = Color.White)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showAddDialog = false
+                        editingInst = null
+                    },
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
+                    Text(stringResource(R.string.common_cancel), color = Slate600)
+                }
+            }
+        )
+    }
+}

@@ -978,6 +978,196 @@ object LocalLedgerRepository {
         }
     }
 
+    suspend fun saveSubscription(
+        context: Context,
+        id: Int?,
+        name: String,
+        category: String,
+        cost: Double,
+        currency: String = "MYR",
+        nextBillingDate: String = "每月1号",
+        autoRenew: Boolean = true
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
+            val subJson = sp.getString("subscriptions_json", null)
+            val arr = if (!subJson.isNullOrBlank()) JSONArray(subJson) else JSONArray()
+            val list = mutableListOf<JSONObject>()
+            for (i in 0 until arr.length()) {
+                list.add(arr.getJSONObject(i))
+            }
+
+            if (id != null && id > 0) {
+                val idx = list.indexOfFirst { it.optInt("id") == id }
+                val updated = JSONObject().apply {
+                    put("id", id)
+                    put("name", name)
+                    put("category", category)
+                    put("cost", cost)
+                    put("currency", currency)
+                    put("next_billing_date", nextBillingDate)
+                    put("auto_renew", autoRenew)
+                }
+                if (idx >= 0) {
+                    list[idx] = updated
+                } else {
+                    list.add(updated)
+                }
+            } else {
+                val maxId = list.maxOfOrNull { it.optInt("id", 0) } ?: 0
+                val newItem = JSONObject().apply {
+                    put("id", maxId + 1)
+                    put("name", name)
+                    put("category", category)
+                    put("cost", cost)
+                    put("currency", currency)
+                    put("next_billing_date", nextBillingDate)
+                    put("auto_renew", autoRenew)
+                }
+                list.add(newItem)
+            }
+
+            val newArr = JSONArray()
+            list.forEach { newArr.put(it) }
+            sp.edit().putString("subscriptions_json", newArr.toString()).apply()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "saveSubscription error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteSubscription(context: Context, id: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
+            val subJson = sp.getString("subscriptions_json", null)
+            val arr = if (!subJson.isNullOrBlank()) JSONArray(subJson) else JSONArray()
+            val newArr = JSONArray()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                if (obj.optInt("id") != id) {
+                    newArr.put(obj)
+                }
+            }
+            sp.edit().putString("subscriptions_json", newArr.toString()).apply()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "deleteSubscription error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun saveInstallment(
+        context: Context,
+        id: Int?,
+        title: String,
+        totalAmount: Double,
+        tenureMonths: Int,
+        paidPeriods: Int,
+        monthlyAmount: Double? = null
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
+            val instJson = sp.getString("installments_json", null)
+            val arr = if (!instJson.isNullOrBlank()) JSONArray(instJson) else JSONArray()
+            val list = mutableListOf<JSONObject>()
+            for (i in 0 until arr.length()) {
+                list.add(arr.getJSONObject(i))
+            }
+
+            val calculatedMonthly = if (monthlyAmount != null && monthlyAmount > 0) monthlyAmount
+                                    else if (tenureMonths > 0) totalAmount / tenureMonths
+                                    else 0.0
+            val remainingPeriods = Math.max(0, tenureMonths - paidPeriods)
+            val remaining = remainingPeriods * calculatedMonthly
+
+            if (id != null && id > 0) {
+                val idx = list.indexOfFirst { it.optInt("id") == id }
+                val updated = JSONObject().apply {
+                    put("id", id)
+                    put("title", title)
+                    put("total_amount", totalAmount)
+                    put("tenure_months", tenureMonths)
+                    put("paid_periods", paidPeriods)
+                    put("monthly_amount", calculatedMonthly)
+                    put("remaining_amount", remaining)
+                }
+                if (idx >= 0) {
+                    list[idx] = updated
+                } else {
+                    list.add(updated)
+                }
+            } else {
+                val maxId = list.maxOfOrNull { it.optInt("id", 0) } ?: 0
+                val newItem = JSONObject().apply {
+                    put("id", maxId + 1)
+                    put("title", title)
+                    put("total_amount", totalAmount)
+                    put("tenure_months", tenureMonths)
+                    put("paid_periods", paidPeriods)
+                    put("monthly_amount", calculatedMonthly)
+                    put("remaining_amount", remaining)
+                }
+                list.add(newItem)
+            }
+
+            val newArr = JSONArray()
+            list.forEach { newArr.put(it) }
+            sp.edit().putString("installments_json", newArr.toString()).apply()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "saveInstallment error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun payInstallmentPeriod(context: Context, id: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
+            val instJson = sp.getString("installments_json", null)
+            val arr = if (!instJson.isNullOrBlank()) JSONArray(instJson) else JSONArray()
+            val newArr = JSONArray()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                if (obj.optInt("id") == id) {
+                    val tenure = obj.optInt("tenure_months", 12)
+                    val paid = obj.optInt("paid_periods", 0)
+                    val newPaid = Math.min(tenure, paid + 1)
+                    val monthly = obj.optDouble("monthly_amount", 0.0)
+                    val remaining = Math.max(0.0, (tenure - newPaid) * monthly)
+                    obj.put("paid_periods", newPaid)
+                    obj.put("remaining_amount", remaining)
+                }
+                newArr.put(obj)
+            }
+            sp.edit().putString("installments_json", newArr.toString()).apply()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "payInstallmentPeriod error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteInstallment(context: Context, id: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
+            val instJson = sp.getString("installments_json", null)
+            val arr = if (!instJson.isNullOrBlank()) JSONArray(instJson) else JSONArray()
+            val newArr = JSONArray()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                if (obj.optInt("id") != id) {
+                    newArr.put(obj)
+                }
+            }
+            sp.edit().putString("installments_json", newArr.toString()).apply()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "deleteInstallment error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
     suspend fun applyInstallmentMatch(context: Context, instId: Int, txId: Long?): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             if (txId != null) {
