@@ -6,11 +6,9 @@ import com.siangloh.ledger.NetworkHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.URLEncoder
 import java.security.MessageDigest
 import java.util.Locale
+
 
 /** 离线优先的收支分析数据仓库 (Local-First Cashflow Repository) */
 object CashflowRepository {
@@ -75,60 +73,114 @@ object CashflowRepository {
             }
         }
 
-        val overviewRes = LocalLedgerRepository.getOverviewJson(context, month).getOrNull()
-        val inc = overviewRes?.optDouble("income", 0.0) ?: 0.0
-        val exp = overviewRes?.optDouble("expense", 0.0) ?: 0.0
+        LocalLedgerRepository.initDefaultsIfNeeded(context)
+        val db = AppDatabase.getInstance(context)
+        val txList = db.localTransactionDao().getByMonth("$month%")
+        val accounts = db.localAccountDao().getAll().associateBy { it.id }
+
+        var inc = 0.0
+        var exp = 0.0
+
+        val expMap = mutableMapOf<String, Pair<Double, MutableList<Int>>>()
+        val incMap = mutableMapOf<String, Pair<Double, MutableList<Int>>>()
+        val dailyMap = mutableMapOf<String, Double>()
+        val txArray = org.json.JSONArray()
+
+        for (tx in txList) {
+            val amt = tx.amount
+            if (tx.type == "expense") {
+                exp += amt
+                val entry = expMap.getOrPut(tx.category) { Pair(0.0, mutableListOf()) }
+                expMap[tx.category] = Pair(entry.first + amt, entry.second.apply { add(tx.id.toInt()) })
+                dailyMap[tx.date] = (dailyMap[tx.date] ?: 0.0) + amt
+            } else if (tx.type == "income") {
+                inc += amt
+                val entry = incMap.getOrPut(tx.category) { Pair(0.0, mutableListOf()) }
+                incMap[tx.category] = Pair(entry.first + amt, entry.second.apply { add(tx.id.toInt()) })
+            }
+
+            txArray.put(JSONObject().apply {
+                put("id", tx.id)
+                put("date", tx.date)
+                put("type", tx.type)
+                put("amount", tx.amount)
+                put("note", tx.note)
+                put("category", tx.category)
+                put("channel", tx.channel ?: "")
+                put("account_name", accounts[tx.accountId]?.name ?: "默认账户")
+            })
+        }
+
         val avail = inc - exp
-        val sparkline = overviewRes?.optJSONArray("sparkline")
+
+        val expCategories = org.json.JSONArray()
+        for ((cat, pair) in expMap.entries.sortedByDescending { it.value.first }) {
+            val amt = pair.first
+            val ids = pair.second
+            expCategories.put(JSONObject().apply {
+                put("label", cat)
+                put("amount", amt)
+                put("income_percent", if (inc > 0) amt / inc * 100.0 else 0.0)
+                val idArr = org.json.JSONArray()
+                ids.forEach { idArr.put(it) }
+                put("transaction_ids", idArr)
+            })
+        }
+
+        val incPlatforms = org.json.JSONArray()
+        for ((cat, pair) in incMap.entries.sortedByDescending { it.value.first }) {
+            val amt = pair.first
+            val ids = pair.second
+            incPlatforms.put(JSONObject().apply {
+                put("key", cat)
+                put("label", cat)
+                put("amount", amt)
+                put("income_percent", if (inc > 0) amt / inc * 100.0 else 0.0)
+                val idArr = org.json.JSONArray()
+                ids.forEach { idArr.put(it) }
+                put("transaction_ids", idArr)
+            })
+        }
+
         val dailyArray = org.json.JSONArray()
         for (d in 1..31) {
             val dateStr = String.format(Locale.getDefault(), "%s-%02d", month, d)
-            var dayAmt = 0.0
-            if (sparkline != null) {
-                for (i in 0 until sparkline.length()) {
-                    val pt = sparkline.optJSONObject(i)
-                    if (pt?.optString("date") == dateStr) {
-                        dayAmt = pt.optDouble("amount", 0.0)
-                        break
-                    }
-                }
-            }
-            dailyArray.put(dayAmt)
+            dailyArray.put(dailyMap[dateStr] ?: 0.0)
         }
 
+        val cur = if (currency.isNotBlank()) currency else "RM"
         val data = JSONObject().apply {
             put("ok", true)
             put("month", month)
-            put("currency", if (currency.isNotBlank()) currency else "RM")
+            put("currency", cur)
+            put("currencies", org.json.JSONArray().put(cur))
             put("income", inc)
             put("expense", exp)
             put("reserved", 0.0)
+            put("planned", 0.0)
+            put("paid", exp)
+            put("payment_percent", 100.0)
             put("available", avail)
             put("daily", dailyArray)
             put("expense_percent", if (inc > 0) (exp / inc * 100) else 0.0)
             put("reserve_percent", 0.0)
             put("available_percent", if (inc > 0) (avail / inc * 100) else 0.0)
+            put("transactions", txArray)
+            put("expense_categories", expCategories)
+            put("income_platforms", incPlatforms)
+            put("bills", org.json.JSONArray())
+            put("prior_overdue", org.json.JSONArray())
+            put("scheduled_transactions", org.json.JSONArray())
+            put("confirmed_transactions", org.json.JSONArray())
+            put("inactive_bills", org.json.JSONArray())
         }
         cache.edit().putString(cacheKey, data.toString()).apply()
         Result(data, false)
     }
 
     suspend fun update(context: Context, payload: JSONObject) = withContext(Dispatchers.IO) {
-        val user = URLEncoder.encode(NetworkHelper.getUsername(context), "UTF-8")
-        val server = NetworkHelper.getServerUrl(context).trimEnd('/')
-        val connection = URL("$server/api/native/cashflow-analysis?username=$user").openConnection() as HttpURLConnection
-        try {
-            connection.requestMethod = "POST"
-            connection.setRequestProperty("X-API-KEY", NetworkHelper.getApiKey(context))
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.connectTimeout = 8000
-            connection.readTimeout = 10000
-            connection.doOutput = true
-            connection.outputStream.bufferedWriter().use { it.write(payload.toString()) }
-            check(connection.responseCode in 200..299) { "Cashflow update failed" }
-            check(JSONObject(connection.inputStream.bufferedReader().use { it.readText() }).optBoolean("ok")) { "Cashflow update rejected" }
-            // Invalidate every month/currency: a payment may affect earlier bills.
-            context.getSharedPreferences("cashflow_reports", Context.MODE_PRIVATE).edit().clear().apply()
-        } finally { connection.disconnect() }
+        // 本地单机模式：清除现金流缓存以触发本地重新计算
+        context.getSharedPreferences("cashflow_reports", Context.MODE_PRIVATE).edit().clear().apply()
     }
 }
+
