@@ -258,11 +258,11 @@ object InstantReviewManager {
 // ======================================================================
 // 小提示条 UI：白底 + 主题色，默认只有一行，不需要用户“确认”
 // ======================================================================
-private val ToastTeal = Color(0xFF0F766E)
-private val ToastTealSubtle = Color(0xFFF0FDFA)
-private val ToastText = Color(0xFF0F172A)
-private val ToastSubText = Color(0xFF64748B)
-private val ToastChip = Color(0xFFF1F5F9)
+private val ToastTeal = com.siangloh.ledger.ui.compose.theme.PrimaryTeal
+private val ToastTealSubtle = com.siangloh.ledger.ui.compose.theme.PrimaryTealSubtle
+private val ToastText = com.siangloh.ledger.ui.compose.theme.Slate900
+private val ToastSubText = com.siangloh.ledger.ui.compose.theme.Slate500
+private val ToastChip = com.siangloh.ledger.ui.compose.theme.Slate100
 
 @Composable
 private fun InstantReviewToast(

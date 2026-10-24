@@ -137,14 +137,14 @@ private fun prevCategoryAmounts(prev: JSONObject?): Map<String, Double> =
 // =========================================================================
 // 色彩与数据结构
 // =========================================================================
-private val ExpenseColor = Color(0xFF0F766E)
+private val ExpenseColor = PrimaryTeal
 private val ReservedColor = Color(0xFFD97706)
 private val AvailableColor = Color(0xFF10B981)
 private val DangerColor = Color(0xFFDC2626)
 private val TrackColor = Color(0xFFF1F5F9)
 
 private val ChartPalette = listOf(
-    Color(0xFF0F766E), Color(0xFFF97316), Color(0xFF6366F1), Color(0xFF0EA5E9),
+    PrimaryTeal, Color(0xFFF97316), Color(0xFF6366F1), Color(0xFF0EA5E9),
     Color(0xFFD946EF), Color(0xFFF43F5E), Color(0xFF84CC16), Color(0xFFD97706),
     Color(0xFF10B981), Color(0xFF8B5CF6), Color(0xFF14B8A6), Color(0xFF64748B)
 )

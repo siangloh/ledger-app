@@ -2431,13 +2431,13 @@ fun CategoryRulesCard(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFCCFBF1)),
+                        .background(PrimaryTealSubtle),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Category,
                         contentDescription = stringResource(R.string.tools_category_rules),
-                        tint = Color(0xFF0F766E),
+                        tint = PrimaryTeal,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -2520,7 +2520,7 @@ fun CategoryRulesDialog(
                     Icon(
                         imageVector = Icons.Default.Category,
                         contentDescription = null,
-                        tint = Color(0xFF0F766E),
+                        tint = PrimaryTeal,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -2538,7 +2538,7 @@ fun CategoryRulesDialog(
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = stringResource(R.string.category_rules_add_btn),
-                        tint = Color(0xFF0F766E)
+                        tint = PrimaryTeal
                     )
                 }
             }
@@ -2558,7 +2558,7 @@ fun CategoryRulesDialog(
                     shape = RoundedCornerShape(10.dp),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF0F766E),
+                        focusedBorderColor = PrimaryTeal,
                         unfocusedBorderColor = Slate200
                     )
                 )
@@ -2583,7 +2583,7 @@ fun CategoryRulesDialog(
                         Text(
                             text = "⚡ " + stringResource(R.string.category_rules_apply_all_btn),
                             fontSize = 12.sp,
-                            color = Color(0xFF0F766E),
+                            color = PrimaryTeal,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -2592,7 +2592,7 @@ fun CategoryRulesDialog(
 
                 if (isLoading) {
                     Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFF0F766E))
+                        CircularProgressIndicator(color = PrimaryTeal)
                     }
                 } else if (errorMessage != null) {
                     Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -2653,7 +2653,7 @@ fun CategoryRulesDialog(
                                                 text = "→ ${r.category}",
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = Color(0xFF0F766E)
+                                                color = PrimaryTeal
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
@@ -2692,7 +2692,7 @@ fun CategoryRulesDialog(
                                             Icon(
                                                 imageVector = Icons.Default.FlashOn,
                                                 contentDescription = "追溯此规则",
-                                                tint = Color(0xFF0F766E),
+                                                tint = PrimaryTeal,
                                                 modifier = Modifier.size(20.dp)
                                             )
                                         }
@@ -2766,8 +2766,8 @@ fun CategoryRulesDialog(
                                 modifier = Modifier
                                     .defaultMinSize(minHeight = 48.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(if (selected) Color(0xFFCCFBF1) else Slate100)
-                                    .border(1.dp, if (selected) Color(0xFF0F766E) else Slate200, RoundedCornerShape(8.dp))
+                                    .background(if (selected) PrimaryTealSubtle else Slate100)
+                                    .border(1.dp, if (selected) PrimaryTeal else Slate200, RoundedCornerShape(8.dp))
                                     .clickable { matchTypeInput = type }
                                     .padding(horizontal = 14.dp, vertical = 10.dp),
                                 contentAlignment = Alignment.Center
@@ -2775,7 +2775,7 @@ fun CategoryRulesDialog(
                                 Text(
                                     text = label,
                                     fontSize = 13.sp,
-                                    color = if (selected) Color(0xFF0F766E) else Slate700,
+                                    color = if (selected) PrimaryTeal else Slate700,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                                 )
                             }
@@ -2807,7 +2807,7 @@ fun CategoryRulesDialog(
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                     modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                 ) {
                     Text("保存", color = Color.White)
@@ -2886,7 +2886,7 @@ fun CategoryRulesDialog(
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                     modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                 ) {
                     Text("确认执行", color = Color.White)
@@ -2929,13 +2929,13 @@ fun BudgetManagementCard(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(Color(0xFFE6FFFA), CircleShape),
+                    .background(PrimaryTealSubtle, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Savings,
                     contentDescription = null,
-                    tint = Color(0xFF0F766E),
+                    tint = PrimaryTeal,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -3049,7 +3049,7 @@ fun BudgetManagementDialog(
                         .height(200.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = Color(0xFF0F766E))
+                    CircularProgressIndicator(color = PrimaryTeal)
                 }
             } else if (errorMessage != null) {
                 Column(
@@ -3062,7 +3062,7 @@ fun BudgetManagementDialog(
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         onClick = { loadBudget() },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                         modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                     ) {
                         Text("重试", color = Color.White)
@@ -3105,12 +3105,12 @@ fun BudgetManagementDialog(
                                             val badgeBg = when (data.overall.level) {
                                                 "over" -> Color(0xFFFEE2E2)
                                                 "warn", "reached" -> Color(0xFFFEF3C7)
-                                                else -> Color(0xFFE6FFFA)
+                                                else -> PrimaryTealSubtle
                                             }
                                             val badgeColor = when (data.overall.level) {
                                                 "over" -> Color(0xFFDC2626)
                                                 "warn", "reached" -> Color(0xFFD97706)
-                                                else -> Color(0xFF0F766E)
+                                                else -> PrimaryTeal
                                             }
                                             Box(
                                                 modifier = Modifier
@@ -3136,7 +3136,7 @@ fun BudgetManagementDialog(
                                         Text(
                                             text = if (data != null && data.overall.isExplicit) stringResource(R.string.budget_edit_overall_btn)
                                                    else stringResource(R.string.budget_set_overall_btn),
-                                            color = Color(0xFF0F766E),
+                                            color = PrimaryTeal,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp,
                                             maxLines = 1
@@ -3179,7 +3179,7 @@ fun BudgetManagementDialog(
                                                 ),
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = Color(0xFF0F766E)
+                                                color = PrimaryTeal
                                             )
                                         }
                                     }
@@ -3189,7 +3189,7 @@ fun BudgetManagementDialog(
                                     val barColor = when (data.overall.level) {
                                         "over" -> Color(0xFFEF4444)
                                         "warn", "reached" -> Color(0xFFF59E0B)
-                                        else -> Color(0xFF0F766E)
+                                        else -> PrimaryTeal
                                     }
                                     LinearProgressIndicator(
                                         progress = { progressPct },
@@ -3209,7 +3209,7 @@ fun BudgetManagementDialog(
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .background(Color(0xFFE6FFFA), RoundedCornerShape(6.dp))
+                                                .background(PrimaryTealSubtle, RoundedCornerShape(6.dp))
                                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                                         ) {
                                             Text(
@@ -3219,7 +3219,7 @@ fun BudgetManagementDialog(
                                                 ),
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = Color(0xFF0F766E)
+                                                color = PrimaryTeal
                                             )
                                         }
 
@@ -3263,9 +3263,9 @@ fun BudgetManagementDialog(
                                 onClick = { showAddCategoryBudgetDialog = true },
                                 modifier = Modifier.defaultMinSize(minHeight = 44.dp)
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF0F766E), modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Add, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text(stringResource(R.string.budget_add_category_btn), color = Color(0xFF0F766E), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text(stringResource(R.string.budget_add_category_btn), color = PrimaryTeal, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         }
                     }
@@ -3311,7 +3311,7 @@ fun BudgetManagementDialog(
                                                         try {
                                                             Color(android.graphics.Color.parseColor(cat.color))
                                                         } catch (_: Exception) {
-                                                            Color(0xFF0F766E)
+                                                            PrimaryTeal
                                                         },
                                                         CircleShape
                                                     )
@@ -3333,7 +3333,7 @@ fun BudgetManagementDialog(
                                                 color = when (cat.level) {
                                                     "over" -> Color(0xFFDC2626)
                                                     "warn", "reached" -> Color(0xFFD97706)
-                                                    else -> Color(0xFF0F766E)
+                                                    else -> PrimaryTeal
                                                 }
                                             )
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -3382,7 +3382,7 @@ fun BudgetManagementDialog(
                                     val cBarColor = when (cat.level) {
                                         "over" -> Color(0xFFEF4444)
                                         "warn", "reached" -> Color(0xFFF59E0B)
-                                        else -> Color(0xFF0F766E)
+                                        else -> PrimaryTeal
                                     }
                                     LinearProgressIndicator(
                                         progress = { catPct },
@@ -3403,7 +3403,7 @@ fun BudgetManagementDialog(
         confirmButton = {
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                 modifier = Modifier.defaultMinSize(minHeight = 48.dp)
             ) {
                 Text(stringResource(R.string.common_close), color = Color.White)
@@ -3447,8 +3447,8 @@ fun BudgetManagementDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF0F766E),
-                            focusedLabelColor = Color(0xFF0F766E)
+                            focusedBorderColor = PrimaryTeal,
+                            focusedLabelColor = PrimaryTeal
                         )
                     )
                 }
@@ -3471,7 +3471,7 @@ fun BudgetManagementDialog(
                         }
                     },
                     enabled = !isSubmitting,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                     modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                 ) {
                     Text(stringResource(R.string.budget_save_btn), color = Color.White)
@@ -3520,8 +3520,8 @@ fun BudgetManagementDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF0F766E),
-                            focusedLabelColor = Color(0xFF0F766E)
+                            focusedBorderColor = PrimaryTeal,
+                            focusedLabelColor = PrimaryTeal
                         )
                     )
                 }
@@ -3566,7 +3566,7 @@ fun BudgetManagementDialog(
                             }
                         },
                         enabled = !isSubmitting,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                         modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                     ) {
                         Text(stringResource(R.string.budget_save_btn), color = Color.White)
@@ -3613,8 +3613,8 @@ fun BudgetManagementDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF0F766E),
-                            focusedLabelColor = Color(0xFF0F766E)
+                            focusedBorderColor = PrimaryTeal,
+                            focusedLabelColor = PrimaryTeal
                         )
                     )
                     OutlinedTextField(
@@ -3625,8 +3625,8 @@ fun BudgetManagementDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF0F766E),
-                            focusedLabelColor = Color(0xFF0F766E)
+                            focusedBorderColor = PrimaryTeal,
+                            focusedLabelColor = PrimaryTeal
                         )
                     )
                 }
@@ -3654,7 +3654,7 @@ fun BudgetManagementDialog(
                         }
                     },
                     enabled = !isSubmitting,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                     modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                 ) {
                     Text(stringResource(R.string.budget_save_btn), color = Color.White)

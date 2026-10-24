@@ -148,9 +148,9 @@ object SourceBrandBadgeHelper {
             "notification", "auto_track", "auto_track_confirmed" -> BrandBadgeConfig(
                 label = stringResource(R.string.source_label_notification),
                 emoji = "📱",
-                containerColor = Color(0xFFF0FDFA), // Teal 50
-                contentColor = Color(0xFF0F766E),   // Teal 700
-                borderColor = Color(0xFFCCFBF1)    // Teal 100
+                containerColor = com.siangloh.ledger.ui.compose.theme.PrimaryTealSubtle, // PrimaryTealSubtle
+                contentColor = com.siangloh.ledger.ui.compose.theme.PrimaryTeal,         // PrimaryTeal
+                borderColor = com.siangloh.ledger.ui.compose.theme.Teal100               // Teal 100
             )
             "manual" -> BrandBadgeConfig(
                 label = stringResource(R.string.source_label_manual),
