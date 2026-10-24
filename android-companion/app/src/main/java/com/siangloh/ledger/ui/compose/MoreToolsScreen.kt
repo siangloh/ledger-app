@@ -222,6 +222,7 @@ fun MoreToolsScreen(
             "subscription" -> {
                 SubscriptionManagementPage(
                     subscriptions = toolsSummary?.subscriptions ?: emptyList(),
+                    fixedIncomes = toolsSummary?.fixedIncomes ?: emptyList(),
                     userCategories = userCategories,
                     onBack = {
                         activeSubPage = null
@@ -350,11 +351,12 @@ fun MoreToolsScreen(
                 )
             }
 
-            // 3. 订阅与周期记账 (Subscriptions)
+            // 3. 周期记账与固定收支 (Subscriptions & Fixed Income)
             item {
                 SubscriptionsCard(
                     subscriptions = toolsSummary?.subscriptions ?: emptyList(),
                     totalMonthly = toolsSummary?.totalMonthlySub ?: 0.0,
+                    totalMonthlyIncome = toolsSummary?.totalMonthlyIncome ?: 0.0,
                     errorMessage = toolsError,
                     onRetry = { refreshAll() },
                     onOpenManage = { activeSubPage = "subscription" }
@@ -856,6 +858,7 @@ fun ReceiptOcrBannerCard(
 fun SubscriptionsCard(
     subscriptions: List<SubscriptionRecord>,
     totalMonthly: Double,
+    totalMonthlyIncome: Double = 0.0,
     errorMessage: String? = null,
     onRetry: () -> Unit = {},
     onOpenManage: () -> Unit = {}
@@ -883,7 +886,7 @@ fun SubscriptionsCard(
                 Row(
                     modifier = Modifier
                         .weight(1f)
-                        .clickable { if (subscriptions.isNotEmpty()) expanded = !expanded },
+                        .clickable { onOpenManage() },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
@@ -903,14 +906,14 @@ fun SubscriptionsCard(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "订阅与周期记账",
+                            text = "固定收支与周期记账",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate800
                         )
                         Text(
                             text = if (errorMessage != null) "加载失败：$errorMessage"
-                                   else "月均支出 RM ${String.format(Locale.getDefault(), "%.2f", totalMonthly)} · ${subscriptions.size} 项生效中",
+                                   else "支出 RM ${String.format(Locale.getDefault(), "%.2f", totalMonthly)} · 收入 RM ${String.format(Locale.getDefault(), "%.2f", totalMonthlyIncome)}",
                             fontSize = 12.sp,
                             color = if (errorMessage != null) ExpenseRed else Slate500
                         )
@@ -1192,7 +1195,7 @@ fun InstallmentsCard(
                 Row(
                     modifier = Modifier
                         .weight(1f)
-                        .clickable { if (installments.isNotEmpty()) expanded = !expanded },
+                        .clickable { onOpenManage() },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
@@ -2659,11 +2662,13 @@ fun BudgetManagementDialog(
 @Composable
 fun SubscriptionManagementDialog(
     subscriptions: List<SubscriptionRecord>,
+    fixedIncomes: List<FixedIncomeRecord> = emptyList(),
     userCategories: List<String>,
     onDismiss: () -> Unit
 ) {
     SubscriptionManagementPage(
         subscriptions = subscriptions,
+        fixedIncomes = fixedIncomes,
         userCategories = userCategories,
         onBack = onDismiss
     )

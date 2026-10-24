@@ -147,11 +147,23 @@ data class InstallmentRecord(
     val remainingAmount: Double
 )
 
+data class FixedIncomeRecord(
+    val id: Int,
+    val name: String,
+    val category: String,
+    val amount: Double,
+    val currency: String = "MYR",
+    val arrivalDay: String = "每月25号",
+    val isActive: Boolean = true
+)
+
 data class ToolsSummary(
     val subscriptions: List<SubscriptionRecord>,
     val totalMonthlySub: Double,
     val installments: List<InstallmentRecord>,
-    val totalRemainingInst: Double
+    val totalRemainingInst: Double,
+    val fixedIncomes: List<FixedIncomeRecord> = emptyList(),
+    val totalMonthlyIncome: Double = 0.0
 )
 
 data class TransactionMatchRecord(
@@ -861,6 +873,42 @@ object NativeLedgerApi {
     suspend fun deleteSubscription(context: Context, id: Int): Result<Unit> = withContext(Dispatchers.IO) {
         cachedTools = null
         LocalLedgerRepository.deleteSubscription(context, id)
+    }
+
+    suspend fun saveFixedIncome(
+        context: Context,
+        id: Int?,
+        name: String,
+        category: String,
+        amount: Double,
+        currency: String = "MYR",
+        arrivalDay: String = "每月25号",
+        isActive: Boolean = true
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        cachedTools = null
+        LocalLedgerRepository.saveFixedIncome(context, id, name, category, amount, currency, arrivalDay, isActive)
+    }
+
+    suspend fun deleteFixedIncome(context: Context, id: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        cachedTools = null
+        LocalLedgerRepository.deleteFixedIncome(context, id)
+    }
+
+    suspend fun recordFixedIncomeAsTransaction(
+        context: Context,
+        income: FixedIncomeRecord
+    ): Result<Long> = withContext(Dispatchers.IO) {
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        addTransaction(
+            context = context,
+            type = "income",
+            amount = income.amount,
+            category = income.category,
+            date = today,
+            note = "${income.name} (固定收入)",
+            tags = "#fixed_income",
+            groupName = "main"
+        )
     }
 
     suspend fun saveInstallment(

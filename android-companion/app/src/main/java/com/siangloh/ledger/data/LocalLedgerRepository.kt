@@ -912,15 +912,56 @@ object LocalLedgerRepository {
                 sp.edit().putString("installments_json", arr.toString()).apply()
             }
 
+            val incomesJson = sp.getString("fixed_incomes_json", null)
+            val fixedIncomes = mutableListOf<FixedIncomeRecord>()
+            if (!incomesJson.isNullOrBlank()) {
+                val arr = JSONArray(incomesJson)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    fixedIncomes.add(
+                        FixedIncomeRecord(
+                            id = obj.optInt("id", i + 1),
+                            name = obj.optString("name", "固定收入"),
+                            category = obj.optString("category", "工资"),
+                            amount = obj.optDouble("amount", 0.0),
+                            currency = obj.optString("currency", "MYR"),
+                            arrivalDay = obj.optString("arrival_day", "每月25号"),
+                            isActive = obj.optBoolean("is_active", true)
+                        )
+                    )
+                }
+            } else {
+                val defaults = listOf(
+                    FixedIncomeRecord(1, "全职月薪", "工资", 5000.0, "MYR", "每月25号", true)
+                )
+                fixedIncomes.addAll(defaults)
+                val arr = JSONArray()
+                defaults.forEach { inc ->
+                    arr.put(JSONObject().apply {
+                        put("id", inc.id)
+                        put("name", inc.name)
+                        put("category", inc.category)
+                        put("amount", inc.amount)
+                        put("currency", inc.currency)
+                        put("arrival_day", inc.arrivalDay)
+                        put("is_active", inc.isActive)
+                    })
+                }
+                sp.edit().putString("fixed_incomes_json", arr.toString()).apply()
+            }
+
             val totalMonthly = subscriptions.sumOf { it.cost }
             val totalRemaining = installments.sumOf { it.remainingAmount }
+            val totalMonthlyIncome = fixedIncomes.filter { it.isActive }.sumOf { it.amount }
 
             Result.success(
                 ToolsSummary(
                     subscriptions = subscriptions,
                     totalMonthlySub = totalMonthly,
                     installments = installments,
-                    totalRemainingInst = totalRemaining
+                    totalRemainingInst = totalRemaining,
+                    fixedIncomes = fixedIncomes,
+                    totalMonthlyIncome = totalMonthlyIncome
                 )
             )
         } catch (e: Exception) {
@@ -1053,6 +1094,85 @@ object LocalLedgerRepository {
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "deleteSubscription error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun saveFixedIncome(
+        context: Context,
+        id: Int?,
+        name: String,
+        category: String,
+        amount: Double,
+        currency: String = "MYR",
+        arrivalDay: String = "每月25号",
+        isActive: Boolean = true
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
+            val json = sp.getString("fixed_incomes_json", null)
+            val arr = if (!json.isNullOrBlank()) JSONArray(json) else JSONArray()
+            val list = mutableListOf<JSONObject>()
+            for (i in 0 until arr.length()) {
+                list.add(arr.getJSONObject(i))
+            }
+
+            if (id != null && id > 0) {
+                val idx = list.indexOfFirst { it.optInt("id") == id }
+                val updated = JSONObject().apply {
+                    put("id", id)
+                    put("name", name)
+                    put("category", category)
+                    put("amount", amount)
+                    put("currency", currency)
+                    put("arrival_day", arrivalDay)
+                    put("is_active", isActive)
+                }
+                if (idx >= 0) {
+                    list[idx] = updated
+                } else {
+                    list.add(updated)
+                }
+            } else {
+                val maxId = list.maxOfOrNull { it.optInt("id", 0) } ?: 0
+                val newItem = JSONObject().apply {
+                    put("id", maxId + 1)
+                    put("name", name)
+                    put("category", category)
+                    put("amount", amount)
+                    put("currency", currency)
+                    put("arrival_day", arrivalDay)
+                    put("is_active", isActive)
+                }
+                list.add(newItem)
+            }
+
+            val newArr = JSONArray()
+            list.forEach { newArr.put(it) }
+            sp.edit().putString("fixed_incomes_json", newArr.toString()).apply()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "saveFixedIncome error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteFixedIncome(context: Context, id: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
+            val json = sp.getString("fixed_incomes_json", null)
+            val arr = if (!json.isNullOrBlank()) JSONArray(json) else JSONArray()
+            val newArr = JSONArray()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                if (obj.optInt("id") != id) {
+                    newArr.put(obj)
+                }
+            }
+            sp.edit().putString("fixed_incomes_json", newArr.toString()).apply()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "deleteFixedIncome error: ${e.message}", e)
             Result.failure(e)
         }
     }
