@@ -11,6 +11,10 @@ interface PendingNotificationDao {
     @Query("SELECT * FROM pending_notifications WHERE sync_status = 'pending' ORDER BY timestamp ASC")
     suspend fun getPendingNotifications(): List<PendingNotification>
 
+    @Query("SELECT * FROM pending_notifications ORDER BY timestamp ASC")
+    suspend fun getAllNotifications(): List<PendingNotification>
+
+
     @Query("SELECT COUNT(*) FROM pending_notifications WHERE eventId = :eventId AND sync_status IN ('pending', 'syncing')")
     suspend fun countPendingWithEventId(eventId: String): Int
 

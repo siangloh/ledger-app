@@ -54,45 +54,23 @@ object TransactionUndo {
         }
         Thread {
             var ok = false
-            var conn: HttpURLConnection? = null
             try {
-                val serverUrl = NetworkHelper.getServerUrl(context)
-                val apiKey = NetworkHelper.getApiKey(context)
-                val username = NetworkHelper.getUsername(context)
-
-                val connection = URL(serverUrl.trimEnd('/') + UNDO_PATH).openConnection() as HttpURLConnection
-                conn = connection
-                connection.connectTimeout = 6000
-                connection.readTimeout = 6000
-                connection.requestMethod = "POST"
-                connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                if (apiKey.isNotEmpty()) connection.setRequestProperty("X-API-KEY", apiKey)
-                connection.doOutput = true
-                val payload = JSONObject().apply {
-                    put("key", apiKey)
-                    put("transaction_id", transactionId)
-                    if (username.isNotEmpty()) put("username", username)
-                }.toString()
-                connection.outputStream.bufferedWriter().use { it.write(payload) }
-
-                val code = connection.responseCode
-                if (code in 200..299) {
-                    val body = connection.inputStream.bufferedReader().use { it.readText() }
-                    val json = JSONObject(body)
-                    ok = json.optBoolean("ok", false)
-                } else {
-                    Log.w(TAG, "Undo rejected: HTTP $code")
+                kotlinx.coroutines.runBlocking {
+                    val res = com.siangloh.ledger.data.LocalLedgerRepository.deleteTransaction(context, transactionId)
+                    ok = res.isSuccess
                 }
                 if (ok) {
-                    // A deleted transaction changes every derived financial view.
                     for (prefs in listOf("cashflow_reports", "ledger_overview_cache", "ledger_records_cache", "ledger_accounts_cache", "ledger_sync_prefs")) {
                         context.getSharedPreferences(prefs, Context.MODE_PRIVATE).edit().clear().apply()
                     }
+                    try {
+                        val intent = Intent("com.siangloh.ledger.SYNC_COMPLETED")
+                        intent.setPackage(context.packageName)
+                        context.sendBroadcast(intent)
+                    } catch (_: Exception) {}
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Undo failed: ${e.message}", e)
-            } finally {
-                conn?.disconnect()
             }
             toast(context, context.getString(if (ok) R.string.undo_transaction_success else R.string.undo_transaction_failed))
             onDone()

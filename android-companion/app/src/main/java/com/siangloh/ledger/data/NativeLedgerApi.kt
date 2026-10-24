@@ -279,84 +279,7 @@ object NativeLedgerApi {
         limit: Int = 50,
         forceRefresh: Boolean = false
     ): Result<TransactionsPage> = withContext(Dispatchers.IO) {
-        val cacheKey = "${month.orEmpty()}_${type.orEmpty()}_${category.orEmpty()}_${search.orEmpty().trim()}_a${accountId ?: 0}_s${startDate.orEmpty()}_e${endDate.orEmpty()}_min${minAmount ?: 0.0}_max${maxAmount ?: 0.0}_src${source.orEmpty()}_chan${channel.orEmpty()}_p${page}_l${limit}"
-        val now = System.currentTimeMillis()
-        val todayMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
-        if (!month.isNullOrBlank() && month > todayMonthStr) {
-            // 未来月份：天然无流水，0ms 返回空页，严禁请求网络
-            return@withContext Result.success(TransactionsPage(emptyList(), 0, 1, limit, false))
-        }
-
-        if (!forceRefresh) {
-            val mem = recordsCache[cacheKey]
-            if (mem != null && (now - mem.first < 300_000L)) {
-                return@withContext Result.success(mem.second)
-            }
-            val isSimpleMonthQuery = page == 1 && category == null && accountId == null && minAmount == null && maxAmount == null && source == null && channel == null && startDate == null && endDate == null
-            if (isSimpleMonthQuery) {
-                val cached = LocalDataStore.getRecords(context, month, type, search ?: "", page)
-                if (!cached.isNullOrBlank()) {
-                    try {
-                        val pageResult = parseTransactionsPageJson(JSONObject(cached), page, limit)
-                        recordsCache[cacheKey] = Pair(now, pageResult)
-                        return@withContext Result.success(pageResult)
-                    } catch (_: Exception) {}
-                }
-            }
-        }
-
-        try {
-            val params = mutableListOf<String>()
-            val username = NetworkHelper.getUsername(context)
-            if (username.isNotEmpty()) params.add("username=${URLEncoder.encode(username, "UTF-8")}")
-            if (!type.isNullOrBlank() && type != "all") params.add("type=${URLEncoder.encode(type, "UTF-8")}")
-            if (!month.isNullOrBlank()) params.add("month=${URLEncoder.encode(month, "UTF-8")}")
-            if (!startDate.isNullOrBlank()) params.add("start=${URLEncoder.encode(startDate, "UTF-8")}")
-            if (!endDate.isNullOrBlank()) params.add("end=${URLEncoder.encode(endDate, "UTF-8")}")
-            if (!category.isNullOrBlank() && category != "全部" && category != "all") params.add("category=${URLEncoder.encode(category, "UTF-8")}")
-            if (!search.isNullOrBlank()) params.add("search=${URLEncoder.encode(search, "UTF-8")}")
-            if (accountId != null && accountId > 0) params.add("account_id=$accountId")
-            if (minAmount != null && minAmount >= 0.0) params.add("min_amount=$minAmount")
-            if (maxAmount != null && maxAmount > 0.0) params.add("max_amount=$maxAmount")
-            if (!source.isNullOrBlank() && source != "all") params.add("source=${URLEncoder.encode(source, "UTF-8")}")
-            if (!channel.isNullOrBlank() && channel != "all") params.add("channel=${URLEncoder.encode(channel, "UTF-8")}")
-            params.add("page=$page")
-            params.add("limit=$limit")
-
-            val endpoint = "/api/native/transactions" + if (params.isNotEmpty()) "?" + params.joinToString("&") else ""
-            val conn = openConnection(context, endpoint, "GET")
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                LocalDataStore.saveRecords(context, month, type, search ?: "", page, respBody)
-                val pageResult = parseTransactionsPageJson(json, page, limit)
-                recordsCache[cacheKey] = Pair(now, pageResult)
-                Result.success(pageResult)
-            } else {
-                val cached = LocalDataStore.getRecords(context, month, type, search ?: "", page)
-                if (!cached.isNullOrBlank()) {
-                    Result.success(parseTransactionsPageJson(JSONObject(cached), page, limit))
-                } else {
-                    Result.failure(Exception(json.optString("message", "获取流水失败")))
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "getTransactions error: ${e.message}", e)
-            val cached = LocalDataStore.getRecords(context, month, type, search ?: "", page)
-            if (!cached.isNullOrBlank()) {
-                try {
-                    Result.success(parseTransactionsPageJson(JSONObject(cached), page, limit))
-                } catch (_: Exception) {
-                    Result.failure(e)
-                }
-            } else {
-                Result.failure(e)
-            }
-        }
+        LocalLedgerRepository.getTransactionsPage(context, month, type, search, page, limit)
     }
 
     fun parseTransactionsPageJson(json: JSONObject?, fallbackPage: Int = 1, fallbackLimit: Int = 50): TransactionsPage {
@@ -450,47 +373,8 @@ object NativeLedgerApi {
         groupName: String? = null,
         clientTxId: String? = null
     ): Result<Long> = withContext(Dispatchers.IO) {
-        try {
-            val conn = openConnection(context, "/api/native/transactions", "POST")
-            conn.doOutput = true
-
-            val jsonPayload = JSONObject().apply {
-                put("type", type)
-                put("amount", amount)
-                put("category", category)
-                put("date", date)
-                put("note", note)
-                put("tags", tags)
-                put("client_tx_id", clientTxId ?: java.util.UUID.randomUUID().toString())
-                accountId?.let { put("account_id", it) }
-                toAccountId?.let { put("to_account_id", it) }
-                groupName?.let { put("group_name", it) }
-                val username = NetworkHelper.getUsername(context)
-                if (username.isNotEmpty()) put("username", username)
-            }.toString()
-
-            OutputStreamWriter(conn.outputStream, "UTF-8").use {
-                it.write(jsonPayload)
-                it.flush()
-            }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = try { JSONObject(respBody) } catch (_: Exception) { JSONObject() }
-            if (respCode in 200..299 && json.optBoolean("ok", false)) {
-                invalidateCache()
-                Result.success(json.optLong("id", 0L))
-            } else {
-                val msg = json.optString("message", if (respCode >= 400) "服务端校验未通过 (HTTP $respCode)" else "记账失败")
-                Result.failure(ServerValidationException(msg))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "addTransaction error: ${e.message}", e)
-            Result.failure(e)
-        }
+        invalidateCache()
+        LocalLedgerRepository.createTransaction(context, date, type, category, amount, note, tags, accountId, toAccountId)
     }
 
     suspend fun updateTransaction(
@@ -504,123 +388,17 @@ object NativeLedgerApi {
         tags: String,
         accountId: Int? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val conn = openConnection(context, "/api/native/transactions/$txId", "POST")
-            conn.doOutput = true
-
-            val jsonPayload = JSONObject().apply {
-                put("type", type)
-                put("amount", amount)
-                put("category", category)
-                put("date", date)
-                put("note", note)
-                put("tags", tags)
-                accountId?.let { put("account_id", it) }
-                val username = NetworkHelper.getUsername(context)
-                if (username.isNotEmpty()) put("username", username)
-            }.toString()
-
-            OutputStreamWriter(conn.outputStream, "UTF-8").use {
-                it.write(jsonPayload)
-                it.flush()
-            }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                invalidateCache()
-                Result.success(Unit)
-            } else {
-                Result.failure(Exception(json.optString("message", "更新失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "updateTransaction error: ${e.message}", e)
-            Result.failure(e)
-        }
+        invalidateCache()
+        LocalLedgerRepository.updateTransaction(context, txId, date, type, category, amount, note, tags, accountId)
     }
 
     suspend fun deleteTransaction(context: Context, txId: Long): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val conn = openConnection(context, "/api/native/transactions/$txId", "DELETE")
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                invalidateCache()
-                Result.success(Unit)
-            } else {
-                Result.failure(Exception(json.optString("message", "删除失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "deleteTransaction error: ${e.message}", e)
-            Result.failure(e)
-        }
+        invalidateCache()
+        LocalLedgerRepository.deleteTransaction(context, txId)
     }
 
     suspend fun getAccounts(context: Context, forceRefresh: Boolean = false): Result<AccountsSummary> = withContext(Dispatchers.IO) {
-        val now = System.currentTimeMillis()
-        if (!forceRefresh) {
-            if (cachedAccounts != null && (now - cachedAccountsTimestamp < 300_000L)) {
-                return@withContext Result.success(cachedAccounts!!)
-            }
-            val localJson = LocalDataStore.getAccounts(context)
-            if (!localJson.isNullOrBlank()) {
-                try {
-                    val summary = parseAccountsSummaryJson(JSONObject(localJson))
-                    cachedAccounts = summary
-                    cachedAccountsTimestamp = now
-                    return@withContext Result.success(summary)
-                } catch (_: Exception) {}
-            }
-        }
-
-        try {
-            val params = mutableListOf<String>()
-            val username = NetworkHelper.getUsername(context)
-            if (username.isNotEmpty()) params.add("username=${URLEncoder.encode(username, "UTF-8")}")
-            val endpoint = "/api/native/accounts" + if (params.isNotEmpty()) "?" + params.joinToString("&") else ""
-
-            val conn = openConnection(context, endpoint, "GET")
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                LocalDataStore.saveAccounts(context, respBody)
-                val summary = parseAccountsSummaryJson(json)
-                cachedAccounts = summary
-                cachedAccountsTimestamp = now
-                Result.success(summary)
-            } else {
-                val cached = LocalDataStore.getAccounts(context)
-                if (!cached.isNullOrBlank()) {
-                    Result.success(parseAccountsSummaryJson(JSONObject(cached)))
-                } else {
-                    Result.failure(Exception(json.optString("message", "获取账户失败")))
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "getAccounts error: ${e.message}", e)
-            val cached = LocalDataStore.getAccounts(context)
-            if (!cached.isNullOrBlank()) {
-                try {
-                    Result.success(parseAccountsSummaryJson(JSONObject(cached)))
-                } catch (_: Exception) {
-                    Result.failure(e)
-                }
-            } else {
-                Result.failure(e)
-            }
-        }
+        LocalLedgerRepository.getAccountsSummary(context)
     }
 
     fun parseAccountsSummaryJson(json: JSONObject): AccountsSummary {
@@ -665,41 +443,8 @@ object NativeLedgerApi {
         currency: String = "MYR",
         creditLimit: Double = 0.0
     ): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val conn = openConnection(context, "/api/native/accounts", "POST")
-            conn.doOutput = true
-
-            val jsonPayload = JSONObject().apply {
-                id?.let { put("id", it) }
-                put("name", name)
-                put("type", type)
-                put("currency", currency)
-                put("credit_limit", creditLimit)
-                val username = NetworkHelper.getUsername(context)
-                if (username.isNotEmpty()) put("username", username)
-            }.toString()
-
-            OutputStreamWriter(conn.outputStream, "UTF-8").use {
-                it.write(jsonPayload)
-                it.flush()
-            }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                invalidateCache()
-                Result.success(Unit)
-            } else {
-                Result.failure(Exception(json.optString("message", "保存账户失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "addOrUpdateAccount error: ${e.message}", e)
-            Result.failure(e)
-        }
+        invalidateCache()
+        LocalLedgerRepository.addOrUpdateAccount(context, id, name, type, 0.0, creditLimit, currency)
     }
 
     fun parseCategoriesJson(json: JSONObject): CategoriesResult {
@@ -729,53 +474,7 @@ object NativeLedgerApi {
     }
 
     suspend fun getCategories(context: Context, forceRefresh: Boolean = false): Result<CategoriesResult> = withContext(Dispatchers.IO) {
-        val now = System.currentTimeMillis()
-        if (!forceRefresh) {
-            if (cachedCategories != null && (now - cachedCategoriesTimestamp < 300_000L)) {
-                return@withContext Result.success(cachedCategories!!)
-            }
-            val localJson = LocalDataStore.getCategories(context)
-            if (!localJson.isNullOrBlank()) {
-                try {
-                    val catRes = parseCategoriesJson(JSONObject(localJson))
-                    cachedCategories = catRes
-                    cachedCategoriesTimestamp = now
-                    return@withContext Result.success(catRes)
-                } catch (_: Exception) {}
-            }
-        }
-
-        try {
-            val params = mutableListOf<String>()
-            val username = NetworkHelper.getUsername(context)
-            if (username.isNotEmpty()) params.add("username=${URLEncoder.encode(username, "UTF-8")}")
-            val endpoint = "/api/native/categories" + if (params.isNotEmpty()) "?" + params.joinToString("&") else ""
-
-            val conn = openConnection(context, endpoint, "GET")
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            LocalDataStore.saveCategories(context, respBody)
-            val catRes = parseCategoriesJson(json)
-            cachedCategories = catRes
-            cachedCategoriesTimestamp = now
-            Result.success(catRes)
-        } catch (e: Exception) {
-            Log.e(TAG, "getCategories error: ${e.message}", e)
-            val localJson = LocalDataStore.getCategories(context)
-            if (!localJson.isNullOrBlank()) {
-                try {
-                    Result.success(parseCategoriesJson(JSONObject(localJson)))
-                } catch (_: Exception) {
-                    Result.failure(e)
-                }
-            } else {
-                Result.failure(e)
-            }
-        }
+        LocalLedgerRepository.getCategoriesResult(context)
     }
 
     suspend fun getToolsSummary(context: Context, forceRefresh: Boolean = false): Result<ToolsSummary> = withContext(Dispatchers.IO) {

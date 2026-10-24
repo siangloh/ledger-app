@@ -367,28 +367,16 @@ fun OverviewScreen(
             try {
                 val username = NetworkHelper.getUsername(context)
                 val serverUrl = NetworkHelper.getServerUrl(context)
-                val apiKey = NetworkHelper.getApiKey(context)
                 val prevM = shiftMonthString(targetMonth, -1)
                 val nextM = shiftMonthString(targetMonth, 1)
 
                 for (adjMonth in listOf(prevM, nextM)) {
                     val existing = com.siangloh.ledger.data.LocalDataStore.getOverview(context, username, currentPeriod, adjMonth)
                     if (existing.isNullOrBlank()) {
-                        val queryParams = mutableListOf("period=$currentPeriod", "month=$adjMonth")
-                        if (username.isNotEmpty()) queryParams.add("username=$username")
-                        val urlStr = "$serverUrl/api/native/overview?" + queryParams.joinToString("&")
-                        val url = URL(urlStr)
-                        val conn = url.openConnection() as HttpURLConnection
-                        conn.requestMethod = "GET"
-                        conn.setRequestProperty("User-Agent", "LedgerAppCompanion/1.0 (Android; Dalvik)")
-                        if (apiKey.isNotEmpty()) conn.setRequestProperty("X-API-KEY", apiKey)
-                        conn.connectTimeout = 6000
-                        conn.readTimeout = 6000
-                        if (conn.responseCode in 200..299) {
-                            val text = conn.inputStream.bufferedReader().use { it.readText() }
-                            com.siangloh.ledger.data.LocalDataStore.saveOverview(context, username, currentPeriod, adjMonth, text)
+                        val adjJson = com.siangloh.ledger.data.LocalLedgerRepository.getOverviewJson(context, adjMonth).getOrNull()?.toString()
+                        if (adjJson != null) {
+                            com.siangloh.ledger.data.LocalDataStore.saveOverview(context, username, currentPeriod, adjMonth, adjJson)
                         }
-                        conn.disconnect()
                     }
                 }
             } catch (_: Exception) {}
@@ -400,7 +388,6 @@ fun OverviewScreen(
         val todayMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
         val isFutureMonth = period == "month" && currentMonthStr > todayMonthStr
 
-        // 1. 未来月份：天然 0.00 空态，严禁请求网络（除非用户强制刷新）
         if (isFutureMonth) {
             overviewData = OverviewData(lastActiveTime = "刚刚", isListening = isListeningActual)
             isLoading = false
@@ -412,56 +399,24 @@ fun OverviewScreen(
         val cachedJson = com.siangloh.ledger.data.LocalDataStore.getOverview(context, username, period, currentMonthStr)
         val isFresh = com.siangloh.ledger.data.LocalDataStore.isOverviewFresh(context, username, period, currentMonthStr)
 
-        // 2. 本地缓存命中：立即呈现
-        if (!cachedJson.isNullOrBlank()) {
+        if (!cachedJson.isNullOrBlank() && !forceRefresh) {
             try {
                 overviewData = parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = !isFresh)
                 isLoading = false
                 hasNetworkError = false
                 networkErrorMessage = ""
-                // 核心：若非用户主动点击刷新，只要本地有缓存，100% 消费本地快照，直接 return 绝不访问网络！
-                if (!forceRefresh) {
-                    return
-                }
+                return
             } catch (_: Exception) {
                 isLoading = true
             }
         } else {
-            // 切换时期（如切换到 近3个月 或 年度）未命中缓存时：
-            // 绝不能直接把 overviewData 清空！保留已有状态，仅在后台发起拉取，避免界面突兀跳动
             isLoading = true
         }
 
         coroutineScope.launch {
             try {
-                val serverUrl = NetworkHelper.getServerUrl(context)
-                val apiKey = NetworkHelper.getApiKey(context)
-
-                val queryParams = mutableListOf("period=$period", "month=$currentMonthStr")
-                if (username.isNotEmpty()) queryParams.add("username=$username")
-                val urlStr = "$serverUrl/api/native/overview?" + queryParams.joinToString("&")
-
                 val result = withContext(Dispatchers.IO) {
-                    try {
-                        val url = URL(urlStr)
-                        val conn = url.openConnection() as HttpURLConnection
-                        conn.requestMethod = "GET"
-                        conn.setRequestProperty("User-Agent", "LedgerAppCompanion/1.0 (Android; Dalvik)")
-                        if (apiKey.isNotEmpty()) conn.setRequestProperty("X-API-KEY", apiKey)
-                        conn.connectTimeout = 8000
-                        conn.readTimeout = 8000
-
-                        if (conn.responseCode in 200..299) {
-                            val text = conn.inputStream.bufferedReader().use { it.readText() }
-                            conn.disconnect()
-                            text
-                        } else {
-                            conn.disconnect()
-                            null
-                        }
-                    } catch (e: Exception) {
-                        null
-                    }
+                    com.siangloh.ledger.data.LocalLedgerRepository.getOverviewJson(context, currentMonthStr).getOrNull()?.toString()
                 }
 
                 if (result != null) {

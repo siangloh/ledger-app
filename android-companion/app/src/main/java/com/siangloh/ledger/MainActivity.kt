@@ -103,13 +103,10 @@ class MainActivity : AppCompatActivity() {
         handleIncomingIntent(intent)
         registerNetworkCallback()
 
-        // 核心优化：进 App 时一次性全量拉取当前用户所有核心数据（近3月概览、近2月流水、账户、分类、小工具）存入本地
-        // 之后界面交互 100% 消费本地快照（0ms 瞬开，0 网络延迟），后续切月绝不再向在线数据库发送请求
+        // 核心：单机离线模式，初始化本地账户、分类以及迁移以往积攒的通知
         lifecycleScope.launch(Dispatchers.IO) {
-            com.siangloh.ledger.data.LocalDataStore.syncAllUserData(this@MainActivity)
+            com.siangloh.ledger.data.LocalLedgerRepository.initDefaultsIfNeeded(this@MainActivity)
         }
-        // 启动每 5 分钟在后台静默同步一次的定时协程
-        startPeriodicDataSyncLoop()
     }
 
     private fun ensureWebViewInitialized() {

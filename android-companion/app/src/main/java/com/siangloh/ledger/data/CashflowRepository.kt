@@ -10,6 +10,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.security.MessageDigest
+import java.util.Locale
 
 /** 离线优先的收支分析数据仓库 (Local-First Cashflow Repository) */
 object CashflowRepository {
@@ -74,37 +75,42 @@ object CashflowRepository {
             }
         }
 
-        // 2. 离线保护：设备无网络时直接回退到本地缓存，不报错
-        if (!NetworkHelper.isOnline(context)) {
-            val fallback = getCached(context, month, currency)
-            if (fallback != null) {
-                return@withContext fallback
+        val overviewRes = LocalLedgerRepository.getOverviewJson(context, month).getOrNull()
+        val inc = overviewRes?.optDouble("income", 0.0) ?: 0.0
+        val exp = overviewRes?.optDouble("expense", 0.0) ?: 0.0
+        val avail = inc - exp
+        val sparkline = overviewRes?.optJSONArray("sparkline")
+        val dailyArray = org.json.JSONArray()
+        for (d in 1..31) {
+            val dateStr = String.format(Locale.getDefault(), "%s-%02d", month, d)
+            var dayAmt = 0.0
+            if (sparkline != null) {
+                for (i in 0 until sparkline.length()) {
+                    val pt = sparkline.optJSONObject(i)
+                    if (pt?.optString("date") == dateStr) {
+                        dayAmt = pt.optDouble("amount", 0.0)
+                        break
+                    }
+                }
             }
-            throw IllegalStateException("Offline and no local cashflow cache")
+            dailyArray.put(dayAmt)
         }
 
-        // 3. 网络请求：使用更紧凑的超时（5秒连接，8秒读取，避免长达15秒的卡死）
-        val server = NetworkHelper.getServerUrl(context).trimEnd('/')
-        val key = NetworkHelper.getApiKey(context)
-        val user = NetworkHelper.getUsername(context)
-        try {
-            val query = "month=${URLEncoder.encode(month, "UTF-8")}&currency=${URLEncoder.encode(currency, "UTF-8")}&username=${URLEncoder.encode(user, "UTF-8")}"
-            val connection = URL("$server/api/native/cashflow-analysis?$query").openConnection() as HttpURLConnection
-            try {
-                connection.setRequestProperty("X-API-KEY", key)
-                connection.connectTimeout = 5000
-                connection.readTimeout = 8000
-                check(connection.responseCode in 200..299) { "Cashflow request failed: ${connection.responseCode}" }
-                val data = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-                check(data.optBoolean("ok")) { "Invalid cashflow report" }
-                cache.edit().putString(cacheKey, data.toString()).apply()
-                Result(data, false)
-            } finally { connection.disconnect() }
-        } catch (error: Exception) {
-            Log.w("Cashflow", "Online fetch failed or timed out; falling back to local cache", error)
-            val fallback = getCached(context, month, currency) ?: throw error
-            fallback
+        val data = JSONObject().apply {
+            put("ok", true)
+            put("month", month)
+            put("currency", if (currency.isNotBlank()) currency else "RM")
+            put("income", inc)
+            put("expense", exp)
+            put("reserved", 0.0)
+            put("available", avail)
+            put("daily", dailyArray)
+            put("expense_percent", if (inc > 0) (exp / inc * 100) else 0.0)
+            put("reserve_percent", 0.0)
+            put("available_percent", if (inc > 0) (avail / inc * 100) else 0.0)
         }
+        cache.edit().putString(cacheKey, data.toString()).apply()
+        Result(data, false)
     }
 
     suspend fun update(context: Context, payload: JSONObject) = withContext(Dispatchers.IO) {

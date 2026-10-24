@@ -241,82 +241,39 @@ object LocalDataStore {
 
         isSyncing = true
         try {
-            Log.i(TAG, "Preloading all user data from online db into local storage...")
+            Log.i(TAG, "Preloading all local data from Room database...")
             val username = NetworkHelper.getUsername(context)
-            val serverUrl = NetworkHelper.getServerUrl(context)
-            val apiKey = NetworkHelper.getApiKey(context)
             val today = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
             val prevMonth = shiftMonth(today, -1)
             val prev2Month = shiftMonth(today, -2)
 
-            // 1. 批量预载当前月、上月、前月、近3个月与年度 Overview (覆盖 100% 概览时期切换)
-            val overviewQueries = listOf(
-                Pair("month", today),
-                Pair("month", prevMonth),
-                Pair("month", prev2Month),
-                Pair("3m", today),
-                Pair("year", today)
-            )
-            for ((p, m) in overviewQueries) {
-                try {
-                    val queryParams = mutableListOf("period=$p", "month=$m")
-                    if (username.isNotEmpty()) queryParams.add("username=$username")
-                    val urlStr = "$serverUrl/api/native/overview?" + queryParams.joinToString("&")
-                    val url = URL(urlStr)
-                    val conn = url.openConnection() as HttpURLConnection
-                    conn.requestMethod = "GET"
-                    conn.setRequestProperty("User-Agent", "LedgerAppCompanion/1.0 (Android; Dalvik)")
-                    if (apiKey.isNotEmpty()) conn.setRequestProperty("X-API-KEY", apiKey)
-                    conn.connectTimeout = 15000
-                    conn.readTimeout = 15000
-                    if (conn.responseCode in 200..299) {
-                        val text = conn.inputStream.bufferedReader().use { it.readText() }
-                        saveOverview(context, username, p, m, text)
-                    }
-                    conn.disconnect()
-                } catch (e: Exception) {
-                    Log.w(TAG, "Preload overview for $p-$m failed: ${e.message}")
+            LocalLedgerRepository.initDefaultsIfNeeded(context)
+
+            for ((p, m) in listOf(Pair("month", today), Pair("month", prevMonth), Pair("month", prev2Month), Pair("3m", today), Pair("year", today))) {
+                val ovJson = LocalLedgerRepository.getOverviewJson(context, m).getOrNull()?.toString()
+                if (ovJson != null) {
+                    saveOverview(context, username, p, m, ovJson)
                 }
             }
 
-            // 2. 批量同步当月与上月流水列表 (第 1 页)
             for (m in listOf(today, prevMonth)) {
-                try {
-                    NativeLedgerApi.getTransactions(
-                        context = context,
-                        type = "all",
-                        month = m,
-                        page = 1,
-                        limit = 50,
-                        forceRefresh = true
-                    )
-                } catch (e: Exception) {
-                    Log.w(TAG, "Preload transactions for $m failed: ${e.message}")
-                }
+                NativeLedgerApi.getTransactions(
+                    context = context,
+                    type = "all",
+                    month = m,
+                    page = 1,
+                    limit = 50,
+                    forceRefresh = true
+                )
+                CashflowRepository.load(context, m, forceRefresh = true)
             }
 
-            // 3. 同步账户、分类、小工具
-            try {
-                NativeLedgerApi.getAccounts(context, forceRefresh = true)
-                NativeLedgerApi.getCategories(context, forceRefresh = true)
-                NativeLedgerApi.getToolsSummary(context, forceRefresh = true)
-            } catch (e: Exception) {
-                Log.w(TAG, "Preload aux data failed: ${e.message}")
-            }
-
-            // 4. 批量预载当月与上月收支分析 (Cashflow Analysis)，离线优先保底，确保进分析页 0ms 秒开
-            for (m in listOf(today, prevMonth)) {
-                try {
-                    CashflowRepository.load(context, m, forceRefresh = force)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Preload cashflow for $m failed: ${e.message}")
-                }
-            }
+            NativeLedgerApi.getAccounts(context, forceRefresh = true)
+            NativeLedgerApi.getCategories(context, forceRefresh = true)
 
             saveFullSyncTime(context)
-            Log.i(TAG, "All user data successfully preloaded into local storage!")
+            Log.i(TAG, "All local user data successfully preloaded into cache!")
 
-            // 触发全局广播，通知已打开的屏幕静默刷新最新数据
             try {
                 val intent = Intent("com.siangloh.ledger.DATA_SYNCED")
                 intent.setPackage(context.packageName)

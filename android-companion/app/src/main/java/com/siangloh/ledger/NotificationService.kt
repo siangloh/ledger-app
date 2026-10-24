@@ -167,61 +167,66 @@ class NotificationService : NotificationListenerService() {
         }
 
         // 5. 通过 Phase-1 检验，尝试发送给后端（或离线/等待WiFi时加入 Room 队列）
-        if (NetworkHelper.canSyncNow(this)) {
-            Log.i(TAG, "Posting transaction notification to backend (package: $pkgName)...")
-            NetworkHelper.postNotificationAsync(fullContent, this, packageName = pkgName, notificationEventId = eventId) { success, msg, verdict ->
-                serviceScope.launch {
-                    val finalOutcome = when (verdict) {
-                        "rejected_promo" -> "synced_rejected_promo"
-                        "duplicate_ignored" -> "synced_duplicate_ignored"
-                        "on_hold" -> "synced_on_hold"
-                        "ignored_internal_transfer" -> "synced_internal_transfer"
-                        else -> if (success) "synced_success" else {
-                            queueOfflineNotification(pkgName, fullContent, eventId)
-                            "queued_offline"
-                        }
-                    }
-
-                    if (success && (verdict == "accepted" || verdict == null)) {
-                        try {
-                            val json = org.json.JSONObject(msg)
-                            val txId = json.optLong("transaction_id", -1L)
-                            val parsed = json.optJSONObject("parsed")
-                            val merchant = parsed?.optString("merchant")?.ifBlank { parsed.optString("note") } ?: ""
-                            val amount = parsed?.optDouble("amount", 0.0) ?: 0.0
-                            val category = parsed?.optString("category") ?: "餐饮"
-                            val channel = parsed?.optString("channel") ?: ""
-                            com.siangloh.ledger.ui.overlay.InstantReviewManager.showInstantReview(
-                                this@NotificationService,
-                                merchant,
-                                amount,
-                                category,
-                                channel,
-                                txId
+        // 5. 纯本地独立记账：直接在设备本地解析并入库，彻底脱离外部服务器
+        serviceScope.launch {
+            try {
+                val parsed = com.siangloh.ledger.parser.LocalNotificationParser.parse(fullContent, pkgName)
+                if (parsed != null) {
+                    if (parsed.isPromo) {
+                        insertLogAndPrune(
+                            db,
+                            NotificationLog(
+                                sourcePackage = pkgName,
+                                rawText = fullContent,
+                                matchedPhase1 = true,
+                                sentToBackend = false,
+                                outcome = "ignored_promo_keyword"
                             )
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Failed to trigger instant review: ${e.message}")
-                        }
-                    }
-
-                    insertLogAndPrune(
-                        db,
-                        NotificationLog(
-                            sourcePackage = pkgName,
-                            rawText = fullContent,
-                            matchedPhase1 = true,
-                            sentToBackend = true,
-                            backendVerdict = verdict,
-                            outcome = finalOutcome
                         )
-                    )
+                        return@launch
+                    }
+                    if (parsed.isInternalTransfer) {
+                        insertLogAndPrune(
+                            db,
+                            NotificationLog(
+                                sourcePackage = pkgName,
+                                rawText = fullContent,
+                                matchedPhase1 = true,
+                                sentToBackend = false,
+                                outcome = "synced_internal_transfer"
+                            )
+                        )
+                        return@launch
+                    }
+                    if (parsed.amount > 0) {
+                        val txId = com.siangloh.ledger.data.LocalLedgerRepository.recordNotificationTransaction(this@NotificationService, parsed)
+                        com.siangloh.ledger.ui.overlay.InstantReviewManager.showInstantReview(
+                            this@NotificationService,
+                            parsed.merchant,
+                            parsed.amount,
+                            parsed.category,
+                            parsed.channel,
+                            txId
+                        )
+                        insertLogAndPrune(
+                            db,
+                            NotificationLog(
+                                sourcePackage = pkgName,
+                                rawText = fullContent,
+                                matchedPhase1 = true,
+                                sentToBackend = false,
+                                outcome = "local_recorded"
+                            )
+                        )
+                        try {
+                            val intent = android.content.Intent("com.siangloh.ledger.SYNC_COMPLETED")
+                            intent.setPackage(packageName)
+                            sendBroadcast(intent)
+                        } catch (_: Exception) {}
+                        return@launch
+                    }
                 }
-            }
-        } else {
-            // 离线状态：直接加入本地 pending_notifications 数据库并触发 WorkManager
-            Log.i(TAG, "Device offline: queuing notification in local database...")
-            serviceScope.launch {
-                queueOfflineNotification(pkgName, fullContent, eventId)
+
                 insertLogAndPrune(
                     db,
                     NotificationLog(
@@ -229,9 +234,11 @@ class NotificationService : NotificationListenerService() {
                         rawText = fullContent,
                         matchedPhase1 = true,
                         sentToBackend = false,
-                        outcome = "queued_offline"
+                        outcome = "ignored_no_keywords"
                     )
                 )
+            } catch (e: Exception) {
+                Log.w(TAG, "Local notification processing failed: ${e.message}", e)
             }
         }
     }

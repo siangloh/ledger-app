@@ -47,65 +47,24 @@ class QuickCategoryReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val serverUrl = NetworkHelper.getServerUrl(context)
-                val apiKey = NetworkHelper.getApiKey(context)
-                val username = NetworkHelper.getUsername(context)
-
-                val url = URL("$serverUrl/api/native/quick-categorize")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("User-Agent", "LedgerAppCompanion/1.0 (Android; Dalvik)")
-                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                if (apiKey.isNotEmpty()) {
-                    conn.setRequestProperty("X-API-KEY", apiKey)
-                }
-                conn.connectTimeout = 8000
-                conn.readTimeout = 8000
-                conn.doOutput = true
-
-                val payload = JSONObject().apply {
-                    put("key", apiKey)
-                    put("transaction_id", txId)
-                    put("category", category)
-                    put("remember_merchant", remember)
-                    if (merchant.isNotEmpty()) {
-                        put("note", merchant)
-                    }
-                    if (username.isNotEmpty()) {
-                        put("username", username)
-                    }
-                }.toString()
-
-                OutputStreamWriter(conn.outputStream, "UTF-8").use { out ->
-                    out.write(payload)
-                    out.flush()
-                }
-
-                val code = conn.responseCode
-                if (code in 200..299) {
-                    val respStr = conn.inputStream.bufferedReader().use { it.readText() }
-                    val respJson = JSONObject(respStr)
-                    if (respJson.optBoolean("ok", false)) {
-                        kotlinx.coroutines.withContext(Dispatchers.Main) {
-                            Toast.makeText(context, "已将【$merchant】分类为【$category】", Toast.LENGTH_SHORT).show()
-                        }
-                    } else {
-                        val errMsg = respJson.optString("message", "分类修改失败")
-                        kotlinx.coroutines.withContext(Dispatchers.Main) {
-                            Toast.makeText(context, "修改失败: $errMsg", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                } else {
-                    kotlinx.coroutines.withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "分类修改失败 (HTTP $code)", Toast.LENGTH_LONG).show()
-                    }
-                }
-                conn.disconnect()
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to update category on backend: ${e.message}")
+                val res = com.siangloh.ledger.data.LocalLedgerRepository.updateTransactionCategory(context, txId, category)
                 kotlinx.coroutines.withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "网络错误，无法更新分类", Toast.LENGTH_SHORT).show()
+                    if (res.isSuccess) {
+                        Toast.makeText(context, "已将【$merchant】分类为【$category】", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "分类修改失败", Toast.LENGTH_SHORT).show()
+                    }
                 }
+                for (prefs in listOf("cashflow_reports", "ledger_overview_cache", "ledger_records_cache", "ledger_accounts_cache", "ledger_sync_prefs")) {
+                    context.getSharedPreferences(prefs, Context.MODE_PRIVATE).edit().clear().apply()
+                }
+                try {
+                    val syncIntent = Intent("com.siangloh.ledger.SYNC_COMPLETED")
+                    syncIntent.setPackage(context.packageName)
+                    context.sendBroadcast(syncIntent)
+                } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to update category locally: ${e.message}")
             } finally {
                 pendingResult.finish()
             }
