@@ -392,8 +392,12 @@ object LocalLedgerRepository {
             initDefaultsIfNeeded(context)
             val db = AppDatabase.getInstance(context)
             val localAccs = db.localAccountDao().getAll()
+            val allTxs = db.localTransactionDao().getAll()
 
             val accountRecords = localAccs.map { a ->
+                val unreconciled = allTxs.count {
+                    (it.accountId == a.id || it.toAccountId == a.id) && !it.tags.contains("#reconciled")
+                }
                 AccountRecord(
                     id = a.id,
                     name = a.name,
@@ -402,7 +406,8 @@ object LocalLedgerRepository {
                     creditLimit = a.creditLimit,
                     currency = a.currency,
                     statementDay = null,
-                    dueDay = null
+                    dueDay = null,
+                    unreconciledCount = unreconciled
                 )
             }
 
@@ -638,6 +643,126 @@ object LocalLedgerRepository {
             NativeLedgerApi.invalidateCache()
             Result.success(Unit)
         } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getAccountReconciliation(context: Context, accountId: Int): Result<AccountReconciliationData> = withContext(Dispatchers.IO) {
+        try {
+            initDefaultsIfNeeded(context)
+            val db = AppDatabase.getInstance(context)
+            val acc = db.localAccountDao().getById(accountId) ?: return@withContext Result.failure(Exception("账户未找到"))
+            val txs = db.localTransactionDao().getByAccountId(accountId)
+
+            val txItems = txs.map { tx ->
+                ReconcileTxItem(
+                    id = tx.id.toInt(),
+                    date = tx.date,
+                    type = tx.type,
+                    category = tx.category,
+                    amount = tx.amount,
+                    note = tx.note,
+                    isReconciled = tx.tags.contains("#reconciled")
+                )
+            }
+
+            val unreconciledCount = txItems.count { !it.isReconciled }
+
+            val data = AccountReconciliationData(
+                accountId = acc.id,
+                accountName = acc.name,
+                accountType = acc.type,
+                currency = acc.currency,
+                systemBalance = acc.balance,
+                unreconciledCount = unreconciledCount,
+                transactions = txItems,
+                history = emptyList()
+            )
+            Result.success(data)
+        } catch (e: Exception) {
+            Log.e(TAG, "getAccountReconciliation error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun reconcileAccount(
+        context: Context,
+        accountId: Int,
+        statementBalance: Double,
+        autoAdjust: Boolean,
+        note: String
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val db = AppDatabase.getInstance(context)
+            val acc = db.localAccountDao().getById(accountId) ?: return@withContext Result.failure(Exception("账户未找到"))
+
+            val diff = statementBalance - acc.balance
+            if (autoAdjust && kotlin.math.abs(diff) >= 0.005) {
+                val now = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                val timeNow = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+                val adjType = if (diff > 0) "income" else "expense"
+                val adjAmount = kotlin.math.abs(diff)
+                val adjCategory = "平账调整"
+                val adjNote = if (note.isNotBlank()) "对账平账: $note" else "对账差额平账"
+
+                val adjTx = LocalTransaction(
+                    date = now,
+                    time = timeNow,
+                    type = adjType,
+                    category = adjCategory,
+                    amount = adjAmount,
+                    note = adjNote,
+                    tags = "#reconciled #calibration",
+                    accountId = accountId,
+                    source = "reconciliation"
+                )
+                db.localTransactionDao().insert(adjTx)
+            }
+
+            // Mark all existing transactions for this account as reconciled
+            val txs = db.localTransactionDao().getByAccountId(accountId)
+            for (t in txs) {
+                if (!t.tags.contains("#reconciled")) {
+                    val updatedTags = if (t.tags.isBlank()) "#reconciled" else "${t.tags.trim()} #reconciled"
+                    db.localTransactionDao().update(t.copy(tags = updatedTags, updatedAt = System.currentTimeMillis()))
+                }
+            }
+
+            // Update account balance to statement balance
+            db.localAccountDao().update(acc.copy(balance = statementBalance))
+            NativeLedgerApi.invalidateCache()
+
+            val json = JSONObject().apply {
+                put("ok", true)
+                put("final_balance", statementBalance)
+                put("message", "对账成功")
+            }
+            Result.success(json)
+        } catch (e: Exception) {
+            Log.e(TAG, "reconcileAccount error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun toggleTransactionReconciled(
+        context: Context,
+        txId: Int,
+        isReconciled: Boolean
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val db = AppDatabase.getInstance(context)
+            val tx = db.localTransactionDao().getById(txId.toLong())
+            if (tx != null) {
+                val newTags = if (isReconciled) {
+                    if (!tx.tags.contains("#reconciled")) "${tx.tags.trim()} #reconciled".trim() else tx.tags
+                } else {
+                    tx.tags.replace("#reconciled", "").trim()
+                }
+                db.localTransactionDao().update(tx.copy(tags = newTags, updatedAt = System.currentTimeMillis()))
+            }
+            Result.success(JSONObject().put("ok", true))
+        } catch (e: Exception) {
+            Log.e(TAG, "toggleTransactionReconciled error: ${e.message}", e)
             Result.failure(e)
         }
     }

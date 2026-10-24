@@ -30,6 +30,9 @@ interface LocalTransactionDao {
     @Query("UPDATE local_transactions SET category = :category, updatedAt = :updatedAt WHERE id = :id")
     suspend fun updateCategory(id: Long, category: String, updatedAt: Long = System.currentTimeMillis())
 
+    @Query("SELECT * FROM local_transactions WHERE accountId = :accountId OR toAccountId = :accountId ORDER BY date DESC, id DESC")
+    suspend fun getByAccountId(accountId: Int): List<LocalTransaction>
+
     @Query("SELECT COUNT(*) FROM local_transactions")
     suspend fun countAll(): Int
 }

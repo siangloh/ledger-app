@@ -357,7 +357,9 @@ fun AccountCard(
         color = Color.White,
         shadowElevation = 0.5.dp,
         border = BorderStroke(1.dp, Slate100),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onReconcile(account) }
     ) {
         Row(
             modifier = Modifier
@@ -986,6 +988,21 @@ fun AccountReconcileDialog(
                                 color = if (tx.type == "expense") ExpenseRed else IncomeGreen
                             )
                         }
+                    }
+                } else if (!isLoadingData) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Slate50,
+                        border = BorderStroke(1.dp, Slate200),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "暂无待核对交易",
+                            fontSize = 12.sp,
+                            color = Slate400,
+                            modifier = Modifier.padding(12.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
                     }
                 }
             }
