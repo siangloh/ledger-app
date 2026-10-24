@@ -191,20 +191,175 @@ private fun expenseSlices(data: JSONObject, includeTransfer: Boolean): List<Donu
 }
 
 @Composable
+private fun expensePlatformSlices(data: JSONObject): List<DonutSliceData> {
+    val unknown = stringResource(R.string.cf_unknown)
+    val rows = data.rows("expense_platforms").sortedByDescending { it.optDouble("amount", 0.0) }
+    val total = rows.sumOf { it.optDouble("amount", 0.0).coerceAtLeast(0.0) }
+    return rows.mapIndexed { idx, group ->
+        val raw = group.optString("label")
+        val amt = group.optDouble("amount", 0.0)
+        val pct = if (total > 0) amt / total * 100.0 else 0.0
+        DonutSliceData(
+            label = if (raw.isBlank() || raw == "null") unknown else raw,
+            amount = amt,
+            percent = pct,
+            color = ChartPalette[idx % ChartPalette.size],
+            iconEmoji = CategoryUiHelper.getCategoryEmoji(raw, "expense"),
+            transactionIds = group.optJSONArray("transaction_ids")
+                ?.let { arr -> (0 until arr.length()).map { arr.getInt(it) } } ?: emptyList(),
+            key = raw,
+            incomePercent = if (group.isNull("income_percent")) null else group.optDouble("income_percent")
+        )
+    }
+}
+
+@Composable
 private fun incomeSlices(data: JSONObject): List<DonutSliceData> {
     val unknown = stringResource(R.string.cf_unknown)
     return data.rows("income_platforms").sortedByDescending { it.optDouble("amount", 0.0) }.mapIndexed { idx, group ->
         val raw = group.optString("label")
+        val pct = if (group.has("income_percent")) group.optDouble("income_percent", 0.0) else group.optDouble("total_percent", 0.0)
         DonutSliceData(
             label = if (raw.isBlank() || raw == "null") unknown else raw,
             amount = group.optDouble("amount", 0.0),
-            percent = group.optDouble("income_percent", 0.0),
+            percent = pct,
             color = ChartPalette[idx % ChartPalette.size],
             iconEmoji = CategoryUiHelper.getCategoryEmoji(raw, "income"),
             transactionIds = group.optJSONArray("transaction_ids")
                 ?.let { arr -> (0 until arr.length()).map { arr.getInt(it) } } ?: emptyList(),
             key = raw
         )
+    }
+}
+
+private data class PlatformFlowItem(
+    val platform: String,
+    val inflow: Double,
+    val outflow: Double,
+    val net: Double,
+    val inTxIds: List<Int>,
+    val outTxIds: List<Int>
+)
+
+@Composable
+private fun PlatformCashflowCard(
+    data: JSONObject,
+    currency: String,
+    onItemClick: (TxSelection) -> Unit
+) {
+    val incRows = data.rows("income_platforms")
+    val expRows = data.rows("expense_platforms")
+    val allNames = (incRows.map { it.optString("label") } + expRows.map { it.optString("label") })
+        .filter { it.isNotBlank() && it != "null" }
+        .distinct()
+
+    if (allNames.isEmpty()) return
+
+    val incMap = incRows.associateBy { it.optString("label") }
+    val expMap = expRows.associateBy { it.optString("label") }
+
+    val items = allNames.map { name ->
+        val incObj = incMap[name]
+        val expObj = expMap[name]
+        val inflow = incObj?.optDouble("amount", 0.0) ?: 0.0
+        val outflow = expObj?.optDouble("amount", 0.0) ?: 0.0
+        val inIds = incObj?.optJSONArray("transaction_ids")?.let { arr -> (0 until arr.length()).map { arr.getInt(it) } } ?: emptyList()
+        val outIds = expObj?.optJSONArray("transaction_ids")?.let { arr -> (0 until arr.length()).map { arr.getInt(it) } } ?: emptyList()
+        PlatformFlowItem(
+            platform = name,
+            inflow = inflow,
+            outflow = outflow,
+            net = inflow - outflow,
+            inTxIds = inIds,
+            outTxIds = outIds
+        )
+    }.sortedByDescending { it.inflow + it.outflow }
+
+    SectionCard(
+        title = stringResource(R.string.cf_platform_summary),
+        trailing = stringResource(R.string.cf_platform_count, items.size)
+    ) {
+        Text(stringResource(R.string.cf_platform_summary_hint), fontSize = 12.sp, color = Slate500)
+        items.forEach { item ->
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable {
+                        onItemClick(TxSelection(item.platform, item.inTxIds + item.outTxIds))
+                    },
+                color = Slate50,
+                border = BorderStroke(1.dp, Slate200),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                            Box(
+                                Modifier.size(34.dp).clip(CircleShape).background(Teal50),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(CategoryUiHelper.getCategoryEmoji(item.platform, "platform").ifEmpty { "💳" }, fontSize = 16.sp)
+                            }
+                            Column {
+                                Text(item.platform, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate900, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                val netSign = if (item.net >= 0) "+" else ""
+                                Text(
+                                    stringResource(R.string.cf_net_flow) + ": " + netSign + formatMoney(currency, item.net),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (item.net >= 0) IncomeGreen else ExpenseRed
+                                )
+                            }
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(stringResource(R.string.cf_money_in), fontSize = 11.sp, color = Slate400)
+                                Text("+" + formatMoney(currency, item.inflow), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = IncomeGreen)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(stringResource(R.string.cf_money_out), fontSize = 11.sp, color = Slate400)
+                                Text("-" + formatMoney(currency, item.outflow), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ExpenseRed)
+                            }
+                        }
+                        Spacer(Modifier.width(2.dp))
+                        Icon(Icons.Default.ChevronRight, null, Modifier.size(16.dp), tint = Slate400)
+                    }
+
+                    val totalFlow = item.inflow + item.outflow
+                    if (totalFlow > 0) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Slate200)
+                        ) {
+                            if (item.inflow > 0) {
+                                Box(
+                                    Modifier
+                                        .weight((item.inflow / totalFlow).toFloat().coerceAtLeast(0.01f))
+                                        .fillMaxHeight()
+                                        .background(IncomeGreen)
+                                )
+                            }
+                            if (item.outflow > 0) {
+                                Box(
+                                    Modifier
+                                        .weight((item.outflow / totalFlow).toFloat().coerceAtLeast(0.01f))
+                                        .fillMaxHeight()
+                                        .background(ExpenseRed)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -781,6 +936,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
     val pager = rememberPagerState(pageCount = { detailPages.size })
     var includeTransfer by rememberSaveable { mutableStateOf(false) }
     var showCharts by rememberSaveable { mutableStateOf(false) }
+    var expenseViewMode by rememberSaveable { mutableIntStateOf(0) }
 
     LaunchedEffect(month, currency, refresh) {
         result = CashflowRepository.getCached(context, month, currency)
@@ -961,25 +1117,22 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                 CashflowDashboardTab.EXPENSE -> {
                                     item {
                                         val transfer = transferAmount(data)
+                                        val isPlatformMode = expenseViewMode == 1
                                         BreakdownCard(
                                             title = stringResource(R.string.cfd_expense_title),
                                             totalLabel = if (includeTransfer) stringResource(R.string.cf_donut_center_expense) else stringResource(R.string.cfu_consumption),
                                             currency = cur,
-                                            slices = expenseSlices(data, includeTransfer),
-                                            unitLabel = stringResource(R.string.cfu_categories),
+                                            slices = if (isPlatformMode) expensePlatformSlices(data) else expenseSlices(data, includeTransfer),
+                                            unitLabel = if (isPlatformMode) stringResource(R.string.cfu_platforms) else stringResource(R.string.cfu_categories),
                                             showIncomeShare = true,
-                                            prevMap = prevCategoryAmounts(prev),
-                                            headerExtra = if (transfer > 0) {
-                                                {
-                                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                                        Text(
-                                                            stringResource(R.string.cfu_transfers) + " " + formatMoney(cur, transfer),
-                                                            fontSize = 12.sp, color = Slate500
-                                                        )
+                                            prevMap = if (isPlatformMode) emptyMap() else prevCategoryAmounts(prev),
+                                            headerExtra = {
+                                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                         FilterChip(
-                                                            selected = includeTransfer,
-                                                            onClick = { includeTransfer = !includeTransfer },
-                                                            label = { Text(stringResource(R.string.cfu_include_transfers)) },
+                                                            selected = expenseViewMode == 0,
+                                                            onClick = { expenseViewMode = 0 },
+                                                            label = { Text(stringResource(R.string.cf_by_category)) },
                                                             colors = FilterChipDefaults.filterChipColors(
                                                                 containerColor = Color.White,
                                                                 labelColor = Slate700,
@@ -988,17 +1141,66 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                                             ),
                                                             border = FilterChipDefaults.filterChipBorder(
                                                                 enabled = true,
-                                                                selected = includeTransfer,
+                                                                selected = expenseViewMode == 0,
+                                                                borderColor = Slate200,
+                                                                selectedBorderColor = PrimaryTeal,
+                                                                borderWidth = 1.dp
+                                                            )
+                                                        )
+                                                        FilterChip(
+                                                            selected = expenseViewMode == 1,
+                                                            onClick = { expenseViewMode = 1 },
+                                                            label = { Text(stringResource(R.string.cf_by_platform)) },
+                                                            colors = FilterChipDefaults.filterChipColors(
+                                                                containerColor = Color.White,
+                                                                labelColor = Slate700,
+                                                                selectedContainerColor = Teal50,
+                                                                selectedLabelColor = PrimaryTeal
+                                                            ),
+                                                            border = FilterChipDefaults.filterChipBorder(
+                                                                enabled = true,
+                                                                selected = expenseViewMode == 1,
                                                                 borderColor = Slate200,
                                                                 selectedBorderColor = PrimaryTeal,
                                                                 borderWidth = 1.dp
                                                             )
                                                         )
                                                     }
+                                                    if (!isPlatformMode && transfer > 0) {
+                                                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                            Text(
+                                                                stringResource(R.string.cfu_transfers) + " " + formatMoney(cur, transfer),
+                                                                fontSize = 12.sp, color = Slate500
+                                                            )
+                                                            FilterChip(
+                                                                selected = includeTransfer,
+                                                                onClick = { includeTransfer = !includeTransfer },
+                                                                label = { Text(stringResource(R.string.cfu_include_transfers)) },
+                                                                colors = FilterChipDefaults.filterChipColors(
+                                                                    containerColor = Color.White,
+                                                                    labelColor = Slate700,
+                                                                    selectedContainerColor = Teal50,
+                                                                    selectedLabelColor = PrimaryTeal
+                                                                ),
+                                                                border = FilterChipDefaults.filterChipBorder(
+                                                                    enabled = true,
+                                                                    selected = includeTransfer,
+                                                                    borderColor = Slate200,
+                                                                    selectedBorderColor = PrimaryTeal,
+                                                                    borderWidth = 1.dp
+                                                                )
+                                                            )
+                                                        }
+                                                    }
                                                 }
-                                            } else null,
+                                            },
                                             onItemClick = { selection = it }
                                         )
+                                    }
+                                    if (expenseViewMode == 1) {
+                                        item {
+                                            PlatformCashflowCard(data, cur, onItemClick = { selection = it })
+                                        }
                                     }
                                     item {
                                         TextButton(onClick = { showCharts = !showCharts }, modifier = Modifier.fillMaxWidth()) {
@@ -1024,6 +1226,9 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                             },
                                             onItemClick = { selection = it }
                                         )
+                                    }
+                                    item {
+                                        PlatformCashflowCard(data, cur, onItemClick = { selection = it })
                                     }
                                 }
 
@@ -1133,7 +1338,11 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
     selection?.let { sel ->
         val cur = result?.data?.optString("currency") ?: ""
         val txs = result?.data?.rows("transactions")?.filter { it.optInt("id") in sel.ids } ?: emptyList()
-        val sum = txs.sumOf { it.optDouble("amount", 0.0) }
+        val inTxs = txs.filter { it.optString("type") == "income" }
+        val outTxs = txs.filter { it.optString("type") != "income" }
+        val inSum = inTxs.sumOf { it.optDouble("amount", 0.0) }
+        val outSum = outTxs.sumOf { it.optDouble("amount", 0.0) }
+        val net = inSum - outSum
         ModalBottomSheet(onDismissRequest = { selection = null }, containerColor = Color.White) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -1141,7 +1350,24 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                         Text(sel.title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
                         Text(stringResource(R.string.cfu_tx_count, txs.size), fontSize = 12.sp, color = Slate500)
                     }
-                    Text(formatMoney(cur, sum), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = PrimaryTeal)
+                    if (inSum > 0 && outSum > 0) {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                (if (net >= 0) "+" else "") + formatMoney(cur, net),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (net >= 0) IncomeGreen else ExpenseRed
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("+" + formatMoney(cur, inSum), fontSize = 11.sp, color = IncomeGreen, fontWeight = FontWeight.SemiBold)
+                                Text("-" + formatMoney(cur, outSum), fontSize = 11.sp, color = ExpenseRed, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    } else if (inSum > 0) {
+                        Text("+" + formatMoney(cur, inSum), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = IncomeGreen)
+                    } else {
+                        Text("-" + formatMoney(cur, outSum), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = ExpenseRed)
+                    }
                 }
                 if (txs.isEmpty()) {
                     Text(stringResource(R.string.cf_empty), fontSize = 13.sp, color = Slate500)

@@ -102,6 +102,14 @@
         <span class="acc-detail-val">{{ type_labels.get(a.type, a.type) }}</span>
       </div>
       {% endif %}
+      <div class="acc-detail-item">
+        <span class="acc-detail-label">{{ t('accounts.income_sum', '累计进账') }}</span>
+        <span class="acc-detail-val" style="color:#059669; font-weight:600;">+{{ "%.2f" | format(a.income_sum|default(0.0)) }} {{ a.currency or current_user_currency_code|default('MYR') }}</span>
+      </div>
+      <div class="acc-detail-item">
+        <span class="acc-detail-label">{{ t('accounts.expense_sum', '累计出账') }}</span>
+        <span class="acc-detail-val" style="color:#e11d48; font-weight:600;">-{{ "%.2f" | format(a.expense_sum|default(0.0)) }} {{ a.currency or current_user_currency_code|default('MYR') }}</span>
+      </div>
       <div class="acc-detail-item acc-balance-highlight">
         <span class="acc-detail-label">{% if a.type == 'credit_card' %}{{ t('accounts.credit_card_balance') }}{% else %}{{ t('accounts.system_balance') }}{% endif %}</span>
         <span class="acc-detail-val acc-balance-val {% if a.type != 'credit_card' and a.system_balance < 0 %}negative{% endif %}">

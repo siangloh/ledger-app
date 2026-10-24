@@ -307,6 +307,8 @@ def accounts_page():
         flow = flow_map.get(a['id'])
         inc = float(flow['income_sum']) if flow else 0.0
         exp = float(flow['expense_sum']) if flow else 0.0
+        a['income_sum'] = inc
+        a['expense_sum'] = exp
         if a['type'] == 'credit_card':
             a['system_balance'] = round(max(0.0, exp - inc), 2)
         else:

@@ -60,7 +60,9 @@ data class AccountRecord(
     val dueDay: Int?,
     val lastReconciledAt: String? = null,
     val reconciledBalance: Double? = null,
-    val unreconciledCount: Int = 0
+    val unreconciledCount: Int = 0,
+    val monthlyInflow: Double = 0.0,
+    val monthlyOutflow: Double = 0.0
 )
 
 data class ReconcileTxItem(
@@ -450,7 +452,9 @@ object NativeLedgerApi {
                     dueDay = if (obj.has("due_day") && !obj.isNull("due_day")) obj.optInt("due_day") else null,
                     lastReconciledAt = if (obj.has("last_reconciled_at") && !obj.isNull("last_reconciled_at")) obj.optString("last_reconciled_at") else null,
                     reconciledBalance = if (obj.has("reconciled_balance") && !obj.isNull("reconciled_balance")) obj.optDouble("reconciled_balance") else null,
-                    unreconciledCount = obj.optInt("unreconciled_count", 0)
+                    unreconciledCount = obj.optInt("unreconciled_count", 0),
+                    monthlyInflow = obj.optDouble("monthly_inflow", obj.optDouble("income_sum", 0.0)),
+                    monthlyOutflow = obj.optDouble("monthly_outflow", obj.optDouble("expense_sum", 0.0))
                 )
             )
         }

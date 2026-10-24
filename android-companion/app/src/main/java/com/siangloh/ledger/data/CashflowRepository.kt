@@ -87,22 +87,28 @@ object CashflowRepository {
         var inc = 0.0
         var exp = 0.0
 
-        val expMap = mutableMapOf<String, Pair<Double, MutableList<Int>>>()
-        val incMap = mutableMapOf<String, Pair<Double, MutableList<Int>>>()
+        val expCategoriesMap = mutableMapOf<String, Pair<Double, MutableList<Int>>>()
+        val expPlatformMap = mutableMapOf<String, Pair<Double, MutableList<Int>>>()
+        val incPlatformMap = mutableMapOf<String, Pair<Double, MutableList<Int>>>()
         val dailyMap = mutableMapOf<String, Double>()
         val txArray = org.json.JSONArray()
 
         for (tx in txList) {
             val amt = tx.amount
+            val platformName = accounts[tx.accountId]?.name ?: "未指定账户"
             if (tx.type == "expense") {
                 exp += amt
-                val entry = expMap.getOrPut(tx.category) { Pair(0.0, mutableListOf()) }
-                expMap[tx.category] = Pair(entry.first + amt, entry.second.apply { add(tx.id.toInt()) })
+                val entry = expCategoriesMap.getOrPut(tx.category) { Pair(0.0, mutableListOf()) }
+                expCategoriesMap[tx.category] = Pair(entry.first + amt, entry.second.apply { add(tx.id.toInt()) })
+
+                val pEntry = expPlatformMap.getOrPut(platformName) { Pair(0.0, mutableListOf()) }
+                expPlatformMap[platformName] = Pair(pEntry.first + amt, pEntry.second.apply { add(tx.id.toInt()) })
+
                 dailyMap[tx.date] = (dailyMap[tx.date] ?: 0.0) + amt
             } else if (tx.type == "income") {
                 inc += amt
-                val entry = incMap.getOrPut(tx.category) { Pair(0.0, mutableListOf()) }
-                incMap[tx.category] = Pair(entry.first + amt, entry.second.apply { add(tx.id.toInt()) })
+                val pEntry = incPlatformMap.getOrPut(platformName) { Pair(0.0, mutableListOf()) }
+                incPlatformMap[platformName] = Pair(pEntry.first + amt, pEntry.second.apply { add(tx.id.toInt()) })
             }
 
             txArray.put(JSONObject().apply {
@@ -113,14 +119,14 @@ object CashflowRepository {
                 put("note", tx.note)
                 put("category", tx.category)
                 put("channel", tx.channel ?: "")
-                put("account_name", accounts[tx.accountId]?.name ?: "默认账户")
+                put("account_name", platformName)
             })
         }
 
         val avail = inc - exp
 
         val expCategories = org.json.JSONArray()
-        for ((cat, pair) in expMap.entries.sortedByDescending { it.value.first }) {
+        for ((cat, pair) in expCategoriesMap.entries.sortedByDescending { it.value.first }) {
             val amt = pair.first
             val ids = pair.second
             expCategories.put(JSONObject().apply {
@@ -134,14 +140,29 @@ object CashflowRepository {
         }
 
         val incPlatforms = org.json.JSONArray()
-        for ((cat, pair) in incMap.entries.sortedByDescending { it.value.first }) {
+        for ((plat, pair) in incPlatformMap.entries.sortedByDescending { it.value.first }) {
             val amt = pair.first
             val ids = pair.second
             incPlatforms.put(JSONObject().apply {
-                put("key", cat)
-                put("label", cat)
+                put("key", plat)
+                put("label", plat)
                 put("amount", amt)
                 put("income_percent", if (inc > 0) amt / inc * 100.0 else 0.0)
+                val idArr = org.json.JSONArray()
+                ids.forEach { idArr.put(it) }
+                put("transaction_ids", idArr)
+            })
+        }
+
+        val expPlatforms = org.json.JSONArray()
+        for ((plat, pair) in expPlatformMap.entries.sortedByDescending { it.value.first }) {
+            val amt = pair.first
+            val ids = pair.second
+            expPlatforms.put(JSONObject().apply {
+                put("key", plat)
+                put("label", plat)
+                put("amount", amt)
+                put("total_percent", if (exp > 0) amt / exp * 100.0 else 0.0)
                 val idArr = org.json.JSONArray()
                 ids.forEach { idArr.put(it) }
                 put("transaction_ids", idArr)
@@ -216,6 +237,7 @@ object CashflowRepository {
             put("transactions", txArray)
             put("expense_categories", expCategories)
             put("income_platforms", incPlatforms)
+            put("expense_platforms", expPlatforms)
             put("bills", billsArray)
             put("prior_overdue", org.json.JSONArray())
             put("scheduled_transactions", org.json.JSONArray())

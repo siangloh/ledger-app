@@ -480,5 +480,13 @@
     <string name="cfd_show_method">Cara angka ini dikira ↓</string>
     <string name="cfd_hide_method">Sembunyikan nota pengiraan ↑</string>
     <string name="overview_open_settings">Buka tetapan</string>
+    <string name="cf_platform_summary">Ringkasan Aliran Tunai Platform</string>
+    <string name="cf_platform_summary_hint">Aliran masuk, keluar dan perubahan bersih mengikut akaun/platform</string>
+    <string name="cf_net_flow">Bersih</string>
+    <string name="cf_money_in">Masuk</string>
+    <string name="cf_money_out">Keluar</string>
+    <string name="cf_by_category">Mengikut Kategori</string>
+    <string name="cf_by_platform">Mengikut Platform</string>
+    <string name="cf_platform_count">%1$d platform</string>
 </resources>
 

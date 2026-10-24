@@ -414,11 +414,20 @@ object LocalLedgerRepository {
             val db = AppDatabase.getInstance(context)
             val localAccs = db.localAccountDao().getAll()
             val allTxs = db.localTransactionDao().getAll()
+            val currentMonthPrefix = java.text.SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(java.util.Date())
+            val thisMonthTxs = allTxs.filter { it.date.startsWith(currentMonthPrefix) }
 
             val accountRecords = localAccs.map { a ->
                 val unreconciled = allTxs.count {
                     (it.accountId == a.id || it.toAccountId == a.id) && !it.tags.contains("#reconciled")
                 }
+                val inAmt = thisMonthTxs.filter {
+                    (it.accountId == a.id && it.type == "income") || (it.toAccountId == a.id && it.type == "transfer")
+                }.sumOf { it.amount }
+                val outAmt = thisMonthTxs.filter {
+                    it.accountId == a.id && (it.type == "expense" || it.type == "transfer")
+                }.sumOf { it.amount }
+
                 AccountRecord(
                     id = a.id,
                     name = a.name,
@@ -428,7 +437,9 @@ object LocalLedgerRepository {
                     currency = a.currency,
                     statementDay = null,
                     dueDay = null,
-                    unreconciledCount = unreconciled
+                    unreconciledCount = unreconciled,
+                    monthlyInflow = inAmt,
+                    monthlyOutflow = outAmt
                 )
             }
 

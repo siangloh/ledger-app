@@ -480,5 +480,13 @@
     <string name="cfd_show_method">查看统计口径 ↓</string>
     <string name="cfd_hide_method">收起统计说明 ↑</string>
     <string name="overview_open_settings">打开设置</string>
+    <string name="cf_platform_summary">平台账户出入汇总</string>
+    <string name="cf_platform_summary_hint">统计各账户／平台的进账、出账与净变化</string>
+    <string name="cf_net_flow">净结余</string>
+    <string name="cf_money_in">进</string>
+    <string name="cf_money_out">出</string>
+    <string name="cf_by_category">按分类</string>
+    <string name="cf_by_platform">按平台</string>
+    <string name="cf_platform_count">%1$d 个平台</string>
 </resources>
 

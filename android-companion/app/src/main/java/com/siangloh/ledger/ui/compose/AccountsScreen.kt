@@ -361,102 +361,145 @@ fun AccountCard(
             .fillMaxWidth()
             .clickable { onReconcile(account) }
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(16.dp)
         ) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(Slate100, CircleShape),
-                    contentAlignment = Alignment.Center
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text(text = icon, fontSize = 22.sp)
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = account.name,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Slate900
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(Slate100, CircleShape),
+                        contentAlignment = Alignment.Center
                     ) {
+                        Text(text = icon, fontSize = 22.sp)
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
                         Text(
-                            text = typeName,
-                            fontSize = 11.sp,
-                            color = Slate400
+                            text = account.name,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate900
                         )
-                        if (account.lastReconciledAt != null) {
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = IncomeGreen.copy(alpha = 0.1f)
-                            ) {
-                                Text(
-                                    text = "✓ " + stringResource(R.string.reconciled_badge),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = IncomeGreen,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                )
-                            }
-                        } else {
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = Amber500.copy(alpha = 0.12f)
-                            ) {
-                                Text(
-                                    text = "⚖️ " + stringResource(R.string.unreconciled_badge, account.unreconciledCount),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Amber700,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = typeName,
+                                fontSize = 11.sp,
+                                color = Slate400
+                            )
+                            if (account.lastReconciledAt != null) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = IncomeGreen.copy(alpha = 0.1f)
+                                ) {
+                                    Text(
+                                        text = "✓ " + stringResource(R.string.reconciled_badge),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = IncomeGreen,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            } else {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = Amber500.copy(alpha = 0.12f)
+                                ) {
+                                    Text(
+                                        text = "⚖️ " + stringResource(R.string.unreconciled_badge, account.unreconciledCount),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Amber700,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "${account.currency} ${String.format(Locale.US, "%,.2f", account.balance)}",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (account.type == "credit_card") Rose500 else Slate900
+                    )
+                    if (account.type == "credit_card" && account.creditLimit > 0) {
+                        Text(
+                            text = "${stringResource(R.string.credit_limit_label)}: ${String.format(Locale.US, "%.0f", account.creditLimit)}",
+                            fontSize = 10.sp,
+                            color = Slate400
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = { onReconcile(account) },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.heightIn(min = 32.dp),
+                        border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = "⚖️ " + stringResource(R.string.reconcile_btn),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PrimaryTeal
+                        )
+                    }
+                }
             }
 
-            Column(horizontalAlignment = Alignment.End) {
+            // 本月平台出入账统计
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(color = Slate100, thickness = 0.8.dp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "${account.currency} ${String.format(Locale.US, "%,.2f", account.balance)}",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (account.type == "credit_card") Rose500 else Slate900
+                    text = "本月出入统计",
+                    fontSize = 11.sp,
+                    color = Slate400
                 )
-                if (account.type == "credit_card" && account.creditLimit > 0) {
-                    Text(
-                        text = "${stringResource(R.string.credit_limit_label)}: ${String.format(Locale.US, "%.0f", account.creditLimit)}",
-                        fontSize = 10.sp,
-                        color = Slate400
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                OutlinedButton(
-                    onClick = { onReconcile(account) },
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    modifier = Modifier.heightIn(min = 32.dp),
-                    border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(8.dp)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "⚖️ " + stringResource(R.string.reconcile_btn),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = PrimaryTeal
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("进 ", fontSize = 11.sp, color = Slate400)
+                        Text(
+                            text = "+${account.currency} ${String.format(Locale.US, "%,.2f", account.monthlyInflow)}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = IncomeGreen
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("出 ", fontSize = 11.sp, color = Slate400)
+                        Text(
+                            text = "-${account.currency} ${String.format(Locale.US, "%,.2f", account.monthlyOutflow)}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (account.monthlyOutflow > 0) ExpenseRed else Slate600
+                        )
+                    }
                 }
             }
         }
