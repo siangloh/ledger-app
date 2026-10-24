@@ -195,8 +195,20 @@ object LocalLedgerRepository {
             db.localAccountDao().updateBalance(matchedAccount.id, delta)
         }
 
-        NativeLedgerApi.invalidateCache()
+        notifyDataChanged(context)
         return id
+    }
+
+    fun notifyDataChanged(context: Context) {
+        try {
+            LocalDataStore.clearOverviewCache(context)
+            CashflowRepository.invalidate(context)
+            NativeLedgerApi.invalidateCache()
+            val intent = android.content.Intent("com.siangloh.ledger.DATA_SYNCED").setPackage(context.packageName)
+            context.sendBroadcast(intent)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to notify data changed: ${e.message}")
+        }
     }
 
     suspend fun recordNotificationTransaction(context: Context, parsed: LocalParsedResult): Long = withContext(Dispatchers.IO) {
@@ -246,7 +258,7 @@ object LocalLedgerRepository {
                 db.localAccountDao().updateBalance(toAccountId, amount)
             }
 
-            NativeLedgerApi.invalidateCache()
+            notifyDataChanged(context)
             Result.success(id)
         } catch (e: Exception) {
             Log.e(TAG, "createTransaction failed: ${e.message}", e)
@@ -302,7 +314,7 @@ object LocalLedgerRepository {
                 db.localAccountDao().updateBalance(toAccountId, amount)
             }
 
-            NativeLedgerApi.invalidateCache()
+            notifyDataChanged(context)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -329,8 +341,7 @@ object LocalLedgerRepository {
                 db.pendingTransactionDao().deleteById(id)
             } catch (_: Exception) {}
 
-            CashflowRepository.invalidate(context)
-            NativeLedgerApi.invalidateCache()
+            notifyDataChanged(context)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -341,7 +352,7 @@ object LocalLedgerRepository {
         try {
             val db = AppDatabase.getInstance(context)
             db.localTransactionDao().updateCategory(id, category)
-            NativeLedgerApi.invalidateCache()
+            notifyDataChanged(context)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

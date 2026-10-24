@@ -83,6 +83,14 @@ object LocalDataStore {
         }
     }
 
+    fun clearOverviewCache(context: Context) {
+        try {
+            context.getSharedPreferences(PREF_OVERVIEW, Context.MODE_PRIVATE).edit().clear().apply()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to clear overview cache: ${e.message}")
+        }
+    }
+
     // -------------------------------------------------------------------------
     // 2. 流水明细持久化与新鲜度 (Records Cache)
     // -------------------------------------------------------------------------

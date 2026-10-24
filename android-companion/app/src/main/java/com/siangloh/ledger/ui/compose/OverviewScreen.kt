@@ -347,19 +347,9 @@ fun OverviewScreen(
     var showUncategorizedSheet by remember { mutableStateOf(false) }
     var selectedTxForCategorize by remember { mutableStateOf<TransactionItem?>(null) }
 
-    // U5: 在 ON_RESUME 生命周期动态感知并实时刷新悬浮窗权限与通知监听权限
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                isListeningActual = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
+    // Real-time revision state to refresh CashflowSummaryCard whenever data changes locally
+    var localRevision by remember { mutableIntStateOf(0) }
+
 
     fun prefetchAdjacentOverview(targetMonth: String, currentPeriod: String) {
         if (currentPeriod != "month") return
@@ -502,6 +492,22 @@ fun OverviewScreen(
         refreshData(forceRefresh = false)
     }
 
+    // U5: 在 ON_RESUME 生命周期动态感知并实时刷新权限与概览数据（支持在其他 Tab 删改交易后切回概览实时生效）
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isListeningActual = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
+                localRevision++
+                refreshData(forceRefresh = true)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     // 监听后台定期全量同步广播 (DATA_SYNCED) 与同步队列完成广播 (SYNC_COMPLETED)，静默从本地存储更新 UI
     DisposableEffect(period, currentMonthStr) {
         val filter = android.content.IntentFilter().apply {
@@ -510,14 +516,8 @@ fun OverviewScreen(
         }
         val receiver = object : android.content.BroadcastReceiver() {
             override fun onReceive(ctx: android.content.Context?, intent: android.content.Intent?) {
-                val username = NetworkHelper.getUsername(context)
-                val newCachedJson = com.siangloh.ledger.data.LocalDataStore.getOverview(context, username, period, currentMonthStr)
-                if (!newCachedJson.isNullOrBlank()) {
-                    try {
-                        overviewData = parseOverviewJson(newCachedJson, isListeningActual, isOfflineCache = false)
-                        isLoading = false
-                    } catch (_: Exception) {}
-                }
+                localRevision++
+                refreshData(forceRefresh = true)
             }
         }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -626,7 +626,7 @@ fun OverviewScreen(
                 }
             } else {
                 if (period == "month") {
-                    item { CashflowSummaryCard(currentMonthStr, cashflowRevision) { onNavigateToCashflow(currentMonthStr) } }
+                    item { CashflowSummaryCard(currentMonthStr, cashflowRevision + localRevision) { onNavigateToCashflow(currentMonthStr) } }
                 } else {
                     item {
                         SpendingHeroCard(
