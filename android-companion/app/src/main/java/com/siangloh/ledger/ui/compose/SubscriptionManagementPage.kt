@@ -9,6 +9,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.siangloh.ledger.R
+import androidx.compose.foundation.ExperimentalFoundationApi
 import com.siangloh.ledger.data.FixedIncomeRecord
 import com.siangloh.ledger.data.NativeLedgerApi
 import com.siangloh.ledger.data.SubscriptionRecord
@@ -40,7 +43,7 @@ import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.launch
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SubscriptionManagementPage(
     subscriptions: List<SubscriptionRecord>,
@@ -51,7 +54,7 @@ fun SubscriptionManagementPage(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var selectedTab by remember { mutableStateOf(0) } // 0: 固定支出, 1: 固定收入
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
     var editingSub by remember { mutableStateOf<SubscriptionRecord?>(null) }
     var showAddSubDialog by remember { mutableStateOf(false) }
 
@@ -67,7 +70,7 @@ fun SubscriptionManagementPage(
                 TopAppBar(
                     title = {
                         Text(
-                            text = if (selectedTab == 0) "固定支出与订阅" else "固定收入计划",
+                            text = if (pagerState.currentPage == 0) "固定支出与订阅" else "固定收入计划",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate900
@@ -84,12 +87,12 @@ fun SubscriptionManagementPage(
                     },
                     actions = {
                         IconButton(onClick = {
-                            if (selectedTab == 0) showAddSubDialog = true else showAddIncomeDialog = true
+                            if (pagerState.currentPage == 0) showAddSubDialog = true else showAddIncomeDialog = true
                         }) {
                             Icon(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = "添加",
-                                tint = if (selectedTab == 0) PrimaryTeal else IncomeGreen
+                                tint = if (pagerState.currentPage == 0) PrimaryTeal else IncomeGreen
                             )
                         }
                     },
@@ -97,30 +100,38 @@ fun SubscriptionManagementPage(
                 )
 
                 TabRow(
-                    selectedTabIndex = selectedTab,
+                    selectedTabIndex = pagerState.currentPage,
                     containerColor = Color.White,
-                    contentColor = if (selectedTab == 0) PrimaryTeal else IncomeGreen,
+                    contentColor = if (pagerState.currentPage == 0) PrimaryTeal else IncomeGreen,
                     divider = { HorizontalDivider(color = Slate200) }
                 ) {
                     Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
+                        selected = pagerState.currentPage == 0,
+                        onClick = {
+                            scope.launch {
+                                pagerState.animateScrollToPage(0)
+                            }
+                        },
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("固定支出 (${subscriptions.size})", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal)
+                                Text("固定支出 (${subscriptions.size})", fontWeight = if (pagerState.currentPage == 0) FontWeight.Bold else FontWeight.Normal)
                             }
                         }
                     )
                     Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
+                        selected = pagerState.currentPage == 1,
+                        onClick = {
+                            scope.launch {
+                                pagerState.animateScrollToPage(1)
+                            }
+                        },
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("固定收入 (${fixedIncomes.size})", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal)
+                                Text("固定收入 (${fixedIncomes.size})", fontWeight = if (pagerState.currentPage == 1) FontWeight.Bold else FontWeight.Normal)
                             }
                         }
                     )
@@ -129,16 +140,21 @@ fun SubscriptionManagementPage(
         },
         containerColor = Slate50
     ) { paddingValues ->
-        if (selectedTab == 0) {
-            // 固定支出列表
-            val totalCost = subscriptions.sumOf { it.cost }
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) { page ->
+            if (page == 0) {
+                // 固定支出列表
+                val totalCost = subscriptions.sumOf { it.cost }
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                 item {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -264,16 +280,15 @@ fun SubscriptionManagementPage(
                     }
                 }
             }
-        } else {
-            // 固定收入列表
-            val totalIncome = fixedIncomes.filter { it.isActive }.sumOf { it.amount }
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+            } else {
+                // 固定收入列表
+                val totalIncome = fixedIncomes.filter { it.isActive }.sumOf { it.amount }
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                 item {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -476,6 +491,7 @@ fun SubscriptionManagementPage(
             }
         }
     }
+}
 
     // 新增/编辑订阅子弹窗
     val activeSub = editingSub
