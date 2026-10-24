@@ -622,7 +622,6 @@ private fun BreakdownCard(
     headerExtra: (@Composable ColumnScope.() -> Unit)? = null,
     onItemClick: (TxSelection) -> Unit
 ) {
-    var showDistribution by rememberSaveable { mutableStateOf(false) }
     var selectedIndex by remember(slices.size) { mutableStateOf<Int?>(null) }
     val total = slices.sumOf { it.amount.coerceAtLeast(0.0) }
     SectionCard(title = title, trailing = totalLabel + " " + formatMoney(currency, total)) {
@@ -631,6 +630,26 @@ private fun BreakdownCard(
             Text(stringResource(R.string.cf_empty), style = MaterialTheme.typography.bodyMedium, color = Slate500)
             return@SectionCard
         }
+
+        // 常驻在顶部展示占比图，无需用户额外点击展开
+        val active = selectedIndex?.let { slices.getOrNull(it) }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            CashflowDonutChart(
+                slices = slices,
+                centerTitle = active?.label ?: totalLabel,
+                centerValue = formatMoney(currency, active?.amount ?: total),
+                centerSubtitle = active?.let { formatPct(it.percent) } ?: "${slices.size} $unitLabel",
+                chartSize = 210.dp,
+                strokeWidth = 26.dp,
+                selectedSliceIndex = selectedIndex
+            )
+        }
+
         Text(stringResource(if (showIncomeShare) R.string.cfd_expense_basis else R.string.cfd_income_basis), fontSize = 12.sp, color = Slate600)
         Text(stringResource(R.string.cfu_tap_details), fontSize = 12.sp, color = Slate500)
         val maxAmt = slices.maxOf { it.amount }
@@ -645,21 +664,6 @@ private fun BreakdownCard(
                     if (s.transactionIds.isNotEmpty()) onItemClick(TxSelection(s.label, s.transactionIds))
                 }
             )
-        }
-        TextButton(onClick = { showDistribution = !showDistribution }) {
-            Text(stringResource(if (showDistribution) R.string.cfd_hide_distribution else R.string.cfd_show_distribution))
-        }
-        if (showDistribution) {
-            val active = selectedIndex?.let { slices.getOrNull(it) }
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                CashflowDonutChart(
-                    slices = slices,
-                    centerTitle = active?.label ?: totalLabel,
-                    centerValue = formatMoney(currency, active?.amount ?: total),
-                    centerSubtitle = active?.let { formatPct(it.percent) } ?: "${slices.size} $unitLabel",
-                    chartSize = 210.dp, strokeWidth = 26.dp, selectedSliceIndex = selectedIndex
-                )
-            }
         }
     }
 }
@@ -777,7 +781,6 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
     val pager = rememberPagerState(pageCount = { detailPages.size })
     var includeTransfer by rememberSaveable { mutableStateOf(false) }
     var showCharts by rememberSaveable { mutableStateOf(false) }
-    var showMethod by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(month, currency, refresh) {
         result = CashflowRepository.getCached(context, month, currency)
@@ -1112,19 +1115,10 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                 }
                             }
                             item {
-                                Column(Modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    TextButton(onClick = { showMethod = !showMethod }) {
-                                        Text(stringResource(if (showMethod) R.string.cfd_hide_method else R.string.cfd_show_method))
-                                    }
-                                    if (showMethod) {
-                                        Text(stringResource(R.string.cf_disclaimer), fontSize = 11.sp, color = Slate500)
-                                        if (data.optBoolean("schedule_estimated")) {
-                                            Text(stringResource(R.string.cf_estimate), fontSize = 11.sp, color = WarningAmber)
-                                        }
-                                    }
+                                Box(Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
                                     Text(
                                         stringResource(R.string.cf_updated) + ": " + reportTime(data.optString("updated_at"), LocalContext.current.resources.configuration.locales[0]),
-                                        fontSize = 11.sp, color = Slate500
+                                        fontSize = 11.sp, color = Slate400
                                     )
                                 }
                             }
