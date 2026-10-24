@@ -27,6 +27,12 @@ interface LocalTransactionDao {
     @Query("SELECT * FROM local_transactions WHERE date LIKE :monthPrefix ORDER BY date DESC, id DESC")
     suspend fun getByMonth(monthPrefix: String): List<LocalTransaction>
 
+    @Query("SELECT * FROM local_transactions WHERE date >= :startDate AND date <= :endDate ORDER BY date DESC, id DESC")
+    suspend fun getByDateRange(startDate: String, endDate: String): List<LocalTransaction>
+
+    @Query("SELECT * FROM local_transactions WHERE date LIKE :yearPrefix ORDER BY date DESC, id DESC")
+    suspend fun getByYear(yearPrefix: String): List<LocalTransaction>
+
     @Query("UPDATE local_transactions SET category = :category, updatedAt = :updatedAt WHERE id = :id")
     suspend fun updateCategory(id: Long, category: String, updatedAt: Long = System.currentTimeMillis())
 

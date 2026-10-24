@@ -97,6 +97,8 @@ data class OverviewData(
     val totalSpending: Double = 0.0,
     val expenseAmount: Double = 0.0,
     val transferAmount: Double = 0.0,
+    val incomeAmount: Double = 0.0,
+    val netSavings: Double = 0.0,
     val uncategorizedCount: Int = 0,
     val uncategorizedAmount: Double = 0.0,
     val uncategorizedItems: List<UncategorizedItem> = emptyList(),
@@ -158,6 +160,12 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
 
         val expenseAmountRaw = if (json.isNull("expense_amount")) 0.0 else json.optDouble("expense_amount", 0.0)
         val expenseAmount = if (expenseAmountRaw.isNaN() || expenseAmountRaw.isInfinite()) 0.0 else expenseAmountRaw
+
+        val incomeRaw = if (json.isNull("income")) 0.0 else json.optDouble("income", 0.0)
+        val incomeAmount = if (incomeRaw.isNaN() || incomeRaw.isInfinite()) 0.0 else incomeRaw
+
+        val netRaw = if (json.isNull("net")) (incomeAmount - totalSpending) else json.optDouble("net", incomeAmount - totalSpending)
+        val netSavings = if (netRaw.isNaN() || netRaw.isInfinite()) (incomeAmount - totalSpending) else netRaw
 
         val transferAmountRaw = if (json.isNull("transfer_amount")) 0.0 else json.optDouble("transfer_amount", 0.0)
         val transferAmount = if (transferAmountRaw.isNaN() || transferAmountRaw.isInfinite()) 0.0 else transferAmountRaw
@@ -272,6 +280,8 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
             totalSpending = totalSpending,
             expenseAmount = expenseAmount,
             transferAmount = transferAmount,
+            incomeAmount = incomeAmount,
+            netSavings = netSavings,
             uncategorizedCount = uncategorizedCount,
             uncategorizedAmount = uncategorizedAmount,
             uncategorizedItems = uncatList,
@@ -405,8 +415,14 @@ fun OverviewScreen(
 
         coroutineScope.launch {
             try {
+                val yr = calendar.get(Calendar.YEAR)
                 val result = withContext(Dispatchers.IO) {
-                    com.siangloh.ledger.data.LocalLedgerRepository.getOverviewJson(context, currentMonthStr).getOrNull()?.toString()
+                    com.siangloh.ledger.data.LocalLedgerRepository.getOverviewJson(
+                        context = context,
+                        month = currentMonthStr,
+                        period = period,
+                        year = yr
+                    ).getOrNull()?.toString()
                 }
 
                 if (result != null) {
@@ -602,11 +618,19 @@ fun OverviewScreen(
                     rangeLabel = displayRangeLabel,
                     onPeriodChanged = { newPeriod -> period = newPeriod },
                     onPrevMonth = {
-                        calendar.add(Calendar.MONTH, -1)
+                        when (period) {
+                            "month" -> calendar.add(Calendar.MONTH, -1)
+                            "3m" -> calendar.add(Calendar.MONTH, -3)
+                            "year" -> calendar.add(Calendar.YEAR, -1)
+                        }
                         currentMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
                     },
                     onNextMonth = {
-                        calendar.add(Calendar.MONTH, 1)
+                        when (period) {
+                            "month" -> calendar.add(Calendar.MONTH, 1)
+                            "3m" -> calendar.add(Calendar.MONTH, 3)
+                            "year" -> calendar.add(Calendar.YEAR, 1)
+                        }
                         currentMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
                     }
                 )
@@ -614,7 +638,7 @@ fun OverviewScreen(
 
             // 3. 内容区局部动态数据：仅在数据为空且加载中时，对特定组件展示骨架屏！
             // 顶栏状态与周期切换 Tab 始终保持可见可交互，杜绝整屏骨架白闪！
-            if (isLoading && overviewData.recentTransactions.isEmpty() && overviewData.totalSpending == 0.0) {
+            if (isLoading && overviewData.recentTransactions.isEmpty() && overviewData.totalSpending == 0.0 && overviewData.incomeAmount == 0.0) {
                 item {
                     SpendingHeroCardSkeleton()
                 }
@@ -625,16 +649,17 @@ fun OverviewScreen(
                     RecentTransactionsSkeleton()
                 }
             } else {
-                if (period == "month") {
-                    item { CashflowSummaryCard(currentMonthStr, cashflowRevision + localRevision) { onNavigateToCashflow(currentMonthStr) } }
-                } else {
-                    item {
-                        SpendingHeroCard(
-                            totalSpending = overviewData.totalSpending,
-                            expenseAmount = overviewData.expenseAmount,
-                            transferAmount = overviewData.transferAmount
-                        )
-                    }
+                item {
+                    UnifiedOverviewHeroCard(
+                        period = period,
+                        rangeLabel = displayRangeLabel,
+                        income = overviewData.incomeAmount,
+                        expense = overviewData.totalSpending,
+                        net = overviewData.netSavings,
+                        onOpenDetail = {
+                            onNavigateToCashflow(currentMonthStr)
+                        }
+                    )
                 }
 
                 if (overviewData.uncategorizedCount > 0) {
@@ -937,20 +962,32 @@ fun PeriodSelector(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 4.dp, vertical = 2.dp),
-                horizontalArrangement = if (period == "month") Arrangement.SpaceBetween else Arrangement.Center,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (period == "month") {
-                    IconButton(
-                        onClick = onPrevMonth,
-                        modifier = Modifier.size(48.dp)
-                    ) {
+                IconButton(
+                    onClick = onPrevMonth,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = stringResource(R.string.prev_month),
+                        tint = Slate700,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    if (period != "month") {
                         Icon(
-                            imageVector = Icons.Default.ChevronLeft,
-                            contentDescription = stringResource(R.string.prev_month),
-                            tint = Slate700,
-                            modifier = Modifier.size(24.dp)
+                            imageVector = if (period == "3m") Icons.Default.DateRange else Icons.Default.CalendarToday,
+                            contentDescription = null,
+                            tint = PrimaryTeal,
+                            modifier = Modifier.size(16.dp)
                         )
+                        Spacer(modifier = Modifier.width(6.dp))
                     }
                     Text(
                         text = rangeLabel,
@@ -959,38 +996,221 @@ fun PeriodSelector(
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
-                    IconButton(
-                        onClick = onNextMonth,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = stringResource(R.string.next_month),
-                            tint = Slate700,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                } else {
+                }
+                IconButton(
+                    onClick = onNextMonth,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = stringResource(R.string.next_month),
+                        tint = Slate700,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private val HeroAvailableColor = Color(0xFF10B981)
+private val HeroExpenseColor = Color(0xFF0F766E)
+private val HeroDangerColor = Color(0xFFEF4444)
+
+@Composable
+fun UnifiedOverviewHeroCard(
+    period: String,
+    rangeLabel: String,
+    income: Double,
+    expense: Double,
+    net: Double,
+    onOpenDetail: () -> Unit
+) {
+    val isPositive = net >= 0
+    val expensePct = if (income > 0) (expense / income * 100.0).coerceIn(0.0, 100.0) else (if (expense > 0) 100.0 else 0.0)
+
+    Card(
+        onClick = onOpenDetail,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = when (period) {
+                        "month" -> "收支详情 · $rangeLabel"
+                        "3m" -> "收支概览 · 近3个月"
+                        "year" -> "年度收支概览 · $rangeLabel"
+                        else -> "收支概览 · $rangeLabel"
+                    },
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = Slate900
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "查看收支详情",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PrimaryTeal
+                    )
+                    Spacer(Modifier.width(2.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = PrimaryTeal,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = when (period) {
+                    "year" -> "年度累计结余 / 净现金流"
+                    "3m" -> "近3个月累计结余"
+                    else -> "扣除预留后预计可用"
+                },
+                fontSize = 12.sp,
+                color = Slate500
+            )
+
+            Text(
+                text = (if (net < 0) "-RM " else "RM ") + String.format(Locale.getDefault(), "%,.2f", Math.abs(net)),
+                fontSize = 26.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (isPositive) PrimaryTeal else ExpenseRed
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("实际总收入", fontSize = 12.sp, color = Slate500)
+                    Text(
+                        text = "+RM " + String.format(Locale.getDefault(), "%,.2f", income),
+                        fontWeight = FontWeight.SemiBold,
+                        color = Slate900
+                    )
+                }
+                Column(Modifier.weight(1f)) {
+                    Text("实际总支出", fontSize = 12.sp, color = Slate500)
+                    Text(
+                        text = "-RM " + String.format(Locale.getDefault(), "%,.2f", expense),
+                        fontWeight = FontWeight.SemiBold,
+                        color = Slate900
+                    )
+                }
+            }
+
+            if (income > 0 || expense > 0) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(HeroExpenseColor)
+                            )
+                            Text(
+                                "已用: RM " + String.format(Locale.getDefault(), "%,.2f", expense),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Slate800
+                            )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isPositive) HeroAvailableColor else HeroDangerColor)
+                            )
+                            Text(
+                                (if (isPositive) "结余: RM " else "超支: RM ") + String.format(Locale.getDefault(), "%,.2f", Math.abs(net)),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isPositive) HeroAvailableColor else ExpenseRed
+                            )
+                        }
+                    }
+
+                    // Progress bar
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 12.dp)
+                            .height(14.dp)
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(Slate100)
                     ) {
-                        Icon(
-                            imageVector = if (period == "3m") Icons.Default.DateRange else Icons.Default.CalendarToday,
-                            contentDescription = null,
-                            tint = PrimaryTeal,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            if (income > 0) {
+                                val expFraction = (expense / income).coerceIn(0.0, 1.0).toFloat()
+                                val availFraction = if (isPositive) (net / income).coerceIn(0.0, 1.0).toFloat() else 0f
+                                if (expFraction > 0f) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(expFraction)
+                                            .fillMaxHeight()
+                                            .background(HeroExpenseColor)
+                                    )
+                                }
+                                if (availFraction > 0f) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(availFraction)
+                                            .fillMaxHeight()
+                                            .background(HeroAvailableColor)
+                                    )
+                                }
+                            } else if (expense > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(HeroDangerColor)
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = rangeLabel,
-                            color = Slate800,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
+                            text = "已支出 ${String.format(Locale.getDefault(), "%.1f", expensePct)}%",
+                            fontSize = 11.sp,
+                            color = Slate500
+                        )
+                        Text(
+                            text = (if (isPositive) "结余率 " else "超支率 ") +
+                                (if (income > 0) "${String.format(Locale.getDefault(), "%.1f", Math.abs(net / income * 100.0))}%"
+                                 else "100.0%"),
+                            fontSize = 11.sp,
+                            color = if (isPositive) HeroAvailableColor else ExpenseRed,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }

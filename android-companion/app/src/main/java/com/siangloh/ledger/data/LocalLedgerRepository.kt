@@ -586,24 +586,62 @@ object LocalLedgerRepository {
         }
     }
 
-    suspend fun getOverviewJson(context: Context, month: String? = null): Result<JSONObject> = withContext(Dispatchers.IO) {
+    private fun shiftMonthStringHelper(monthStr: String, delta: Int): String {
+        return try {
+            val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+            val date = sdf.parse(monthStr) ?: return monthStr
+            val cal = Calendar.getInstance().apply { time = date }
+            cal.add(Calendar.MONTH, delta)
+            sdf.format(cal.time)
+        } catch (_: Exception) {
+            monthStr
+        }
+    }
+
+    suspend fun getOverviewJson(
+        context: Context,
+        month: String? = null,
+        period: String = "month",
+        year: Int? = null
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
         try {
             initDefaultsIfNeeded(context)
             val currentMonth = month ?: SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
             val db = AppDatabase.getInstance(context)
-            val txList = db.localTransactionDao().getByMonth("$currentMonth%")
+
+            val txList = when (period) {
+                "3m" -> {
+                    val endMonth = currentMonth
+                    val startMonth = shiftMonthStringHelper(endMonth, -2)
+                    val startDate = "$startMonth-01"
+                    val endDate = "$endMonth-31"
+                    db.localTransactionDao().getByDateRange(startDate, endDate)
+                }
+                "year" -> {
+                    val targetYear = year ?: (currentMonth.substringBefore('-').toIntOrNull() ?: Calendar.getInstance().get(Calendar.YEAR))
+                    db.localTransactionDao().getByYear("$targetYear%")
+                }
+                else -> {
+                    db.localTransactionDao().getByMonth("$currentMonth%")
+                }
+            }
             val accounts = db.localAccountDao().getAll()
 
             var totalExp = 0.0
             var totalInc = 0.0
             val catExpMap = mutableMapOf<String, Double>()
+            val trendExpMap = mutableMapOf<String, Double>()
 
-            val dailyExpMap = mutableMapOf<String, Double>()
             txList.forEach { tx ->
                 if (tx.type == "expense") {
                     totalExp += tx.amount
                     catExpMap[tx.category] = (catExpMap[tx.category] ?: 0.0) + tx.amount
-                    dailyExpMap[tx.date] = (dailyExpMap[tx.date] ?: 0.0) + tx.amount
+                    val trendKey = if (period == "year") {
+                        if (tx.date.length >= 7) tx.date.substring(0, 7) else tx.date
+                    } else {
+                        tx.date
+                    }
+                    trendExpMap[trendKey] = (trendExpMap[trendKey] ?: 0.0) + tx.amount
                 } else if (tx.type == "income") {
                     totalInc += tx.amount
                 }
@@ -622,7 +660,7 @@ object LocalLedgerRepository {
             }
 
             val sparklineArray = JSONArray()
-            dailyExpMap.entries.sortedBy { it.key }.forEach { (date, amt) ->
+            trendExpMap.entries.sortedBy { it.key }.forEach { (date, amt) ->
                 sparklineArray.put(JSONObject().apply {
                     put("date", date)
                     put("amount", amt)
@@ -656,6 +694,7 @@ object LocalLedgerRepository {
 
             val json = JSONObject().apply {
                 put("ok", true)
+                put("period", period)
                 put("month", currentMonth)
                 put("currency", "RM")
                 put("income", totalInc)
@@ -678,6 +717,7 @@ object LocalLedgerRepository {
 
             Result.success(json)
         } catch (e: Exception) {
+            Log.e(TAG, "getOverviewJson error: ${e.message}", e)
             Result.failure(e)
         }
     }
