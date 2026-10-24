@@ -490,6 +490,7 @@ fun SubscriptionManagementPage(
                 editingSub = null
             },
             containerColor = Color.White,
+            tonalElevation = 0.dp,
             title = {
                 Text(
                     text = if (activeSub != null) "编辑订阅项目" else "添加新的订阅/固定支出",
@@ -627,6 +628,7 @@ fun SubscriptionManagementPage(
                 editingIncome = null
             },
             containerColor = Color.White,
+            tonalElevation = 0.dp,
             title = {
                 Text(
                     text = if (activeIncome != null) "编辑固定收入项目" else "添加新的固定收入",
