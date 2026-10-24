@@ -397,6 +397,11 @@ object NativeLedgerApi {
         LocalLedgerRepository.deleteTransaction(context, txId)
     }
 
+    suspend fun restoreTransaction(context: Context, record: TransactionRecord): Result<Unit> = withContext(Dispatchers.IO) {
+        invalidateCache()
+        LocalLedgerRepository.restoreTransaction(context, record)
+    }
+
     suspend fun getAccounts(context: Context, forceRefresh: Boolean = false): Result<AccountsSummary> = withContext(Dispatchers.IO) {
         LocalLedgerRepository.getAccountsSummary(context)
     }

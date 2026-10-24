@@ -78,6 +78,7 @@ fun RecordsScreen(
     var editingTx by remember { mutableStateOf<TransactionRecord?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<TransactionRecord?>(null) }
     var loadJob by remember { mutableStateOf<Job?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // 筛选预设与多维度高级筛选状态
     var savedFilters by remember { mutableStateOf<List<SavedFilterRecord>>(emptyList()) }
@@ -352,6 +353,17 @@ fun RecordsScreen(
 
 
     Scaffold(
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = Slate900,
+                    contentColor = Color.White,
+                    actionColor = Emerald400,
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        },
         topBar = {
             Column(
                 modifier = Modifier
@@ -1126,13 +1138,28 @@ fun RecordsScreen(
             confirmButton = {
                 Button(
                     onClick = {
+                        val toDelete = tx
+                        showDeleteConfirm = null
+                        editingTx = null
                         scope.launch {
-                            val res = NativeLedgerApi.deleteTransaction(context, tx.id)
-                            showDeleteConfirm = null
-                            editingTx = null
+                            val res = NativeLedgerApi.deleteTransaction(context, toDelete.id)
                             res.onSuccess {
-                                Toast.makeText(context, context.getString(R.string.common_success), Toast.LENGTH_SHORT).show()
                                 loadData()
+                                val noteOrCat = toDelete.note.ifBlank { toDelete.category }
+                                val snackResult = snackbarHostState.showSnackbar(
+                                    message = "已删除「$noteOrCat」",
+                                    actionLabel = "撤销",
+                                    duration = SnackbarDuration.Long
+                                )
+                                if (snackResult == SnackbarResult.ActionPerformed) {
+                                    val restoreRes = NativeLedgerApi.restoreTransaction(context, toDelete)
+                                    if (restoreRes.isSuccess) {
+                                        Toast.makeText(context, "已恢复交易", Toast.LENGTH_SHORT).show()
+                                        loadData()
+                                    } else {
+                                        Toast.makeText(context, "撤销失败: ${restoreRes.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
                             }.onFailure {
                                 Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                             }
@@ -1420,103 +1447,101 @@ fun EditTransactionBottomSheet(
     var isSaving by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = Color.White,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.85f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 8.dp)
-                .navigationBarsPadding()
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = Slate900,
+        unfocusedTextColor = Slate900,
+        focusedContainerColor = Slate50,
+        unfocusedContainerColor = Slate50,
+        focusedBorderColor = PrimaryTeal,
+        unfocusedBorderColor = Slate300,
+        focusedLabelColor = PrimaryTeal,
+        unfocusedLabelColor = Slate600,
+        cursorColor = PrimaryTeal
+    )
+
+    MaterialTheme(colorScheme = LightColorScheme) {
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = sheetState,
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.85f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .navigationBarsPadding()
             ) {
-                Text(stringResource(R.string.edit_tx_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                IconButton(onClick = onDeleteClick) {
-                    Icon(Icons.Default.DeleteOutline, contentDescription = stringResource(R.string.delete_tx_btn), tint = Rose500)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(stringResource(R.string.edit_tx_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                    IconButton(onClick = onDeleteClick) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = stringResource(R.string.delete_tx_btn), tint = Rose500)
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-            // 金额输入
-            OutlinedTextField(
-                value = amountStr,
-                onValueChange = { amountStr = it },
-                label = { Text("金额 (MYR)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = PrimaryTeal,
-                    focusedLabelColor = PrimaryTeal
-                )
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // 类别与日期
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // 金额输入
                 OutlinedTextField(
-                    value = category,
-                    onValueChange = { category = it },
-                    label = { Text("分类") },
+                    value = amountStr,
+                    onValueChange = { amountStr = it },
+                    label = { Text("金额 (MYR)", color = Slate600) },
                     singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryTeal,
-                        focusedLabelColor = PrimaryTeal
-                    )
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = fieldColors
                 )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 类别与日期
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = category,
+                        onValueChange = { category = it },
+                        label = { Text("分类", color = Slate600) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        colors = fieldColors
+                    )
+                    OutlinedTextField(
+                        value = dateStr,
+                        onValueChange = { dateStr = it },
+                        label = { Text("日期 (YYYY-MM-DD)", color = Slate600) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        colors = fieldColors
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 备注
                 OutlinedTextField(
-                    value = dateStr,
-                    onValueChange = { dateStr = it },
-                    label = { Text("日期 (YYYY-MM-DD)") },
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("商户 / 备注", color = Slate600) },
                     singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryTeal,
-                        focusedLabelColor = PrimaryTeal
-                    )
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = fieldColors
                 )
-            }
 
-            Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-            // 备注
-            OutlinedTextField(
-                value = note,
-                onValueChange = { note = it },
-                label = { Text("商户 / 备注") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = PrimaryTeal,
-                    focusedLabelColor = PrimaryTeal
+                // 标签
+                OutlinedTextField(
+                    value = tags,
+                    onValueChange = { tags = it },
+                    label = { Text("标签 (如: #food #lunch)", color = Slate600) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = fieldColors
                 )
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // 标签
-            OutlinedTextField(
-                value = tags,
-                onValueChange = { tags = it },
-                label = { Text("标签 (如: #food #lunch)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = PrimaryTeal,
-                    focusedLabelColor = PrimaryTeal
-                )
-            )
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -1689,6 +1714,7 @@ fun EditTransactionBottomSheet(
             Spacer(modifier = Modifier.height(12.dp))
         }
     }
+}
 }
 
 fun shiftMonthString(monthStr: String, delta: Int): String {

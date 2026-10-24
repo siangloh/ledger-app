@@ -348,6 +348,34 @@ object LocalLedgerRepository {
         }
     }
 
+    suspend fun restoreTransaction(context: Context, record: TransactionRecord): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val db = AppDatabase.getInstance(context)
+            val entity = LocalTransaction(
+                id = record.id,
+                date = record.date,
+                time = "",
+                type = record.type,
+                category = record.category,
+                amount = record.amount,
+                note = record.note,
+                tags = record.tags,
+                accountId = record.accountId,
+                source = record.source,
+                channel = record.channel
+            )
+            db.localTransactionDao().insert(entity)
+            if (record.accountId != null) {
+                val delta = if (record.type == "income") record.amount else -record.amount
+                db.localAccountDao().updateBalance(record.accountId, delta)
+            }
+            notifyDataChanged(context)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun updateTransactionCategory(context: Context, id: Long, category: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val db = AppDatabase.getInstance(context)
