@@ -6,7 +6,10 @@ import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -92,11 +95,8 @@ fun MoreToolsScreen(
     var showServerConfigDialog by remember { mutableStateOf(false) }
     var currentServerUrl by remember { mutableStateOf(NetworkHelper.getServerUrl(context)) }
     var currentApiKey by remember { mutableStateOf(NetworkHelper.getApiKey(context)) }
-    var showRecycleBinDialog by remember { mutableStateOf(false) }
     var showCategoryRulesDialog by remember { mutableStateOf(false) }
-    var showBudgetDialog by remember { mutableStateOf(false) }
-    var showSubscriptionDialog by remember { mutableStateOf(false) }
-    var showInstallmentDialog by remember { mutableStateOf(false) }
+    var activeSubPage by remember { mutableStateOf<String?>(null) } // "subscription", "installment", "budget", "recycle_bin"
 
 
     fun refreshAll() {
@@ -196,8 +196,69 @@ fun MoreToolsScreen(
         refreshAll()
     }
 
-    Scaffold(
-        topBar = {
+    BackHandler(enabled = activeSubPage != null) {
+        activeSubPage = null
+        refreshAll()
+    }
+
+    AnimatedContent(
+        targetState = activeSubPage,
+        transitionSpec = {
+            if (targetState != null) {
+                (slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } +
+                    fadeIn(tween(220))) togetherWith
+                    (slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { -it / 4 } +
+                        fadeOut(tween(180)))
+            } else {
+                (slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { -it / 4 } +
+                    fadeIn(tween(220))) togetherWith
+                    (slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } +
+                        fadeOut(tween(180)))
+            }
+        },
+        label = "subPageSlide"
+    ) { page ->
+        when (page) {
+            "subscription" -> {
+                SubscriptionManagementPage(
+                    subscriptions = toolsSummary?.subscriptions ?: emptyList(),
+                    userCategories = userCategories,
+                    onBack = {
+                        activeSubPage = null
+                        refreshAll()
+                    },
+                    onRefresh = { refreshAll() }
+                )
+            }
+            "installment" -> {
+                InstallmentManagementPage(
+                    installments = toolsSummary?.installments ?: emptyList(),
+                    onBack = {
+                        activeSubPage = null
+                        refreshAll()
+                    },
+                    onRefresh = { refreshAll() }
+                )
+            }
+            "budget" -> {
+                BudgetManagementPage(
+                    onBack = {
+                        activeSubPage = null
+                        refreshAll()
+                    }
+                )
+            }
+            "recycle_bin" -> {
+                RecycleBinPage(
+                    onBack = {
+                        activeSubPage = null
+                        refreshAll()
+                    }
+                )
+            }
+            else -> {
+                Scaffold(
+                    topBar = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -296,7 +357,7 @@ fun MoreToolsScreen(
                     totalMonthly = toolsSummary?.totalMonthlySub ?: 0.0,
                     errorMessage = toolsError,
                     onRetry = { refreshAll() },
-                    onOpenManage = { showSubscriptionDialog = true }
+                    onOpenManage = { activeSubPage = "subscription" }
                 )
             }
 
@@ -307,7 +368,7 @@ fun MoreToolsScreen(
                     totalRemaining = toolsSummary?.totalRemainingInst ?: 0.0,
                     errorMessage = toolsError,
                     onRetry = { refreshAll() },
-                    onOpenManage = { showInstallmentDialog = true }
+                    onOpenManage = { activeSubPage = "installment" }
                 )
             }
 
@@ -344,14 +405,14 @@ fun MoreToolsScreen(
             // 6.5 回收站管理 (Recycle Bin)
             item {
                 RecycleBinCard(
-                    onOpenRecycleBin = { showRecycleBinDialog = true }
+                    onOpenRecycleBin = { activeSubPage = "recycle_bin" }
                 )
             }
 
             // 6.7 预算规划与每日安全限额 (Budget Management)
             item {
                 BudgetManagementCard(
-                    onOpenBudget = { showBudgetDialog = true }
+                    onOpenBudget = { activeSubPage = "budget" }
                 )
             }
 
@@ -393,7 +454,9 @@ fun MoreToolsScreen(
         }
     }
 }
-
+}
+}
+}
 
     if (showServerConfigDialog) {
         ServerConfigDialog(
@@ -415,45 +478,9 @@ fun MoreToolsScreen(
         )
     }
 
-    if (showRecycleBinDialog) {
-        RecycleBinDialog(
-            onDismiss = { showRecycleBinDialog = false }
-        )
-    }
-
     if (showCategoryRulesDialog) {
         CategoryRulesDialog(
             onDismiss = { showCategoryRulesDialog = false }
-        )
-    }
-
-    if (showBudgetDialog) {
-        BudgetManagementDialog(
-            onDismiss = {
-                showBudgetDialog = false
-                refreshAll()
-            }
-        )
-    }
-
-    if (showSubscriptionDialog) {
-        SubscriptionManagementDialog(
-            subscriptions = toolsSummary?.subscriptions ?: emptyList(),
-            userCategories = userCategories,
-            onDismiss = {
-                showSubscriptionDialog = false
-                refreshAll()
-            }
-        )
-    }
-
-    if (showInstallmentDialog) {
-        InstallmentManagementDialog(
-            installments = toolsSummary?.installments ?: emptyList(),
-            onDismiss = {
-                showInstallmentDialog = false
-                refreshAll()
-            }
         )
     }
 
@@ -2042,398 +2069,7 @@ fun RecycleBinCard(
 fun RecycleBinDialog(
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var items by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
-    var totalCount by remember { mutableStateOf(0) }
-    var isLoading by remember { mutableStateOf(true) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var itemToDelete by remember { mutableStateOf<Long?>(null) }
-    var showEmptyConfirm by remember { mutableStateOf(false) }
-    var isOperating by remember { mutableStateOf(false) }
-
-    fun loadItems() {
-        isLoading = true
-        errorMessage = null
-        scope.launch {
-            val localItems = com.siangloh.ledger.data.LocalLedgerRepository.getRecycleBinItems(context)
-            items = localItems
-            totalCount = localItems.size
-            isLoading = false
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        loadItems()
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Color.White,
-        titleContentColor = Slate900,
-        textContentColor = Slate800,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.DeleteOutline,
-                        contentDescription = null,
-                        tint = Rose500,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.tools_recycle_bin),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Slate900
-                    )
-                    if (totalCount > 0) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            shape = CircleShape,
-                            color = Slate100,
-                            modifier = Modifier.padding(start = 4.dp)
-                        ) {
-                            Text(
-                                text = "$totalCount",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Slate600,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
-
-                if (items.isNotEmpty()) {
-                    TextButton(
-                        onClick = { showEmptyConfirm = true },
-                        enabled = !isOperating,
-                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.recycle_bin_empty_btn),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Rose500
-                        )
-                    }
-                }
-            }
-        },
-        text = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 200.dp, max = 460.dp)
-            ) {
-                when {
-                    isLoading -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(36.dp),
-                                color = PrimaryTeal,
-                                strokeWidth = 3.dp
-                            )
-                        }
-                    }
-                    errorMessage != null -> {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = errorMessage ?: "加载失败",
-                                fontSize = 13.sp,
-                                color = ExpenseRed,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-                            Button(
-                                onClick = { loadItems() },
-                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                            ) {
-                                Text(stringResource(R.string.common_retry), color = Color.White)
-                            }
-                        }
-                    }
-                    items.isEmpty() -> {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DeleteOutline,
-                                contentDescription = null,
-                                tint = Slate300,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = stringResource(R.string.recycle_bin_empty_title),
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Slate700
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.recycle_bin_empty_desc),
-                                fontSize = 12.sp,
-                                color = Slate400
-                            )
-                        }
-                    }
-                    else -> {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(items) { item ->
-                                val id = item.optLong("id")
-                                val date = item.optString("date")
-                                val type = item.optString("type")
-                                val cat = item.optString("category")
-                                val note = item.optString("note")
-                                val amount = item.optDouble("amount")
-                                val accName = item.optString("account_name", "默认账户")
-                                val isExpense = type == "expense"
-
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Slate50,
-                                    border = BorderStroke(1.dp, Slate200),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = note.ifBlank { cat.ifBlank { "已删除记录" } },
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = Slate800,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = "$date · $cat · $accName",
-                                                    fontSize = 11.sp,
-                                                    color = Slate500
-                                                )
-                                            }
-                                            Text(
-                                                text = String.format(Locale.getDefault(), if (isExpense) "-RM %.2f" else "+RM %.2f", amount),
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isExpense) ExpenseRed else IncomeGreen
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.height(10.dp))
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.End,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            // 彻底删除按钮
-                                            OutlinedButton(
-                                                onClick = { itemToDelete = id },
-                                                enabled = !isOperating,
-                                                shape = RoundedCornerShape(8.dp),
-                                                border = BorderStroke(1.dp, Rose500.copy(alpha = 0.4f)),
-                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Rose500),
-                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                                            ) {
-                                                Text(
-                                                    text = stringResource(R.string.recycle_bin_delete_btn),
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Medium
-                                                )
-                                            }
-
-                                            Spacer(modifier = Modifier.width(8.dp))
-
-                                            // 恢复按钮 (PrimaryTeal, min 48dp)
-                                            Button(
-                                                onClick = {
-                                                    isOperating = true
-                                                    scope.launch {
-                                                        val res = com.siangloh.ledger.data.LocalLedgerRepository.restoreRecycleBinItem(context, id)
-                                                        isOperating = false
-                                                        res.onSuccess {
-                                                            Toast.makeText(context, "已成功恢复", Toast.LENGTH_SHORT).show()
-                                                            loadItems()
-                                                        }.onFailure {
-                                                            Toast.makeText(context, it.message ?: "恢复失败", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    }
-                                                },
-                                                enabled = !isOperating,
-                                                shape = RoundedCornerShape(8.dp),
-                                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal, contentColor = Color.White),
-                                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                                            ) {
-                                                Text(
-                                                    text = stringResource(R.string.recycle_bin_restore_btn),
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.common_close),
-                    fontSize = 13.sp,
-                    color = Slate600
-                )
-            }
-        }
-    )
-
-    // 二次确认：单条彻底删除
-    itemToDelete?.let { txId ->
-        AlertDialog(
-            onDismissRequest = { itemToDelete = null },
-            containerColor = Color.White,
-            title = {
-                Text(
-                    text = stringResource(R.string.recycle_bin_delete_btn),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = Slate900
-                )
-            },
-            text = {
-                Text(
-                    text = stringResource(R.string.recycle_bin_confirm_delete),
-                    fontSize = 13.sp,
-                    color = Slate700
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val toDel = txId
-                        itemToDelete = null
-                        isOperating = true
-                        scope.launch {
-                            val res = com.siangloh.ledger.data.LocalLedgerRepository.permanentDeleteRecycleBinItem(context, toDel)
-                            isOperating = false
-                            res.onSuccess {
-                                Toast.makeText(context, "已彻底删除", Toast.LENGTH_SHORT).show()
-                                loadItems()
-                            }.onFailure {
-                                Toast.makeText(context, it.message ?: "删除失败", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Rose500, contentColor = Color.White),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                ) {
-                    Text(stringResource(R.string.common_confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { itemToDelete = null },
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                ) {
-                    Text(stringResource(R.string.common_cancel), color = Slate600)
-                }
-            }
-        )
-    }
-
-    // 二次确认：清空回收站
-    if (showEmptyConfirm) {
-        AlertDialog(
-            onDismissRequest = { showEmptyConfirm = false },
-            containerColor = Color.White,
-            title = {
-                Text(
-                    text = stringResource(R.string.recycle_bin_empty_btn),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = Slate900
-                )
-            },
-            text = {
-                Text(
-                    text = stringResource(R.string.recycle_bin_confirm_empty),
-                    fontSize = 13.sp,
-                    color = Slate700
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showEmptyConfirm = false
-                        isOperating = true
-                        scope.launch {
-                            val res = com.siangloh.ledger.data.LocalLedgerRepository.emptyRecycleBin(context)
-                            isOperating = false
-                            res.onSuccess {
-                                Toast.makeText(context, "回收站已清空", Toast.LENGTH_SHORT).show()
-                                loadItems()
-                            }.onFailure {
-                                Toast.makeText(context, it.message ?: "清空失败", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Rose500, contentColor = Color.White),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                ) {
-                    Text(stringResource(R.string.common_confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showEmptyConfirm = false },
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                ) {
-                    Text(stringResource(R.string.common_cancel), color = Slate600)
-                }
-            }
-        )
-    }
+    RecycleBinPage(onBack = onDismiss)
 }
 
 @Composable
@@ -3002,1289 +2638,39 @@ fun BudgetManagementCard(
 // -----------------------------------------------------------------------------
 // Dialog: 预算规划与管理中心 (Budget Management Dialog)
 // -----------------------------------------------------------------------------
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetManagementDialog(
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var overview by remember { mutableStateOf<BudgetOverviewRecord?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    var showSetOverallDialog by remember { mutableStateOf(false) }
-    var editingCategoryBudget by remember { mutableStateOf<BudgetItemRecord?>(null) }
-    var showAddCategoryBudgetDialog by remember { mutableStateOf(false) }
-    var isSubmitting by remember { mutableStateOf(false) }
-
-    fun loadBudget() {
-        isLoading = true
-        errorMessage = null
-        scope.launch {
-            val res = NativeLedgerApi.getBudgetOverview(context)
-            isLoading = false
-            res.onSuccess {
-                overview = it
-            }.onFailure {
-                errorMessage = it.message ?: "加载预算概览失败"
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        loadBudget()
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Color.White,
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.88f),
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "🎯", fontSize = 20.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.budget_title),
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Slate900
-                    )
-                }
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "关闭",
-                        tint = Slate400,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        },
-        text = {
-            if (isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = PrimaryTeal)
-                }
-            } else if (errorMessage != null) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(text = errorMessage ?: "", color = Color(0xFFEF4444), fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = { loadBudget() },
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
-                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                    ) {
-                        Text("重试", color = Color.White)
-                    }
-                }
-            } else {
-                val data = overview
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    // 1. 月度总预算专区
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Slate50),
-                            border = BorderStroke(1.dp, Color(0xFF5EEAD4))
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Row(
-                                        modifier = Modifier.weight(1f, fill = false),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = stringResource(R.string.budget_overall_title),
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Slate900,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        if (data != null && data.overall.isSet) {
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            val badgeBg = when (data.overall.level) {
-                                                "over" -> Color(0xFFFEE2E2)
-                                                "warn", "reached" -> Color(0xFFFEF3C7)
-                                                else -> PrimaryTealSubtle
-                                            }
-                                            val badgeColor = when (data.overall.level) {
-                                                "over" -> Color(0xFFDC2626)
-                                                "warn", "reached" -> Color(0xFFD97706)
-                                                else -> PrimaryTeal
-                                            }
-                                            Box(
-                                                modifier = Modifier
-                                                    .background(badgeBg, RoundedCornerShape(10.dp))
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(
-                                                    text = "${data.overall.pct}%",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = badgeColor
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.width(8.dp))
-
-                                    TextButton(
-                                        onClick = { showSetOverallDialog = true },
-                                        modifier = Modifier.defaultMinSize(minHeight = 44.dp)
-                                    ) {
-                                        Text(
-                                            text = if (data != null && data.overall.isExplicit) stringResource(R.string.budget_edit_overall_btn)
-                                                   else stringResource(R.string.budget_set_overall_btn),
-                                            color = PrimaryTeal,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-
-                                if (data != null && data.overall.isSet) {
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = stringResource(
-                                                R.string.budget_spent_format,
-                                                String.format(Locale.getDefault(), "RM %.2f", data.overall.spent),
-                                                String.format(Locale.getDefault(), "RM %.2f", data.overall.limit)
-                                            ),
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Slate600
-                                        )
-                                        if (data.overall.remaining < 0) {
-                                            Text(
-                                                text = stringResource(
-                                                    R.string.budget_overspent_format,
-                                                    String.format(Locale.getDefault(), "RM %.2f", -data.overall.remaining)
-                                                ),
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFFDC2626)
-                                            )
-                                        } else {
-                                            Text(
-                                                text = stringResource(
-                                                    R.string.budget_remaining_format,
-                                                    String.format(Locale.getDefault(), "RM %.2f", data.overall.remaining)
-                                                ),
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = PrimaryTeal
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    val progressPct = ((data.overall.pct) / 100.0).toFloat().coerceIn(0f, 1f)
-                                    val barColor = when (data.overall.level) {
-                                        "over" -> Color(0xFFEF4444)
-                                        "warn", "reached" -> Color(0xFFF59E0B)
-                                        else -> PrimaryTeal
-                                    }
-                                    LinearProgressIndicator(
-                                        progress = { progressPct },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(8.dp)
-                                            .clip(RoundedCornerShape(4.dp)),
-                                        color = barColor,
-                                        trackColor = Slate200
-                                    )
-
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .background(PrimaryTealSubtle, RoundedCornerShape(6.dp))
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                                        ) {
-                                            Text(
-                                                text = stringResource(
-                                                    R.string.budget_daily_allowance_format,
-                                                    String.format(Locale.getDefault(), "RM %.2f", data.overall.dailyAllowance)
-                                                ),
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = PrimaryTeal
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.width(8.dp))
-
-                                        Text(
-                                            text = stringResource(
-                                                R.string.budget_cycle_days_format,
-                                                data.billingCycle.remainingDays
-                                            ),
-                                            fontSize = 11.sp,
-                                            color = Slate400
-                                        )
-                                    }
-                                } else {
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        text = stringResource(R.string.budget_no_budget) + stringResource(R.string.budget_no_budget_desc),
-                                        fontSize = 12.sp,
-                                        color = Slate400
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // 2. 分类预算列表
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = stringResource(R.string.budget_categories_title_fmt, data?.categories?.size ?: 0),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Slate800
-                            )
-                            TextButton(
-                                onClick = { showAddCategoryBudgetDialog = true },
-                                modifier = Modifier.defaultMinSize(minHeight = 44.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(stringResource(R.string.budget_add_category_btn), color = PrimaryTeal, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            }
-                        }
-                    }
-
-                    val catList = data?.categories ?: emptyList()
-                    if (catList.isEmpty()) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.budget_no_categories_hint),
-                                    fontSize = 12.sp,
-                                    color = Slate400,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    } else {
-                        items(catList) { cat ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { editingCategoryBudget = cat },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.White),
-                                border = BorderStroke(1.dp, Slate200)
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(10.dp)
-                                                    .background(
-                                                        try {
-                                                            Color(android.graphics.Color.parseColor(cat.color))
-                                                        } catch (_: Exception) {
-                                                            PrimaryTeal
-                                                        },
-                                                        CircleShape
-                                                    )
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = cat.category,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Slate900
-                                            )
-                                        }
-
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = "${cat.pct}%",
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = when (cat.level) {
-                                                    "over" -> Color(0xFFDC2626)
-                                                    "warn", "reached" -> Color(0xFFD97706)
-                                                    else -> PrimaryTeal
-                                                }
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            IconButton(
-                                                onClick = { editingCategoryBudget = cat },
-                                                modifier = Modifier.size(36.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Edit,
-                                                    contentDescription = "修改",
-                                                    tint = Slate400,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = "已花: RM ${String.format(Locale.getDefault(), "%.0f", cat.spent)} / 限额: RM ${String.format(Locale.getDefault(), "%.0f", cat.limit)}",
-                                            fontSize = 11.sp,
-                                            color = Slate500
-                                        )
-                                        if (cat.remaining < 0) {
-                                            Text(
-                                                text = "超支 RM ${String.format(Locale.getDefault(), "%.0f", -cat.remaining)}",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFFDC2626)
-                                            )
-                                        } else {
-                                            Text(
-                                                text = "剩余 RM ${String.format(Locale.getDefault(), "%.0f", cat.remaining)}",
-                                                fontSize = 11.sp,
-                                                color = Slate500
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    val catPct = (cat.pct / 100.0).toFloat().coerceIn(0f, 1f)
-                                    val cBarColor = when (cat.level) {
-                                        "over" -> Color(0xFFEF4444)
-                                        "warn", "reached" -> Color(0xFFF59E0B)
-                                        else -> PrimaryTeal
-                                    }
-                                    LinearProgressIndicator(
-                                        progress = { catPct },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(6.dp)
-                                            .clip(RoundedCornerShape(3.dp)),
-                                        color = cBarColor,
-                                        trackColor = Slate100
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
-                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-            ) {
-                Text(stringResource(R.string.common_close), color = Color.White)
-            }
-        }
-    )
-
-    // Sub-dialog 1: 设置月度总预算
-    if (showSetOverallDialog) {
-        var limitInput by remember {
-            mutableStateOf(
-                if (overview != null && overview!!.overall.isExplicit && overview!!.overall.limit > 0)
-                    String.format(Locale.getDefault(), "%.2f", overview!!.overall.limit)
-                else ""
-            )
-        }
-        AlertDialog(
-            onDismissRequest = { showSetOverallDialog = false },
-            containerColor = Color.White,
-            title = {
-                Text(
-                    text = stringResource(R.string.budget_set_dialog_title),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate900
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        text = "输入每月最高支出限额。输入 0 或留空可取消总预算。",
-                        fontSize = 13.sp,
-                        color = Slate500
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = limitInput,
-                        onValueChange = { limitInput = it },
-                        label = { Text("总预算限额 (MYR)") },
-                        placeholder = { Text(stringResource(R.string.budget_amount_hint)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryTeal,
-                            focusedLabelColor = PrimaryTeal
-                        )
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val num = limitInput.toDoubleOrNull() ?: 0.0
-                        isSubmitting = true
-                        scope.launch {
-                            val res = NativeLedgerApi.saveOverallBudget(context, num)
-                            isSubmitting = false
-                            res.onSuccess {
-                                Toast.makeText(context, "总预算设置成功", Toast.LENGTH_SHORT).show()
-                                showSetOverallDialog = false
-                                loadBudget()
-                            }.onFailure {
-                                Toast.makeText(context, "设置失败: ${it.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                    enabled = !isSubmitting,
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                ) {
-                    Text(stringResource(R.string.budget_save_btn), color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showSetOverallDialog = false },
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                ) {
-                    Text(stringResource(R.string.budget_cancel_btn), color = Slate600)
-                }
-            }
-        )
-    }
-
-    // Sub-dialog 2: 编辑/删除已有分类预算
-    editingCategoryBudget?.let { cat ->
-        var catLimitInput by remember {
-            mutableStateOf(String.format(Locale.getDefault(), "%.2f", cat.limit))
-        }
-        AlertDialog(
-            onDismissRequest = { editingCategoryBudget = null },
-            containerColor = Color.White,
-            title = {
-                Text(
-                    text = stringResource(R.string.budget_set_cat_dialog_title, cat.category),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate900
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        text = "输入「${cat.category}」每月的支出上限金额。",
-                        fontSize = 13.sp,
-                        color = Slate500
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = catLimitInput,
-                        onValueChange = { catLimitInput = it },
-                        label = { Text("限额 (MYR)") },
-                        placeholder = { Text(stringResource(R.string.budget_amount_hint)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryTeal,
-                            focusedLabelColor = PrimaryTeal
-                        )
-                    )
-                }
-            },
-            confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(
-                        onClick = {
-                            isSubmitting = true
-                            scope.launch {
-                                val res = NativeLedgerApi.deleteCategoryBudget(context, cat.category)
-                                isSubmitting = false
-                                res.onSuccess {
-                                    Toast.makeText(context, "已清除分类预算", Toast.LENGTH_SHORT).show()
-                                    editingCategoryBudget = null
-                                    loadBudget()
-                                }.onFailure {
-                                    Toast.makeText(context, "清除失败: ${it.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        enabled = !isSubmitting,
-                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                    ) {
-                        Text(stringResource(R.string.budget_delete_btn), color = Color(0xFFDC2626))
-                    }
-
-                    Button(
-                        onClick = {
-                            val num = catLimitInput.toDoubleOrNull() ?: 0.0
-                            isSubmitting = true
-                            scope.launch {
-                                val res = NativeLedgerApi.saveCategoryBudget(context, cat.category, num)
-                                isSubmitting = false
-                                res.onSuccess {
-                                    Toast.makeText(context, "分类预算已保存", Toast.LENGTH_SHORT).show()
-                                    editingCategoryBudget = null
-                                    loadBudget()
-                                }.onFailure {
-                                    Toast.makeText(context, "保存失败: ${it.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        enabled = !isSubmitting,
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
-                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                    ) {
-                        Text(stringResource(R.string.budget_save_btn), color = Color.White)
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { editingCategoryBudget = null },
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                ) {
-                    Text(stringResource(R.string.budget_cancel_btn), color = Slate600)
-                }
-            }
-        )
-    }
-
-    // Sub-dialog 3: 新增分类预算
-    if (showAddCategoryBudgetDialog) {
-        var newCatName by remember { mutableStateOf("") }
-        var newCatLimit by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showAddCategoryBudgetDialog = false },
-            containerColor = Color.White,
-            title = {
-                Text(
-                    text = "添加分类预算",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate900
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "输入需要设定月度限额的分类名称与金额：",
-                        fontSize = 13.sp,
-                        color = Slate500
-                    )
-                    OutlinedTextField(
-                        value = newCatName,
-                        onValueChange = { newCatName = it },
-                        label = { Text("分类名称 (如: 餐饮)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryTeal,
-                            focusedLabelColor = PrimaryTeal
-                        )
-                    )
-                    OutlinedTextField(
-                        value = newCatLimit,
-                        onValueChange = { newCatLimit = it },
-                        label = { Text("月度限额 (MYR)") },
-                        placeholder = { Text("如: 800.00") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryTeal,
-                            focusedLabelColor = PrimaryTeal
-                        )
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val name = newCatName.trim()
-                        val num = newCatLimit.toDoubleOrNull() ?: 0.0
-                        if (name.isEmpty() || num <= 0.0) {
-                            Toast.makeText(context, "请输入有效的分类名称与大于0的金额", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        isSubmitting = true
-                        scope.launch {
-                            val res = NativeLedgerApi.saveCategoryBudget(context, name, num)
-                            isSubmitting = false
-                            res.onSuccess {
-                                Toast.makeText(context, "已为「$name」设定预算", Toast.LENGTH_SHORT).show()
-                                showAddCategoryBudgetDialog = false
-                                loadBudget()
-                            }.onFailure {
-                                Toast.makeText(context, "设定失败: ${it.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                    enabled = !isSubmitting,
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                ) {
-                    Text(stringResource(R.string.budget_save_btn), color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showAddCategoryBudgetDialog = false },
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                ) {
-                    Text(stringResource(R.string.budget_cancel_btn), color = Slate600)
-                }
-            }
-        )
-    }
+    BudgetManagementPage(onBack = onDismiss)
 }
-
 
 // -----------------------------------------------------------------------------
 // Dialog: 周期记账与订阅管理中心 (Subscription Management Dialog)
 // -----------------------------------------------------------------------------
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubscriptionManagementDialog(
     subscriptions: List<SubscriptionRecord>,
     userCategories: List<String>,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var editingSub by remember { mutableStateOf<SubscriptionRecord?>(null) }
-    var showAddDialog by remember { mutableStateOf(false) }
-    var isSubmitting by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Color.White,
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.88f),
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(PrimaryTealSubtle),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Repeat, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(18.dp))
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "订阅与周期记账", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                }
-                IconButton(onClick = { showAddDialog = true }, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.Default.Add, contentDescription = "添加", tint = PrimaryTeal)
-                }
-            }
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                val totalCost = subscriptions.sumOf { it.cost }
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Slate50,
-                    border = BorderStroke(1.dp, Slate200),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = "月度固定支出概览", fontSize = 13.sp, color = Slate600)
-                        Text(
-                            text = String.format(Locale.getDefault(), "RM %.2f / 月", totalCost),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = PrimaryTeal
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (subscriptions.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                        Text("暂无订阅，点击右上角「+」即可自定义添加", color = Slate400, fontSize = 13.sp, textAlign = TextAlign.Center)
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(subscriptions) { sub ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { editingSub = sub },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.White),
-                                border = BorderStroke(1.dp, Slate200)
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(text = sub.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = "分类: ${sub.category} · 扣款: ${sub.nextBillingDate}",
-                                            fontSize = 11.sp,
-                                            color = Slate500
-                                        )
-                                    }
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = String.format(Locale.getDefault(), "RM %.2f", sub.cost),
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Slate900
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        IconButton(onClick = { editingSub = sub }, modifier = Modifier.size(36.dp)) {
-                                            Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Slate400, modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
-                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-            ) {
-                Text(stringResource(R.string.common_close), color = Color.White)
-            }
-        }
+    SubscriptionManagementPage(
+        subscriptions = subscriptions,
+        userCategories = userCategories,
+        onBack = onDismiss
     )
-
-    // 新增/编辑订阅子弹窗
-    val activeSub = editingSub
-    if (showAddDialog || activeSub != null) {
-        var nameInput by remember { mutableStateOf(activeSub?.name ?: "") }
-        var costInput by remember { mutableStateOf(if (activeSub != null) String.format(Locale.getDefault(), "%.2f", activeSub.cost) else "") }
-        var categoryInput by remember { mutableStateOf(activeSub?.category ?: if (userCategories.isNotEmpty()) userCategories.first() else "日常") }
-        var dateInput by remember { mutableStateOf(activeSub?.nextBillingDate ?: "每月1号") }
-
-        AlertDialog(
-            onDismissRequest = {
-                showAddDialog = false
-                editingSub = null
-            },
-            containerColor = Color.White,
-            title = {
-                Text(
-                    text = if (activeSub != null) "编辑订阅项目" else "添加新的订阅/固定支出",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate900
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = nameInput,
-                        onValueChange = { nameInput = it },
-                        label = { Text("项目名称 (如: Netflix, iCloud, 宽带)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = costInput,
-                        onValueChange = { costInput = it },
-                        label = { Text("周期扣费金额 (MYR)") },
-                        placeholder = { Text("0.00") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = categoryInput,
-                        onValueChange = { categoryInput = it },
-                        label = { Text("记账分类 (如: 娱乐, 账单)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = dateInput,
-                        onValueChange = { dateInput = it },
-                        label = { Text("下次扣款周期 (如: 每月15号)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (activeSub != null) {
-                        TextButton(
-                            onClick = {
-                                isSubmitting = true
-                                scope.launch {
-                                    val res = NativeLedgerApi.deleteSubscription(context, activeSub.id)
-                                    isSubmitting = false
-                                    res.onSuccess {
-                                        Toast.makeText(context, "已删除订阅", Toast.LENGTH_SHORT).show()
-                                        editingSub = null
-                                    }.onFailure {
-                                        Toast.makeText(context, "删除失败: ${it.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
-                            enabled = !isSubmitting,
-                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                        ) {
-                            Text("删除", color = ExpenseRed)
-                        }
-                    }
-
-                    Button(
-                        onClick = {
-                            val n = nameInput.trim()
-                            val c = costInput.toDoubleOrNull() ?: 0.0
-                            val cat = categoryInput.trim().ifEmpty { "账单" }
-                            val dt = dateInput.trim().ifEmpty { "每月1号" }
-                            if (n.isEmpty() || c <= 0.0) {
-                                Toast.makeText(context, "请输入有效的名称和扣费金额", Toast.LENGTH_SHORT).show()
-                                return@Button
-                            }
-                            isSubmitting = true
-                            scope.launch {
-                                val res = NativeLedgerApi.saveSubscription(
-                                    context = context,
-                                    id = activeSub?.id,
-                                    name = n,
-                                    category = cat,
-                                    cost = c,
-                                    currency = "MYR",
-                                    nextBillingDate = dt,
-                                    autoRenew = true
-                                )
-                                isSubmitting = false
-                                res.onSuccess {
-                                    Toast.makeText(context, "订阅已保存", Toast.LENGTH_SHORT).show()
-                                    showAddDialog = false
-                                    editingSub = null
-                                }.onFailure {
-                                    Toast.makeText(context, "保存失败: ${it.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        enabled = !isSubmitting,
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
-                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                    ) {
-                        Text("保存", color = Color.White)
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showAddDialog = false
-                        editingSub = null
-                    },
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                ) {
-                    Text(stringResource(R.string.common_cancel), color = Slate600)
-                }
-            }
-        )
-    }
 }
-
 
 // -----------------------------------------------------------------------------
 // Dialog: 分期付款与债务管理中心 (Installment Management Dialog)
 // -----------------------------------------------------------------------------
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InstallmentManagementDialog(
     installments: List<InstallmentRecord>,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var editingInst by remember { mutableStateOf<InstallmentRecord?>(null) }
-    var showAddDialog by remember { mutableStateOf(false) }
-    var isSubmitting by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Color.White,
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.88f),
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFFEF3C7)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.DateRange, contentDescription = null, tint = Color(0xFFD97706), modifier = Modifier.size(18.dp))
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "分期与债务追踪", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                }
-                IconButton(onClick = { showAddDialog = true }, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.Default.Add, contentDescription = "添加", tint = Color(0xFFD97706))
-                }
-            }
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                val totalRemaining = installments.sumOf { it.remainingAmount }
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Slate50,
-                    border = BorderStroke(1.dp, Slate200),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = "累计剩余待还总额", fontSize = 13.sp, color = Slate600)
-                        Text(
-                            text = String.format(Locale.getDefault(), "RM %.2f", totalRemaining),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = ExpenseRed
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (installments.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                        Text("暂无分期或债务记录，点击右上角「+」即可自定义添加", color = Slate400, fontSize = 13.sp, textAlign = TextAlign.Center)
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(installments) { inst ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { editingInst = inst },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.White),
-                                border = BorderStroke(1.dp, Slate200)
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(text = inst.title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                                        Text(
-                                            text = String.format(Locale.getDefault(), "RM %.2f", inst.remainingAmount),
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = ExpenseRed
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "进度: ${inst.paidPeriods}/${inst.tenureMonths} 期 · 月供 RM ${String.format(Locale.getDefault(), "%.2f", inst.monthlyAmount)}",
-                                            fontSize = 11.sp,
-                                            color = Slate500
-                                        )
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            TextButton(
-                                                onClick = {
-                                                    scope.launch {
-                                                        isSubmitting = true
-                                                        val res = NativeLedgerApi.payInstallmentPeriod(context, inst.id)
-                                                        isSubmitting = false
-                                                        res.onSuccess {
-                                                            Toast.makeText(context, "已成功打卡本期还款", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    }
-                                                },
-                                                enabled = inst.paidPeriods < inst.tenureMonths && !isSubmitting
-                                            ) {
-                                                Text("打卡本期", fontSize = 12.sp, color = PrimaryTeal, fontWeight = FontWeight.Bold)
-                                            }
-                                            IconButton(onClick = { editingInst = inst }, modifier = Modifier.size(36.dp)) {
-                                                Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Slate400, modifier = Modifier.size(16.dp))
-                                            }
-                                        }
-                                    }
-                                    val progressPct = if (inst.tenureMonths > 0) (inst.paidPeriods.toFloat() / inst.tenureMonths.toFloat()).coerceIn(0f, 1f) else 0f
-                                    LinearProgressIndicator(
-                                        progress = { progressPct },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(4.dp)
-                                            .clip(RoundedCornerShape(2.dp)),
-                                        color = if (progressPct >= 1f) IncomeGreen else Color(0xFFD97706),
-                                        trackColor = Slate100
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
-                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-            ) {
-                Text(stringResource(R.string.common_close), color = Color.White)
-            }
-        }
+    InstallmentManagementPage(
+        installments = installments,
+        onBack = onDismiss
     )
-
-    // 新增/编辑分期子弹窗
-    val activeInst = editingInst
-    if (showAddDialog || activeInst != null) {
-        var titleInput by remember { mutableStateOf(activeInst?.title ?: "") }
-        var totalAmountInput by remember { mutableStateOf(if (activeInst != null) String.format(Locale.getDefault(), "%.2f", activeInst.totalAmount) else "") }
-        var tenureInput by remember { mutableStateOf(activeInst?.tenureMonths?.toString() ?: "12") }
-        var paidInput by remember { mutableStateOf(activeInst?.paidPeriods?.toString() ?: "0") }
-        var monthlyInput by remember { mutableStateOf(if (activeInst != null) String.format(Locale.getDefault(), "%.2f", activeInst.monthlyAmount) else "") }
-
-        AlertDialog(
-            onDismissRequest = {
-                showAddDialog = false
-                editingInst = null
-            },
-            containerColor = Color.White,
-            title = {
-                Text(
-                    text = if (activeInst != null) "编辑分期项目" else "添加新的分期/借款",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate900
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = titleInput,
-                        onValueChange = { titleInput = it },
-                        label = { Text("分期/债务名称 (如: iPhone 免息分期)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = totalAmountInput,
-                        onValueChange = { totalAmountInput = it },
-                        label = { Text("总欠款金额 (MYR)") },
-                        placeholder = { Text("0.00") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = tenureInput,
-                            onValueChange = { tenureInput = it },
-                            label = { Text("总期数") },
-                            placeholder = { Text("12") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = paidInput,
-                            onValueChange = { paidInput = it },
-                            label = { Text("已还期数") },
-                            placeholder = { Text("0") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    OutlinedTextField(
-                        value = monthlyInput,
-                        onValueChange = { monthlyInput = it },
-                        label = { Text("月供金额 (留空按期数自动计算)") },
-                        placeholder = { Text("可选") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (activeInst != null) {
-                        TextButton(
-                            onClick = {
-                                isSubmitting = true
-                                scope.launch {
-                                    val res = NativeLedgerApi.deleteInstallment(context, activeInst.id)
-                                    isSubmitting = false
-                                    res.onSuccess {
-                                        Toast.makeText(context, "已删除分期记录", Toast.LENGTH_SHORT).show()
-                                        editingInst = null
-                                    }.onFailure {
-                                        Toast.makeText(context, "删除失败: ${it.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
-                            enabled = !isSubmitting,
-                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                        ) {
-                            Text("删除", color = ExpenseRed)
-                        }
-                    }
-
-                    Button(
-                        onClick = {
-                            val t = titleInput.trim()
-                            val tot = totalAmountInput.toDoubleOrNull() ?: 0.0
-                            val ten = tenureInput.toIntOrNull() ?: 12
-                            val pd = paidInput.toIntOrNull() ?: 0
-                            val mo = monthlyInput.toDoubleOrNull()
-                            if (t.isEmpty() || tot <= 0.0 || ten <= 0) {
-                                Toast.makeText(context, "请输入有效的分期名称、总金额及期数", Toast.LENGTH_SHORT).show()
-                                return@Button
-                            }
-                            isSubmitting = true
-                            scope.launch {
-                                val res = NativeLedgerApi.saveInstallment(
-                                    context = context,
-                                    id = activeInst?.id,
-                                    title = t,
-                                    totalAmount = tot,
-                                    tenureMonths = ten,
-                                    paidPeriods = pd,
-                                    monthlyAmount = mo
-                                )
-                                isSubmitting = false
-                                res.onSuccess {
-                                    Toast.makeText(context, "分期记录已保存", Toast.LENGTH_SHORT).show()
-                                    showAddDialog = false
-                                    editingInst = null
-                                }.onFailure {
-                                    Toast.makeText(context, "保存失败: ${it.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        enabled = !isSubmitting,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
-                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                    ) {
-                        Text("保存", color = Color.White)
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showAddDialog = false
-                        editingInst = null
-                    },
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                ) {
-                    Text(stringResource(R.string.common_cancel), color = Slate600)
-                }
-            }
-        )
-    }
 }
