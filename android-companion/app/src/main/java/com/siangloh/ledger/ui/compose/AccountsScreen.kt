@@ -498,10 +498,12 @@ fun AddAccountDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.account_name_label)) },
-                    placeholder = { Text("Maybank, TNG, Cash...") },
+                    label = { Text(stringResource(R.string.account_name_label), color = Slate600) },
+                    placeholder = { Text("Maybank, TNG, Cash...", color = Slate400) },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
+                    colors = ledgerInputColors()
                 )
 
                 Text(stringResource(R.string.account_type_label), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate700)
@@ -533,10 +535,12 @@ fun AddAccountDialog(
                     OutlinedTextField(
                         value = creditLimitText,
                         onValueChange = { creditLimitText = it },
-                        label = { Text(stringResource(R.string.credit_limit_label)) },
-                        placeholder = { Text("0") },
+                        label = { Text(stringResource(R.string.credit_limit_label), color = Slate600) },
+                        placeholder = { Text("0", color = Slate400) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                 }
             }
@@ -676,18 +680,22 @@ fun TransferFundsDialog(
                 OutlinedTextField(
                     value = amountStr,
                     onValueChange = { amountStr = it },
-                    label = { Text(stringResource(R.string.amount_label) + " (MYR)") },
-                    placeholder = { Text("0.00") },
+                    label = { Text(stringResource(R.string.amount_label) + " (MYR)", color = Slate600) },
+                    placeholder = { Text("0.00", color = Slate400) },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
+                    colors = ledgerInputColors()
                 )
 
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text(stringResource(R.string.add_note)) },
+                    label = { Text(stringResource(R.string.add_note), color = Slate600) },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
+                    colors = ledgerInputColors()
                 )
             }
         },
@@ -852,13 +860,11 @@ fun AccountReconcileDialog(
                 OutlinedTextField(
                     value = statementBalanceStr,
                     onValueChange = { statementBalanceStr = it },
-                    label = { Text(stringResource(R.string.statement_balance_label)) },
-                    placeholder = { Text(stringResource(R.string.statement_balance_hint)) },
+                    label = { Text(stringResource(R.string.statement_balance_label), color = Slate600) },
+                    placeholder = { Text(stringResource(R.string.statement_balance_hint), color = Slate400) },
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryTeal,
-                        focusedLabelColor = PrimaryTeal
-                    ),
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
+                    colors = ledgerInputColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -924,12 +930,10 @@ fun AccountReconcileDialog(
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text(stringResource(R.string.reconcile_note_hint)) },
+                    label = { Text(stringResource(R.string.reconcile_note_hint), color = Slate600) },
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryTeal,
-                        focusedLabelColor = PrimaryTeal
-                    ),
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
+                    colors = ledgerInputColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 

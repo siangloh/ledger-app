@@ -1833,6 +1833,8 @@ fun QuickCategorizeDialog(
                     placeholder = { Text("自定义分类...", fontSize = 12.sp, color = Slate400) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
+                    colors = ledgerInputColors(),
                     trailingIcon = {
                         if (customCategory.isNotBlank()) {
                             IconButton(onClick = { onConfirmCategory(customCategory.trim()) }) {
@@ -1930,17 +1932,21 @@ fun ServerConfigDialog(
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("后端服务器地址 (URL)") },
-                    placeholder = { Text("https://example.com 或 http://192.168.x.x:5000") },
+                    label = { Text("后端服务器地址 (URL)", color = Slate600) },
+                    placeholder = { Text("https://example.com 或 http://192.168.x.x:5000", color = Slate400) },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
+                    colors = ledgerInputColors()
                 )
                 OutlinedTextField(
                     value = key,
                     onValueChange = { key = it },
-                    label = { Text("API 访问秘钥 (X-API-KEY)") },
+                    label = { Text("API 访问秘钥 (X-API-KEY)", color = Slate600) },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
+                    colors = ledgerInputColors()
                 )
                 Surface(
                     shape = RoundedCornerShape(10.dp),
@@ -2224,10 +2230,8 @@ fun CategoryRulesDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryTeal,
-                        unfocusedBorderColor = Slate200
-                    )
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
+                    colors = ledgerInputColors(containerColor = Slate50)
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -2410,18 +2414,22 @@ fun CategoryRulesDialog(
                     OutlinedTextField(
                         value = patternInput,
                         onValueChange = { patternInput = it },
-                        label = { Text("商户匹配模式") },
-                        placeholder = { Text("例如：GrabFood、Starbucks") },
+                        label = { Text("商户匹配模式", color = Slate600) },
+                        placeholder = { Text("例如：GrabFood、Starbucks", color = Slate400) },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                     OutlinedTextField(
                         value = categoryInput,
                         onValueChange = { categoryInput = it },
-                        label = { Text("目标分类") },
-                        placeholder = { Text("例如：餐饮、交通") },
+                        label = { Text("目标分类", color = Slate600) },
+                        placeholder = { Text("例如：餐饮、交通", color = Slate400) },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),

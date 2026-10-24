@@ -427,6 +427,17 @@ fun AddTransactionScreen(
                                 }
                             ),
                             colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = when (draft.txType) {
+                                    "income" -> IncomeGreen
+                                    "transfer" -> Slate700
+                                    else -> Slate900
+                                },
+                                unfocusedTextColor = when (draft.txType) {
+                                    "income" -> IncomeGreen
+                                    "transfer" -> Slate700
+                                    else -> Slate900
+                                },
+                                cursorColor = PrimaryTeal,
                                 focusedBorderColor = Color.Transparent,
                                 unfocusedBorderColor = Color.Transparent,
                                 focusedContainerColor = Color.Transparent,
@@ -732,10 +743,12 @@ fun AddTransactionScreen(
                         OutlinedTextField(
                             value = draft.note,
                             onValueChange = { draft.note = it },
-                            label = { Text("商户 / 备注说明", fontSize = 12.sp) },
-                            placeholder = { Text("如：Starbucks、麦当劳、超市买菜", fontSize = 12.sp) },
+                            label = { Text("商户 / 备注说明", fontSize = 12.sp, color = Slate600) },
+                            placeholder = { Text("如：Starbucks、麦当劳、超市买菜", fontSize = 12.sp, color = Slate400) },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(color = Slate900),
+                            colors = ledgerInputColors(containerColor = Slate50)
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -743,10 +756,12 @@ fun AddTransactionScreen(
                         OutlinedTextField(
                             value = draft.tags,
                             onValueChange = { draft.tags = it },
-                            label = { Text("标签 (Tags)", fontSize = 12.sp) },
-                            placeholder = { Text("如：#出差 #聚会 #报销", fontSize = 12.sp) },
+                            label = { Text("标签 (Tags)", fontSize = 12.sp, color = Slate600) },
+                            placeholder = { Text("如：#出差 #聚会 #报销", fontSize = 12.sp, color = Slate400) },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(color = Slate900),
+                            colors = ledgerInputColors(containerColor = Slate50)
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))

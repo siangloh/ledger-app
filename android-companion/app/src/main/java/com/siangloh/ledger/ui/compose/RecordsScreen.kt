@@ -477,11 +477,15 @@ fun RecordsScreen(
                         },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
                         colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Slate900,
+                            unfocusedTextColor = Slate900,
                             focusedBorderColor = PrimaryTeal,
                             unfocusedBorderColor = Slate200,
                             focusedContainerColor = Slate50,
-                            unfocusedContainerColor = Slate50
+                            unfocusedContainerColor = Slate50,
+                            cursorColor = PrimaryTeal
                         ),
                         modifier = Modifier
                             .weight(1f)
@@ -1493,6 +1497,7 @@ fun EditTransactionBottomSheet(
                     onValueChange = { amountStr = it },
                     label = { Text("金额 (MYR)", color = Slate600) },
                     singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
                     modifier = Modifier.fillMaxWidth(),
                     colors = fieldColors
                 )
@@ -1506,6 +1511,7 @@ fun EditTransactionBottomSheet(
                         onValueChange = { category = it },
                         label = { Text("分类", color = Slate600) },
                         singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
                         modifier = Modifier.weight(1f),
                         colors = fieldColors
                     )
@@ -1514,6 +1520,7 @@ fun EditTransactionBottomSheet(
                         onValueChange = { dateStr = it },
                         label = { Text("日期 (YYYY-MM-DD)", color = Slate600) },
                         singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
                         modifier = Modifier.weight(1f),
                         colors = fieldColors
                     )
@@ -1527,6 +1534,7 @@ fun EditTransactionBottomSheet(
                     onValueChange = { note = it },
                     label = { Text("商户 / 备注", color = Slate600) },
                     singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
                     modifier = Modifier.fillMaxWidth(),
                     colors = fieldColors
                 )
@@ -1539,6 +1547,7 @@ fun EditTransactionBottomSheet(
                     onValueChange = { tags = it },
                     label = { Text("标签 (如: #food #lunch)", color = Slate600) },
                     singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
                     modifier = Modifier.fillMaxWidth(),
                     colors = fieldColors
                 )
@@ -1982,7 +1991,8 @@ fun AdvancedFilterBottomSheet(
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PrimaryTeal, focusedLabelColor = PrimaryTeal)
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
+                    colors = ledgerInputColors()
                 )
                 Text("~", color = Slate400, fontWeight = FontWeight.Bold)
                 OutlinedTextField(
@@ -1992,7 +2002,8 @@ fun AdvancedFilterBottomSheet(
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PrimaryTeal, focusedLabelColor = PrimaryTeal)
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
+                    colors = ledgerInputColors()
                 )
             }
 
@@ -2139,13 +2150,11 @@ fun SavePresetDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    placeholder = { Text(stringResource(R.string.filter_preset_name_hint), fontSize = 13.sp) },
+                    placeholder = { Text(stringResource(R.string.filter_preset_name_hint), fontSize = 13.sp, color = Slate400) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryTeal,
-                        focusedLabelColor = PrimaryTeal
-                    )
+                    textStyle = LocalTextStyle.current.copy(color = Slate900),
+                    colors = ledgerInputColors()
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

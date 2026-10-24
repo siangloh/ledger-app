@@ -512,14 +512,12 @@ fun BudgetManagementPage(
                     OutlinedTextField(
                         value = limitInput,
                         onValueChange = { limitInput = it },
-                        label = { Text("总预算限额 (MYR)") },
-                        placeholder = { Text(stringResource(R.string.budget_amount_hint)) },
+                        label = { Text("总预算限额 (MYR)", color = Slate600) },
+                        placeholder = { Text(stringResource(R.string.budget_amount_hint), color = Slate400) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryTeal,
-                            focusedLabelColor = PrimaryTeal
-                        )
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                 }
             },
@@ -585,14 +583,12 @@ fun BudgetManagementPage(
                     OutlinedTextField(
                         value = catLimitInput,
                         onValueChange = { catLimitInput = it },
-                        label = { Text("限额 (MYR)") },
-                        placeholder = { Text(stringResource(R.string.budget_amount_hint)) },
+                        label = { Text("限额 (MYR)", color = Slate600) },
+                        placeholder = { Text(stringResource(R.string.budget_amount_hint), color = Slate400) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryTeal,
-                            focusedLabelColor = PrimaryTeal
-                        )
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                 }
             },
@@ -679,25 +675,21 @@ fun BudgetManagementPage(
                     OutlinedTextField(
                         value = newCatName,
                         onValueChange = { newCatName = it },
-                        label = { Text("分类名称 (如: 餐饮)") },
+                        label = { Text("分类名称 (如: 餐饮)", color = Slate600) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryTeal,
-                            focusedLabelColor = PrimaryTeal
-                        )
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                     OutlinedTextField(
                         value = newCatLimit,
                         onValueChange = { newCatLimit = it },
-                        label = { Text("月度限额 (MYR)") },
-                        placeholder = { Text("如: 800.00") },
+                        label = { Text("月度限额 (MYR)", color = Slate600) },
+                        placeholder = { Text("如: 800.00", color = Slate400) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryTeal,
-                            focusedLabelColor = PrimaryTeal
-                        )
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                 }
             },

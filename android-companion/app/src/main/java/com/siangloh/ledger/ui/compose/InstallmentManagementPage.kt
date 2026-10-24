@@ -283,43 +283,53 @@ fun InstallmentManagementPage(
                     OutlinedTextField(
                         value = titleInput,
                         onValueChange = { titleInput = it },
-                        label = { Text("分期/债务名称 (如: iPhone 免息分期)") },
+                        label = { Text("分期/债务名称 (如: iPhone 免息分期)", color = Slate600) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                     OutlinedTextField(
                         value = totalAmountInput,
                         onValueChange = { totalAmountInput = it },
-                        label = { Text("总欠款金额 (MYR)") },
-                        placeholder = { Text("0.00") },
+                        label = { Text("总欠款金额 (MYR)", color = Slate600) },
+                        placeholder = { Text("0.00", color = Slate400) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = tenureInput,
                             onValueChange = { tenureInput = it },
-                            label = { Text("总期数") },
-                            placeholder = { Text("12") },
+                            label = { Text("总期数", color = Slate600) },
+                            placeholder = { Text("12", color = Slate400) },
                             singleLine = true,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            textStyle = LocalTextStyle.current.copy(color = Slate900),
+                            colors = ledgerInputColors()
                         )
                         OutlinedTextField(
                             value = paidInput,
                             onValueChange = { paidInput = it },
-                            label = { Text("已还期数") },
-                            placeholder = { Text("0") },
+                            label = { Text("已还期数", color = Slate600) },
+                            placeholder = { Text("0", color = Slate400) },
                             singleLine = true,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            textStyle = LocalTextStyle.current.copy(color = Slate900),
+                            colors = ledgerInputColors()
                         )
                     }
                     OutlinedTextField(
                         value = monthlyInput,
                         onValueChange = { monthlyInput = it },
-                        label = { Text("月供金额 (留空按期数自动计算)") },
-                        placeholder = { Text("可选") },
+                        label = { Text("月供金额 (留空按期数自动计算)", color = Slate600) },
+                        placeholder = { Text("可选", color = Slate400) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                 }
             },

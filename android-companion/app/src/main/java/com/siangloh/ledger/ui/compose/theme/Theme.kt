@@ -42,12 +42,29 @@ val DarkColorScheme = darkColorScheme(
 )
 
 @Composable
+fun ledgerInputColors(
+    containerColor: Color = Color.White
+) = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = Slate900,
+    unfocusedTextColor = Slate900,
+    focusedContainerColor = containerColor,
+    unfocusedContainerColor = containerColor,
+    focusedBorderColor = PrimaryTeal,
+    unfocusedBorderColor = Slate300,
+    focusedLabelColor = PrimaryTeal,
+    unfocusedLabelColor = Slate600,
+    focusedPlaceholderColor = Slate400,
+    unfocusedPlaceholderColor = Slate400,
+    cursorColor = PrimaryTeal
+)
+
+@Composable
 fun LedgerTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit
 ) {
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+        colorScheme = LightColorScheme,
         content = content
     )
 }

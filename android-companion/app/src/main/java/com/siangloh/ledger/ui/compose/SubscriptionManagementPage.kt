@@ -251,31 +251,39 @@ fun SubscriptionManagementPage(
                     OutlinedTextField(
                         value = nameInput,
                         onValueChange = { nameInput = it },
-                        label = { Text("项目名称 (如: Netflix, iCloud, 宽带)") },
+                        label = { Text("项目名称 (如: Netflix, iCloud, 宽带)", color = Slate600) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                     OutlinedTextField(
                         value = costInput,
                         onValueChange = { costInput = it },
-                        label = { Text("周期扣费金额 (MYR)") },
-                        placeholder = { Text("0.00") },
+                        label = { Text("周期扣费金额 (MYR)", color = Slate600) },
+                        placeholder = { Text("0.00", color = Slate400) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                     OutlinedTextField(
                         value = categoryInput,
                         onValueChange = { categoryInput = it },
-                        label = { Text("记账分类 (如: 娱乐, 账单)") },
+                        label = { Text("记账分类 (如: 娱乐, 账单)", color = Slate600) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                     OutlinedTextField(
                         value = dateInput,
                         onValueChange = { dateInput = it },
-                        label = { Text("下次扣款周期 (如: 每月15号)") },
+                        label = { Text("下次扣款周期 (如: 每月15号)", color = Slate600) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
                     )
                 }
             },
