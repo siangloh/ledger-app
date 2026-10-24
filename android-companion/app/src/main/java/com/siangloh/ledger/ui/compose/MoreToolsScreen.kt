@@ -254,14 +254,6 @@ fun MoreToolsScreen(
             ) {
                 item { Spacer(modifier = Modifier.height(4.dp)) }
 
-                // 0. 全功能账本大厅直达与功能矩阵
-                item {
-                    FullLedgerFeaturesCard(
-                        onOpenFullLedger = { onOpenWebUrl("/") },
-                        onOpenFeature = onOpenWebUrl,
-                        onOpenSettings = onOpenSettings
-                    )
-                }
 
             // 1. 待整理收件箱 (Pending Review)
             item {
@@ -943,36 +935,23 @@ fun SubscriptionsCard(
                     }
 
                     Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Button(
+                        onClick = {
+                            isLoadingMatches = true
+                            showMatchDialog = true
+                            scope.launch {
+                                val res = NativeLedgerApi.getSubscriptionMatches(context)
+                                isLoadingMatches = false
+                                matchRecords = res.getOrDefault(emptyList())
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(38.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        OutlinedButton(
-                            onClick = onOpenManage,
-                            modifier = Modifier.weight(1f).height(38.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, PrimaryTeal)
-                        ) {
-                            Text("订阅大厅", fontSize = 12.sp, color = PrimaryTeal)
-                        }
-                        Button(
-                            onClick = {
-                                isLoadingMatches = true
-                                showMatchDialog = true
-                                scope.launch {
-                                    val res = NativeLedgerApi.getSubscriptionMatches(context)
-                                    isLoadingMatches = false
-                                    matchRecords = res.getOrDefault(emptyList())
-                                }
-                            },
-                            modifier = Modifier.weight(1f).height(38.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("智能匹配流水", fontSize = 12.sp, color = Color.White)
-                        }
+                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("智能匹配流水", fontSize = 12.sp, color = Color.White)
                     }
                 }
             }
@@ -1254,14 +1233,6 @@ fun InstallmentsCard(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
-                    OutlinedButton(
-                        onClick = onOpenManage,
-                        modifier = Modifier.fillMaxWidth().height(36.dp),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("前往债务中心维护负债、车房贷与分期", fontSize = 12.sp, color = Rose500)
-                    }
                 }
             }
         }

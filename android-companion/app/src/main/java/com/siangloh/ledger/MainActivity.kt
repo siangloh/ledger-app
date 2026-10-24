@@ -137,14 +137,8 @@ class MainActivity : AppCompatActivity() {
                 com.siangloh.ledger.ui.compose.MainAppScreen(
                     onScanReceipt = { showReceiptScanChooser() },
                     onOpenSettings = { showAppSettingsDialog() },
-                    onOpenWebUrl = { relativeOrAbsoluteUrl ->
-                        showWebViewMode()
-                        if (relativeOrAbsoluteUrl.startsWith("http")) {
-                            webView.loadUrl(relativeOrAbsoluteUrl)
-                        } else {
-                            val serverUrl = NetworkHelper.getServerUrl(this).trimEnd('/')
-                            webView.loadUrl("$serverUrl$relativeOrAbsoluteUrl")
-                        }
+                    onOpenWebUrl = {
+                        Toast.makeText(this, "当前为独立纯原生模式，未启用 Web 视图", Toast.LENGTH_SHORT).show()
                     }
                 )
             }
@@ -152,14 +146,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun showWebViewMode() {
-        ensureWebViewInitialized()
-        composeView.visibility = View.GONE
-        swipeRefreshLayout.visibility = View.VISIBLE
-        fabQuickAdd.visibility = View.VISIBLE
-        offlineContainer.visibility = View.GONE
-        if (webView.url.isNullOrEmpty()) {
-            loadContent()
-        }
+        showNativeComposeMode()
     }
 
     fun showNativeComposeMode() {
@@ -638,15 +625,9 @@ class MainActivity : AppCompatActivity() {
             "ms" -> "Bahasa Melayu"
             else -> "中文 (简体)"
         }
-        val sp = getSharedPreferences("ledger_network_prefs", Context.MODE_PRIVATE)
-        val defaultMode = sp.getString("default_view_mode", "compose") ?: "compose"
-        val modeText = if (defaultMode == "web") "🏛️ 全功能账本大厅" else "📊 极简原生视图"
         val isWifiOnly = NetworkHelper.isWifiOnlySync(this)
         val syncScopeLabel = if (isWifiOnly) "仅在 WiFi 下自动同步" else "任何网络均可自动同步"
         val options = arrayOf(
-            "🏛️ 切换至全功能账本大厅",
-            "📊 切换至极简原生视图",
-            "📱 默认启动视图设置 (当前: $modeText)",
             "🌐 界面语言设置 (当前: $langLabel)",
             "📶 自动同步网络设置 (当前: $syncScopeLabel)",
             "⚡ 离线快速记账",
@@ -661,24 +642,21 @@ class MainActivity : AppCompatActivity() {
             .setTitle("⚙️ 应用设置与快捷操作")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> showWebViewMode()
-                    1 -> showNativeComposeMode()
-                    2 -> showDefaultViewModeDialog()
-                    3 -> showLanguageDialog()
-                    4 -> {
+                    0 -> showLanguageDialog()
+                    1 -> {
                         val newSetting = !isWifiOnly
                         NetworkHelper.setWifiOnlySync(this, newSetting)
                         SyncWorker.enqueueSync(this)
                         val notice = if (newSetting) "已开启【仅在 WiFi 下自动同步】\n离线或移动网络下将安全保存在手机，连上 WiFi 时自动上传。" else "已切换为【任何网络均可自动同步】"
                         Toast.makeText(this, notice, Toast.LENGTH_LONG).show()
                     }
-                    5 -> startActivity(Intent(this, QuickAddActivity::class.java))
-                    6 -> showUsernameDialog()
-                    7 -> showServerUrlDialog()
-                    8 -> showApiKeyDialog()
-                    9 -> startActivity(Intent(this, AppSelectionActivity::class.java))
-                    10 -> startActivity(Intent(this, NotificationLogActivity::class.java))
-                    11 -> {
+                    2 -> startActivity(Intent(this, QuickAddActivity::class.java))
+                    3 -> showUsernameDialog()
+                    4 -> showServerUrlDialog()
+                    5 -> showApiKeyDialog()
+                    6 -> startActivity(Intent(this, AppSelectionActivity::class.java))
+                    7 -> startActivity(Intent(this, NotificationLogActivity::class.java))
+                    8 -> {
                         SyncWorker.enqueueSync(this)
                         Toast.makeText(this, "已发起后台同步请求", Toast.LENGTH_SHORT).show()
                     }
@@ -765,31 +743,25 @@ class MainActivity : AppCompatActivity() {
     private fun showServerUrlDialog() {
         val currentUrl = NetworkHelper.getServerUrl(this)
         val presets = arrayOf(
-            "☁️ 云端生产服务器 (Render)\nhttps://ledger-app-l3hc.onrender.com",
-            "🏠 本地局域网 (Wi-Fi 局域网)\nhttp://192.168.100.85:5000",
-            "🔌 USB 反向代理 (端口映射)\nhttp://127.0.0.1:5000",
+            "🏠 电脑本地局域网 (Wi-Fi)\nhttp://192.168.1.12:5000",
+            "🔌 USB 反向代理 (adb reverse)\nhttp://127.0.0.1:5000",
             "✏️ 自定义输入服务器地址..."
         )
         AlertDialog.Builder(this)
-            .setTitle("🌐 服务器地址切换与设置\n(当前: $currentUrl)")
+            .setTitle("🌐 本地服务器地址切换与设置\n(当前: $currentUrl)")
             .setItems(presets) { _, which ->
                 when (which) {
                     0 -> {
-                        NetworkHelper.setServerUrl(this, "https://ledger-app-l3hc.onrender.com")
-                        Toast.makeText(this, "已切换为云端服务器并重新加载", Toast.LENGTH_SHORT).show()
+                        NetworkHelper.setServerUrl(this, "http://192.168.1.12:5000")
+                        Toast.makeText(this, "已切换为电脑本地局域网服务器", Toast.LENGTH_SHORT).show()
                         loadContent()
                     }
                     1 -> {
-                        NetworkHelper.setServerUrl(this, "http://192.168.100.85:5000")
-                        Toast.makeText(this, "已切换为局域网服务器并重新加载", Toast.LENGTH_SHORT).show()
-                        loadContent()
-                    }
-                    2 -> {
                         NetworkHelper.setServerUrl(this, "http://127.0.0.1:5000")
-                        Toast.makeText(this, "已切换为 USB 代理服务器并重新加载", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "已切换为 USB 本地代理服务器", Toast.LENGTH_SHORT).show()
                         loadContent()
                     }
-                    3 -> showCustomServerUrlInput(currentUrl)
+                    2 -> showCustomServerUrlInput(currentUrl)
                 }
             }
             .setNegativeButton("取消", null)
@@ -992,27 +964,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendRecognizedTextToWebView(text: String) {
-        showWebViewMode()
-        val curUrl = webView.url ?: ""
-        val splitBillUrl = NetworkHelper.getServerUrl(this).trimEnd('/') + "/split-bill"
-
-        if (!curUrl.contains("/split-bill")) {
-            pendingScannedReceiptText = text
-            webView.loadUrl(splitBillUrl)
-            return
+        val intent = Intent(this, QuickAddActivity::class.java).apply {
+            putExtra("extra_note", text.take(60))
         }
-
-        // JSONObject.quote() 会把字符串安全地转成带引号、已转义的 JS 字符串字面量，
-        // 避免小票文字里如果含有引号/换行导致注入到页面的 JS 语法出错。
-        val jsSafeText = JSONObject.quote(text)
-        val js = "javascript:(function(){ " +
-            "if (typeof receiveScannedReceiptText === 'function') { " +
-            "  receiveScannedReceiptText($jsSafeText); " +
-            "} else { " +
-            "  window._pendingScannedReceiptText = $jsSafeText; " +
-            "} " +
-            "})();"
-        webView.evaluateJavascript(js, null)
+        startActivity(intent)
     }
 
     private var lastBackPressedTime = 0L

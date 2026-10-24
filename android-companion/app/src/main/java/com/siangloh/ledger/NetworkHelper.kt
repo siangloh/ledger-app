@@ -14,7 +14,7 @@ import java.net.URL
 
 object NetworkHelper {
     private const val TAG = "LedgerNetwork"
-    const val DEFAULT_BASE_URL = "https://ledger-app-l3hc.onrender.com"
+    const val DEFAULT_BASE_URL = "http://192.168.1.12:5000"
     private const val PREFS_NAME = "ledger_network_prefs"
     private const val KEY_SERVER_URL = "custom_server_url"
 
