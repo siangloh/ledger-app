@@ -8,6 +8,10 @@ interface LocalTransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(transaction: LocalTransaction): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(transactions: List<LocalTransaction>)
+
+
     @Update
     suspend fun update(transaction: LocalTransaction)
 
