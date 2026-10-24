@@ -341,28 +341,10 @@ fun MoreToolsScreen(
                 )
             }
 
-            // 6. 服务器连接与同步设置 (Connection Settings)
-            item {
-                ServerSettingsCard(
-                    serverUrl = currentServerUrl,
-                    apiKey = currentApiKey,
-                    onEditConfig = {
-                        showServerConfigDialog = true
-                    }
-                )
-            }
-
             // 6.5 回收站管理 (Recycle Bin)
             item {
                 RecycleBinCard(
                     onOpenRecycleBin = { showRecycleBinDialog = true }
-                )
-            }
-
-            // 6.6 商户分类规则与纠正记忆 (Category Rules & Memory)
-            item {
-                CategoryRulesCard(
-                    onOpenCategoryRules = { showCategoryRulesDialog = true }
                 )
             }
 
