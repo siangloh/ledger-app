@@ -268,11 +268,22 @@ private fun AllocationBar(
         modifier.fillMaxWidth().height(barHeight).clip(RoundedCornerShape(barHeight / 2)).background(track)
     ) {
         if (denom > 0) {
-            listOf(e to ExpenseColor, r to ReservedColor, a to AvailableColor).forEach { (v, c) ->
-                if (v > 0) Box(Modifier.weight((v / denom).toFloat()).fillMaxHeight().background(c))
+            if (available < 0 && income > 0) {
+                val base = minOf(income, e + r)
+                val over = (e + r - income).coerceAtLeast(0.0)
+                if (base > 0) {
+                    Box(Modifier.weight((base / denom).toFloat()).fillMaxHeight().background(ExpenseColor))
+                }
+                if (over > 0) {
+                    Box(Modifier.weight((over / denom).toFloat()).fillMaxHeight().background(DangerColor))
+                }
+            } else {
+                listOf(e to ExpenseColor, r to ReservedColor, a to AvailableColor).forEach { (v, c) ->
+                    if (v > 0) Box(Modifier.weight((v / denom).toFloat()).fillMaxHeight().background(c))
+                }
+                val rest = denom - e - r - a
+                if (rest > denom * 0.001) Spacer(Modifier.weight((rest / denom).toFloat()))
             }
-            val rest = denom - e - r - a
-            if (rest > denom * 0.001) Spacer(Modifier.weight((rest / denom).toFloat()))
         }
     }
 }
@@ -483,12 +494,32 @@ fun CashflowSummaryCard(month: String, revision: Int = 0, onOpen: () -> Unit) {
                         Text(formatMoney(currency, expense), fontWeight = FontWeight.SemiBold, color = Slate900)
                     }
                 }
-                LegendDot(ReservedColor, stringResource(R.string.cf_reserved), formatMoney(currency, reserved))
-                if (income > 0) {
-                    AllocationBar(income, expense, reserved, available, track = Slate100)
-                    Text(stringResource(R.string.cfd_usage_short,
-                        formatPct(data.optDouble("expense_percent")), formatPct(data.optDouble("reserve_percent")),
-                        formatPct(data.optDouble("available_percent"))), fontSize = 11.sp, color = Slate500)
+                if (reserved > 0) {
+                    LegendDot(ReservedColor, stringResource(R.string.cf_reserved), formatMoney(currency, reserved))
+                }
+                if (income > 0 || expense > 0) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Box(Modifier.size(8.dp).clip(CircleShape).background(ExpenseColor))
+                                Text("已用: " + formatMoney(currency, expense), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate800)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Box(Modifier.size(8.dp).clip(CircleShape).background(if (available < 0) DangerColor else AvailableColor))
+                                Text((if (available < 0) "超支: " else "剩下: ") + formatMoney(currency, available),
+                                    fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (available < 0) ExpenseRed else AvailableColor)
+                            }
+                        }
+                        AllocationBar(income, expense, reserved, available, track = Slate100, barHeight = 14.dp)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("已支出 " + formatPct(data.optDouble("expense_percent")), fontSize = 11.sp, color = Slate500)
+                            if (reserved > 0) {
+                                Text("预留 " + formatPct(data.optDouble("reserve_percent")), fontSize = 11.sp, color = Slate500)
+                            }
+                            Text((if (available < 0) "超支 " else "可用 ") + formatPct(data.optDouble("available_percent")),
+                                fontSize = 11.sp, color = if (available < 0) ExpenseRed else AvailableColor, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 } else Text(stringResource(R.string.cf_no_ratio), fontSize = 11.sp, color = Slate500)
                 Text(stringResource(R.string.cfd_estimate_note), fontSize = 11.sp, color = Slate500)
                 if (report.cached) Text(stringResource(R.string.cf_cached), fontSize = 11.sp, color = WarningAmber)

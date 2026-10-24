@@ -82,70 +82,77 @@ object LocalLedgerRepository {
                     }
                 }
 
-                // 迁移以往从服务器缓存保存在本地 SharedPreferences 里的历史交易记录到 local_transactions
-                try {
-                    val spRecords = context.getSharedPreferences("ledger_records_cache", Context.MODE_PRIVATE)
-                    val allEntries = spRecords.all
-                    if (allEntries.isNotEmpty()) {
-                        val existingTx = db.localTransactionDao().getAll()
-                        val existingKeys = existingTx.map { "${it.date}_${it.type}_${it.amount}_${it.note}" }.toMutableSet()
-                        val toInsert = mutableListOf<LocalTransaction>()
+                // 迁移以往从服务器缓存保存在本地 SharedPreferences 里的历史交易记录到 local_transactions (仅首次迁移一次)
+                val spMigration = context.getSharedPreferences("ledger_migration_flags", Context.MODE_PRIVATE)
+                val alreadyMigrated = spMigration.getBoolean("historical_cache_migrated_v1", false)
+                if (!alreadyMigrated) {
+                    try {
+                        val spRecords = context.getSharedPreferences("ledger_records_cache", Context.MODE_PRIVATE)
+                        val allEntries = spRecords.all
+                        if (allEntries.isNotEmpty()) {
+                            val existingTx = db.localTransactionDao().getAll()
+                            val existingKeys = existingTx.map { "${it.date}_${it.type}_${it.amount}_${it.note}" }.toMutableSet()
+                            val toInsert = mutableListOf<LocalTransaction>()
 
-                        for ((key, value) in allEntries) {
-                            if (key.startsWith("ts_")) continue
-                            val jsonStr = value as? String ?: continue
-                            try {
-                                val root = JSONObject(jsonStr)
-                                val itemsArr = root.optJSONArray("items") ?: continue
-                                for (i in 0 until itemsArr.length()) {
-                                    val it = itemsArr.optJSONObject(i) ?: continue
-                                    val d = it.optString("date", "")
-                                    val t = it.optString("type", "expense")
-                                    val amt = it.optDouble("amount", 0.0)
-                                    val note = it.optString("note", "")
-                                    val cat = it.optString("category", "其他")
-                                    val channel = it.optString("channel").takeIf { ch -> ch.isNotBlank() && ch != "null" }
-                                    val src = it.optString("source", "manual")
-                                    val dedupeKey = "${d}_${t}_${amt}_${note}"
-                                    if (amt > 0 && d.isNotBlank() && !existingKeys.contains(dedupeKey)) {
-                                        existingKeys.add(dedupeKey)
-                                        toInsert.add(
-                                            LocalTransaction(
-                                                date = d,
-                                                time = it.optString("time", "12:00:00"),
-                                                type = t,
-                                                category = cat,
-                                                amount = amt,
-                                                note = note,
-                                                tags = it.optString("tags", ""),
-                                                accountId = it.optInt("accountId", 0).takeIf { a -> a > 0 },
-                                                source = src,
-                                                channel = channel,
-                                                createdAt = System.currentTimeMillis(),
-                                                updatedAt = System.currentTimeMillis()
+                            for ((key, value) in allEntries) {
+                                if (key.startsWith("ts_")) continue
+                                val jsonStr = value as? String ?: continue
+                                try {
+                                    val root = JSONObject(jsonStr)
+                                    val itemsArr = root.optJSONArray("items") ?: continue
+                                    for (i in 0 until itemsArr.length()) {
+                                        val it = itemsArr.optJSONObject(i) ?: continue
+                                        val d = it.optString("date", "")
+                                        val t = it.optString("type", "expense")
+                                        val amt = it.optDouble("amount", 0.0)
+                                        val note = it.optString("note", "")
+                                        val cat = it.optString("category", "其他")
+                                        val channel = it.optString("channel").takeIf { ch -> ch.isNotBlank() && ch != "null" }
+                                        val src = it.optString("source", "manual")
+                                        val dedupeKey = "${d}_${t}_${amt}_${note}"
+                                        if (amt > 0 && d.isNotBlank() && !existingKeys.contains(dedupeKey)) {
+                                            existingKeys.add(dedupeKey)
+                                            toInsert.add(
+                                                LocalTransaction(
+                                                    date = d,
+                                                    time = it.optString("time", "12:00:00"),
+                                                    type = t,
+                                                    category = cat,
+                                                    amount = amt,
+                                                    note = note,
+                                                    tags = it.optString("tags", ""),
+                                                    accountId = it.optInt("accountId", 0).takeIf { a -> a > 0 },
+                                                    source = src,
+                                                    channel = channel,
+                                                    createdAt = System.currentTimeMillis(),
+                                                    updatedAt = System.currentTimeMillis()
+                                                )
                                             )
-                                        )
+                                        }
                                     }
-                                }
-                            } catch (_: Exception) {}
-                        }
-                        if (toInsert.isNotEmpty()) {
-                            Log.i(TAG, "Migrated ${toInsert.size} historical cached transactions into local_transactions!")
-                            db.localTransactionDao().insertAll(toInsert)
-
-                            // 自动补充历史遗留分类
-                            val allCats = db.localCategoryDao().getAll().map { it.name }.toMutableSet()
-                            val newCats = toInsert.map { it.category }.distinct().filter { it.isNotBlank() && !allCats.contains(it) }
-                            if (newCats.isNotEmpty()) {
-                                val newCatEntities = newCats.mapIndexed { idx, name ->
-                                    LocalCategory(name = name, type = "expense", icon = "🏷️", color = "#94a3b8", orderNum = 20 + idx)
-                                }
-                                db.localCategoryDao().insertAll(newCatEntities)
+                                } catch (_: Exception) {}
                             }
+                            if (toInsert.isNotEmpty()) {
+                                Log.i(TAG, "Migrated ${toInsert.size} historical cached transactions into local_transactions!")
+                                db.localTransactionDao().insertAll(toInsert)
+
+                                // 自动补充历史遗留分类
+                                val allCats = db.localCategoryDao().getAll().map { it.name }.toMutableSet()
+                                val newCats = toInsert.map { it.category }.distinct().filter { it.isNotBlank() && !allCats.contains(it) }
+                                if (newCats.isNotEmpty()) {
+                                    val newCatEntities = newCats.mapIndexed { idx, name ->
+                                        LocalCategory(name = name, type = "expense", icon = "🏷️", color = "#94a3b8", orderNum = 20 + idx)
+                                    }
+                                    db.localCategoryDao().insertAll(newCatEntities)
+                                }
+                            }
+                            // 迁移完成后清空旧缓存并标记已完成迁移，防止删除记录后被重新还原
+                            spRecords.edit().clear().apply()
                         }
+                        spMigration.edit().putBoolean("historical_cache_migrated_v1", true).apply()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to migrate historical cache: ${e.message}")
                     }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to migrate historical cache: ${e.message}")
                 }
                 Unit
             } catch (e: Exception) {
@@ -305,17 +312,24 @@ object LocalLedgerRepository {
     suspend fun deleteTransaction(context: Context, id: Long): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val db = AppDatabase.getInstance(context)
-            val old = db.localTransactionDao().getById(id) ?: return@withContext Result.success(Unit)
+            val old = db.localTransactionDao().getById(id)
 
-            if (old.accountId != null) {
-                val revert = if (old.type == "income") -old.amount else old.amount
-                db.localAccountDao().updateBalance(old.accountId, revert)
-            }
-            if (old.type == "transfer" && old.toAccountId != null) {
-                db.localAccountDao().updateBalance(old.toAccountId, -old.amount)
+            if (old != null) {
+                if (old.accountId != null) {
+                    val revert = if (old.type == "income") -old.amount else old.amount
+                    db.localAccountDao().updateBalance(old.accountId, revert)
+                }
+                if (old.type == "transfer" && old.toAccountId != null) {
+                    db.localAccountDao().updateBalance(old.toAccountId, -old.amount)
+                }
+                db.localTransactionDao().deleteById(id)
             }
 
-            db.localTransactionDao().deleteById(id)
+            try {
+                db.pendingTransactionDao().deleteById(id)
+            } catch (_: Exception) {}
+
+            CashflowRepository.invalidate(context)
             NativeLedgerApi.invalidateCache()
             Result.success(Unit)
         } catch (e: Exception) {

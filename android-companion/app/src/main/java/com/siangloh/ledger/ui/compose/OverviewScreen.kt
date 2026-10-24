@@ -848,64 +848,12 @@ fun OverviewScreen(
                 showCategorizeDialog = false
                 selectedTxForCategorize = null
                 coroutineScope.launch {
-                    if (tx.isOfflineLocal) {
-                        // D3: 离线账单仅修改本地 Room 数据库，防止本地自增 ID 提交至服务端与他人账单碰撞
-                        withContext(Dispatchers.IO) {
-                            val db = AppDatabase.getInstance(context)
-                            db.pendingTransactionDao().updateCategory(tx.id, newCategory)
-                        }
-                        Toast.makeText(context, "已更新离线账单分类为【$newCategory】", Toast.LENGTH_SHORT).show()
+                    val res = com.siangloh.ledger.data.LocalLedgerRepository.updateTransactionCategory(context, tx.id, newCategory)
+                    res.onSuccess {
+                        Toast.makeText(context, "已修改为【$newCategory】", Toast.LENGTH_SHORT).show()
                         refreshData(forceRefresh = true)
-                    } else {
-                        val serverUrl = NetworkHelper.getServerUrl(context)
-                        val apiKey = NetworkHelper.getApiKey(context)
-                        val username = NetworkHelper.getUsername(context)
-
-                        var isSuccess = false
-                        var errorMsg = ""
-
-                        withContext(Dispatchers.IO) {
-                            try {
-                                val url = URL("$serverUrl/api/native/quick-categorize")
-                                val conn = url.openConnection() as HttpURLConnection
-                                conn.connectTimeout = 5000
-                                conn.readTimeout = 5000
-                                conn.requestMethod = "POST"
-                                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                                if (apiKey.isNotEmpty()) conn.setRequestProperty("X-API-KEY", apiKey)
-                                conn.doOutput = true
-                                val payload = JSONObject().apply {
-                                    put("key", apiKey)
-                                    put("transaction_id", tx.id)
-                                    put("category", newCategory)
-                                    put("remember_merchant", remember)
-                                    put("note", tx.note)
-                                    if (username.isNotEmpty()) put("username", username)
-                                }.toString()
-                                conn.outputStream.bufferedWriter().use { it.write(payload) }
-                                val code = conn.responseCode
-                                if (code in 200..299) {
-                                    val respStr = conn.inputStream.bufferedReader().use { it.readText() }
-                                    val respJson = JSONObject(respStr)
-                                    isSuccess = respJson.optBoolean("ok", false)
-                                    if (!isSuccess) {
-                                        errorMsg = respJson.optString("message", "分类修改失败")
-                                    }
-                                } else {
-                                    errorMsg = "HTTP $code"
-                                }
-                                conn.disconnect()
-                            } catch (e: Exception) {
-                                errorMsg = e.message ?: "网络异常"
-                            }
-                        }
-                        // U2: 真实校验结果再提示反馈
-                        if (isSuccess) {
-                            Toast.makeText(context, "已修改为【$newCategory】", Toast.LENGTH_SHORT).show()
-                            refreshData(forceRefresh = true)
-                        } else {
-                            Toast.makeText(context, "保存失败: $errorMsg", Toast.LENGTH_LONG).show()
-                        }
+                    }.onFailure { e ->
+                        Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 }
             }

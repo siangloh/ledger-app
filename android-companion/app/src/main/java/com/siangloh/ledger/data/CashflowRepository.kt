@@ -51,6 +51,12 @@ object CashflowRepository {
         }
     }
 
+    fun invalidate(context: Context) {
+        try {
+            context.getSharedPreferences("cashflow_reports", Context.MODE_PRIVATE).edit().clear().apply()
+        } catch (_: Exception) {}
+    }
+
     /**
      * 离线优先加载 (Local-First / Offline-First)
      * - 如果 !forceRefresh 且本地已有缓存，立即返回本地缓存 (0ms 瞬切)，绝对不阻塞等待慢速网络
