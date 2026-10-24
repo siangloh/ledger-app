@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Repeat
@@ -483,6 +484,7 @@ fun SubscriptionManagementPage(
         var costInput by remember { mutableStateOf(if (activeSub != null) String.format(Locale.getDefault(), "%.2f", activeSub.cost) else "") }
         var categoryInput by remember { mutableStateOf(activeSub?.category ?: if (userCategories.isNotEmpty()) userCategories.first() else "日常") }
         var dateInput by remember { mutableStateOf(activeSub?.nextBillingDate ?: "每月1号") }
+        var showDayPicker by remember { mutableStateOf(false) }
 
         AlertDialog(
             onDismissRequest = {
@@ -529,15 +531,34 @@ fun SubscriptionManagementPage(
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
                         colors = ledgerInputColors()
                     )
-                    OutlinedTextField(
-                        value = dateInput,
-                        onValueChange = { dateInput = it },
-                        label = { Text("下次扣款周期 (如: 每月15号)", color = Slate600) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = LocalTextStyle.current.copy(color = Slate900),
-                        colors = ledgerInputColors()
-                    )
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = dateInput,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("下次扣款周期 (点击选择日期)", color = Slate600) },
+                            trailingIcon = {
+                                IconButton(onClick = { showDayPicker = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarToday,
+                                        contentDescription = "选择扣款日",
+                                        tint = PrimaryTeal,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(color = Slate900),
+                            colors = ledgerInputColors()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showDayPicker = true }
+                        )
+                    }
                 }
             },
             confirmButton = {
@@ -609,6 +630,19 @@ fun SubscriptionManagementPage(
                 }
             }
         )
+
+        if (showDayPicker) {
+            MonthlyDayPickerDialog(
+                title = "选择每月扣款日",
+                currentValue = dateInput,
+                accentColor = PrimaryTeal,
+                onDaySelected = { selected ->
+                    dateInput = selected
+                    showDayPicker = false
+                },
+                onDismissRequest = { showDayPicker = false }
+            )
+        }
     }
 
     // 新增/编辑固定收入子弹窗
@@ -619,6 +653,7 @@ fun SubscriptionManagementPage(
         var categoryInput by remember { mutableStateOf(activeIncome?.category ?: "工资") }
         var dayInput by remember { mutableStateOf(activeIncome?.arrivalDay ?: "每月25号") }
         var isActiveInput by remember { mutableStateOf(activeIncome?.isActive ?: true) }
+        var showDayPicker by remember { mutableStateOf(false) }
 
         val incomeCategoryOptions = listOf("工资", "兼职", "租金", "投资", "奖金", "报销", "其他")
 
@@ -688,15 +723,34 @@ fun SubscriptionManagementPage(
                         }
                     }
 
-                    OutlinedTextField(
-                        value = dayInput,
-                        onValueChange = { dayInput = it },
-                        label = { Text("预计入账周期 (如: 每月25号、每月1号)", color = Slate600) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = LocalTextStyle.current.copy(color = Slate900),
-                        colors = ledgerInputColors()
-                    )
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = dayInput,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("预计入账周期 (点击选择日期)", color = Slate600) },
+                            trailingIcon = {
+                                IconButton(onClick = { showDayPicker = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarToday,
+                                        contentDescription = "选择入账日",
+                                        tint = IncomeGreen,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(color = Slate900),
+                            colors = ledgerInputColors()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showDayPicker = true }
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -781,5 +835,213 @@ fun SubscriptionManagementPage(
                 }
             }
         )
+
+        if (showDayPicker) {
+            MonthlyDayPickerDialog(
+                title = "选择每月入账日",
+                currentValue = dayInput,
+                accentColor = IncomeGreen,
+                onDaySelected = { selected ->
+                    dayInput = selected
+                    showDayPicker = false
+                },
+                onDismissRequest = { showDayPicker = false }
+            )
+        }
     }
 }
+
+/**
+ * 优雅的纯白无偏色每月周期日期选择弹窗 (1 ~ 31 号 + 月末)
+ */
+@Composable
+fun MonthlyDayPickerDialog(
+    title: String = "选择每月周期日期",
+    currentValue: String,
+    accentColor: Color = PrimaryTeal,
+    onDaySelected: (String) -> Unit,
+    onDismissRequest: () -> Unit
+) {
+    val initialDayNum = remember(currentValue) {
+        if (currentValue.contains("底") || currentValue.contains("末")) {
+            -1
+        } else {
+            Regex("\\d+").find(currentValue)?.value?.toIntOrNull() ?: 1
+        }
+    }
+
+    var selectedDay by remember { mutableStateOf(initialDayNum) }
+
+    val quickOptions = listOf(
+        1 to "1号",
+        5 to "5号",
+        10 to "10号",
+        15 to "15号",
+        20 to "20号",
+        25 to "25号",
+        -1 to "月底"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        containerColor = Color.White,
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarToday,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column {
+                    Text(
+                        text = title,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900
+                    )
+                    Text(
+                        text = "点击数字直接选定每月的固定执行日期",
+                        fontSize = 11.sp,
+                        color = Slate500
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // 快捷推荐标签
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "快捷推荐",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Slate700
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        quickOptions.forEach { (day, label) ->
+                            val isSel = selectedDay == day
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSel) accentColor else Slate100,
+                                modifier = Modifier.clickable {
+                                    selectedDay = day
+                                    val formatted = if (day == -1) "每月最后一天(月底)" else "每月${day}号"
+                                    onDaySelected(formatted)
+                                }
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSel) Color.White else Slate700,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = Slate200, thickness = 0.8.dp)
+
+                // 1 ~ 31 号 日历网格
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "全部日期 (1 ~ 31 号)",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Slate700
+                        )
+                        Text(
+                            text = if (selectedDay == -1) "当前: 月底" else "当前: 每月${selectedDay}号",
+                            fontSize = 11.sp,
+                            color = accentColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // 7 列日历网格
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        for (row in 0..4) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                for (col in 0..6) {
+                                    val day = row * 7 + col + 1
+                                    if (day <= 31) {
+                                        val isSel = selectedDay == day
+                                        Box(
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (isSel) accentColor else Slate100)
+                                                .clickable {
+                                                    selectedDay = day
+                                                    onDaySelected("每月${day}号")
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "$day",
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSel) Color.White else Slate800
+                                            )
+                                        }
+                                    } else {
+                                        Spacer(modifier = Modifier.size(36.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val formatted = if (selectedDay == -1) "每月最后一天(月底)" else "每月${selectedDay}号"
+                    onDaySelected(formatted)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("确定")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text("取消", color = Slate600)
+            }
+        }
+    )
+}
+
