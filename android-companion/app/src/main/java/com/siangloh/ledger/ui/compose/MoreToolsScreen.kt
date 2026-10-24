@@ -2024,16 +2024,11 @@ fun RecycleBinDialog(
     fun loadItems() {
         isLoading = true
         errorMessage = null
-        NetworkHelper.getRecycleBinItems(page = 1) { success, resultItems, total, error ->
-            scope.launch(Dispatchers.Main) {
-                isLoading = false
-                if (success) {
-                    items = resultItems
-                    totalCount = total
-                } else {
-                    errorMessage = error ?: "加载回收站失败"
-                }
-            }
+        scope.launch {
+            val localItems = com.siangloh.ledger.data.LocalLedgerRepository.getRecycleBinItems(context)
+            items = localItems
+            totalCount = localItems.size
+            isLoading = false
         }
     }
 
@@ -2253,15 +2248,14 @@ fun RecycleBinDialog(
                                             Button(
                                                 onClick = {
                                                     isOperating = true
-                                                    NetworkHelper.restoreRecycleBinItem(id) { success, msg ->
-                                                        scope.launch(Dispatchers.Main) {
-                                                            isOperating = false
-                                                            if (success) {
-                                                                Toast.makeText(context, "已成功恢复", Toast.LENGTH_SHORT).show()
-                                                                loadItems()
-                                                            } else {
-                                                                Toast.makeText(context, msg ?: "恢复失败", Toast.LENGTH_SHORT).show()
-                                                            }
+                                                    scope.launch {
+                                                        val res = com.siangloh.ledger.data.LocalLedgerRepository.restoreRecycleBinItem(context, id)
+                                                        isOperating = false
+                                                        res.onSuccess {
+                                                            Toast.makeText(context, "已成功恢复", Toast.LENGTH_SHORT).show()
+                                                            loadItems()
+                                                        }.onFailure {
+                                                            Toast.makeText(context, it.message ?: "恢复失败", Toast.LENGTH_SHORT).show()
                                                         }
                                                     }
                                                 },
@@ -2327,15 +2321,14 @@ fun RecycleBinDialog(
                         val toDel = txId
                         itemToDelete = null
                         isOperating = true
-                        NetworkHelper.permanentDeleteRecycleBinItem(toDel) { success, msg ->
-                            scope.launch(Dispatchers.Main) {
-                                isOperating = false
-                                if (success) {
-                                    Toast.makeText(context, "已彻底删除", Toast.LENGTH_SHORT).show()
-                                    loadItems()
-                                } else {
-                                    Toast.makeText(context, msg ?: "删除失败", Toast.LENGTH_SHORT).show()
-                                }
+                        scope.launch {
+                            val res = com.siangloh.ledger.data.LocalLedgerRepository.permanentDeleteRecycleBinItem(context, toDel)
+                            isOperating = false
+                            res.onSuccess {
+                                Toast.makeText(context, "已彻底删除", Toast.LENGTH_SHORT).show()
+                                loadItems()
+                            }.onFailure {
+                                Toast.makeText(context, it.message ?: "删除失败", Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
@@ -2382,15 +2375,14 @@ fun RecycleBinDialog(
                     onClick = {
                         showEmptyConfirm = false
                         isOperating = true
-                        NetworkHelper.emptyRecycleBin { success, msg ->
-                            scope.launch(Dispatchers.Main) {
-                                isOperating = false
-                                if (success) {
-                                    Toast.makeText(context, "回收站已清空", Toast.LENGTH_SHORT).show()
-                                    loadItems()
-                                } else {
-                                    Toast.makeText(context, msg ?: "清空失败", Toast.LENGTH_SHORT).show()
-                                }
+                        scope.launch {
+                            val res = com.siangloh.ledger.data.LocalLedgerRepository.emptyRecycleBin(context)
+                            isOperating = false
+                            res.onSuccess {
+                                Toast.makeText(context, "回收站已清空", Toast.LENGTH_SHORT).show()
+                                loadItems()
+                            }.onFailure {
+                                Toast.makeText(context, it.message ?: "清空失败", Toast.LENGTH_SHORT).show()
                             }
                         }
                     },

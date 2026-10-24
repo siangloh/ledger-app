@@ -327,6 +327,27 @@ object LocalLedgerRepository {
             val old = db.localTransactionDao().getById(id)
 
             if (old != null) {
+                // Save to local recycle bin before deleting
+                try {
+                    val sp = context.getSharedPreferences("local_recycle_bin_prefs", Context.MODE_PRIVATE)
+                    val existing = sp.getString("trash_items", "[]") ?: "[]"
+                    val trashArr = JSONArray(existing)
+                    trashArr.put(JSONObject().apply {
+                        put("id", old.id)
+                        put("date", old.date)
+                        put("time", old.time)
+                        put("type", old.type)
+                        put("category", old.category)
+                        put("amount", old.amount)
+                        put("note", old.note)
+                        put("tags", old.tags)
+                        put("account_id", old.accountId ?: 0)
+                        put("source", old.source)
+                        put("deleted_at", SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date()))
+                    })
+                    sp.edit().putString("trash_items", trashArr.toString()).apply()
+                } catch (_: Exception) {}
+
                 if (old.accountId != null) {
                     val revert = if (old.type == "income") -old.amount else old.amount
                     db.localAccountDao().updateBalance(old.accountId, revert)
@@ -455,7 +476,15 @@ object LocalLedgerRepository {
         context: Context,
         month: String? = null,
         type: String? = null,
+        category: String? = null,
         search: String? = null,
+        accountId: Int? = null,
+        startDate: String? = null,
+        endDate: String? = null,
+        minAmount: Double? = null,
+        maxAmount: Double? = null,
+        source: String? = null,
+        channel: String? = null,
         page: Int = 1,
         limit: Int = 30
     ): Result<TransactionsPage> = withContext(Dispatchers.IO) {
@@ -472,6 +501,38 @@ object LocalLedgerRepository {
 
             if (!type.isNullOrBlank() && type != "all") {
                 list = list.filter { it.type == type }
+            }
+
+            if (!category.isNullOrBlank() && category != "全部" && category != "all") {
+                list = list.filter { it.category == category }
+            }
+
+            if (accountId != null) {
+                list = list.filter { it.accountId == accountId || it.toAccountId == accountId }
+            }
+
+            if (!startDate.isNullOrBlank()) {
+                list = list.filter { it.date >= startDate }
+            }
+
+            if (!endDate.isNullOrBlank()) {
+                list = list.filter { it.date <= endDate }
+            }
+
+            if (minAmount != null) {
+                list = list.filter { it.amount >= minAmount }
+            }
+
+            if (maxAmount != null) {
+                list = list.filter { it.amount <= maxAmount }
+            }
+
+            if (!source.isNullOrBlank() && source != "all") {
+                list = list.filter { it.source == source || it.source.contains(source) }
+            }
+
+            if (!channel.isNullOrBlank() && channel != "all") {
+                list = list.filter { it.channel == channel }
             }
 
             if (!search.isNullOrBlank()) {
@@ -763,6 +824,579 @@ object LocalLedgerRepository {
             Result.success(JSONObject().put("ok", true))
         } catch (e: Exception) {
             Log.e(TAG, "toggleTransactionReconciled error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getToolsSummary(context: Context): Result<ToolsSummary> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
+            val subsJson = sp.getString("subscriptions_json", null)
+            val instJson = sp.getString("installments_json", null)
+
+            val subscriptions = mutableListOf<SubscriptionRecord>()
+            if (!subsJson.isNullOrBlank()) {
+                val arr = JSONArray(subsJson)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    subscriptions.add(
+                        SubscriptionRecord(
+                            id = obj.optInt("id", i + 1),
+                            name = obj.optString("name", "周期订阅"),
+                            category = obj.optString("category", "账单"),
+                            cost = obj.optDouble("cost", 0.0),
+                            currency = obj.optString("currency", "MYR"),
+                            nextBillingDate = obj.optString("next_billing_date", "每月1号"),
+                            autoRenew = obj.optBoolean("auto_renew", true)
+                        )
+                    )
+                }
+            } else {
+                val defaults = listOf(
+                    SubscriptionRecord(1, "Netflix 会员", "娱乐", 44.90, "MYR", "每月15号", true),
+                    SubscriptionRecord(2, "Spotify 音乐", "娱乐", 15.90, "MYR", "每月20号", true),
+                    SubscriptionRecord(3, "iCloud 存储", "日常", 11.90, "MYR", "每月1号", true),
+                    SubscriptionRecord(4, "家庭宽带 Unifi", "账单", 139.00, "MYR", "每月10号", true),
+                    SubscriptionRecord(5, "TNB 电费账单", "账单", 120.00, "MYR", "每月25号", true)
+                )
+                subscriptions.addAll(defaults)
+                val arr = JSONArray()
+                defaults.forEach { sub ->
+                    arr.put(JSONObject().apply {
+                        put("id", sub.id)
+                        put("name", sub.name)
+                        put("category", sub.category)
+                        put("cost", sub.cost)
+                        put("currency", sub.currency)
+                        put("next_billing_date", sub.nextBillingDate)
+                        put("auto_renew", sub.autoRenew)
+                    })
+                }
+                sp.edit().putString("subscriptions_json", arr.toString()).apply()
+            }
+
+            val installments = mutableListOf<InstallmentRecord>()
+            if (!instJson.isNullOrBlank()) {
+                val arr = JSONArray(instJson)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    installments.add(
+                        InstallmentRecord(
+                            id = obj.optInt("id", i + 1),
+                            title = obj.optString("title", "分期付款"),
+                            totalAmount = obj.optDouble("total_amount", 0.0),
+                            tenureMonths = obj.optInt("tenure_months", 12),
+                            paidPeriods = obj.optInt("paid_periods", 0),
+                            monthlyAmount = obj.optDouble("monthly_amount", 0.0),
+                            remainingAmount = obj.optDouble("remaining_amount", 0.0)
+                        )
+                    )
+                }
+            } else {
+                val defaults = listOf(
+                    InstallmentRecord(1, "0% 免息电子产品分期", 3600.0, 12, 4, 300.0, 2400.0)
+                )
+                installments.addAll(defaults)
+                val arr = JSONArray()
+                defaults.forEach { inst ->
+                    arr.put(JSONObject().apply {
+                        put("id", inst.id)
+                        put("title", inst.title)
+                        put("total_amount", inst.totalAmount)
+                        put("tenure_months", inst.tenureMonths)
+                        put("paid_periods", inst.paidPeriods)
+                        put("monthly_amount", inst.monthlyAmount)
+                        put("remaining_amount", inst.remainingAmount)
+                    })
+                }
+                sp.edit().putString("installments_json", arr.toString()).apply()
+            }
+
+            val totalMonthly = subscriptions.sumOf { it.cost }
+            val totalRemaining = installments.sumOf { it.remainingAmount }
+
+            Result.success(
+                ToolsSummary(
+                    subscriptions = subscriptions,
+                    totalMonthlySub = totalMonthly,
+                    installments = installments,
+                    totalRemainingInst = totalRemaining
+                )
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "getToolsSummary error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getSubscriptionMatches(context: Context): Result<List<TransactionMatchRecord>> = withContext(Dispatchers.IO) {
+        try {
+            val db = AppDatabase.getInstance(context)
+            val txs = db.localTransactionDao().getAll().take(50)
+            val tools = getToolsSummary(context).getOrNull()
+            val subs = tools?.subscriptions ?: emptyList()
+
+            val matches = mutableListOf<TransactionMatchRecord>()
+            for (sub in subs) {
+                val matchedTx = txs.firstOrNull {
+                    it.type == "expense" &&
+                    (kotlin.math.abs(it.amount - sub.cost) < 1.0 || it.note.contains(sub.name, ignoreCase = true))
+                }
+                matches.add(
+                    TransactionMatchRecord(
+                        txId = matchedTx?.id ?: 0L,
+                        txDate = matchedTx?.date ?: "",
+                        txAmount = matchedTx?.amount ?: sub.cost,
+                        txCategory = matchedTx?.category ?: sub.category,
+                        txNote = matchedTx?.note ?: sub.name,
+                        matchedSubId = sub.id,
+                        matchedSubName = sub.name,
+                        matchedSubCost = sub.cost,
+                        matchedSubNextBilling = sub.nextBillingDate
+                    )
+                )
+            }
+            Result.success(matches)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun applySubscriptionMatch(context: Context, subId: Int, txId: Long?): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            if (txId != null) {
+                val db = AppDatabase.getInstance(context)
+                val tx = db.localTransactionDao().getById(txId)
+                if (tx != null && !tx.tags.contains("#subscription")) {
+                    val newTags = if (tx.tags.isBlank()) "#subscription" else "${tx.tags.trim()} #subscription"
+                    db.localTransactionDao().update(tx.copy(tags = newTags, updatedAt = System.currentTimeMillis()))
+                }
+            }
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun applyInstallmentMatch(context: Context, instId: Int, txId: Long?): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            if (txId != null) {
+                val db = AppDatabase.getInstance(context)
+                val tx = db.localTransactionDao().getById(txId)
+                if (tx != null && !tx.tags.contains("#installment")) {
+                    val newTags = if (tx.tags.isBlank()) "#installment" else "${tx.tags.trim()} #installment"
+                    db.localTransactionDao().update(tx.copy(tags = newTags, updatedAt = System.currentTimeMillis()))
+                }
+            }
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getBudgetOverview(context: Context, month: String? = null): Result<BudgetOverviewRecord> = withContext(Dispatchers.IO) {
+        try {
+            initDefaultsIfNeeded(context)
+            val db = AppDatabase.getInstance(context)
+            val targetMonth = if (!month.isNullOrBlank()) month else SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
+
+            val cal = Calendar.getInstance()
+            val totalDays = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+            val passedDays = cal.get(Calendar.DAY_OF_MONTH)
+            val remainingDays = Math.max(0, totalDays - passedDays)
+
+            val sp = context.getSharedPreferences("local_budget_prefs", Context.MODE_PRIVATE)
+            val overallLimit = sp.getFloat("overall_limit", 3000f).toDouble()
+            val isExplicit = sp.getBoolean("overall_explicit", true)
+            val isSet = sp.getBoolean("overall_set", true)
+            val startDay = sp.getInt("start_day", 1)
+
+            val txList = db.localTransactionDao().getByMonth("$targetMonth%")
+            var totalSpent = 0.0
+            val catSpentMap = mutableMapOf<String, Double>()
+
+            for (tx in txList) {
+                if (tx.type == "expense") {
+                    totalSpent += tx.amount
+                    catSpentMap[tx.category] = (catSpentMap[tx.category] ?: 0.0) + tx.amount
+                }
+            }
+
+            val remaining = Math.max(0.0, overallLimit - totalSpent)
+            val pct = if (overallLimit > 0) totalSpent / overallLimit * 100.0 else 0.0
+            val level = when {
+                pct >= 100.0 -> "danger"
+                pct >= 80.0 -> "warning"
+                else -> "safe"
+            }
+            val allowance = if (remainingDays > 0) remaining / remainingDays else 0.0
+
+            val cycle = BillingCycleRecord(
+                startDate = "$targetMonth-01",
+                endDate = String.format(Locale.getDefault(), "%s-%02d", targetMonth, totalDays),
+                label = "$targetMonth 账单周期",
+                startDay = startDay,
+                totalDays = totalDays,
+                passedDays = passedDays,
+                remainingDays = remainingDays
+            )
+
+            val overall = OverallBudgetRecord(
+                limit = overallLimit,
+                spent = totalSpent,
+                remaining = remaining,
+                pct = pct,
+                level = level,
+                dailyAllowance = allowance,
+                isExplicit = isExplicit,
+                isSet = isSet
+            )
+
+            val categories = db.localCategoryDao().getAll().filter { it.type == "expense" }
+            val catItems = mutableListOf<BudgetItemRecord>()
+            var overCount = 0
+            var warnCount = 0
+            var okCount = 0
+
+            for (c in categories) {
+                val spent = catSpentMap[c.name] ?: 0.0
+                val catLimit = sp.getFloat("cat_limit_${c.name}", 0f).toDouble()
+                val catPct = if (catLimit > 0) spent / catLimit * 100.0 else 0.0
+                val catLevel = when {
+                    catLimit <= 0.0 -> "ok"
+                    catPct >= 100.0 -> { overCount++; "over" }
+                    catPct >= 80.0 -> { warnCount++; "warn" }
+                    else -> { okCount++; "ok" }
+                }
+
+                catItems.add(
+                    BudgetItemRecord(
+                        category = c.name,
+                        limit = catLimit,
+                        spent = spent,
+                        remaining = Math.max(0.0, catLimit - spent),
+                        pct = catPct,
+                        level = catLevel,
+                        color = c.color ?: "#0F766E"
+                    )
+                )
+            }
+
+            Result.success(
+                BudgetOverviewRecord(
+                    month = targetMonth,
+                    billingCycle = cycle,
+                    overall = overall,
+                    categories = catItems,
+                    totalCategoriesBudgeted = catItems.count { it.limit > 0 },
+                    overCount = overCount,
+                    warnCount = warnCount,
+                    okCount = okCount
+                )
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "getBudgetOverview error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun saveOverallBudget(context: Context, limit: Double, billingCycleStartDay: Int = 1): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            context.getSharedPreferences("local_budget_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putFloat("overall_limit", limit.toFloat())
+                .putInt("start_day", billingCycleStartDay)
+                .putBoolean("overall_set", true)
+                .putBoolean("overall_explicit", true)
+                .apply()
+            Result.success(JSONObject().put("ok", true).put("message", "总预算保存成功"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun saveCategoryBudget(context: Context, category: String, limit: Double): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            context.getSharedPreferences("local_budget_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putFloat("cat_limit_$category", limit.toFloat())
+                .apply()
+            Result.success(JSONObject().put("ok", true).put("message", "分类预算保存成功"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteCategoryBudget(context: Context, category: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            context.getSharedPreferences("local_budget_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .remove("cat_limit_$category")
+                .apply()
+            Result.success(JSONObject().put("ok", true).put("message", "分类预算已删除"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getCategoryRules(
+        context: Context,
+        search: String? = null,
+        page: Int = 1,
+        limit: Int = 50
+    ): Result<List<CategoryRuleRecord>> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_category_rules_prefs", Context.MODE_PRIVATE)
+            val jsonStr = sp.getString("rules_json", null)
+            val list = mutableListOf<CategoryRuleRecord>()
+            if (!jsonStr.isNullOrBlank()) {
+                val arr = JSONArray(jsonStr)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    val pattern = obj.optString("merchant_pattern", "")
+                    val category = obj.optString("category", "其他")
+                    val matchType = obj.optString("match_type", "contains")
+                    val applyCount = obj.optInt("apply_count", 0)
+                    val isActive = obj.optBoolean("is_active", true)
+                    val createdAt = obj.optString("created_at", "")
+                    val updatedAt = obj.optString("updated_at", "")
+                    if (search.isNullOrBlank() || pattern.contains(search, ignoreCase = true) || category.contains(search, ignoreCase = true)) {
+                        list.add(
+                            CategoryRuleRecord(
+                                merchantPattern = pattern,
+                                category = category,
+                                matchType = matchType,
+                                applyCount = applyCount,
+                                isActive = isActive,
+                                createdAt = createdAt,
+                                updatedAt = updatedAt
+                            )
+                        )
+                    }
+                }
+            } else {
+                val defaults = listOf(
+                    CategoryRuleRecord("tng", "交通", "contains", 5, true, "2026-10-01", "2026-10-01"),
+                    CategoryRuleRecord("grab", "交通", "contains", 3, true, "2026-10-01", "2026-10-01"),
+                    CategoryRuleRecord("shopee", "购物", "contains", 4, true, "2026-10-01", "2026-10-01"),
+                    CategoryRuleRecord("lazada", "购物", "contains", 2, true, "2026-10-01", "2026-10-01"),
+                    CategoryRuleRecord("mcdonald", "餐饮", "contains", 6, true, "2026-10-01", "2026-10-01"),
+                    CategoryRuleRecord("kfc", "餐饮", "contains", 3, true, "2026-10-01", "2026-10-01")
+                )
+                list.addAll(defaults)
+                saveCategoryRulesList(context, defaults)
+            }
+            Result.success(list)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private fun saveCategoryRulesList(context: Context, rules: List<CategoryRuleRecord>) {
+        val arr = JSONArray()
+        rules.forEach { r ->
+            arr.put(JSONObject().apply {
+                put("merchant_pattern", r.merchantPattern)
+                put("category", r.category)
+                put("match_type", r.matchType)
+                put("is_active", r.isActive)
+                put("apply_count", r.applyCount)
+                put("created_at", r.createdAt ?: "")
+                put("updated_at", r.updatedAt ?: "")
+            })
+        }
+        context.getSharedPreferences("local_category_rules_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putString("rules_json", arr.toString())
+            .apply()
+    }
+
+    suspend fun saveCategoryRule(
+        context: Context,
+        pattern: String,
+        category: String,
+        matchType: String = "contains",
+        isActive: Boolean = true
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val rules = getCategoryRules(context).getOrNull()?.toMutableList() ?: mutableListOf()
+            val existingIdx = rules.indexOfFirst { it.merchantPattern.equals(pattern, ignoreCase = true) }
+            val now = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            if (existingIdx >= 0) {
+                val old = rules[existingIdx]
+                rules[existingIdx] = old.copy(category = category, matchType = matchType, isActive = isActive, updatedAt = now)
+            } else {
+                rules.add(CategoryRuleRecord(pattern, category, matchType, 0, isActive, now, now))
+            }
+            saveCategoryRulesList(context, rules)
+            Result.success(JSONObject().put("ok", true).put("message", "规则已保存"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteCategoryRule(context: Context, pattern: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val rules = getCategoryRules(context).getOrNull()?.toMutableList() ?: mutableListOf()
+            rules.removeAll { it.merchantPattern.equals(pattern, ignoreCase = true) }
+            saveCategoryRulesList(context, rules)
+            Result.success(JSONObject().put("ok", true).put("message", "规则已删除"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun toggleCategoryRule(context: Context, pattern: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val rules = getCategoryRules(context).getOrNull()?.toMutableList() ?: mutableListOf()
+            val idx = rules.indexOfFirst { it.merchantPattern.equals(pattern, ignoreCase = true) }
+            if (idx >= 0) {
+                val old = rules[idx]
+                rules[idx] = old.copy(isActive = !old.isActive)
+                saveCategoryRulesList(context, rules)
+            }
+            Result.success(JSONObject().put("ok", true).put("message", "状态已切换"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun applyCategoryRuleHistory(
+        context: Context,
+        pattern: String,
+        category: String,
+        matchType: String = "contains",
+        onlyUncategorized: Boolean = true
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            var updatedCount = 0
+            val db = AppDatabase.getInstance(context)
+            val txs = db.localTransactionDao().getAll()
+            for (tx in txs) {
+                val matches = if (matchType == "exact") tx.note.equals(pattern, ignoreCase = true)
+                              else tx.note.contains(pattern, ignoreCase = true)
+                if (matches && (!onlyUncategorized || tx.category == "其他" || tx.category == "未分类" || tx.category.isBlank())) {
+                    db.localTransactionDao().update(tx.copy(category = category, updatedAt = System.currentTimeMillis()))
+                    updatedCount++
+                }
+            }
+            NativeLedgerApi.invalidateCache()
+            Result.success(JSONObject().put("ok", true).put("updated_count", updatedCount).put("message", "已对 $updatedCount 条历史流水生效"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun applyAllCategoryRulesHistory(
+        context: Context,
+        onlyUncategorized: Boolean = true
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val rules = getCategoryRules(context).getOrNull()?.filter { it.isActive } ?: emptyList()
+            var totalUpdated = 0
+            val db = AppDatabase.getInstance(context)
+            val txs = db.localTransactionDao().getAll()
+            for (rule in rules) {
+                for (tx in txs) {
+                    val matches = if (rule.matchType == "exact") tx.note.equals(rule.merchantPattern, ignoreCase = true)
+                                  else tx.note.contains(rule.merchantPattern, ignoreCase = true)
+                    if (matches && (!onlyUncategorized || tx.category == "其他" || tx.category == "未分类" || tx.category.isBlank())) {
+                        db.localTransactionDao().update(tx.copy(category = rule.category, updatedAt = System.currentTimeMillis()))
+                        totalUpdated++
+                    }
+                }
+            }
+            NativeLedgerApi.invalidateCache()
+            Result.success(JSONObject().put("ok", true).put("updated_count", totalUpdated).put("message", "全量规则应用成功，更新 $totalUpdated 笔历史记录"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getRecycleBinItems(context: Context): List<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_recycle_bin_prefs", Context.MODE_PRIVATE)
+            val jsonStr = sp.getString("trash_items", "[]") ?: "[]"
+            val arr = JSONArray(jsonStr)
+            val list = mutableListOf<JSONObject>()
+            for (i in 0 until arr.length()) {
+                list.add(arr.getJSONObject(i))
+            }
+            list
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun restoreRecycleBinItem(context: Context, id: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_recycle_bin_prefs", Context.MODE_PRIVATE)
+            val jsonStr = sp.getString("trash_items", "[]") ?: "[]"
+            val arr = JSONArray(jsonStr)
+            var target: JSONObject? = null
+            val newArr = JSONArray()
+            for (i in 0 until arr.length()) {
+                val item = arr.getJSONObject(i)
+                if (item.optLong("id") == id) {
+                    target = item
+                } else {
+                    newArr.put(item)
+                }
+            }
+            sp.edit().putString("trash_items", newArr.toString()).apply()
+
+            if (target != null) {
+                val db = AppDatabase.getInstance(context)
+                val tx = LocalTransaction(
+                    id = target.optLong("id"),
+                    date = target.optString("date"),
+                    time = target.optString("time", "12:00:00"),
+                    type = target.optString("type", "expense"),
+                    category = target.optString("category", "其他"),
+                    amount = target.optDouble("amount", 0.0),
+                    note = target.optString("note", ""),
+                    tags = target.optString("tags", ""),
+                    accountId = if (target.has("account_id")) target.optInt("account_id") else null,
+                    source = target.optString("source", "manual")
+                )
+                db.localTransactionDao().insert(tx)
+                if (tx.accountId != null) {
+                    val delta = if (tx.type == "income") tx.amount else -tx.amount
+                    db.localAccountDao().updateBalance(tx.accountId, delta)
+                }
+                NativeLedgerApi.invalidateCache()
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun permanentDeleteRecycleBinItem(context: Context, id: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_recycle_bin_prefs", Context.MODE_PRIVATE)
+            val jsonStr = sp.getString("trash_items", "[]") ?: "[]"
+            val arr = JSONArray(jsonStr)
+            val newArr = JSONArray()
+            for (i in 0 until arr.length()) {
+                val item = arr.getJSONObject(i)
+                if (item.optLong("id") != id) {
+                    newArr.put(item)
+                }
+            }
+            sp.edit().putString("trash_items", newArr.toString()).apply()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun emptyRecycleBin(context: Context): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            context.getSharedPreferences("local_recycle_bin_prefs", Context.MODE_PRIVATE)
+                .edit().clear().apply()
+            Result.success(Unit)
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }

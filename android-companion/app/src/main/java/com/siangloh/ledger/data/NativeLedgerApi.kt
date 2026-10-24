@@ -279,7 +279,22 @@ object NativeLedgerApi {
         limit: Int = 50,
         forceRefresh: Boolean = false
     ): Result<TransactionsPage> = withContext(Dispatchers.IO) {
-        LocalLedgerRepository.getTransactionsPage(context, month, type, search, page, limit)
+        LocalLedgerRepository.getTransactionsPage(
+            context = context,
+            month = month,
+            type = type,
+            search = search,
+            page = page,
+            limit = limit,
+            category = category,
+            accountId = accountId,
+            startDate = startDate,
+            endDate = endDate,
+            minAmount = minAmount,
+            maxAmount = maxAmount,
+            source = source,
+            channel = channel
+        )
     }
 
     fun parseTransactionsPageJson(json: JSONObject?, fallbackPage: Int = 1, fallbackLimit: Int = 50): TransactionsPage {
@@ -484,61 +499,15 @@ object NativeLedgerApi {
 
     suspend fun getToolsSummary(context: Context, forceRefresh: Boolean = false): Result<ToolsSummary> = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
-        if (!forceRefresh) {
-            if (cachedTools != null && (now - cachedToolsTimestamp < 300_000L)) {
-                return@withContext Result.success(cachedTools!!)
-            }
-            val localJson = LocalDataStore.getTools(context)
-            if (!localJson.isNullOrBlank()) {
-                try {
-                    val toolsRes = parseToolsSummaryJson(JSONObject(localJson))
-                    cachedTools = toolsRes
-                    cachedToolsTimestamp = now
-                    return@withContext Result.success(toolsRes)
-                } catch (_: Exception) {}
-            }
+        if (!forceRefresh && cachedTools != null && (now - cachedToolsTimestamp < 300_000L)) {
+            return@withContext Result.success(cachedTools!!)
         }
-
-        try {
-            val params = mutableListOf<String>()
-            val username = NetworkHelper.getUsername(context)
-            if (username.isNotEmpty()) params.add("username=${URLEncoder.encode(username, "UTF-8")}")
-            val endpoint = "/api/native/tools-summary" + if (params.isNotEmpty()) "?" + params.joinToString("&") else ""
-
-            val conn = openConnection(context, endpoint, "GET")
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = if (respBody.isNotBlank()) JSONObject(respBody) else JSONObject()
-            if (json.optBoolean("ok", true)) {
-                LocalDataStore.saveTools(context, respBody)
-                val toolsRes = parseToolsSummaryJson(json)
-                cachedTools = toolsRes
-                cachedToolsTimestamp = now
-                Result.success(toolsRes)
-            } else {
-                val cached = LocalDataStore.getTools(context)
-                if (!cached.isNullOrBlank()) {
-                    Result.success(parseToolsSummaryJson(JSONObject(cached)))
-                } else {
-                    Result.failure(Exception(json.optString("message", "加载工具摘要失败")))
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "getToolsSummary error: ${e.message}", e)
-            val cached = LocalDataStore.getTools(context)
-            if (!cached.isNullOrBlank()) {
-                try {
-                    Result.success(parseToolsSummaryJson(JSONObject(cached)))
-                } catch (_: Exception) {
-                    Result.failure(e)
-                }
-            } else {
-                Result.failure(e)
-            }
+        val res = LocalLedgerRepository.getToolsSummary(context)
+        res.onSuccess {
+            cachedTools = it
+            cachedToolsTimestamp = now
         }
+        res
     }
 
     fun parseToolsSummaryJson(json: JSONObject): ToolsSummary {
@@ -695,47 +664,7 @@ object NativeLedgerApi {
         page: Int = 1,
         limit: Int = 50
     ): Result<List<CategoryRuleRecord>> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val queryParams = mutableListOf<String>()
-            if (username.isNotEmpty()) queryParams.add("username=${URLEncoder.encode(username, "UTF-8")}")
-            if (!search.isNullOrBlank()) queryParams.add("search=${URLEncoder.encode(search.trim(), "UTF-8")}")
-            queryParams.add("page=$page")
-            queryParams.add("limit=$limit")
-
-            val endpoint = "/api/native/category-rules?" + queryParams.joinToString("&")
-            val conn = openConnection(context, endpoint, "GET")
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                val rulesArray = json.optJSONArray("rules") ?: JSONArray()
-                val list = ArrayList<CategoryRuleRecord>()
-                for (i in 0 until rulesArray.length()) {
-                    val item = rulesArray.getJSONObject(i)
-                    list.add(
-                        CategoryRuleRecord(
-                            merchantPattern = item.optString("merchant_pattern", ""),
-                            category = item.optString("category", ""),
-                            matchType = item.optString("match_type", "contains"),
-                            applyCount = item.optInt("apply_count", 0),
-                            isActive = item.optInt("is_active", 1) == 1,
-                            createdAt = if (item.isNull("created_at")) null else item.optString("created_at"),
-                            updatedAt = if (item.isNull("updated_at")) null else item.optString("updated_at")
-                        )
-                    )
-                }
-                Result.success(list)
-            } else {
-                Result.failure(Exception(json.optString("message", "获取分类规则失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "getCategoryRules error: ${e.message}", e)
-            Result.failure(e)
-        }
+        LocalLedgerRepository.getCategoryRules(context, search, page, limit)
     }
 
     suspend fun saveCategoryRule(
@@ -745,108 +674,21 @@ object NativeLedgerApi {
         matchType: String = "contains",
         isActive: Boolean = true
     ): Result<JSONObject> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val endpoint = "/api/native/category-rules" +
-                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
-            val conn = openConnection(context, endpoint, "POST")
-            val payload = JSONObject().apply {
-                put("merchant_pattern", pattern)
-                put("category", category)
-                put("match_type", matchType)
-                put("is_active", if (isActive) 1 else 0)
-            }.toString()
-
-            OutputStreamWriter(conn.outputStream, "UTF-8").use {
-                it.write(payload)
-                it.flush()
-            }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                Result.success(json)
-            } else {
-                Result.failure(Exception(json.optString("message", "保存分类规则失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "saveCategoryRule error: ${e.message}", e)
-            Result.failure(e)
-        }
+        LocalLedgerRepository.saveCategoryRule(context, pattern, category, matchType, isActive)
     }
 
     suspend fun deleteCategoryRule(
         context: Context,
         pattern: String
     ): Result<JSONObject> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val endpoint = "/api/native/category-rules/delete" +
-                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
-            val conn = openConnection(context, endpoint, "POST")
-            val payload = JSONObject().apply {
-                put("merchant_pattern", pattern)
-            }.toString()
-
-            OutputStreamWriter(conn.outputStream, "UTF-8").use {
-                it.write(payload)
-                it.flush()
-            }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                Result.success(json)
-            } else {
-                Result.failure(Exception(json.optString("message", "删除分类规则失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "deleteCategoryRule error: ${e.message}", e)
-            Result.failure(e)
-        }
+        LocalLedgerRepository.deleteCategoryRule(context, pattern)
     }
 
     suspend fun toggleCategoryRule(
         context: Context,
         pattern: String
     ): Result<JSONObject> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val endpoint = "/api/native/category-rules/toggle" +
-                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
-            val conn = openConnection(context, endpoint, "POST")
-            val payload = JSONObject().apply {
-                put("merchant_pattern", pattern)
-            }.toString()
-
-            OutputStreamWriter(conn.outputStream, "UTF-8").use {
-                it.write(payload)
-                it.flush()
-            }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                Result.success(json)
-            } else {
-                Result.failure(Exception(json.optString("message", "切换状态失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "toggleCategoryRule error: ${e.message}", e)
-            Result.failure(e)
-        }
+        LocalLedgerRepository.toggleCategoryRule(context, pattern)
     }
 
     suspend fun applyCategoryRuleHistory(
@@ -856,190 +698,30 @@ object NativeLedgerApi {
         matchType: String = "contains",
         onlyUncategorized: Boolean = true
     ): Result<JSONObject> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val endpoint = "/api/native/category-rules/apply-history" +
-                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
-            val conn = openConnection(context, endpoint, "POST")
-            val payload = JSONObject().apply {
-                put("merchant_pattern", pattern)
-                put("category", category)
-                put("match_type", matchType)
-                put("only_uncategorized", onlyUncategorized)
-            }.toString()
-
-            OutputStreamWriter(conn.outputStream, "UTF-8").use {
-                it.write(payload)
-                it.flush()
-            }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                recordsCache.clear()
-                Result.success(json)
-            } else {
-                Result.failure(Exception(json.optString("message", "追溯历史失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "applyCategoryRuleHistory error: ${e.message}", e)
-            Result.failure(e)
-        }
+        recordsCache.clear()
+        LocalLedgerRepository.applyCategoryRuleHistory(context, pattern, category, matchType, onlyUncategorized)
     }
 
     suspend fun applyAllCategoryRulesHistory(
         context: Context,
         onlyUncategorized: Boolean = true
     ): Result<JSONObject> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val endpoint = "/api/native/category-rules/apply-all" +
-                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
-            val conn = openConnection(context, endpoint, "POST")
-            val payload = JSONObject().apply {
-                put("only_uncategorized", onlyUncategorized)
-            }.toString()
-
-            OutputStreamWriter(conn.outputStream, "UTF-8").use {
-                it.write(payload)
-                it.flush()
-            }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                recordsCache.clear()
-                Result.success(json)
-            } else {
-                Result.failure(Exception(json.optString("message", "全量重筛历史失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "applyAllCategoryRulesHistory error: ${e.message}", e)
-            Result.failure(e)
-        }
+        recordsCache.clear()
+        LocalLedgerRepository.applyAllCategoryRulesHistory(context, onlyUncategorized)
     }
 
     suspend fun getBudgetOverview(
         context: Context,
         month: String? = null
     ): Result<BudgetOverviewRecord> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val qList = mutableListOf<String>()
-            if (!month.isNullOrBlank()) qList.add("month=${URLEncoder.encode(month, "UTF-8")}")
-            if (username.isNotEmpty()) qList.add("username=${URLEncoder.encode(username, "UTF-8")}")
-            val qStr = if (qList.isNotEmpty()) "?" + qList.joinToString("&") else ""
-            val conn = openConnection(context, "/api/native/budgets$qStr", "GET")
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (!json.optBoolean("ok", false)) {
-                return@withContext Result.failure(Exception(json.optString("message", "加载预算失败")))
-            }
-
-            val cycleObj = json.optJSONObject("billing_cycle") ?: JSONObject()
-            val cycle = BillingCycleRecord(
-                startDate = cycleObj.optString("start_date", ""),
-                endDate = cycleObj.optString("end_date", ""),
-                label = cycleObj.optString("label", ""),
-                startDay = cycleObj.optInt("start_day", 1),
-                totalDays = cycleObj.optInt("total_days", 30),
-                passedDays = cycleObj.optInt("passed_days", 1),
-                remainingDays = cycleObj.optInt("remaining_days", 30)
-            )
-
-            val overallObj = json.optJSONObject("overall") ?: JSONObject()
-            val overall = OverallBudgetRecord(
-                limit = overallObj.optDouble("limit", 0.0),
-                spent = overallObj.optDouble("spent", 0.0),
-                remaining = overallObj.optDouble("remaining", 0.0),
-                pct = overallObj.optDouble("pct", 0.0),
-                level = overallObj.optString("level", "none"),
-                dailyAllowance = overallObj.optDouble("daily_allowance", 0.0),
-                isExplicit = overallObj.optBoolean("is_explicit", false),
-                isSet = overallObj.optBoolean("is_set", false)
-            )
-
-            val catArray = json.optJSONArray("categories") ?: JSONArray()
-            val catList = mutableListOf<BudgetItemRecord>()
-            for (i in 0 until catArray.length()) {
-                val c = catArray.getJSONObject(i)
-                catList.add(
-                    BudgetItemRecord(
-                        category = c.optString("category", ""),
-                        limit = c.optDouble("limit", 0.0),
-                        spent = c.optDouble("spent", 0.0),
-                        remaining = c.optDouble("remaining", 0.0),
-                        pct = c.optDouble("pct", 0.0),
-                        level = c.optString("level", "ok"),
-                        color = c.optString("color", "#0F766E")
-                    )
-                )
-            }
-
-            val summaryObj = json.optJSONObject("summary") ?: JSONObject()
-            val record = BudgetOverviewRecord(
-                month = json.optString("month", ""),
-                billingCycle = cycle,
-                overall = overall,
-                categories = catList,
-                totalCategoriesBudgeted = summaryObj.optInt("total_categories_budgeted", catList.size),
-                overCount = summaryObj.optInt("over_count", 0),
-                warnCount = summaryObj.optInt("warn_count", 0),
-                okCount = summaryObj.optInt("ok_count", 0)
-            )
-            Result.success(record)
-        } catch (e: Exception) {
-            Log.e(TAG, "getBudgetOverview error: ${e.message}", e)
-            Result.failure(e)
-        }
+        LocalLedgerRepository.getBudgetOverview(context, month)
     }
 
     suspend fun saveOverallBudget(
         context: Context,
         monthlyLimit: Double
     ): Result<JSONObject> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val endpoint = "/api/native/budgets/overall" +
-                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
-            val conn = openConnection(context, endpoint, "POST")
-            conn.doOutput = true
-            val payload = JSONObject().apply {
-                put("monthly_limit", monthlyLimit)
-            }.toString()
-
-            OutputStreamWriter(conn.outputStream, "UTF-8").use {
-                it.write(payload)
-                it.flush()
-            }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                Result.success(json)
-            } else {
-                Result.failure(Exception(json.optString("message", "设置总预算失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "saveOverallBudget error: ${e.message}", e)
-            Result.failure(e)
-        }
+        LocalLedgerRepository.saveOverallBudget(context, monthlyLimit)
     }
 
     suspend fun saveCategoryBudget(
@@ -1047,73 +729,14 @@ object NativeLedgerApi {
         category: String,
         monthlyLimit: Double
     ): Result<JSONObject> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val endpoint = "/api/native/budgets/category" +
-                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
-            val conn = openConnection(context, endpoint, "POST")
-            conn.doOutput = true
-            val payload = JSONObject().apply {
-                put("category", category)
-                put("monthly_limit", monthlyLimit)
-            }.toString()
-
-            OutputStreamWriter(conn.outputStream, "UTF-8").use {
-                it.write(payload)
-                it.flush()
-            }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                Result.success(json)
-            } else {
-                Result.failure(Exception(json.optString("message", "设置分类预算失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "saveCategoryBudget error: ${e.message}", e)
-            Result.failure(e)
-        }
+        LocalLedgerRepository.saveCategoryBudget(context, category, monthlyLimit)
     }
 
     suspend fun deleteCategoryBudget(
         context: Context,
         category: String
     ): Result<JSONObject> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val endpoint = "/api/native/budgets/delete" +
-                if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
-            val conn = openConnection(context, endpoint, "POST")
-            conn.doOutput = true
-            val payload = JSONObject().apply {
-                put("category", category)
-            }.toString()
-
-            OutputStreamWriter(conn.outputStream, "UTF-8").use {
-                it.write(payload)
-                it.flush()
-            }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                Result.success(json)
-            } else {
-                Result.failure(Exception(json.optString("message", "删除分类预算失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "deleteCategoryBudget error: ${e.message}", e)
-            Result.failure(e)
-        }
+        LocalLedgerRepository.deleteCategoryBudget(context, category)
     }
 
     suspend fun getSavedFilters(context: Context): Result<List<SavedFilterRecord>> = withContext(Dispatchers.IO) {
@@ -1218,106 +841,15 @@ object NativeLedgerApi {
     }
 
     suspend fun getSubscriptionMatches(context: Context): Result<List<TransactionMatchRecord>> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val endpoint = "/api/native/subscriptions/matches" + if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
-            val conn = openConnection(context, endpoint, "GET")
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                val arr = json.optJSONArray("matches") ?: JSONArray()
-                val list = mutableListOf<TransactionMatchRecord>()
-                for (i in 0 until arr.length()) {
-                    val m = arr.getJSONObject(i)
-                    val tx = m.optJSONObject("transaction") ?: JSONObject()
-                    val sub = m.optJSONObject("subscription")
-                    val inst = m.optJSONObject("installment")
-
-                    list.add(
-                        TransactionMatchRecord(
-                            txId = tx.optLong("id", 0L),
-                            txDate = tx.optString("date", ""),
-                            txAmount = tx.optDouble("amount", 0.0),
-                            txCategory = tx.optString("category", ""),
-                            txNote = tx.optString("note", ""),
-                            matchedSubId = sub?.optInt("id"),
-                            matchedSubName = sub?.optString("name"),
-                            matchedSubCost = sub?.optDouble("cost"),
-                            matchedSubNextBilling = sub?.optString("next_billing_date"),
-                            matchedSubTargetToCancel = sub?.optBoolean("target_to_cancel", false) ?: false,
-                            matchedInstId = inst?.optInt("id"),
-                            matchedInstTitle = inst?.optString("title"),
-                            matchedInstNextPeriod = inst?.optInt("next_period"),
-                            matchedInstTenure = inst?.optInt("tenure_months")
-                        )
-                    )
-                }
-                Result.success(list)
-            } else {
-                Result.failure(Exception(json.optString("message", "加载流水匹配候选失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "getSubscriptionMatches error: ${e.message}", e)
-            Result.failure(e)
-        }
+        LocalLedgerRepository.getSubscriptionMatches(context)
     }
 
     suspend fun applySubscriptionMatch(context: Context, subId: Int, txId: Long?): Result<Boolean> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val endpoint = "/api/native/subscriptions/$subId/apply-match" + if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
-            val conn = openConnection(context, endpoint, "POST")
-            val payload = JSONObject().apply {
-                if (txId != null) put("tx_id", txId)
-            }.toString()
-            conn.outputStream.bufferedWriter().use { it.write(payload) }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                Result.success(true)
-            } else {
-                Result.failure(Exception(json.optString("message", "顺延订阅扣款日失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "applySubscriptionMatch error: ${e.message}", e)
-            Result.failure(e)
-        }
+        LocalLedgerRepository.applySubscriptionMatch(context, subId, txId)
     }
 
     suspend fun applyInstallmentMatch(context: Context, instId: Int, txId: Long?): Result<Boolean> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val endpoint = "/api/native/installments/$instId/apply-match" + if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
-            val conn = openConnection(context, endpoint, "POST")
-            val payload = JSONObject().apply {
-                if (txId != null) put("tx_id", txId)
-            }.toString()
-            conn.outputStream.bufferedWriter().use { it.write(payload) }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                Result.success(true)
-            } else {
-                Result.failure(Exception(json.optString("message", "推进分期计划失败")))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "applyInstallmentMatch error: ${e.message}", e)
-            Result.failure(e)
-        }
+        LocalLedgerRepository.applyInstallmentMatch(context, instId, txId)
     }
 }
 

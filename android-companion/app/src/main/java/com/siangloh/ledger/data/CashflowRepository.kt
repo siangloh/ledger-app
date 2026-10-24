@@ -155,6 +155,48 @@ object CashflowRepository {
         }
 
         val cur = if (currency.isNotBlank()) currency else "RM"
+
+        val toolsRes = LocalLedgerRepository.getToolsSummary(context).getOrNull()
+        val subs = toolsRes?.subscriptions ?: emptyList()
+        val billsArray = org.json.JSONArray()
+        var plannedBills = 0.0
+        var paidBills = 0.0
+        var pendingBills = 0.0
+
+        for (sub in subs) {
+            plannedBills += sub.cost
+            // 检查当月是否有对应类别的支出或包含该订阅名称的交易
+            val matchedTx = txList.find { tx ->
+                tx.type == "expense" && (
+                    tx.category.equals(sub.category, ignoreCase = true) ||
+                    tx.note.contains(sub.name, ignoreCase = true) ||
+                    tx.tags.contains(sub.name, ignoreCase = true)
+                )
+            }
+            val isPaid = matchedTx != null
+            val paidAmt = if (isPaid) sub.cost else 0.0
+            val pendingAmt = if (isPaid) 0.0 else sub.cost
+            if (isPaid) paidBills += paidAmt else pendingBills += pendingAmt
+
+            billsArray.put(JSONObject().apply {
+                put("bill_key", "sub_${sub.id}")
+                put("title", sub.name)
+                put("amount", sub.cost)
+                put("due_date", sub.nextBillingDate.ifBlank { "$month-15" })
+                put("paid", paidAmt)
+                put("pending", pendingAmt)
+                put("is_paid", isPaid)
+                put("category", sub.category)
+            })
+        }
+
+        val totalPlanned = if (plannedBills > 0.0) plannedBills else exp
+        val totalPaid = if (plannedBills > 0.0) paidBills else exp
+        val totalPending = if (plannedBills > 0.0) pendingBills else 0.0
+        val paymentPct = if (totalPlanned > 0.0) (totalPaid / totalPlanned * 100.0).coerceIn(0.0, 100.0) else 100.0
+
+        val nowIso = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(java.util.Date())
+
         val data = JSONObject().apply {
             put("ok", true)
             put("month", month)
@@ -162,23 +204,24 @@ object CashflowRepository {
             put("currencies", org.json.JSONArray().put(cur))
             put("income", inc)
             put("expense", exp)
-            put("reserved", 0.0)
-            put("planned", 0.0)
-            put("paid", exp)
-            put("payment_percent", 100.0)
-            put("available", avail)
+            put("reserved", totalPending)
+            put("planned", totalPlanned)
+            put("paid", totalPaid)
+            put("payment_percent", paymentPct)
+            put("available", avail - totalPending)
             put("daily", dailyArray)
             put("expense_percent", if (inc > 0) (exp / inc * 100) else 0.0)
-            put("reserve_percent", 0.0)
-            put("available_percent", if (inc > 0) (avail / inc * 100) else 0.0)
+            put("reserve_percent", if (inc > 0) (totalPending / inc * 100) else 0.0)
+            put("available_percent", if (inc > 0) ((avail - totalPending) / inc * 100) else 0.0)
             put("transactions", txArray)
             put("expense_categories", expCategories)
             put("income_platforms", incPlatforms)
-            put("bills", org.json.JSONArray())
+            put("bills", billsArray)
             put("prior_overdue", org.json.JSONArray())
             put("scheduled_transactions", org.json.JSONArray())
             put("confirmed_transactions", org.json.JSONArray())
             put("inactive_bills", org.json.JSONArray())
+            put("updated_at", nowIso)
         }
         cache.edit().putString(cacheKey, data.toString()).apply()
         Result(data, false)
