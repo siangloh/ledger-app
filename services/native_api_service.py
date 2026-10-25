@@ -135,19 +135,21 @@ def get_native_overview_summary(
                 cat_name = cat or '其他'
                 category_spending[cat_name] = category_spending.get(cat_name, 0.0) + amt
 
-            # 统计待归类交易（仅包含已入账但类别未明确的普通交易）
-            if cat.lower() in UNCATEGORIZED_NAMES or not cat:
-                uncategorized_count += 1
-                uncategorized_amount += amt
-                regular_uncat_items.append({
-                    'id': r['id'],
-                    'date': r['date'],
-                    'amount': amt,
-                    'note': r['note'] or '未命名支出',
-                    'category': cat or '待分类',
-                    'is_pending_on_hold': False,
-                    'source_type': 'transaction'
-                })
+                # 统计待归类交易（仅包含已入账但类别未明确的普通交易）
+                if cat.lower() in UNCATEGORIZED_NAMES or not cat:
+                    uncategorized_count += 1
+                    uncategorized_amount += amt
+                    regular_uncat_items.append({
+                        'id': r['id'],
+                        'date': r['date'],
+                        'amount': amt,
+                        'note': r['note'] or '未命名支出',
+                        'category': cat or '待分类',
+                        'is_pending_on_hold': False,
+                        'source_type': 'transaction'
+                    })
+        elif t_type == 'transfer':
+            transfer_amount += amt
 
     # 待确认暂存表 (on_hold) 具有最高待办优先级，排在最前端
     on_hold_items = []
