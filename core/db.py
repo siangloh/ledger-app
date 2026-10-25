@@ -549,8 +549,29 @@ def init_db(app_logger=None):
             db.commit()
         except Exception as e:
             logger.debug("ALTER recurring_rules ADD user_id skipped: %s", e)
+    if 'account_id' not in rec_cols:
+        try:
+            db.execute("ALTER TABLE recurring_rules ADD COLUMN account_id INTEGER")
+            db.commit()
+        except Exception as e:
+            logger.debug("ALTER recurring_rules ADD account_id skipped: %s", e)
     db.execute("UPDATE recurring_rules SET user_id = ? WHERE user_id IS NULL OR user_id = ''", (admin_id,))
     db.commit()
+
+    # 自动关联历史 transactions 中缺失 account_id 的渠道交易
+    try:
+        from services.source_tracking_service import resolve_account_for_channel
+        null_acc_txs = db.execute(
+            "SELECT id, user_id, channel, note FROM transactions WHERE account_id IS NULL AND (channel IS NOT NULL OR note IS NOT NULL)"
+        ).fetchall()
+        for ntx in null_acc_txs:
+            resolved_acc_id = resolve_account_for_channel(db, ntx['user_id'], channel=ntx['channel'], note=ntx['note'])
+            if resolved_acc_id:
+                db.execute("UPDATE transactions SET account_id = ? WHERE id = ?", (resolved_acc_id, ntx['id']))
+        if null_acc_txs:
+            db.commit()
+    except Exception as e:
+        logger.debug("Auto backfill transactions account_id error: %s", e)
 
     # 5. 商户-分类记忆表与系统配置表（S5: 严格按 user_id 隔离商户隐私与分类规则）
     db.executescript('''

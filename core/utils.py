@@ -349,11 +349,12 @@ def generate_due_recurring(user_id=None):
         day = min(r['day_of_month'], last_day)
         tx_date = f'{current_month}-{day:02d}'
         r_uid = r['user_id'] if ('user_id' in r.keys() and r['user_id']) else (user_id or get_current_user_id())
+        rec_acc_id = r['account_id'] if ('account_id' in r.keys() and r['account_id']) else None
         db.execute(
-            'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, created_at) '
-            'VALUES (?,?,?,?,?,?,?,?,?)',
+            'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, account_id, created_at) '
+            'VALUES (?,?,?,?,?,?,?,?,?,?)',
             (r_uid, tx_date, r['type'], r['group_name'], r['category'], r['amount'], r['note'] or '',
-             'recurring', datetime.now().isoformat())
+             'recurring', rec_acc_id, datetime.now().isoformat())
         )
         db.execute('UPDATE recurring_rules SET last_generated_month=? WHERE id=?', (current_month, r['id']))
         count += 1

@@ -12,6 +12,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
+import com.siangloh.ledger.NetworkHelper
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -29,9 +30,10 @@ object LocalLedgerRepository {
                         LocalAccount(name = "现金", type = "cash", balance = 0.0, orderNum = 1),
                         LocalAccount(name = "Touch 'n Go", type = "e_wallet", balance = 0.0, orderNum = 2),
                         LocalAccount(name = "Maybank / MAE", type = "savings", balance = 0.0, orderNum = 3),
-                        LocalAccount(name = "CIMB Bank", type = "savings", balance = 0.0, orderNum = 4),
-                        LocalAccount(name = "GrabPay", type = "e_wallet", balance = 0.0, orderNum = 5),
-                        LocalAccount(name = "信用卡", type = "credit_card", balance = 0.0, creditLimit = 5000.0, orderNum = 6)
+                        LocalAccount(name = "Public Bank", type = "savings", balance = 0.0, orderNum = 4),
+                        LocalAccount(name = "CIMB Bank", type = "savings", balance = 0.0, orderNum = 5),
+                        LocalAccount(name = "GrabPay", type = "e_wallet", balance = 0.0, orderNum = 6),
+                        LocalAccount(name = "信用卡", type = "credit_card", balance = 0.0, creditLimit = 5000.0, orderNum = 7)
                     )
                     db.localAccountDao().insertAll(defaults)
                 } else {
@@ -40,6 +42,13 @@ object LocalLedgerRepository {
                         if (!seenNames.add(acc.name)) {
                             db.localAccountDao().deleteById(acc.id)
                         }
+                    }
+                    val hasPublicBank = existingAccounts.any { it.name.equals("Public Bank", ignoreCase = true) }
+                    if (!hasPublicBank) {
+                        val maxOrder = existingAccounts.maxOfOrNull { it.orderNum } ?: 6
+                        db.localAccountDao().insert(
+                            LocalAccount(name = "Public Bank", type = "savings", balance = 0.0, orderNum = maxOrder + 1)
+                        )
                     }
                 }
 
@@ -153,6 +162,24 @@ object LocalLedgerRepository {
                     } catch (e: Exception) {
                         Log.w(TAG, "Failed to migrate historical cache: ${e.message}")
                     }
+
+                    // 自动修复与补全本地流水中缺失 account_id 的渠道交易
+                    try {
+                        val nullAccountTxs = db.localTransactionDao().getAll().filter { it.accountId == null }
+                        if (nullAccountTxs.isNotEmpty()) {
+                            val allAccounts = db.localAccountDao().getAll()
+                            for (tx in nullAccountTxs) {
+                                val fallback = resolveAccountFallback(tx.channel, tx.note, allAccounts)
+                                if (fallback != null) {
+                                    db.localTransactionDao().update(
+                                        tx.copy(accountId = fallback.id, updatedAt = System.currentTimeMillis())
+                                    )
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to backfill missing account_id in local_transactions: ${e.message}")
+                    }
                 }
                 Unit
             } catch (e: Exception) {
@@ -161,16 +188,41 @@ object LocalLedgerRepository {
         }
     }
 
+    fun resolveAccountFallback(
+        channel: String?,
+        note: String?,
+        accounts: Collection<LocalAccount>
+    ): LocalAccount? {
+        val ch = (channel ?: "").lowercase(Locale.ROOT)
+        val nt = (note ?: "").lowercase(Locale.ROOT)
+        val combined = "$ch $nt"
+        return when {
+            combined.contains("touch") || combined.contains("tng") ->
+                accounts.find { it.name.contains("Touch", ignoreCase = true) || it.name.contains("tng", ignoreCase = true) }
+                    ?: accounts.find { it.type == "e_wallet" }
+            combined.contains("grab") ->
+                accounts.find { it.name.contains("Grab", ignoreCase = true) }
+            combined.contains("maybank") || combined.contains("mae") || combined.contains("m2u") ->
+                accounts.find { it.name.contains("Maybank", ignoreCase = true) || it.name.contains("mae", ignoreCase = true) }
+            combined.contains("cimb") ->
+                accounts.find { it.name.contains("CIMB", ignoreCase = true) }
+            combined.contains("public") || combined.contains("pbb") || combined.contains("mypb") ->
+                accounts.find { it.name.contains("Public", ignoreCase = true) }
+            combined.contains("shopee") ->
+                accounts.find { it.name.contains("Shopee", ignoreCase = true) }
+            combined.contains("rhb") ->
+                accounts.find { it.name.contains("RHB", ignoreCase = true) }
+            combined.contains("hong leong") || combined.contains("hlb") ->
+                accounts.find { it.name.contains("Hong Leong", ignoreCase = true) || it.name.contains("HLB", ignoreCase = true) }
+            combined.contains("credit") || combined.contains("信用卡") || combined.contains("card") ->
+                accounts.find { it.type == "credit_card" || it.name.contains("信用卡", ignoreCase = true) }
+            else -> null
+        }
+    }
+
     private suspend fun internalRecordNotification(context: Context, db: AppDatabase, parsed: LocalParsedResult): Long {
         val accounts = db.localAccountDao().getAll()
-
-        val matchedAccount = when {
-            parsed.channel.contains("Touch", ignoreCase = true) || parsed.channel.contains("tng", ignoreCase = true) -> accounts.find { it.name.contains("Touch", ignoreCase = true) || it.name.contains("tng", ignoreCase = true) }
-            parsed.channel.contains("Grab", ignoreCase = true) -> accounts.find { it.name.contains("Grab", ignoreCase = true) }
-            parsed.channel.contains("Maybank", ignoreCase = true) || parsed.channel.contains("MAE", ignoreCase = true) -> accounts.find { it.name.contains("Maybank", ignoreCase = true) || it.name.contains("MAE", ignoreCase = true) }
-            parsed.channel.contains("CIMB", ignoreCase = true) -> accounts.find { it.name.contains("CIMB", ignoreCase = true) }
-            else -> accounts.firstOrNull()
-        } ?: accounts.firstOrNull()
+        val matchedAccount = resolveAccountFallback(parsed.channel, parsed.merchant, accounts) ?: accounts.firstOrNull()
 
         val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
         val tx = LocalTransaction(
@@ -565,6 +617,7 @@ object LocalLedgerRepository {
 
             val items = paged.map { tx ->
                 val acc = tx.accountId?.let { accountsMap[it] }
+                    ?: resolveAccountFallback(tx.channel, tx.note, accountsMap.values)
                 TransactionRecord(
                     id = tx.id,
                     date = tx.date,
@@ -573,7 +626,7 @@ object LocalLedgerRepository {
                     amount = tx.amount,
                     note = tx.note,
                     tags = tx.tags,
-                    accountId = tx.accountId,
+                    accountId = tx.accountId ?: acc?.id,
                     accountName = acc?.name ?: "默认账户",
                     accountType = acc?.type ?: "savings",
                     source = tx.source,
@@ -885,11 +938,20 @@ object LocalLedgerRepository {
             val subsJson = sp.getString("subscriptions_json", null)
             val instJson = sp.getString("installments_json", null)
 
+            val db = AppDatabase.getInstance(context)
+            val accountsMap = try {
+                db.localAccountDao().getAll().associate { it.id to it.name }
+            } catch (_: Exception) {
+                emptyMap()
+            }
+
             val subscriptions = mutableListOf<SubscriptionRecord>()
             if (!subsJson.isNullOrBlank()) {
                 val arr = JSONArray(subsJson)
                 for (i in 0 until arr.length()) {
                     val obj = arr.getJSONObject(i)
+                    val accId = if (obj.has("account_id") && !obj.isNull("account_id")) obj.optInt("account_id") else null
+                    val accName = if (obj.has("account_name") && !obj.isNull("account_name")) obj.optString("account_name").takeIf { it != "null" && it.isNotBlank() } else null
                     subscriptions.add(
                         SubscriptionRecord(
                             id = obj.optInt("id", i + 1),
@@ -898,7 +960,9 @@ object LocalLedgerRepository {
                             cost = obj.optDouble("cost", 0.0),
                             currency = obj.optString("currency", "MYR"),
                             nextBillingDate = obj.optString("next_billing_date", "每月1号"),
-                            autoRenew = obj.optBoolean("auto_renew", true)
+                            autoRenew = obj.optBoolean("auto_renew", true),
+                            accountId = accId,
+                            accountName = accName ?: (accId?.let { accountsMap[it] })
                         )
                     )
                 }
@@ -969,6 +1033,8 @@ object LocalLedgerRepository {
                 val arr = JSONArray(incomesJson)
                 for (i in 0 until arr.length()) {
                     val obj = arr.getJSONObject(i)
+                    val accId = if (obj.has("account_id") && !obj.isNull("account_id")) obj.optInt("account_id") else null
+                    val accName = if (obj.has("account_name") && !obj.isNull("account_name")) obj.optString("account_name").takeIf { it != "null" && it.isNotBlank() } else null
                     fixedIncomes.add(
                         FixedIncomeRecord(
                             id = obj.optInt("id", i + 1),
@@ -977,7 +1043,9 @@ object LocalLedgerRepository {
                             amount = obj.optDouble("amount", 0.0),
                             currency = obj.optString("currency", "MYR"),
                             arrivalDay = obj.optString("arrival_day", "每月25号"),
-                            isActive = obj.optBoolean("is_active", true)
+                            isActive = obj.optBoolean("is_active", true),
+                            accountId = accId,
+                            accountName = accName ?: (accId?.let { accountsMap[it] })
                         )
                     )
                 }
@@ -1078,7 +1146,9 @@ object LocalLedgerRepository {
         cost: Double,
         currency: String = "MYR",
         nextBillingDate: String = "每月1号",
-        autoRenew: Boolean = true
+        autoRenew: Boolean = true,
+        accountId: Int? = null,
+        accountName: String? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val sp = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
@@ -1099,6 +1169,8 @@ object LocalLedgerRepository {
                     put("currency", currency)
                     put("next_billing_date", nextBillingDate)
                     put("auto_renew", autoRenew)
+                    if (accountId != null) put("account_id", accountId) else remove("account_id")
+                    if (accountName != null) put("account_name", accountName) else remove("account_name")
                 }
                 if (idx >= 0) {
                     list[idx] = updated
@@ -1115,6 +1187,8 @@ object LocalLedgerRepository {
                     put("currency", currency)
                     put("next_billing_date", nextBillingDate)
                     put("auto_renew", autoRenew)
+                    if (accountId != null) put("account_id", accountId)
+                    if (accountName != null) put("account_name", accountName)
                 }
                 list.add(newItem)
             }
@@ -1157,7 +1231,9 @@ object LocalLedgerRepository {
         amount: Double,
         currency: String = "MYR",
         arrivalDay: String = "每月25号",
-        isActive: Boolean = true
+        isActive: Boolean = true,
+        accountId: Int? = null,
+        accountName: String? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val sp = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
@@ -1178,6 +1254,8 @@ object LocalLedgerRepository {
                     put("currency", currency)
                     put("arrival_day", arrivalDay)
                     put("is_active", isActive)
+                    if (accountId != null) put("account_id", accountId) else remove("account_id")
+                    if (accountName != null) put("account_name", accountName) else remove("account_name")
                 }
                 if (idx >= 0) {
                     list[idx] = updated
@@ -1194,6 +1272,8 @@ object LocalLedgerRepository {
                     put("currency", currency)
                     put("arrival_day", arrivalDay)
                     put("is_active", isActive)
+                    if (accountId != null) put("account_id", accountId)
+                    if (accountName != null) put("account_name", accountName)
                 }
                 list.add(newItem)
             }
@@ -1204,6 +1284,99 @@ object LocalLedgerRepository {
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "saveFixedIncome error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun syncToolsFromOnline(context: Context): Result<ToolsSummary> = withContext(Dispatchers.IO) {
+        try {
+            val serverUrl = NetworkHelper.getServerUrl(context)
+            if (serverUrl.isBlank()) {
+                return@withContext Result.failure(Exception("未配置服务器地址"))
+            }
+            val apiKey = NetworkHelper.getApiKey(context)
+            val url = java.net.URL(serverUrl.trimEnd('/') + "/api/native/tools-summary")
+            val conn = url.openConnection() as java.net.HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 8000
+            conn.readTimeout = 8000
+            if (apiKey.isNotBlank()) conn.setRequestProperty("X-API-KEY", apiKey)
+            val code = conn.responseCode
+            if (code !in 200..299) {
+                return@withContext Result.failure(Exception("云端接口返回 HTTP $code"))
+            }
+            val body = conn.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(body)
+            if (!json.optBoolean("ok", false)) {
+                return@withContext Result.failure(Exception(json.optString("message", "解析失败")))
+            }
+
+            val db = AppDatabase.getInstance(context)
+            val localAccs = db.localAccountDao().getAll()
+
+            val onlineSubs = json.optJSONArray("subscriptions") ?: JSONArray()
+            val onlineIncomes = json.optJSONArray("fixed_incomes") ?: JSONArray()
+            val sp = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
+
+            val subsArr = JSONArray()
+            for (i in 0 until onlineSubs.length()) {
+                val obj = onlineSubs.getJSONObject(i)
+                val accName = obj.optString("account_name", "")
+                val matchedAcc = if (accName.isNotBlank()) {
+                    localAccs.firstOrNull { it.name.equals(accName, ignoreCase = true) || it.name.contains(accName, ignoreCase = true) || accName.contains(it.name, ignoreCase = true) }
+                } else null
+
+                val subItem = JSONObject().apply {
+                    put("id", obj.optInt("id", i + 1))
+                    put("name", obj.optString("name"))
+                    put("category", obj.optString("category"))
+                    put("cost", obj.optDouble("cost", 0.0))
+                    put("currency", obj.optString("currency", "MYR"))
+                    put("next_billing_date", obj.optString("next_billing_date", "每月1号"))
+                    put("auto_renew", obj.optBoolean("auto_renew", true))
+                    if (matchedAcc != null) {
+                        put("account_id", matchedAcc.id)
+                        put("account_name", matchedAcc.name)
+                    } else if (obj.has("account_id") && !obj.isNull("account_id")) {
+                        put("account_id", obj.optInt("account_id"))
+                        put("account_name", obj.optString("account_name"))
+                    }
+                }
+                subsArr.put(subItem)
+            }
+            sp.edit().putString("subscriptions_json", subsArr.toString()).apply()
+
+            val incsArr = JSONArray()
+            for (i in 0 until onlineIncomes.length()) {
+                val obj = onlineIncomes.getJSONObject(i)
+                val accName = obj.optString("account_name", "")
+                val matchedAcc = if (accName.isNotBlank()) {
+                    localAccs.firstOrNull { it.name.equals(accName, ignoreCase = true) || it.name.contains(accName, ignoreCase = true) || accName.contains(it.name, ignoreCase = true) }
+                } else null
+
+                val incItem = JSONObject().apply {
+                    put("id", obj.optInt("id", i + 1))
+                    put("name", obj.optString("name"))
+                    put("category", obj.optString("category"))
+                    put("amount", obj.optDouble("amount", 0.0))
+                    put("currency", obj.optString("currency", "MYR"))
+                    put("arrival_day", obj.optString("arrival_day", "每月1号"))
+                    put("is_active", obj.optBoolean("is_active", true))
+                    if (matchedAcc != null) {
+                        put("account_id", matchedAcc.id)
+                        put("account_name", matchedAcc.name)
+                    } else if (obj.has("account_id") && !obj.isNull("account_id")) {
+                        put("account_id", obj.optInt("account_id"))
+                        put("account_name", obj.optString("account_name"))
+                    }
+                }
+                incsArr.put(incItem)
+            }
+            sp.edit().putString("fixed_incomes_json", incsArr.toString()).apply()
+
+            getToolsSummary(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "syncToolsFromOnline error: ${e.message}", e)
             Result.failure(e)
         }
     }

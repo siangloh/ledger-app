@@ -136,7 +136,9 @@ data class SubscriptionRecord(
     val cost: Double,
     val currency: String,
     val nextBillingDate: String,
-    val autoRenew: Boolean
+    val autoRenew: Boolean,
+    val accountId: Int? = null,
+    val accountName: String? = null
 )
 
 data class InstallmentRecord(
@@ -156,7 +158,9 @@ data class FixedIncomeRecord(
     val amount: Double,
     val currency: String = "MYR",
     val arrivalDay: String = "每月25号",
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val accountId: Int? = null,
+    val accountName: String? = null
 )
 
 data class ToolsSummary(
@@ -529,10 +533,13 @@ object NativeLedgerApi {
     fun parseToolsSummaryJson(json: JSONObject): ToolsSummary {
         val subArr = json.optJSONArray("subscriptions") ?: JSONArray()
         val instArr = json.optJSONArray("installments") ?: JSONArray()
+        val incArr = json.optJSONArray("fixed_incomes") ?: JSONArray()
 
         val subs = mutableListOf<SubscriptionRecord>()
         for (i in 0 until subArr.length()) {
             val obj = subArr.getJSONObject(i)
+            val accId = if (obj.has("account_id") && !obj.isNull("account_id")) obj.optInt("account_id") else null
+            val accName = if (obj.has("account_name") && !obj.isNull("account_name")) obj.optString("account_name").takeIf { it != "null" && it.isNotBlank() } else null
             subs.add(
                 SubscriptionRecord(
                     id = obj.optInt("id"),
@@ -541,7 +548,9 @@ object NativeLedgerApi {
                     cost = obj.optDouble("cost", 0.0),
                     currency = obj.optString("currency", "MYR"),
                     nextBillingDate = obj.optString("next_billing_date", ""),
-                    autoRenew = obj.optBoolean("auto_renew", true)
+                    autoRenew = obj.optBoolean("auto_renew", true),
+                    accountId = accId,
+                    accountName = accName
                 )
             )
         }
@@ -562,11 +571,33 @@ object NativeLedgerApi {
             )
         }
 
+        val fixedIncomes = mutableListOf<FixedIncomeRecord>()
+        for (i in 0 until incArr.length()) {
+            val obj = incArr.getJSONObject(i)
+            val accId = if (obj.has("account_id") && !obj.isNull("account_id")) obj.optInt("account_id") else null
+            val accName = if (obj.has("account_name") && !obj.isNull("account_name")) obj.optString("account_name").takeIf { it != "null" && it.isNotBlank() } else null
+            fixedIncomes.add(
+                FixedIncomeRecord(
+                    id = obj.optInt("id"),
+                    name = obj.optString("name"),
+                    category = obj.optString("category"),
+                    amount = obj.optDouble("amount", 0.0),
+                    currency = obj.optString("currency", "MYR"),
+                    arrivalDay = obj.optString("arrival_day", "每月1号"),
+                    isActive = obj.optBoolean("is_active", true),
+                    accountId = accId,
+                    accountName = accName
+                )
+            )
+        }
+
         return ToolsSummary(
             subscriptions = subs,
             totalMonthlySub = json.optDouble("total_monthly_sub", 0.0),
             installments = insts,
-            totalRemainingInst = json.optDouble("total_remaining_inst", 0.0)
+            totalRemainingInst = json.optDouble("total_remaining_inst", 0.0),
+            fixedIncomes = fixedIncomes,
+            totalMonthlyIncome = json.optDouble("total_monthly_income", 0.0)
         )
     }
 
@@ -868,10 +899,12 @@ object NativeLedgerApi {
         cost: Double,
         currency: String = "MYR",
         nextBillingDate: String = "每月1号",
-        autoRenew: Boolean = true
+        autoRenew: Boolean = true,
+        accountId: Int? = null,
+        accountName: String? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
         cachedTools = null
-        LocalLedgerRepository.saveSubscription(context, id, name, category, cost, currency, nextBillingDate, autoRenew)
+        LocalLedgerRepository.saveSubscription(context, id, name, category, cost, currency, nextBillingDate, autoRenew, accountId, accountName)
     }
 
     suspend fun deleteSubscription(context: Context, id: Int): Result<Unit> = withContext(Dispatchers.IO) {
@@ -887,10 +920,12 @@ object NativeLedgerApi {
         amount: Double,
         currency: String = "MYR",
         arrivalDay: String = "每月25号",
-        isActive: Boolean = true
+        isActive: Boolean = true,
+        accountId: Int? = null,
+        accountName: String? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
         cachedTools = null
-        LocalLedgerRepository.saveFixedIncome(context, id, name, category, amount, currency, arrivalDay, isActive)
+        LocalLedgerRepository.saveFixedIncome(context, id, name, category, amount, currency, arrivalDay, isActive, accountId, accountName)
     }
 
     suspend fun deleteFixedIncome(context: Context, id: Int): Result<Unit> = withContext(Dispatchers.IO) {
@@ -911,8 +946,32 @@ object NativeLedgerApi {
             date = today,
             note = "${income.name} (固定收入)",
             tags = "#fixed_income",
+            accountId = income.accountId,
             groupName = "main"
         )
+    }
+
+    suspend fun recordSubscriptionAsTransaction(
+        context: Context,
+        sub: SubscriptionRecord
+    ): Result<Long> = withContext(Dispatchers.IO) {
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        addTransaction(
+            context = context,
+            type = "expense",
+            amount = sub.cost,
+            category = sub.category,
+            date = today,
+            note = "${sub.name} (固定支出)",
+            tags = "#subscription",
+            accountId = sub.accountId,
+            groupName = "main"
+        )
+    }
+
+    suspend fun syncToolsFromOnline(context: Context): Result<ToolsSummary> = withContext(Dispatchers.IO) {
+        cachedTools = null
+        LocalLedgerRepository.syncToolsFromOnline(context)
     }
 
     suspend fun saveInstallment(

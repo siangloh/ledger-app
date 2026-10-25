@@ -95,7 +95,9 @@ object CashflowRepository {
 
         for (tx in txList) {
             val amt = tx.amount
-            val platformName = accounts[tx.accountId]?.name ?: "未指定账户"
+            val matchedAcc = accounts[tx.accountId]
+                ?: LocalLedgerRepository.resolveAccountFallback(tx.channel, tx.note, accounts.values)
+            val platformName = matchedAcc?.name ?: "未指定账户"
             if (tx.type == "expense") {
                 exp += amt
                 val entry = expCategoriesMap.getOrPut(tx.category) { Pair(0.0, mutableListOf()) }

@@ -508,9 +508,20 @@ def get_native_transactions_list(
     '''
     data_params = list(params) + [limit, offset]
     rows = db.execute(data_query, data_params).fetchall()
+    accounts_cache = {a['id']: a for a in db.execute("SELECT id, name, type FROM accounts WHERE user_id = ?", (str(user_id),)).fetchall()}
     items = []
     for r in rows:
         disp = format_source_display(r['source'], r['channel'], lang=lang, note=r['note'])
+        acc_id = r['account_id']
+        acc_name = r['account_name']
+        acc_type = r['account_type']
+        if not acc_id and accounts_cache:
+            from services.source_tracking_service import resolve_account_for_channel
+            resolved_id = resolve_account_for_channel(db, user_id, channel=disp['channel'], note=r['note'])
+            if resolved_id and resolved_id in accounts_cache:
+                acc_id = resolved_id
+                acc_name = accounts_cache[resolved_id]['name']
+                acc_type = accounts_cache[resolved_id]['type']
         items.append({
             'id': r['id'],
             'date': r['date'],
@@ -519,9 +530,9 @@ def get_native_transactions_list(
             'amount': float(r['amount'] or 0.0),
             'note': r['note'] or '',
             'tags': r['tags'] or '',
-            'account_id': r['account_id'],
-            'account_name': r['account_name'] or '未指定账户',
-            'account_type': r['account_type'] or '',
+            'account_id': acc_id,
+            'account_name': acc_name or '未指定账户',
+            'account_type': acc_type or '',
             'source': disp['source'],
             'channel': disp['channel'],
             'source_label': disp['source_label'],
@@ -986,12 +997,14 @@ def get_native_tools_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
 
     from subscription_tracker import BillingCycle, default_mock_exchange_rate_provider
 
-    # 1. 订阅列表（复用 Web 端周期月均与汇率折算）
+    # 1. 订阅列表（复用 Web 端周期月均与汇率折算，支持账户关联）
     sub_rows = db.execute('''
-        SELECT id, name, category, billing_cycle, cost, currency, next_billing_date, auto_renew
-        FROM subscriptions
-        WHERE user_id = ? AND status = 'ACTIVE'
-        ORDER BY next_billing_date ASC
+        SELECT s.id, s.name, s.category, s.billing_cycle, s.cost, s.currency, s.next_billing_date, s.auto_renew,
+               s.payment_method_id, a.name AS account_name
+        FROM subscriptions s
+        LEFT JOIN accounts a ON s.payment_method_id = a.id
+        WHERE s.user_id = ? AND s.status = 'ACTIVE'
+        ORDER BY s.next_billing_date ASC
     ''', (str(user_id),)).fetchall()
 
     subscriptions = []
@@ -1023,10 +1036,71 @@ def get_native_tools_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
             'cost': float(cost_val),
             'currency': curr,
             'next_billing_date': s['next_billing_date'],
-            'auto_renew': bool(s['auto_renew'])
+            'auto_renew': bool(s['auto_renew']),
+            'account_id': s['payment_method_id'],
+            'account_name': s['account_name']
         })
 
-    # 2. 分期与负债
+    # 固定收支表中的固定支出 (recurring_rules expense)
+    try:
+        rec_exp_rows = db.execute('''
+            SELECT r.id, r.category, r.amount, r.day_of_month, r.note, r.account_id, a.name AS account_name
+            FROM recurring_rules r
+            LEFT JOIN accounts a ON r.account_id = a.id
+            WHERE r.user_id = ? AND r.type = 'expense' AND r.is_active = 1
+            ORDER BY r.day_of_month ASC
+        ''', (str(user_id),)).fetchall()
+        for r in rec_exp_rows:
+            amt = Decimal(str(r['amount'] or 0.0))
+            total_monthly_sub += amt
+            dom = r['day_of_month'] or 1
+            name = r['category'] if not r['note'] else f"{r['category']} - {r['note']}"
+            subscriptions.append({
+                'id': 10000 + int(r['id']),
+                'name': name,
+                'category': r['category'] or '日常',
+                'billing_cycle': 'monthly',
+                'cost': float(amt),
+                'currency': 'MYR',
+                'next_billing_date': f"每月{dom}号",
+                'auto_renew': True,
+                'account_id': r['account_id'],
+                'account_name': r['account_name']
+            })
+    except Exception as e:
+        logger.debug("Fetch recurring expense rules error: %s", e)
+
+    # 2. 固定收入列表 (recurring_rules income)
+    fixed_incomes = []
+    total_monthly_income = Decimal("0.0")
+    try:
+        inc_rows = db.execute('''
+            SELECT r.id, r.category, r.amount, r.day_of_month, r.note, r.account_id, a.name AS account_name
+            FROM recurring_rules r
+            LEFT JOIN accounts a ON r.account_id = a.id
+            WHERE r.user_id = ? AND r.type = 'income' AND r.is_active = 1
+            ORDER BY r.day_of_month ASC
+        ''', (str(user_id),)).fetchall()
+        for r in inc_rows:
+            amt = Decimal(str(r['amount'] or 0.0))
+            total_monthly_income += amt
+            dom = r['day_of_month'] or 1
+            name = r['category'] if not r['note'] else f"{r['category']} - {r['note']}"
+            fixed_incomes.append({
+                'id': r['id'],
+                'name': name,
+                'category': r['category'] or '工资',
+                'amount': float(amt),
+                'currency': 'MYR',
+                'arrival_day': f"每月{dom}号",
+                'is_active': True,
+                'account_id': r['account_id'],
+                'account_name': r['account_name']
+            })
+    except Exception as e:
+        logger.debug("Fetch recurring income rules error: %s", e)
+
+    # 3. 分期与负债
     inst_rows = db.execute('''
         SELECT id, title, total_amount, tenure_months, paid_periods, monthly_amount, status
         FROM installments
@@ -1057,6 +1131,8 @@ def get_native_tools_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
         'ok': True,
         'subscriptions': subscriptions,
         'total_monthly_sub': float(round(total_monthly_sub, 2)),
+        'fixed_incomes': fixed_incomes,
+        'total_monthly_income': float(round(total_monthly_income, 2)),
         'installments': installments,
         'total_remaining_inst': round(total_remaining_inst, 2)
     }

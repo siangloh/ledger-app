@@ -34,9 +34,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.Sync
 import com.siangloh.ledger.R
 import androidx.compose.foundation.ExperimentalFoundationApi
+import com.siangloh.ledger.data.AccountRecord
 import com.siangloh.ledger.data.FixedIncomeRecord
+import com.siangloh.ledger.data.LocalLedgerRepository
 import com.siangloh.ledger.data.NativeLedgerApi
 import com.siangloh.ledger.data.SubscriptionRecord
 import com.siangloh.ledger.ui.compose.theme.*
@@ -49,12 +52,26 @@ fun SubscriptionManagementPage(
     subscriptions: List<SubscriptionRecord>,
     fixedIncomes: List<FixedIncomeRecord> = emptyList(),
     userCategories: List<String>,
+    accounts: List<AccountRecord> = emptyList(),
     onBack: () -> Unit,
     onRefresh: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
+    var localAccounts by remember { mutableStateOf(accounts) }
+    var isSyncing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(accounts) {
+        if (accounts.isNotEmpty()) {
+            localAccounts = accounts
+        } else {
+            LocalLedgerRepository.getAccountsSummary(context).onSuccess {
+                localAccounts = it.accounts
+            }
+        }
+    }
+
     var editingSub by remember { mutableStateOf<SubscriptionRecord?>(null) }
     var showAddSubDialog by remember { mutableStateOf(false) }
 
@@ -86,6 +103,29 @@ fun SubscriptionManagementPage(
                         }
                     },
                     actions = {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    isSyncing = true
+                                    val syncRes = NativeLedgerApi.syncToolsFromOnline(context)
+                                    isSyncing = false
+                                    syncRes.onSuccess {
+                                        Toast.makeText(context, "已从在线数据库同步固定支出与收入", Toast.LENGTH_SHORT).show()
+                                        LocalLedgerRepository.getAccountsSummary(context).onSuccess { localAccounts = it.accounts }
+                                        onRefresh()
+                                    }.onFailure {
+                                        Toast.makeText(context, "同步失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            enabled = !isSyncing
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Sync,
+                                contentDescription = "同步在线数据",
+                                tint = if (pagerState.currentPage == 0) PrimaryTeal else IncomeGreen
+                            )
+                        }
                         IconButton(onClick = {
                             if (pagerState.currentPage == 0) showAddSubDialog = true else showAddIncomeDialog = true
                         }) {
@@ -237,7 +277,6 @@ fun SubscriptionManagementPage(
                             }
                         }
                     }
-                } else {
                     items(subscriptions) { sub ->
                         Card(
                             modifier = Modifier
@@ -247,32 +286,89 @@ fun SubscriptionManagementPage(
                             colors = CardDefaults.cardColors(containerColor = Color.White),
                             border = BorderStroke(1.dp, Slate200)
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(14.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(text = sub.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "分类: ${sub.category} · 扣款: ${sub.nextBillingDate}",
-                                        fontSize = 11.sp,
-                                        color = Slate500
-                                    )
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = sub.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "分类: ${sub.category} · 扣款: ${sub.nextBillingDate}",
+                                            fontSize = 11.sp,
+                                            color = Slate500
+                                        )
+                                    }
                                     Text(
                                         text = String.format(Locale.getDefault(), "RM %.2f", sub.cost),
-                                        fontSize = 14.sp,
+                                        fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Slate900
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    IconButton(onClick = { editingSub = sub }, modifier = Modifier.size(36.dp)) {
-                                        Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Slate400, modifier = Modifier.size(16.dp))
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+                                HorizontalDivider(color = Slate100)
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = if (!sub.accountName.isNullOrBlank()) Teal50 else Slate100
+                                    ) {
+                                        val accText = sub.accountName ?: "未绑定账户"
+                                        val icon = when {
+                                            accText.contains("Touch") || accText.contains("TNG") -> "📱 "
+                                            accText.contains("卡") || accText.contains("Credit") -> "💳 "
+                                            accText.contains("现金") -> "💵 "
+                                            else -> "🏦 "
+                                        }
+                                        Text(
+                                            text = if (!sub.accountName.isNullOrBlank()) "$icon$accText" else "未绑定账户",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = if (!sub.accountName.isNullOrBlank()) PrimaryTeal else Slate500,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                scope.launch {
+                                                    val res = NativeLedgerApi.recordSubscriptionAsTransaction(context, sub)
+                                                    res.onSuccess {
+                                                        Toast.makeText(context, "已成功将「${sub.name}」记入本月支出", Toast.LENGTH_SHORT).show()
+                                                        onRefresh()
+                                                    }.onFailure {
+                                                        Toast.makeText(context, "记账失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                            modifier = Modifier.height(30.dp),
+                                            shape = RoundedCornerShape(6.dp),
+                                            border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.5f))
+                                        ) {
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("一键记入", fontSize = 11.sp, color = PrimaryTeal, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        IconButton(onClick = { editingSub = sub }, modifier = Modifier.size(30.dp)) {
+                                            Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Slate400, modifier = Modifier.size(16.dp))
+                                        }
                                     }
                                 }
                             }
@@ -500,6 +596,8 @@ fun SubscriptionManagementPage(
         var costInput by remember { mutableStateOf(if (activeSub != null) String.format(Locale.getDefault(), "%.2f", activeSub.cost) else "") }
         var categoryInput by remember { mutableStateOf(activeSub?.category ?: if (userCategories.isNotEmpty()) userCategories.first() else "日常") }
         var dateInput by remember { mutableStateOf(activeSub?.nextBillingDate ?: "每月1号") }
+        var selectedAccountId by remember { mutableStateOf(activeSub?.accountId) }
+        var selectedAccountName by remember { mutableStateOf(activeSub?.accountName) }
         var showDayPicker by remember { mutableStateOf(false) }
 
         AlertDialog(
@@ -547,6 +645,62 @@ fun SubscriptionManagementPage(
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
                         colors = ledgerInputColors()
                     )
+
+                    // 扣款/支付账户选择
+                    Column {
+                        Text("扣款支付账户:", fontSize = 12.sp, color = Slate600)
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val noneSelected = selectedAccountId == null && selectedAccountName == null
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (noneSelected) PrimaryTeal else Slate100,
+                                modifier = Modifier.clickable {
+                                    selectedAccountId = null
+                                    selectedAccountName = null
+                                }
+                            ) {
+                                Text(
+                                    text = "未绑定账户",
+                                    fontSize = 11.sp,
+                                    fontWeight = if (noneSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (noneSelected) Color.White else Slate700,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                            localAccounts.forEach { acc ->
+                                val sel = selectedAccountId == acc.id || (selectedAccountId == null && selectedAccountName == acc.name)
+                                val icon = when {
+                                    acc.name.contains("Touch") || acc.name.contains("TNG") -> "📱 "
+                                    acc.name.contains("卡") || acc.name.contains("Credit") -> "💳 "
+                                    acc.name.contains("现金") -> "💵 "
+                                    else -> "🏦 "
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (sel) PrimaryTeal else Slate100,
+                                    modifier = Modifier.clickable {
+                                        selectedAccountId = acc.id
+                                        selectedAccountName = acc.name
+                                    }
+                                ) {
+                                    Text(
+                                        text = "$icon${acc.name}",
+                                        fontSize = 11.sp,
+                                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (sel) Color.White else Slate700,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Box(modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
                             value = dateInput,
@@ -614,7 +768,9 @@ fun SubscriptionManagementPage(
                                     cost = cost,
                                     currency = "MYR",
                                     nextBillingDate = dateInput.trim().ifEmpty { "每月1号" },
-                                    autoRenew = true
+                                    autoRenew = true,
+                                    accountId = selectedAccountId,
+                                    accountName = selectedAccountName
                                 )
                                 isSubmitting = false
                                 res.onSuccess {
@@ -669,6 +825,8 @@ fun SubscriptionManagementPage(
         var categoryInput by remember { mutableStateOf(activeIncome?.category ?: "工资") }
         var dayInput by remember { mutableStateOf(activeIncome?.arrivalDay ?: "每月25号") }
         var isActiveInput by remember { mutableStateOf(activeIncome?.isActive ?: true) }
+        var selectedAccountId by remember { mutableStateOf(activeIncome?.accountId) }
+        var selectedAccountName by remember { mutableStateOf(activeIncome?.accountName) }
         var showDayPicker by remember { mutableStateOf(false) }
 
         val incomeCategoryOptions = listOf("工资", "兼职", "租金", "投资", "奖金", "报销", "其他")
@@ -729,6 +887,61 @@ fun SubscriptionManagementPage(
                                 ) {
                                     Text(
                                         text = opt,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (sel) Color.White else Slate700,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 入账/收款账户选择
+                    Column {
+                        Text("入账收款账户:", fontSize = 12.sp, color = Slate600)
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val noneSelected = selectedAccountId == null && selectedAccountName == null
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (noneSelected) IncomeGreen else Slate100,
+                                modifier = Modifier.clickable {
+                                    selectedAccountId = null
+                                    selectedAccountName = null
+                                }
+                            ) {
+                                Text(
+                                    text = "未绑定账户",
+                                    fontSize = 11.sp,
+                                    fontWeight = if (noneSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (noneSelected) Color.White else Slate700,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                            localAccounts.forEach { acc ->
+                                val sel = selectedAccountId == acc.id || (selectedAccountId == null && selectedAccountName == acc.name)
+                                val icon = when {
+                                    acc.name.contains("Touch") || acc.name.contains("TNG") -> "📱 "
+                                    acc.name.contains("卡") || acc.name.contains("Credit") -> "💳 "
+                                    acc.name.contains("现金") -> "💵 "
+                                    else -> "🏦 "
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (sel) IncomeGreen else Slate100,
+                                    modifier = Modifier.clickable {
+                                        selectedAccountId = acc.id
+                                        selectedAccountName = acc.name
+                                    }
+                                ) {
+                                    Text(
+                                        text = "$icon${acc.name}",
                                         fontSize = 11.sp,
                                         fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
                                         color = if (sel) Color.White else Slate700,
@@ -819,7 +1032,9 @@ fun SubscriptionManagementPage(
                                     amount = amount,
                                     currency = "MYR",
                                     arrivalDay = dayInput.trim().ifEmpty { "每月25号" },
-                                    isActive = isActiveInput
+                                    isActive = isActiveInput,
+                                    accountId = selectedAccountId,
+                                    accountName = selectedAccountName
                                 )
                                 isSubmitting = false
                                 res.onSuccess {

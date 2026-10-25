@@ -190,6 +190,80 @@ def normalize_channel(
     return None
 
 
+def resolve_account_for_channel(
+    db: Any,
+    user_id: Any,
+    channel: Optional[str] = None,
+    raw_text: Optional[str] = None,
+    note: Optional[str] = None
+) -> Optional[int]:
+    """
+    根据给定的渠道标识、原始通知文本或备注，智能匹配用户 accounts 表中的账户 ID。
+    例如 channel 为 'tng' 或文本提及 Touch 'n Go 时，优先匹配名称包含 'Touch' 或 'TNG' 的账户。
+    """
+    chan = normalize_channel(channel, raw_text=raw_text)
+    if not chan and note:
+        chan = normalize_channel(None, raw_text=note)
+
+    if not chan and not raw_text and not note:
+        return None
+
+    try:
+        rows = db.execute(
+            "SELECT id, name, type FROM accounts WHERE user_id = ? AND is_active = 1",
+            (str(user_id),)
+        ).fetchall()
+        if not rows:
+            return None
+
+        # 匹配规则列表
+        match_keys = []
+        if chan == 'tng':
+            match_keys = ['touch', 'tng']
+        elif chan == 'grab':
+            match_keys = ['grab']
+        elif chan == 'maybank':
+            match_keys = ['maybank', 'mae', 'm2u']
+        elif chan == 'cimb':
+            match_keys = ['cimb']
+        elif chan == 'public_bank':
+            match_keys = ['public', 'pbb', 'mypb']
+        elif chan == 'shopee':
+            match_keys = ['shopee']
+        elif chan == 'rhb':
+            match_keys = ['rhb']
+        elif chan == 'hong_leong':
+            match_keys = ['hong leong', 'hlb']
+        elif chan == 'bank_card':
+            match_keys = ['卡', 'card', 'credit']
+        else:
+            combined_txt = f"{raw_text or ''} {note or ''}".lower()
+            if any(k in combined_txt for k in ['touch', 'tng']):
+                match_keys = ['touch', 'tng']
+            elif 'grab' in combined_txt:
+                match_keys = ['grab']
+            elif any(k in combined_txt for k in ['maybank', 'mae']):
+                match_keys = ['maybank', 'mae']
+            elif 'cimb' in combined_txt:
+                match_keys = ['cimb']
+            elif 'public' in combined_txt:
+                match_keys = ['public']
+
+        if match_keys:
+            for r in rows:
+                acc_name = (r['name'] or '').lower()
+                if any(k in acc_name for k in match_keys):
+                    return int(r['id'])
+
+        if chan in ('tng', 'grab', 'shopee'):
+            for r in rows:
+                if (r['type'] or '').lower() == 'e_wallet':
+                    return int(r['id'])
+    except Exception:
+        pass
+    return None
+
+
 def normalize_source(raw_source: Optional[str]) -> str:
     """
     统一来源标准化。

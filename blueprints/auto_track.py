@@ -780,12 +780,13 @@ def api_auto_track():
             if parsed.get('category') in ('其他', '未分类', '待分类', '') and sub.get('category'):
                 parsed['category'] = sub['category']
 
-        from services.source_tracking_service import normalize_channel
+        from services.source_tracking_service import normalize_channel, resolve_account_for_channel
         channel_val = normalize_channel(parsed.get('channel'), raw_text=text, package_name=package_name) or 'generic'
         source_ref_val = content_hash[:16]
+        account_id_val = resolve_account_for_channel(db, target_user_id, channel=channel_val, raw_text=text, note=parsed.get('note'))
         cur = db.execute(
-            'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, channel, source_ref, created_at) '
-            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO transactions (user_id, date, type, group_name, category, amount, note, source, channel, source_ref, created_at, account_id) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             (
                 target_user_id,
                 parsed['date'],
@@ -797,7 +798,8 @@ def api_auto_track():
                 'notification',
                 channel_val,
                 source_ref_val,
-                now
+                now,
+                account_id_val
             )
         )
         try:
