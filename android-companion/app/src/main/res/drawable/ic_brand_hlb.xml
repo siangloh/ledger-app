@@ -1,0 +1,17 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Hong Leong Bank Crimson Red Base Badge -->
+    <path
+        android:fillColor="#E21836"
+        android:pathData="M24,2 C36.15,2 46,11.85 46,24 C46,36.15 36.15,46 24,46 C11.85,46 2,36.15 2,24 C2,11.85 11.85,2 24,2 Z" />
+    <!-- HLB White Iconic Emblem (Stylized Arch / Shield Ring) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,12 C17.4,12 12,17.4 12,24 C12,30.6 17.4,36 24,36 C30.6,36 36,30.6 36,24 C36,17.4 30.6,12 24,12 Z M24,31.5 C19.9,31.5 16.5,28.1 16.5,24 C16.5,19.9 19.9,16.5 24,16.5 C28.1,16.5 31.5,19.9 31.5,24 C31.5,28.1 28.1,31.5 24,31.5 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M21.5,19 L26.5,19 L26.5,29 L21.5,29 Z" />
+</vector>

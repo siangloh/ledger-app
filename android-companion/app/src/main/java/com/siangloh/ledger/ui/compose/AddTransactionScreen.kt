@@ -28,6 +28,8 @@ import com.siangloh.ledger.data.NativeLedgerApi
 import com.siangloh.ledger.data.ServerValidationException
 import com.siangloh.ledger.data.entities.PendingTransaction
 import com.siangloh.ledger.sync.SyncWorker
+import com.siangloh.ledger.ui.compose.components.BrandIcon
+import com.siangloh.ledger.ui.compose.components.SourceBrandBadgeHelper
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -643,6 +645,7 @@ fun AddTransactionScreen(
                         ) {
                             accounts.forEach { acc ->
                                 val isSelected = draft.selectedAccountId == acc.id
+                                val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(acc.name, null)
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
                                     color = if (isSelected) PrimaryTeal else Slate100,
@@ -652,7 +655,7 @@ fun AddTransactionScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
                                     ) {
-                                        Text(CategoryUiHelper.getAccountTypeIcon(acc.type), fontSize = 13.sp)
+                                        BrandIcon(config = badgeCfg, modifier = Modifier.size(15.dp))
                                         Spacer(modifier = Modifier.width(5.dp))
                                         Text(
                                             text = acc.name,
@@ -679,6 +682,7 @@ fun AddTransactionScreen(
                         ) {
                             accounts.forEach { acc ->
                                 val isSelected = draft.selectedToAccountId == acc.id
+                                val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(acc.name, null)
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
                                     color = if (isSelected) PrimaryTeal else Slate100,
@@ -688,7 +692,7 @@ fun AddTransactionScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
                                     ) {
-                                        Text(CategoryUiHelper.getAccountTypeIcon(acc.type), fontSize = 13.sp)
+                                        BrandIcon(config = badgeCfg, modifier = Modifier.size(15.dp))
                                         Spacer(modifier = Modifier.width(5.dp))
                                         Text(
                                             text = acc.name,

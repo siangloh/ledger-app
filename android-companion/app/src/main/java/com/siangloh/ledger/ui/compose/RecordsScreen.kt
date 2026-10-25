@@ -35,6 +35,7 @@ import com.siangloh.ledger.data.SavedFilterRecord
 import com.siangloh.ledger.data.AccountRecord
 import com.siangloh.ledger.data.entities.PendingTransaction
 import com.siangloh.ledger.sync.SyncWorker
+import com.siangloh.ledger.ui.compose.components.BrandIcon
 import com.siangloh.ledger.ui.compose.components.RecordsSkeletonList
 import com.siangloh.ledger.ui.compose.components.SourceBrandBadge
 import com.siangloh.ledger.ui.compose.components.SourceBrandBadgeHelper
@@ -1347,13 +1348,8 @@ fun TransactionCard(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
-                                if (badgeCfg.emoji.isNotBlank()) {
-                                    Text(
-                                        text = badgeCfg.emoji,
-                                        fontSize = 9.sp,
-                                        modifier = Modifier.padding(end = 3.dp)
-                                    )
-                                }
+                                BrandIcon(config = badgeCfg, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(3.5.dp))
                                 Text(
                                     text = tx.accountName,
                                     fontSize = 11.sp,
@@ -1375,13 +1371,8 @@ fun TransactionCard(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
-                                if (badgeCfg.emoji.isNotBlank()) {
-                                    Text(
-                                        text = badgeCfg.emoji,
-                                        fontSize = 9.sp,
-                                        modifier = Modifier.padding(end = 3.dp)
-                                    )
-                                }
+                                BrandIcon(config = badgeCfg, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(3.5.dp))
                                 Text(
                                     text = badgeCfg.label,
                                     fontSize = 11.sp,
@@ -1723,13 +1714,8 @@ fun EditTransactionBottomSheet(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
                             ) {
-                                if (badgeCfg.emoji.isNotBlank()) {
-                                    Text(
-                                        text = badgeCfg.emoji,
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.padding(end = 4.dp)
-                                    )
-                                }
+                                BrandIcon(config = badgeCfg, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
                                 Text(
                                     text = acc.name,
                                     fontSize = 12.sp,

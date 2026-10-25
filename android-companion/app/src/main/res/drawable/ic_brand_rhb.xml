@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- RHB Signature Cobalt Blue Base Badge -->
+    <path
+        android:fillColor="#0067B1"
+        android:pathData="M24,2 C36.15,2 46,11.85 46,24 C46,36.15 36.15,46 24,46 C11.85,46 2,36.15 2,24 C2,11.85 11.85,2 24,2 Z" />
+    <!-- RHB White Trapezoid / Rhombus Mark -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M14,16 L23,16 L28,32 L19,32 Z" />
+    <!-- RHB Hot Magenta Accent Diamond -->
+    <path
+        android:fillColor="#ED008C"
+        android:pathData="M26,16 L35,16 L30,32 L21,32 Z" />
+</vector>

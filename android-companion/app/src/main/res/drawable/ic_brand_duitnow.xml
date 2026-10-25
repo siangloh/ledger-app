@@ -1,0 +1,31 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- DuitNow Electric Magenta Base Badge -->
+    <path
+        android:fillColor="#ED028C"
+        android:pathData="M24,2 C36.15,2 46,11.85 46,24 C46,36.15 36.15,46 24,46 C11.85,46 2,36.15 2,24 C2,11.85 11.85,2 24,2 Z" />
+    <!-- DuitNow Iconic Compass Arrows Motif in White -->
+    <!-- Top Arrow -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,12 L28,20 L24,18 L20,20 Z" />
+    <!-- Bottom Arrow -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,36 L20,28 L24,30 L28,28 Z" />
+    <!-- Right Arrow -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,24 L28,20 L30,24 L28,28 Z" />
+    <!-- Left Arrow -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,24 L20,28 L18,24 L20,20 Z" />
+    <!-- Center Dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,22 C25.1,22 26,22.9 26,24 C26,25.1 25.1,26 24,26 C22.9,26 22,25.1 22,24 C22,22.9 22.9,22 24,22 Z" />
+</vector>

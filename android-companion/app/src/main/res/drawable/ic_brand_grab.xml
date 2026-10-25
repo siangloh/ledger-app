@@ -1,0 +1,27 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Grab Emerald Green Base Badge -->
+    <path
+        android:fillColor="#00B14F"
+        android:pathData="M24,2 C36.15,2 46,11.85 46,24 C46,36.15 36.15,46 24,46 C11.85,46 2,36.15 2,24 C2,11.85 11.85,2 24,2 Z" />
+    <!-- Grab Parallel Curved Ribbon Tracks (Iconic G-loop) -->
+    <!-- Outer Track -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M31,17 C28.5,14.5 24,14 20,16 C15.5,18.5 13.5,23.5 15,28 C16.5,32.5 21,34.5 25.5,34 C29,33.5 32,31 33,27.5 L24,27.5" />
+    <!-- Inner Track -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M28,20 C26,18.5 23.5,18.2 21.5,19.2 C18.8,20.5 18,23.5 19,26 C20,28.5 22.5,29.5 25,29.2 C26.5,29 28,27.8 28.5,26.5 L24,26.5" />
+</vector>

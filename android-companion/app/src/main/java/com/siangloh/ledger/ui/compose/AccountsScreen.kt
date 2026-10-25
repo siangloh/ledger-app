@@ -27,6 +27,8 @@ import com.siangloh.ledger.data.AccountsSummary
 import com.siangloh.ledger.data.LocalDataStore
 import com.siangloh.ledger.data.NativeLedgerApi
 import com.siangloh.ledger.ui.compose.components.AccountsSkeletonScreen
+import com.siangloh.ledger.ui.compose.components.BrandIcon
+import com.siangloh.ledger.ui.compose.components.SourceBrandBadgeHelper
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -375,13 +377,22 @@ fun AccountCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
+                    val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(account.name, null)
                     Box(
                         modifier = Modifier
                             .size(44.dp)
-                            .background(Slate100, CircleShape),
+                            .background(if (badgeCfg.iconRes != null) Color.Transparent else Slate100, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = icon, fontSize = 22.sp)
+                        if (badgeCfg.iconRes != null) {
+                            Image(
+                                painter = androidx.compose.ui.res.painterResource(id = badgeCfg.iconRes),
+                                contentDescription = account.name,
+                                modifier = Modifier.size(40.dp)
+                            )
+                        } else {
+                            Text(text = icon, fontSize = 22.sp)
+                        }
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
@@ -680,17 +691,24 @@ fun TransferFundsDialog(
                 ) {
                     accounts.forEach { acc ->
                         val isSelected = fromId == acc.id
+                        val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(acc.name, null)
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = if (isSelected) PrimaryTeal else Slate100,
                             modifier = Modifier.clickable { fromId = acc.id }
                         ) {
-                            Text(
-                                text = acc.name,
-                                fontSize = 11.sp,
-                                color = if (isSelected) Color.White else Slate700,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp)
+                            ) {
+                                BrandIcon(config = badgeCfg, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = acc.name,
+                                    fontSize = 11.sp,
+                                    color = if (isSelected) Color.White else Slate700
+                                )
+                            }
                         }
                     }
                 }
@@ -705,17 +723,24 @@ fun TransferFundsDialog(
                 ) {
                     accounts.forEach { acc ->
                         val isSelected = toId == acc.id
+                        val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(acc.name, null)
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = if (isSelected) PrimaryTeal else Slate100,
                             modifier = Modifier.clickable { toId = acc.id }
                         ) {
-                            Text(
-                                text = acc.name,
-                                fontSize = 11.sp,
-                                color = if (isSelected) Color.White else Slate700,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp)
+                            ) {
+                                BrandIcon(config = badgeCfg, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = acc.name,
+                                    fontSize = 11.sp,
+                                    color = if (isSelected) Color.White else Slate700
+                                )
+                            }
                         }
                     }
                 }

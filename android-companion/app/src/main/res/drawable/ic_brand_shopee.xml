@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Shopee Vivid Coral Orange Base Badge -->
+    <path
+        android:fillColor="#EE4D2D"
+        android:pathData="M24,2 C36.15,2 46,11.85 46,24 C46,36.15 36.15,46 24,46 C11.85,46 2,36.15 2,24 C2,11.85 11.85,2 24,2 Z" />
+    <!-- Shopee Shopping Bag Silhouette -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,18 L32,18 L30.5,35 L17.5,35 Z" />
+    <!-- Bag Handle Loop -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M20,18 C20,14 28,14 28,18" />
+    <!-- Stylized 'S' inside the bag -->
+    <path
+        android:fillColor="#EE4D2D"
+        android:pathData="M26.5,23 C26.5,21.8 25.5,21.2 24.2,21.2 C22.8,21.2 21.8,22 21.8,23 C21.8,24.8 26.5,24.8 26.5,27.5 C26.5,29.2 25,30.2 23.5,30.2 C21.8,30.2 20.8,29.2 20.8,28 L22.8,28 C22.8,28.8 23.4,29.2 24.2,29.2 C25.1,29.2 25.8,28.7 25.8,27.8 C25.8,26.2 21.2,26 21.2,23.4 C21.2,21.5 22.8,20.2 24.5,20.2 C26.2,20.2 27.5,21.2 27.5,22.8 L26.5,23 Z" />
+</vector>

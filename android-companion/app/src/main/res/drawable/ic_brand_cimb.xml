@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- CIMB Deep Burgundy Red Base Badge -->
+    <path
+        android:fillColor="#7D0014"
+        android:pathData="M24,2 C36.15,2 46,11.85 46,24 C46,36.15 36.15,46 24,46 C11.85,46 2,36.15 2,24 C2,11.85 11.85,2 24,2 Z" />
+    <!-- CIMB Iconic Forward Chevron Wedge in Crisp White -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M14,15 L26,15 L33,24 L26,33 L14,33 L21,24 Z" />
+    <!-- CIMB Secondary Dynamic Accent Line -->
+    <path
+        android:fillColor="#ED1B24"
+        android:pathData="M17,18 L24,18 L28.5,24 L24,30 L17,30 L21.5,24 Z" />
+</vector>

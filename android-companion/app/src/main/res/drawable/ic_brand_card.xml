@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Deep Navy Slate Base Badge -->
+    <path
+        android:fillColor="#334155"
+        android:pathData="M24,2 C36.15,2 46,11.85 46,24 C46,36.15 36.15,46 24,46 C11.85,46 2,36.15 2,24 C2,11.85 11.85,2 24,2 Z" />
+    <!-- Credit Card Shape -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M10,16 L38,16 C39.1,16 40,16.9 40,18 L40,30 C40,31.1 39.1,32 38,32 L10,32 C8.9,32 8,31.1 8,30 L8,18 C8,16.9 8.9,16 10,16 Z" />
+    <!-- Magnetic Stripe -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8,20 L40,20 L40,23 L8,23 Z" />
+    <!-- EMV Chip / Emboss Mark -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M13,26 L18,26 L18,29 L13,29 Z" />
+</vector>
