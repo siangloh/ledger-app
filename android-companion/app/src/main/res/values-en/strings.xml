@@ -44,6 +44,7 @@
     <string name="sync_status_pending">Pending Sync</string>
     <string name="sync_status_synced">Synced</string>
     <string name="sync_status_failed">Sync Failed</string>
+    <string name="status_edited_badge">Edited</string>
     <string name="sync_retry_btn">Retry Sync</string>
     <string name="sync_failed_reason">Reason: %1$s</string>
     <string name="sync_pending_banner_title">Offline Queue (%1$d)</string>

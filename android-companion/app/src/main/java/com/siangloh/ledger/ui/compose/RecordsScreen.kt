@@ -36,6 +36,7 @@ import com.siangloh.ledger.data.entities.PendingTransaction
 import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.compose.components.RecordsSkeletonList
 import com.siangloh.ledger.ui.compose.components.SourceBrandBadge
+import com.siangloh.ledger.ui.compose.components.SourceBrandBadgeHelper
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -1276,29 +1277,28 @@ fun TransactionCard(
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 主行：分类 Emoji + 商户/备注 + 金额显示
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            // 1. Emoji 图标背景圆圈 (42.dp)
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .background(catColor.copy(alpha = 0.12f), CircleShape),
+                contentAlignment = Alignment.Center
             ) {
-                // Emoji 图标背景圆圈 (40.dp)
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(catColor.copy(alpha = 0.12f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = emoji, fontSize = 20.sp)
-                }
+                Text(text = emoji, fontSize = 20.sp)
+            }
 
-                Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-                // 商户/备注 (单行加粗，超出省略)
+            // 2. 中间主要区域：商户名称 + 标签微胶囊栏 (自适应占据剩余宽度)
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 val localizedCat = CategoryUiHelper.getLocalizedCategoryName(context, tx.category)
                 val merchantTitle = tx.note.ifBlank { localizedCat }
                 Text(
@@ -1307,14 +1307,148 @@ fun TransactionCard(
                     fontWeight = FontWeight.SemiBold,
                     color = Slate900,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                    overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.height(5.dp))
 
-                // 金额显示 (加粗单行靠右)
-                Column(horizontalAlignment = Alignment.End) {
+                @OptIn(ExperimentalLayoutApi::class)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // (1) 分类微胶囊
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Slate100
+                    ) {
+                        Text(
+                            text = localizedCat,
+                            fontSize = 11.sp,
+                            color = Slate600,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+
+                    // (2) 智能账户与渠道徽标 (自动去重合并，绝不重复显示 TNG + Touch 'n Go)
+                    val normChannel = SourceBrandBadgeHelper.normalizeChannel(tx.channel, tx.note)
+                    val hasAccount = tx.accountName.isNotBlank() && tx.accountName != "未指定" && tx.accountName != "未指定账户"
+
+                    if (hasAccount) {
+                        val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(tx.accountName, tx.channel, tx.note)
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = badgeCfg.containerColor,
+                            border = if (badgeCfg.borderColor != Color.Transparent) BorderStroke(0.6.dp, badgeCfg.borderColor) else null
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                if (badgeCfg.emoji.isNotBlank()) {
+                                    Text(
+                                        text = badgeCfg.emoji,
+                                        fontSize = 9.sp,
+                                        modifier = Modifier.padding(end = 3.dp)
+                                    )
+                                }
+                                Text(
+                                    text = tx.accountName,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = badgeCfg.contentColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    } else if (normChannel != null && normChannel != "generic") {
+                        val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(normChannel.uppercase(), normChannel, tx.note)
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = badgeCfg.containerColor,
+                            border = if (badgeCfg.borderColor != Color.Transparent) BorderStroke(0.6.dp, badgeCfg.borderColor) else null
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                if (badgeCfg.emoji.isNotBlank()) {
+                                    Text(
+                                        text = badgeCfg.emoji,
+                                        fontSize = 9.sp,
+                                        modifier = Modifier.padding(end = 3.dp)
+                                    )
+                                }
+                                Text(
+                                    text = badgeCfg.label,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = badgeCfg.contentColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    // (3) 业务标签 / 自动记账标识
+                    if (tx.tags.isNotBlank()) {
+                        val isAuto = tx.tags.contains("自动记账")
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (isAuto) Emerald50 else Teal50,
+                            border = BorderStroke(0.6.dp, if (isAuto) Emerald100 else Teal100)
+                        ) {
+                            Text(
+                                text = tx.tags,
+                                fontSize = 10.sp,
+                                color = if (isAuto) Emerald700 else PrimaryTeal,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
+                    } else if (tx.isEdited) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Amber50,
+                            border = BorderStroke(0.6.dp, Amber200)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.status_edited_badge),
+                                fontSize = 10.sp,
+                                color = Amber700,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // 3. 右侧：金额在上，日期在下，布局稳定清晰居右对齐
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (tx.type == "transfer") {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Sky50,
+                            modifier = Modifier.padding(end = 4.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.type_transfer),
+                                fontSize = 10.sp,
+                                color = Sky600,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
                     Text(
                         text = "$amountPrefix MYR ${String.format(Locale.US, "%.2f", tx.amount)}",
                         fontSize = 15.sp,
@@ -1322,88 +1456,16 @@ fun TransactionCard(
                         color = amountColor,
                         maxLines = 1
                     )
-                    if (tx.type == "transfer") {
-                        Text(
-                            text = stringResource(R.string.type_transfer),
-                            fontSize = 10.sp,
-                            color = Sky500,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // 次行：元数据流式排布 (对齐商户起始位置：paddingStart = 50.dp)
-            // 使用 FlowRow 保证小屏、大字号、多语言长文本自然折行，绝不互相挤爆！
-            @OptIn(ExperimentalLayoutApi::class)
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 50.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                // 1. 来源与渠道专属 Brand Badge (Maybank / TNG / PB / Grab / 手动 等)
-                SourceBrandBadge(
-                    source = tx.source,
-                    channel = tx.channel,
-                    note = tx.note,
-                    isEdited = tx.isEdited,
-                    fallbackBadgeText = tx.badgeText,
-                    fallbackBadgeEmoji = tx.badgeEmoji,
-                    fallbackBadgeColor = tx.badgeColor
-                )
-
-                // 2. 分类微胶囊 (若主标题已是备注，则展示分类)
-                val localizedCategory = CategoryUiHelper.getLocalizedCategoryName(context, tx.category)
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = Slate100
-                ) {
-                    Text(
-                        text = localizedCategory,
-                        fontSize = 11.sp,
-                        color = Slate600,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
                 }
 
-                // 3. 账户信息 (若已指定)
-                if (tx.accountName.isNotBlank() && tx.accountName != "未指定" && tx.accountName != "未指定账户") {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Slate100
-                    ) {
-                        Text(
-                            text = tx.accountName,
-                            fontSize = 11.sp,
-                            color = Slate500,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
+                Spacer(modifier = Modifier.height(4.dp))
 
-                // 4. 日期
+                // 日期清晰展示在金额下方，整齐划一
                 Text(
                     text = tx.date,
                     fontSize = 11.sp,
                     color = Slate400,
-                    modifier = Modifier.align(Alignment.CenterVertically)
-                )
-            }
-
-            if (tx.tags.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = tx.tags,
-                    fontSize = 10.sp,
-                    color = PrimaryTeal,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(start = 50.dp)
+                    maxLines = 1
                 )
             }
         }

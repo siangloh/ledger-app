@@ -44,6 +44,7 @@
     <string name="sync_status_pending">Menunggu Segerak</string>
     <string name="sync_status_synced">Disegerakkan</string>
     <string name="sync_status_failed">Gagal Segerak</string>
+    <string name="status_edited_badge">Diedit</string>
     <string name="sync_retry_btn">Cuba Semula</string>
     <string name="sync_failed_reason">Sebab: %1$s</string>
     <string name="sync_pending_banner_title">Barisan Luar Talian (%1$d)</string>

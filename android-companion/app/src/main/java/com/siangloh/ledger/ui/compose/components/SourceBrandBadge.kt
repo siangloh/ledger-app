@@ -214,6 +214,93 @@ object SourceBrandBadgeHelper {
             }
         }
     }
+
+    /**
+     * 针对账户名称与渠道进行智能合并与品牌化识别，
+     * 避免因同时显示渠道徽标与账户名称而导致诸如 "TNG" 与 "Touch 'n Go" 重复展示的问题。
+     */
+    fun getAccountBrandConfig(accountName: String, channel: String?, note: String = ""): BrandBadgeConfig {
+        val normCh = normalizeChannel(channel, note)
+        val accLower = accountName.trim().lowercase()
+
+        val matchedBrand = when {
+            accLower.contains("tng") || accLower.contains("touch") || normCh == "tng" -> "tng"
+            accLower.contains("maybank") || accLower.contains("mae") || accLower.contains("m2u") || normCh == "maybank" -> "maybank"
+            accLower.contains("public") || accLower.contains("pb") || normCh == "public_bank" -> "public_bank"
+            accLower.contains("grab") || normCh == "grab" -> "grab"
+            accLower.contains("shopee") || normCh == "shopee" -> "shopee"
+            accLower.contains("cimb") || normCh == "cimb" -> "cimb"
+            accLower.contains("duitnow") || normCh == "duitnow" -> "duitnow"
+            accLower.contains("cash") || accLower.contains("现金") -> "cash"
+            else -> null
+        }
+
+        return when (matchedBrand) {
+            "tng" -> BrandBadgeConfig(
+                label = accountName.ifBlank { "TNG" },
+                emoji = "🔵",
+                containerColor = Color(0xFFF0F9FF), // Sky 50
+                contentColor = Color(0xFF0369A1),   // Sky 700
+                borderColor = Color(0xFFBAE6FD)    // Sky 200
+            )
+            "maybank" -> BrandBadgeConfig(
+                label = accountName.ifBlank { "Maybank" },
+                emoji = "🟡",
+                containerColor = Color(0xFFFEFCE8), // Yellow 50
+                contentColor = Color(0xFF854D0E),   // Yellow 800
+                borderColor = Color(0xFFFEF08A)    // Yellow 200
+            )
+            "public_bank" -> BrandBadgeConfig(
+                label = accountName.ifBlank { "PB" },
+                emoji = "🔴",
+                containerColor = Color(0xFFFEF2F2), // Red 50
+                contentColor = Color(0xFFB91C1C),   // Red 700
+                borderColor = Color(0xFFFECACA)    // Red 200
+            )
+            "grab" -> BrandBadgeConfig(
+                label = accountName.ifBlank { "Grab" },
+                emoji = "🟢",
+                containerColor = Color(0xFFF0FDF4), // Green 50
+                contentColor = Color(0xFF15803D),   // Green 700
+                borderColor = Color(0xFFBBF7D0)    // Green 200
+            )
+            "shopee" -> BrandBadgeConfig(
+                label = accountName.ifBlank { "Shopee" },
+                emoji = "🟠",
+                containerColor = Color(0xFFFFF7ED), // Orange 50
+                contentColor = Color(0xFFC2410C),   // Orange 700
+                borderColor = Color(0xFFFED7AA)    // Orange 200
+            )
+            "cimb" -> BrandBadgeConfig(
+                label = accountName.ifBlank { "CIMB" },
+                emoji = "🔴",
+                containerColor = Color(0xFFFFF1F2), // Rose 50
+                contentColor = Color(0xFFBE123C),   // Rose 700
+                borderColor = Color(0xFFFECDD3)    // Rose 200
+            )
+            "duitnow" -> BrandBadgeConfig(
+                label = accountName.ifBlank { "DuitNow" },
+                emoji = "🌸",
+                containerColor = Color(0xFFFCE7F3), // Pink 50
+                contentColor = Color(0xFFBE185D),   // Pink 700
+                borderColor = Color(0xFFFBCFE8)    // Pink 200
+            )
+            "cash" -> BrandBadgeConfig(
+                label = accountName.ifBlank { "现金" },
+                emoji = "💵",
+                containerColor = Color(0xFFECFDF5), // Emerald 50
+                contentColor = Color(0xFF047857),   // Emerald 700
+                borderColor = Color(0xFFA7F3D0)    // Emerald 200
+            )
+            else -> BrandBadgeConfig(
+                label = accountName,
+                emoji = "",
+                containerColor = Color(0xFFF1F5F9), // Slate 100
+                contentColor = Color(0xFF475569),   // Slate 600
+                borderColor = Color.Transparent
+            )
+        }
+    }
 }
 
 /**

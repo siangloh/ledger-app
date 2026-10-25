@@ -44,6 +44,7 @@
     <string name="sync_status_pending">待同步</string>
     <string name="sync_status_synced">已同步</string>
     <string name="sync_status_failed">同步失败</string>
+    <string name="status_edited_badge">已修改</string>
     <string name="sync_retry_btn">安全重试</string>
     <string name="sync_failed_reason">失败原因：%1$s</string>
     <string name="sync_pending_banner_title">离线记账队列 (%1$d)</string>

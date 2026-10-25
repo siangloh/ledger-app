@@ -1625,7 +1625,7 @@ fun TransactionCardItem(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = tx.note.ifBlank { localizedCategory },
                         fontSize = 15.sp,
@@ -1662,23 +1662,31 @@ fun TransactionCardItem(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
-
-                        // 3. 日期
-                        Text(
-                            text = tx.date,
-                            color = Slate400,
-                            fontSize = 11.sp
-                        )
                     }
                 }
             }
 
-            Text(
-                text = "${if (tx.type == "income") "+" else "-"}MYR ${String.format(Locale.US, "%,.2f", tx.amount)}",
-                color = if (tx.type == "income") Emerald600 else Slate900,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "${if (tx.type == "income") "+" else "-"}MYR ${String.format(Locale.US, "%,.2f", tx.amount)}",
+                    color = if (tx.type == "income") Emerald600 else Slate900,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = tx.date,
+                    color = Slate400,
+                    fontSize = 11.sp,
+                    maxLines = 1
+                )
+            }
         }
     }
 }

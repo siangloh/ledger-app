@@ -60,8 +60,13 @@ val Emerald400 = Color(0xFF34D399)
 val Emerald500 = IncomeGreen
 val Emerald600 = IncomeGreen
 
+val Sky50 = Color(0xFFF0F9FF)
+val Sky100 = Color(0xFFE0F2FE)
+val Sky200 = Color(0xFFBAE6FD)
 val Sky400 = Color(0xFF38BDF8)
 val Sky500 = Color(0xFF0EA5E9)
+val Sky600 = Color(0xFF0284C7)
+val Sky700 = Color(0xFF0369A1)
 
 val Rose50 = Color(0xFFFFF1F2)
 val Rose100 = Color(0xFFFFE4E6)
@@ -70,4 +75,6 @@ val Rose500 = ExpenseRed
 val Rose600 = Color(0xFFE11D48)
 
 val Emerald50 = Color(0xFFECFDF5)
+val Emerald100 = Color(0xFFD1FAE5)
+val Emerald200 = Color(0xFFA7F3D0)
 val Emerald700 = Color(0xFF047857)
