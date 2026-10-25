@@ -1,5 +1,6 @@
 package com.siangloh.ledger.ui.compose
 
+import android.app.DatePickerDialog
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -1118,6 +1119,7 @@ fun RecordsScreen(
     editingTx?.let { tx ->
         EditTransactionBottomSheet(
             tx = tx,
+            availableAccounts = availableAccounts,
             onDismiss = { editingTx = null },
             onSaveSuccess = {
                 editingTx = null
@@ -1476,6 +1478,7 @@ fun TransactionCard(
 @Composable
 fun EditTransactionBottomSheet(
     tx: TransactionRecord,
+    availableAccounts: List<AccountRecord> = emptyList(),
     onDismiss: () -> Unit,
     onSaveSuccess: () -> Unit,
     onDeleteClick: () -> Unit
@@ -1486,11 +1489,43 @@ fun EditTransactionBottomSheet(
     var amountStr by remember { mutableStateOf(String.format(Locale.US, "%.2f", tx.amount)) }
     var category by remember { mutableStateOf(tx.category) }
     var dateStr by remember { mutableStateOf(tx.date) }
+    var selectedAccountId by remember { mutableStateOf<Int?>(tx.accountId) }
     var note by remember { mutableStateOf(tx.note) }
     var tags by remember { mutableStateOf(tx.tags) }
     var txType by remember { mutableStateOf(tx.type) }
     var isSaving by remember { mutableStateOf(false) }
+    var accountsList by remember { mutableStateOf(availableAccounts) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    LaunchedEffect(Unit) {
+        if (accountsList.isEmpty()) {
+            NativeLedgerApi.getAccounts(context).onSuccess {
+                accountsList = it.accounts
+            }
+        }
+    }
+
+    // 日历弹窗选择器：点击日期卡片唤出原生日历
+    fun showDatePicker() {
+        val cal = Calendar.getInstance()
+        try {
+            val parsed = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dateStr)
+            if (parsed != null) cal.time = parsed
+        } catch (_: Exception) {}
+
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val chosenCal = Calendar.getInstance().apply {
+                    set(year, month, dayOfMonth)
+                }
+                dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(chosenCal.time)
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor = Slate900,
@@ -1514,7 +1549,7 @@ fun EditTransactionBottomSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.85f)
+                    .fillMaxHeight(0.88f)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 8.dp)
                     .navigationBarsPadding()
@@ -1532,6 +1567,39 @@ fun EditTransactionBottomSheet(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
+                // 交易类型切换 (支出 / 收入 / 转账)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val types = listOf(
+                        "expense" to stringResource(R.string.type_expense),
+                        "income" to stringResource(R.string.type_income),
+                        "transfer" to stringResource(R.string.type_transfer)
+                    )
+                    types.forEach { (typeKey, typeLabel) ->
+                        val isSelected = txType == typeKey
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) PrimaryTeal else Slate100,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { txType = typeKey }
+                        ) {
+                            Text(
+                                text = typeLabel,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) Color.White else Slate600,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 // 金额输入
                 OutlinedTextField(
                     value = amountStr,
@@ -1543,10 +1611,14 @@ fun EditTransactionBottomSheet(
                     colors = fieldColors
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // 类别与日期
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // 类别与日期 (点击日期唤出原生日历弹窗)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     OutlinedTextField(
                         value = category,
                         onValueChange = { category = it },
@@ -1556,20 +1628,122 @@ fun EditTransactionBottomSheet(
                         modifier = Modifier.weight(1f),
                         colors = fieldColors
                     )
-                    OutlinedTextField(
-                        value = dateStr,
-                        onValueChange = { dateStr = it },
-                        label = { Text("日期 (YYYY-MM-DD)", color = Slate600) },
-                        singleLine = true,
-                        textStyle = LocalTextStyle.current.copy(color = Slate900),
-                        modifier = Modifier.weight(1f),
-                        colors = fieldColors
-                    )
+
+                    // 日期选择卡片：展示日期并附带日历图标，点击唤出原生日历
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Slate300),
+                        color = Slate50,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp)
+                            .clickable { showDatePicker() }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(verticalArrangement = Arrangement.Center) {
+                                Text("日期", fontSize = 10.sp, color = Slate500)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = dateStr.ifBlank { "选择日期" },
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Slate900
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.CalendarMonth,
+                                contentDescription = "选择日期",
+                                tint = PrimaryTeal,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // 备注
+                // 资金账户选择 (Transaction From / 交易支付来源)
+                Text(
+                    text = "账户来源 (From)",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate800
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 1. 未指定选项
+                    val isNoneSelected = selectedAccountId == null
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isNoneSelected) PrimaryTeal else Slate100,
+                        border = if (isNoneSelected) null else BorderStroke(0.8.dp, Slate200),
+                        modifier = Modifier.clickable { selectedAccountId = null }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                        ) {
+                            Text(
+                                text = "未指定",
+                                fontSize = 12.sp,
+                                fontWeight = if (isNoneSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isNoneSelected) Color.White else Slate700
+                            )
+                        }
+                    }
+
+                    // 2. 各账户选项 (Touch 'n Go, Maybank, 现金 等)
+                    accountsList.forEach { acc ->
+                        val isSelected = selectedAccountId == acc.id
+                        val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(acc.name, null)
+                        val chipBg = if (isSelected) PrimaryTeal else badgeCfg.containerColor
+                        val chipFg = if (isSelected) Color.White else badgeCfg.contentColor
+                        val chipBorder = if (isSelected) null else BorderStroke(0.8.dp, if (badgeCfg.borderColor != Color.Transparent) badgeCfg.borderColor else Slate200)
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = chipBg,
+                            border = chipBorder,
+                            modifier = Modifier.clickable { selectedAccountId = acc.id }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                            ) {
+                                if (badgeCfg.emoji.isNotBlank()) {
+                                    Text(
+                                        text = badgeCfg.emoji,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(end = 4.dp)
+                                    )
+                                }
+                                Text(
+                                    text = acc.name,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = chipFg
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 商户 / 备注
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
@@ -1593,178 +1767,176 @@ fun EditTransactionBottomSheet(
                     colors = fieldColors
                 )
 
-            Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-            // 记录来源与溯源元数据区块 (展示来源、渠道、批次及独立性提示)
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Slate50,
-                border = BorderStroke(1.dp, Slate200),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = stringResource(R.string.source_provenance_title),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Slate800
-                        )
-                        val badgeDisplay = if (tx.badgeText.isNotBlank()) tx.badgeText else tx.sourceLabel
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Slate200
-                        ) {
-                            Text(
-                                text = "${tx.badgeEmoji} $badgeDisplay".trim(),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Slate700,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // 通知渠道与资金账户独立性说明
-                    if (!tx.channel.isNullOrBlank() || tx.source == "notification") {
-                        val chDisplay = tx.channelLabel ?: tx.channel ?: "App通知"
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                text = stringResource(R.string.source_channel_label) + "：",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Slate500
-                            )
-                            Text(
-                                text = chDisplay,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Slate800
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Amber50,
-                            border = BorderStroke(1.dp, Amber200),
+                // 记录来源与溯源元数据区块 (展示来源、渠道、批次及独立性提示)
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Slate50,
+                    border = BorderStroke(1.dp, Slate200),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = stringResource(R.string.source_channel_hint, tx.accountName.ifBlank { "未指定" }),
+                                text = stringResource(R.string.source_provenance_title),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Slate800
+                            )
+                            val badgeDisplay = if (tx.badgeText.isNotBlank()) tx.badgeText else tx.sourceLabel
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Slate200
+                            ) {
+                                Text(
+                                    text = "${tx.badgeEmoji} $badgeDisplay".trim(),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Slate700,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // 通知渠道与资金账户独立性说明
+                        if (!tx.channel.isNullOrBlank() || tx.source == "notification") {
+                            val chDisplay = tx.channelLabel ?: tx.channel ?: "App通知"
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = stringResource(R.string.source_channel_label) + "：",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Slate500
+                                )
+                                Text(
+                                    text = chDisplay,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Slate800
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Amber50,
+                                border = BorderStroke(1.dp, Amber200),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.source_channel_hint, tx.accountName.ifBlank { "未指定" }),
+                                    fontSize = 10.sp,
+                                    color = Amber700,
+                                    modifier = Modifier.padding(8.dp),
+                                    lineHeight = 14.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+
+                        if (!tx.importBatchId.isNullOrBlank()) {
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = stringResource(R.string.source_batch_label) + "：",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Slate500
+                                )
+                                Text(
+                                    text = tx.importBatchId,
+                                    fontSize = 11.sp,
+                                    color = Slate700,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+
+                        if (tx.isEdited || !tx.updatedAt.isNullOrBlank()) {
+                            val editTime = tx.updatedAt ?: "-"
+                            val editSrc = tx.lastEditSource ?: "已编辑"
+                            Text(
+                                text = stringResource(R.string.source_edited_desc, editTime, editSrc),
                                 fontSize = 10.sp,
-                                color = Amber700,
-                                modifier = Modifier.padding(8.dp),
+                                color = Slate500,
                                 lineHeight = 14.sp
                             )
+                            Spacer(modifier = Modifier.height(4.dp))
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
-                    }
 
-                    if (!tx.importBatchId.isNullOrBlank()) {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                text = stringResource(R.string.source_batch_label) + "：",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Slate500
-                            )
-                            Text(
-                                text = tx.importBatchId,
-                                fontSize = 11.sp,
-                                color = Slate700,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                    }
-
-                    if (tx.isEdited || !tx.updatedAt.isNullOrBlank()) {
-                        val editTime = tx.updatedAt ?: "-"
-                        val editSrc = tx.lastEditSource ?: "已编辑"
-                        Text(
-                            text = stringResource(R.string.source_edited_desc, editTime, editSrc),
-                            fontSize = 10.sp,
-                            color = Slate500,
-                            lineHeight = 14.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                    }
-
-                    if (tx.hasMergedEvidence) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = Slate100,
-                            modifier = Modifier.padding(top = 2.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.source_merged_badge),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = PrimaryTeal,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
+                        if (tx.hasMergedEvidence) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Slate100,
+                                modifier = Modifier.padding(top = 2.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.source_merged_badge),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = PrimaryTeal,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
-            // 保存按钮
-            Button(
-                onClick = {
-                    val amt = amountStr.toDoubleOrNull() ?: 0.0
-                    if (amt <= 0) {
-                        Toast.makeText(context, "请输入有效金额", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    isSaving = true
-                    scope.launch {
-                        val res = NativeLedgerApi.updateTransaction(
-                            context = context,
-                            txId = tx.id,
-                            type = txType,
-                            amount = amt,
-                            category = category,
-                            date = dateStr,
-                            note = note,
-                            tags = tags,
-                            accountId = tx.accountId
-                        )
-                        isSaving = false
-                        res.onSuccess {
-                            Toast.makeText(context, "更新成功", Toast.LENGTH_SHORT).show()
-                            onSaveSuccess()
-                        }.onFailure {
-                            Toast.makeText(context, "更新失败：${it.message}", Toast.LENGTH_SHORT).show()
+                // 保存按钮
+                Button(
+                    onClick = {
+                        val amt = amountStr.toDoubleOrNull() ?: 0.0
+                        if (amt <= 0) {
+                            Toast.makeText(context, "请输入有效金额", Toast.LENGTH_SHORT).show()
+                            return@Button
                         }
+                        isSaving = true
+                        scope.launch {
+                            val res = NativeLedgerApi.updateTransaction(
+                                context = context,
+                                txId = tx.id,
+                                type = txType,
+                                amount = amt,
+                                category = category,
+                                date = dateStr,
+                                note = note,
+                                tags = tags,
+                                accountId = selectedAccountId
+                            )
+                            isSaving = false
+                            res.onSuccess {
+                                Toast.makeText(context, "更新成功", Toast.LENGTH_SHORT).show()
+                                onSaveSuccess()
+                            }.onFailure {
+                                Toast.makeText(context, "更新失败：${it.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    enabled = !isSaving,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal)
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
+                    } else {
+                        Text(stringResource(R.string.edit_save), fontSize = 15.sp, fontWeight = FontWeight.Bold)
                     }
-                },
-                enabled = !isSaving,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal)
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
-                } else {
-                    Text(stringResource(R.string.edit_save), fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
         }
     }
-}
 }
 
 fun shiftMonthString(monthStr: String, delta: Int): String {
