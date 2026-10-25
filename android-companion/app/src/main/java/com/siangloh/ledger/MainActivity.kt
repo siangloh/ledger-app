@@ -567,6 +567,8 @@ class MainActivity : AppCompatActivity() {
                 }
                 .setNegativeButton(R.string.permission_dialog_cancel, null)
                 .show()
+        } else {
+            tryReconnectNotificationListener()
         }
     }
 
