@@ -337,6 +337,20 @@ def update_transaction_quick_category(
         return {'ok': False, 'message': '参数缺失'}
 
     clean_category = category.strip()
+    if clean_category.startswith('{') and (clean_category.endswith('}') or 'category' in clean_category):
+        import re, json
+        try:
+            parsed = json.loads(clean_category)
+            if isinstance(parsed, dict) and ('category' in parsed or 'name' in parsed):
+                clean_category = str(parsed.get('category') or parsed.get('name') or clean_category).strip()
+        except Exception:
+            m = re.search(r"['\"]?category['\"]?\s*:\s*['\"]([^'\"]+)['\"]", clean_category)
+            if m:
+                clean_category = m.group(1).strip()
+    clean_category = clean_category.strip('\'"{} ')
+    if not clean_category:
+        clean_category = '其他'
+
     target_tx = db.execute('''
         SELECT id, note, category, amount, date FROM transactions
         WHERE id = ? AND user_id = ? AND deleted_at IS NULL

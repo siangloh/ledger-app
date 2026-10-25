@@ -72,11 +72,28 @@ object LocalLedgerRepository {
                 } else {
                     val seenCats = mutableSetOf<String>()
                     for (cat in existingCategories) {
-                        if (!seenCats.add("${cat.name}_${cat.type}")) {
+                        val clean = com.siangloh.ledger.ui.compose.CategoryUiHelper.cleanCategoryName(cat.name)
+                        if (!seenCats.add("${clean}_${cat.type}")) {
                             db.localCategoryDao().deleteById(cat.id)
+                        } else if (clean != cat.name) {
+                            db.localCategoryDao().deleteById(cat.id)
+                            db.localCategoryDao().insert(cat.copy(id = 0, name = clean))
                         }
                     }
                 }
+
+                // Self-healing: 修复以往存入 local_transactions 中的畸形/JSON 字符串分类
+                try {
+                    val allTxs = db.localTransactionDao().getAll()
+                    for (tx in allTxs) {
+                        if (tx.category.contains("{") || tx.category.contains("category") || tx.category.contains("'") || tx.category.contains("\"")) {
+                            val cleanCat = com.siangloh.ledger.ui.compose.CategoryUiHelper.cleanCategoryName(tx.category)
+                            if (cleanCat != tx.category) {
+                                db.localTransactionDao().updateCategory(tx.id, cleanCat)
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
 
                 // 自动将以往积攒在本地离线表里的待处理通知解析并补录进 local_transactions
                 val pendingNotifs = db.pendingNotificationDao().getAllNotifications()
@@ -452,7 +469,8 @@ object LocalLedgerRepository {
     suspend fun updateTransactionCategory(context: Context, id: Long, category: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val db = AppDatabase.getInstance(context)
-            db.localTransactionDao().updateCategory(id, category)
+            val cleanCat = com.siangloh.ledger.ui.compose.CategoryUiHelper.cleanCategoryName(category)
+            db.localTransactionDao().updateCategory(id, cleanCat)
             notifyDataChanged(context)
             Result.success(Unit)
         } catch (e: Exception) {
@@ -715,12 +733,24 @@ object LocalLedgerRepository {
 
             val topCatsArray = JSONArray()
             catExpMap.entries.sortedByDescending { it.value }.take(8).forEach { (cat, amt) ->
+                val cleanCat = com.siangloh.ledger.ui.compose.CategoryUiHelper.cleanCategoryName(cat)
                 val pct = if (totalExp > 0) (amt / totalExp * 100).toInt() else 0
                 topCatsArray.put(JSONObject().apply {
-                    put("category", cat)
+                    put("category", cleanCat)
                     put("amount", amt)
                     put("percentage", pct)
                 })
+            }
+
+            val allExpenseCats = db.localCategoryDao().getAll()
+                .filter { it.type == "expense" }
+                .map { com.siangloh.ledger.ui.compose.CategoryUiHelper.cleanCategoryName(it.name) }
+                .filter { it.isNotBlank() }
+            val catNamesArray = JSONArray()
+            if (allExpenseCats.isNotEmpty()) {
+                allExpenseCats.distinct().forEach { catNamesArray.put(it) }
+            } else {
+                listOf("餐饮", "交通", "杂货", "账单", "购物", "娱乐", "医疗", "其他").forEach { catNamesArray.put(it) }
             }
 
             val sparklineArray = JSONArray()
@@ -733,11 +763,12 @@ object LocalLedgerRepository {
 
             val recentArray = JSONArray()
             txList.take(20).forEach { tx ->
+                val cleanCat = com.siangloh.ledger.ui.compose.CategoryUiHelper.cleanCategoryName(tx.category)
                 recentArray.put(JSONObject().apply {
                     put("id", tx.id)
                     put("date", tx.date)
                     put("type", tx.type)
-                    put("category", tx.category)
+                    put("category", cleanCat)
                     put("amount", tx.amount)
                     put("note", tx.note)
                     put("channel", tx.channel ?: "")
@@ -771,7 +802,8 @@ object LocalLedgerRepository {
                 put("net", net)
                 put("balance", net)
                 put("net_worth", totalNetWorth)
-                put("categories", topCatsArray)
+                put("categories", catNamesArray)
+                put("category_breakdown", topCatsArray)
                 put("top_categories", topCatsArray)
                 put("sparkline", sparklineArray)
                 put("recent_transactions", recentArray)

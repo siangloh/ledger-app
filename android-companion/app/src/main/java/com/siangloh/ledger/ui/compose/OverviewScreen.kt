@@ -205,7 +205,7 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
                             id = item.optLong("id", 0L),
                             date = item.optString("date", "").takeIf { it != "null" } ?: "",
                             type = item.optString("type", "expense").takeIf { it != "null" } ?: "expense",
-                            category = item.optString("category", "其他").takeIf { it != "null" } ?: "其他",
+                            category = CategoryUiHelper.cleanCategoryName(item.optString("category", "其他")),
                             amount = amt,
                             note = item.optString("note", "").takeIf { it != "null" } ?: "",
                             source = item.optString("source", "unknown").takeIf { it != "null" } ?: "unknown",
@@ -249,7 +249,7 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
                             date = item.optString("date", "").takeIf { it != "null" } ?: "",
                             amount = amt,
                             note = item.optString("note", "").takeIf { it != "null" } ?: "",
-                            category = item.optString("category", "待分类").takeIf { it != "null" } ?: "待分类",
+                            category = CategoryUiHelper.cleanCategoryName(item.optString("category", "待分类")),
                             isPendingOnHold = isPending,
                             sourceType = srcType,
                             reviewReason = reviewReason,
@@ -270,8 +270,18 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
         if (catArray != null) {
             for (i in 0 until catArray.length()) {
                 try {
-                    val c = catArray.optString(i)
-                    if (c.isNotBlank() && c != "null") catList.add(c)
+                    val obj = catArray.optJSONObject(i)
+                    val rawName = if (obj != null) {
+                        obj.optString("category").takeIf { it.isNotBlank() && it != "null" }
+                            ?: obj.optString("name").takeIf { it.isNotBlank() && it != "null" }
+                    } else {
+                        val c = catArray.optString(i)
+                        c.takeIf { it.isNotBlank() && it != "null" }
+                    }
+                    if (!rawName.isNullOrBlank()) {
+                        val cleaned = CategoryUiHelper.cleanCategoryName(rawName)
+                        if (cleaned.isNotBlank()) catList.add(cleaned)
+                    }
                 } catch (_: Exception) {}
             }
         }
@@ -1776,7 +1786,8 @@ fun QuickCategoryBottomSheet(
     onDismiss: () -> Unit,
     onConfirmCategory: (String, Boolean) -> Unit
 ) {
-    var selectedCat by remember { mutableStateOf(transaction.category.ifBlank { "餐饮" }) }
+    val initialCleanCat = CategoryUiHelper.cleanCategoryName(transaction.category)
+    var selectedCat by remember { mutableStateOf(initialCleanCat.ifBlank { "餐饮" }) }
     var rememberRule by remember { mutableStateOf(true) }
 
     val emojiMap = mapOf(
@@ -1788,13 +1799,17 @@ fun QuickCategoryBottomSheet(
 
     val allCategories = remember(availableCategories, transaction.category) {
         val list = mutableListOf<String>()
-        if (availableCategories.isNotEmpty()) {
-            list.addAll(availableCategories)
+        val cleanAvail = availableCategories
+            .map { CategoryUiHelper.cleanCategoryName(it) }
+            .filter { it.isNotBlank() && it != "null" }
+        if (cleanAvail.isNotEmpty()) {
+            list.addAll(cleanAvail)
         } else {
             list.addAll(InstantReviewManager.COMMON_CATEGORIES.map { it.first })
         }
-        if (transaction.category.isNotBlank() && !list.contains(transaction.category)) {
-            list.add(transaction.category)
+        val cleanTx = CategoryUiHelper.cleanCategoryName(transaction.category)
+        if (cleanTx.isNotBlank() && !list.contains(cleanTx)) {
+            list.add(cleanTx)
         }
         if (!list.contains("其他")) {
             list.add("其他")
@@ -1835,7 +1850,7 @@ fun QuickCategoryBottomSheet(
                     ) {
                         rowItems.forEach { catName ->
                             val isSelected = catName == selectedCat
-                            val emoji = emojiMap[catName] ?: "🏷️"
+                            val emoji = emojiMap[catName] ?: CategoryUiHelper.getCategoryEmoji(catName)
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = if (isSelected) Emerald500 else Slate100,

@@ -1796,8 +1796,9 @@ fun QuickCategorizeDialog(
 ) {
     var customCategory by remember { mutableStateOf("") }
     val displayCategories = remember(userCategories) {
-        if (userCategories.isNotEmpty()) {
-            userCategories
+        val cleanList = userCategories.map { CategoryUiHelper.cleanCategoryName(it) }.filter { it.isNotBlank() }
+        if (cleanList.isNotEmpty()) {
+            cleanList
         } else {
             listOf("餐饮", "交通", "杂货", "账单", "购物", "娱乐", "医疗", "居家", "数码", "理财", "教育", "其他")
         }
@@ -1840,7 +1841,7 @@ fun QuickCategorizeDialog(
                     colors = ledgerInputColors(),
                     trailingIcon = {
                         if (customCategory.isNotBlank()) {
-                            IconButton(onClick = { onConfirmCategory(customCategory.trim()) }) {
+                            IconButton(onClick = { onConfirmCategory(CategoryUiHelper.cleanCategoryName(customCategory)) }) {
                                 Icon(Icons.Default.Check, contentDescription = "确认", tint = PrimaryTeal)
                             }
                         }
@@ -1855,7 +1856,7 @@ fun QuickCategorizeDialog(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         row.forEach { catName ->
-                            val emoji = emojiMap[catName] ?: "🏷️"
+                            val emoji = emojiMap[catName] ?: CategoryUiHelper.getCategoryEmoji(catName)
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = Slate100,

@@ -6,8 +6,31 @@ import com.siangloh.ledger.R
 import com.siangloh.ledger.ui.compose.theme.*
 
 object CategoryUiHelper {
+    fun cleanCategoryName(raw: String?): String {
+        if (raw == null) return "其他"
+        val trimmed = raw.trim()
+        if (trimmed.isBlank() || trimmed == "null") return "其他"
+        if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+            try {
+                val obj = org.json.JSONObject(trimmed)
+                val extracted = obj.optString("category").takeIf { it.isNotBlank() && it != "null" }
+                    ?: obj.optString("name").takeIf { it.isNotBlank() && it != "null" }
+                if (!extracted.isNullOrBlank()) return cleanCategoryName(extracted)
+            } catch (_: Exception) {}
+        }
+        if (trimmed.contains("category") && (trimmed.startsWith("{") || trimmed.contains(":"))) {
+            val regex = Regex("""['"]?category['"]?\s*:\s*['"]([^'"}]+)['"]""")
+            val match = regex.find(trimmed)
+            if (match != null) {
+                val extracted = match.groupValues[1].trim()
+                if (extracted.isNotBlank()) return cleanCategoryName(extracted)
+            }
+        }
+        return trimmed.removeSurrounding("\"").removeSurrounding("'").trim().ifBlank { "其他" }
+    }
+
     fun getCategoryEmoji(category: String, type: String = "expense"): String {
-        val clean = category.trim().lowercase()
+        val clean = cleanCategoryName(category).trim().lowercase()
         if (clean.contains("内部") || clean.contains("划转") || clean.contains("自转") || clean.contains("转账") || clean.contains("transfer") || clean.contains("pindahan")) return "🔄"
         if (type == "income") {
             return when {
@@ -42,7 +65,7 @@ object CategoryUiHelper {
     }
 
     fun getCategoryColor(category: String): Color {
-        val clean = category.trim().lowercase()
+        val clean = cleanCategoryName(category).trim().lowercase()
         return when {
             clean.contains("餐") || clean.contains("food") || clean.contains("makan") -> Color(0xFFF97316) // Orange
             clean.contains("交通") || clean.contains("transport") || clean.contains("pengangkutan") -> Sky500
@@ -93,7 +116,8 @@ object CategoryUiHelper {
     }
 
     fun getLocalizedCategoryName(context: Context, category: String): String {
-        val clean = category.trim().lowercase()
+        val cleanCat = cleanCategoryName(category)
+        val clean = cleanCat.trim().lowercase()
         return when {
             clean.contains("餐") || clean.contains("food") || clean.contains("makan") || clean.contains("dining") -> context.getString(R.string.category_dining)
             clean.contains("交通") || clean.contains("transport") || clean.contains("pengangkutan") -> context.getString(R.string.category_transport)
@@ -116,7 +140,7 @@ object CategoryUiHelper {
             clean.contains("内部") || clean.contains("划转") || clean.contains("transfer") || clean.contains("pindahan") -> context.getString(R.string.category_transfer)
             clean.contains("其他") || clean.contains("other") || clean.contains("lain") -> context.getString(R.string.category_other)
             clean.contains("未分类") || clean.contains("待分类") || clean.contains("uncategorized") || clean.isBlank() -> context.getString(R.string.uncategorized_status)
-            else -> category
+            else -> cleanCat
         }
     }
 }
