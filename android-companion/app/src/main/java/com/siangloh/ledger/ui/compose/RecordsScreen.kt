@@ -1337,84 +1337,63 @@ fun TransactionCard(
 
             // 次行：元数据流式排布 (对齐商户起始位置：paddingStart = 50.dp)
             // 使用 FlowRow 保证小屏、大字号、多语言长文本自然折行，绝不互相挤爆！
-            Row(
+            @OptIn(ExperimentalLayoutApi::class)
+            FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 50.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                @OptIn(ExperimentalLayoutApi::class)
-                FlowRow(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    // 1. 来源与渠道专属 Brand Badge (Maybank / TNG / PB / Grab / 手动 等)
-                    SourceBrandBadge(
-                        source = tx.source,
-                        channel = tx.channel,
-                        note = tx.note,
-                        isEdited = tx.isEdited,
-                        fallbackBadgeText = tx.badgeText,
-                        fallbackBadgeEmoji = tx.badgeEmoji,
-                        fallbackBadgeColor = tx.badgeColor
-                    )
+                // 1. 来源与渠道专属 Brand Badge (Maybank / TNG / PB / Grab / 手动 等)
+                SourceBrandBadge(
+                    source = tx.source,
+                    channel = tx.channel,
+                    note = tx.note,
+                    isEdited = tx.isEdited,
+                    fallbackBadgeText = tx.badgeText,
+                    fallbackBadgeEmoji = tx.badgeEmoji,
+                    fallbackBadgeColor = tx.badgeColor
+                )
 
-                    // 2. 分类微胶囊 (若主标题已是备注，则展示分类)
-                    val localizedCategory = CategoryUiHelper.getLocalizedCategoryName(context, tx.category)
+                // 2. 分类微胶囊 (若主标题已是备注，则展示分类)
+                val localizedCategory = CategoryUiHelper.getLocalizedCategoryName(context, tx.category)
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Slate100
+                ) {
+                    Text(
+                        text = localizedCategory,
+                        fontSize = 11.sp,
+                        color = Slate600,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+
+                // 3. 账户信息 (若已指定)
+                if (tx.accountName.isNotBlank() && tx.accountName != "未指定" && tx.accountName != "未指定账户") {
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = Slate100
                     ) {
                         Text(
-                            text = localizedCategory,
+                            text = tx.accountName,
                             fontSize = 11.sp,
-                            color = Slate600,
+                            color = Slate500,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
-
-                    // 3. 账户信息 (若已指定)
-                    if (tx.accountName.isNotBlank() && tx.accountName != "未指定" && tx.accountName != "未指定账户") {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Slate100
-                        ) {
-                            Text(
-                                text = tx.accountName,
-                                fontSize = 11.sp,
-                                color = Slate500,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-
-                    // 4. 日期
-                    Text(
-                        text = tx.date,
-                        fontSize = 11.sp,
-                        color = Slate400,
-                        modifier = Modifier.align(Alignment.CenterVertically)
-                    )
                 }
 
-                // 右侧独立同步状态徽标
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = Emerald50,
-                    modifier = Modifier.padding(start = 6.dp)
-                ) {
-                    Text(
-                        text = "· " + stringResource(R.string.sync_status_synced),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Emerald700,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                    )
-                }
+                // 4. 日期
+                Text(
+                    text = tx.date,
+                    fontSize = 11.sp,
+                    color = Slate400,
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                )
             }
 
             if (tx.tags.isNotBlank()) {
