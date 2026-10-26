@@ -57,10 +57,6 @@ fun LoginScreen(
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val hasLocalCache = remember(username) {
-        AuthManager.hasCachedUser(context, username)
-    }
-
     fun handleLogin() {
         focusManager.clearFocus()
         if (username.isBlank()) {
@@ -217,33 +213,6 @@ fun LoginScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
-
-                    // Local Cache Hint Chip
-                    if (hasLocalCache) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Teal50)
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.OfflineBolt,
-                                contentDescription = "离线缓存",
-                                tint = Teal700,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "该账号已存有本地凭据，支持免联网离线秒登",
-                                fontSize = 11.sp,
-                                color = Teal700,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
 
                     Spacer(modifier = Modifier.height(18.dp))
 
