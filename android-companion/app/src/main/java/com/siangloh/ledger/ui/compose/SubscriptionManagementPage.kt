@@ -51,7 +51,8 @@ import java.util.Locale
 fun SubscriptionManagementPage(
     subscriptions: List<SubscriptionRecord>,
     fixedIncomes: List<FixedIncomeRecord> = emptyList(),
-    userCategories: List<String>,
+    userCategories: List<String> = emptyList(),
+    userIncomeCategories: List<String> = emptyList(),
     accounts: List<AccountRecord> = emptyList(),
     onBack: () -> Unit,
     onRefresh: () -> Unit = {}
@@ -61,6 +62,24 @@ fun SubscriptionManagementPage(
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
     var localAccounts by remember { mutableStateOf(accounts) }
     var isSyncing by remember { mutableStateOf(false) }
+
+    var localExpenseCategories by remember {
+        mutableStateOf(userCategories.ifEmpty { listOf("餐饮", "交通", "杂货", "账单", "房租", "购物", "娱乐", "医疗", "其他") })
+    }
+    var localIncomeCategories by remember {
+        mutableStateOf(userIncomeCategories.ifEmpty { listOf("工资", "兼职", "副业", "租金", "投资", "奖金", "分红", "报销", "其他") })
+    }
+
+    LaunchedEffect(userCategories, userIncomeCategories) {
+        if (userCategories.isNotEmpty()) localExpenseCategories = userCategories
+        if (userIncomeCategories.isNotEmpty()) localIncomeCategories = userIncomeCategories
+        NativeLedgerApi.getCategories(context).onSuccess { res ->
+            val expNames = res.expenses.map { it.name }.filter { it.isNotBlank() }
+            if (expNames.isNotEmpty()) localExpenseCategories = expNames
+            val incNames = res.incomes.map { it.name }.filter { it.isNotBlank() }
+            if (incNames.isNotEmpty()) localIncomeCategories = incNames
+        }
+    }
 
     LaunchedEffect(accounts) {
         if (accounts.isNotEmpty()) {
@@ -639,12 +658,42 @@ fun SubscriptionManagementPage(
                     OutlinedTextField(
                         value = categoryInput,
                         onValueChange = { categoryInput = it },
-                        label = { Text("记账分类 (如: 娱乐, 账单)", color = Slate600) },
+                        label = { Text("记账分类 (可手填或点击下方快速选择)", color = Slate600) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
                         colors = ledgerInputColors()
                     )
+
+                    // 支出分类快捷点选
+                    Column {
+                        Text("点击快速选择支出分类:", fontSize = 12.sp, color = Slate600)
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val options = (localExpenseCategories + listOf("订阅", "房租", "账单", "通讯", "其他")).distinct()
+                            options.forEach { opt ->
+                                val sel = categoryInput == opt
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (sel) PrimaryTeal else Slate100,
+                                    modifier = Modifier.clickable { categoryInput = opt }
+                                ) {
+                                    Text(
+                                        text = opt,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (sel) Color.White else Slate700,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     // 扣款/支付账户选择
                     Column {
@@ -829,7 +878,6 @@ fun SubscriptionManagementPage(
         var selectedAccountName by remember { mutableStateOf(activeIncome?.accountName) }
         var showDayPicker by remember { mutableStateOf(false) }
 
-        val incomeCategoryOptions = listOf("工资", "兼职", "租金", "投资", "奖金", "报销", "其他")
 
         AlertDialog(
             onDismissRequest = {
@@ -868,9 +916,19 @@ fun SubscriptionManagementPage(
                         colors = ledgerInputColors()
                     )
 
-                    // 分类快捷标签
+                    OutlinedTextField(
+                        value = categoryInput,
+                        onValueChange = { categoryInput = it },
+                        label = { Text("收入分类 (可手填或点击下方快速选择)", color = Slate600) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
+                    )
+
+                    // 收入分类快捷点选
                     Column {
-                        Text("收入分类:", fontSize = 12.sp, color = Slate600)
+                        Text("点击快速选择收入分类:", fontSize = 12.sp, color = Slate600)
                         Spacer(Modifier.height(4.dp))
                         Row(
                             modifier = Modifier
@@ -878,7 +936,8 @@ fun SubscriptionManagementPage(
                                 .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            incomeCategoryOptions.forEach { opt ->
+                            val options = (localIncomeCategories + listOf("工资", "兼职", "副业", "租金", "投资", "奖金", "分红", "报销", "其他")).distinct()
+                            options.forEach { opt ->
                                 val sel = categoryInput == opt
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),

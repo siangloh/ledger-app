@@ -79,6 +79,7 @@ fun MoreToolsScreen(
     var isLoading by remember { mutableStateOf(false) }
     var isPendingLoading by remember { mutableStateOf(true) }
     var userCategories by remember { mutableStateOf<List<String>>(emptyList()) }
+    var userIncomeCategories by remember { mutableStateOf<List<String>>(emptyList()) }
     var isSyncing by remember { mutableStateOf(false) }
 
     // Settings & Permissions states
@@ -112,6 +113,8 @@ fun MoreToolsScreen(
                 NativeLedgerApi.getCategories(context).onSuccess { catRes ->
                     val names = catRes.expenses.map { it.name }.filter { it.isNotBlank() }
                     if (names.isNotEmpty()) userCategories = names
+                    val incNames = catRes.incomes.map { it.name }.filter { it.isNotBlank() }
+                    if (incNames.isNotEmpty()) userIncomeCategories = incNames
                 }
             } catch (_: Exception) {}
 
@@ -226,6 +229,7 @@ fun MoreToolsScreen(
                     subscriptions = toolsSummary?.subscriptions ?: emptyList(),
                     fixedIncomes = toolsSummary?.fixedIncomes ?: emptyList(),
                     userCategories = userCategories,
+                    userIncomeCategories = userIncomeCategories,
                     onBack = {
                         activeSubPage = null
                         refreshAll()
