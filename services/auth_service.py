@@ -14,7 +14,7 @@ import uuid
 import secrets
 import logging
 from datetime import datetime, timedelta
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from services.email_service import send_otp_email
 
@@ -230,3 +230,63 @@ def verify_and_reset_password(identifier: str, otp_code: str, new_password: str,
 
     logger.info("Successfully reset password for user '%s' (ID: %s) via OTP", user['username'], user['id'])
     return True, "密码已成功重置！请使用新密码进行登录。"
+
+
+def authenticate_user(username: str, password: str, db=None) -> tuple[bool, str, dict | None]:
+    """
+    原生移动端 / API 用户认证服务。
+    验证用户名与密码，支持普通用户与默认 admin 用户。
+    返回 (是否成功, 提示消息, 用户数据字典)。
+    """
+    if not username or not password:
+        return False, "用户名和密码均不能为空", None
+
+    clean_user = username.strip()
+    if not db:
+        from core.db import get_db
+        db = get_db()
+
+    user = db.execute('SELECT * FROM users WHERE LOWER(username) = LOWER(?)', (clean_user,)).fetchone()
+
+    # 1. 检查已注册普通用户
+    if user and check_password_hash(user['password_hash'], password):
+        api_key = user['api_key']
+        if not api_key:
+            api_key = secrets.token_urlsafe(24)
+            db.execute('UPDATE users SET api_key = ? WHERE id = ?', (api_key, user['id']))
+            db.commit()
+
+        return True, "登录成功", {
+            "id": user['id'],
+            "username": user['username'],
+            "api_key": api_key,
+            "email": user['email']
+        }
+
+    # 2. 检查 admin 特权用户
+    from core.config import get_app_password
+    if clean_user.lower() == 'admin' and password == get_app_password(db):
+        if user:
+            admin_id = user['id']
+            api_key = user['api_key']
+            if not api_key:
+                api_key = secrets.token_urlsafe(24)
+                db.execute('UPDATE users SET api_key = ? WHERE id = ?', (api_key, admin_id))
+                db.commit()
+        else:
+            admin_id = str(uuid.uuid4())
+            api_key = secrets.token_urlsafe(24)
+            db.execute(
+                'INSERT INTO users (id, username, password_hash, created_at, api_key) VALUES (?, ?, ?, ?, ?)',
+                (admin_id, 'admin', generate_password_hash(password), datetime.now().isoformat(), api_key)
+            )
+            db.commit()
+
+        return True, "登录成功", {
+            "id": admin_id,
+            "username": "admin",
+            "api_key": api_key,
+            "email": user['email'] if user else None
+        }
+
+    return False, "用户名或密码错误，请重试", None

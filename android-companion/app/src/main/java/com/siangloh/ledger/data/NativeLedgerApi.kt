@@ -1004,6 +1004,54 @@ object NativeLedgerApi {
     suspend fun applyInstallmentMatch(context: Context, instId: Int, txId: Long?): Result<Boolean> = withContext(Dispatchers.IO) {
         LocalLedgerRepository.applyInstallmentMatch(context, instId, txId)
     }
+
+    suspend fun login(
+        context: Context,
+        username: String,
+        password: String,
+        serverUrl: String? = null
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val base = (if (!serverUrl.isNullOrBlank()) serverUrl else NetworkHelper.getServerUrl(context)).trimEnd('/')
+            val url = URL("$base/api/native/login")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 8000
+                readTimeout = 10000
+                setRequestProperty("User-Agent", "LedgerAppNative/1.0 (Android; Dalvik)")
+                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                doOutput = true
+            }
+            val payload = JSONObject().apply {
+                put("username", username)
+                put("password", password)
+            }.toString()
+
+            OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                it.write(payload)
+                it.flush()
+            }
+
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) {
+                conn.inputStream.bufferedReader().use { it.readText() }
+            } else {
+                conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            }
+            conn.disconnect()
+
+            val json = if (respBody.isNotBlank()) JSONObject(respBody) else JSONObject()
+            if (respCode in 200..299 && json.optBoolean("ok", false)) {
+                Result.success(json)
+            } else {
+                val msg = json.optString("message", if (respCode == 401) "用户名或密码错误" else "登录失败 (HTTP $respCode)")
+                Result.failure(Exception(msg))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "login network error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }
 
 

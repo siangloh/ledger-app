@@ -364,6 +364,39 @@ def test_offline_sync_with_accounts_tags_and_transfer(flask_app, client, admin_u
         assert acc_b in acc_ids
 
 
+def test_native_login_api(client, flask_app, admin_user_id):
+    """验证原生移动端登录接口 /api/native/login"""
+    # 1. 缺少用户名或密码
+    res_bad = client.post('/api/native/login', json={"username": ""})
+    assert res_bad.status_code == 400
+    assert res_bad.get_json()['ok'] is False
+
+    # 2. 错误密码
+    res_wrong = client.post('/api/native/login', json={"username": "admin", "password": "WrongPassword999!"})
+    assert res_wrong.status_code == 401
+    assert res_wrong.get_json()['ok'] is False
+
+    # 3. 正常登录测试
+    with flask_app.app.app_context():
+        from core.db import get_db
+        from werkzeug.security import generate_password_hash
+        db = get_db()
+        db.execute("DELETE FROM users WHERE username = 'testuser'")
+        db.execute(
+            "INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
+            ("test-user-login-id", "testuser", generate_password_hash("SecretPass123!"), "2026-10-26T10:00:00")
+        )
+        db.commit()
+
+    res_ok = client.post('/api/native/login', json={"username": "testuser", "password": "SecretPass123!"})
+    assert res_ok.status_code == 200
+    data = res_ok.get_json()
+    assert data['ok'] is True
+    assert data['user']['username'] == 'testuser'
+    assert bool(data['user']['api_key']) is True
+
+
+
 
 
 

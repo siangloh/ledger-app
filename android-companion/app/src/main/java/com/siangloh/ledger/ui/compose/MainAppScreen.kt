@@ -43,6 +43,7 @@ fun MainAppScreen(
     initialTab: Int = 0,
     onScanReceipt: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onLogout: () -> Unit = {},
     onOpenWebUrl: (String) -> Unit = {}
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(initialTab) }
@@ -167,6 +168,7 @@ fun MainAppScreen(
                                 onScanReceipt = onScanReceipt,
                                 onNavigateToAdd = { selectedTab = 2 },
                                 onOpenSettings = onOpenSettings,
+                                onLogout = onLogout,
                                 onOpenWebUrl = onOpenWebUrl
                             )
                         }

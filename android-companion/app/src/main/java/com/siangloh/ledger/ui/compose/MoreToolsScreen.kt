@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -56,6 +57,7 @@ fun MoreToolsScreen(
     onScanReceipt: () -> Unit = {},
     onNavigateToAdd: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onLogout: () -> Unit = {},
     onOpenWebUrl: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -429,6 +431,83 @@ fun MoreToolsScreen(
                         (context as? android.app.Activity)?.recreate()
                     }
                 )
+            }
+
+            // 8. 当前账户与退出登录 (Account & Logout)
+            item {
+                val currentUsername = com.siangloh.ledger.data.AuthManager.getCurrentUsername(context).ifBlank {
+                    NetworkHelper.getUsername(context).ifBlank { "未登录" }
+                }
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Slate200),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Teal50),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AccountCircle,
+                                    contentDescription = "当前用户",
+                                    tint = PrimaryTeal,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "当前登录账户",
+                                    fontSize = 11.sp,
+                                    color = Slate500
+                                )
+                                Text(
+                                    text = currentUsername,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Slate900
+                                )
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = onLogout,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, ExpenseRed.copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = ExpenseRed
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = "退出登录",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "退出登录",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
             }
 
             item {

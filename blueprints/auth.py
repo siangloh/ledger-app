@@ -10,7 +10,7 @@ from core.db import get_db, init_user_default_categories, get_user_settings
 from core.config import get_app_password
 from core.extensions import csrf
 from core.i18n import set_current_locale
-from services.auth_service import request_password_reset_otp, verify_and_reset_password
+from services.auth_service import request_password_reset_otp, verify_and_reset_password, authenticate_user
 
 logger = logging.getLogger(__name__)
 
@@ -255,4 +255,31 @@ def api_verify_reset():
     return jsonify({
         'ok': True,
         'message': msg
+    })
+
+
+@auth_bp.route('/api/native/login', methods=['POST'], endpoint='api_native_login')
+@csrf.exempt
+def api_native_login():
+    """
+    原生移动端登录接口：
+    接收 JSON 载荷: { "username": "...", "password": "..." }
+    返回认证状态及用户信息 (包含 api_key)。
+    """
+    data = request.get_json(silent=True) or request.form or {}
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+
+    if not username or not password:
+        return jsonify({'ok': False, 'message': '请输入用户名和密码'}), 400
+
+    db = get_db()
+    ok, msg, user_data = authenticate_user(username, password, db=db)
+    if not ok:
+        return jsonify({'ok': False, 'message': msg}), 401
+
+    return jsonify({
+        'ok': True,
+        'message': msg,
+        'user': user_data
     })

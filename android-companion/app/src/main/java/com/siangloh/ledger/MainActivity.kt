@@ -42,6 +42,8 @@ import androidx.lifecycle.lifecycleScope
 import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.AppSelectionActivity
 import com.siangloh.ledger.ui.NotificationLogActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import com.siangloh.ledger.ui.QuickAddActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
@@ -128,16 +130,45 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var onLogoutCallback: (() -> Unit)? = null
+
     private fun initComposeOverview() {
         composeView.setContent {
             com.siangloh.ledger.ui.compose.theme.LedgerTheme {
-                com.siangloh.ledger.ui.compose.MainAppScreen(
-                    onScanReceipt = { showReceiptScanChooser() },
-                    onOpenSettings = { showAppSettingsDialog() },
-                    onOpenWebUrl = {
-                        Toast.makeText(this, "当前为独立纯原生模式，未启用 Web 视图", Toast.LENGTH_SHORT).show()
+                val context = androidx.compose.ui.platform.LocalContext.current
+                var isLoggedIn by androidx.compose.runtime.remember {
+                    androidx.compose.runtime.mutableStateOf(com.siangloh.ledger.data.AuthManager.isLoggedIn(context))
+                }
+
+                androidx.compose.runtime.DisposableEffect(Unit) {
+                    onLogoutCallback = {
+                        isLoggedIn = false
                     }
-                )
+                    onDispose {
+                        onLogoutCallback = null
+                    }
+                }
+
+                if (isLoggedIn) {
+                    com.siangloh.ledger.ui.compose.MainAppScreen(
+                        onScanReceipt = { showReceiptScanChooser() },
+                        onOpenSettings = { showAppSettingsDialog() },
+                        onLogout = {
+                            com.siangloh.ledger.data.AuthManager.logout(context)
+                            isLoggedIn = false
+                            Toast.makeText(context, "已退出登录", Toast.LENGTH_SHORT).show()
+                        },
+                        onOpenWebUrl = {
+                            Toast.makeText(this, "当前为独立纯原生模式，未启用 Web 视图", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                } else {
+                    com.siangloh.ledger.ui.compose.LoginScreen(
+                        onLoginSuccess = {
+                            isLoggedIn = true
+                        }
+                    )
+                }
             }
         }
     }
@@ -635,7 +666,8 @@ class MainActivity : AppCompatActivity() {
             "🔑 自动记账 API Key 设置",
             "⚙️ 监测的应用设置",
             "📋 查看通知与同步日志",
-            "🔄 立即执行后台同步"
+            "🔄 立即执行后台同步",
+            "🚪 退出登录"
         )
         AlertDialog.Builder(this)
             .setTitle("⚙️ 应用设置与快捷操作")
@@ -658,6 +690,18 @@ class MainActivity : AppCompatActivity() {
                     8 -> {
                         SyncWorker.enqueueSync(this)
                         Toast.makeText(this, "已发起后台同步请求", Toast.LENGTH_SHORT).show()
+                    }
+                    9 -> {
+                        AlertDialog.Builder(this)
+                            .setTitle("🚪 确认退出登录")
+                            .setMessage("确定要退出当前账号 ($currentBound) 吗？退出后将返回登录页。")
+                            .setPositiveButton("退出登录") { _, _ ->
+                                com.siangloh.ledger.data.AuthManager.logout(this)
+                                Toast.makeText(this, "已退出登录", Toast.LENGTH_SHORT).show()
+                                onLogoutCallback?.invoke()
+                            }
+                            .setNegativeButton("取消", null)
+                            .show()
                     }
                 }
             }
