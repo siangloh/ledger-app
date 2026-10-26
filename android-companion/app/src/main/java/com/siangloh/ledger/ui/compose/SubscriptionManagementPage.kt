@@ -341,6 +341,7 @@ fun SubscriptionManagementPage(
                             }
                         }
                     }
+                } else {
                     items(subscriptions) { sub ->
                         Card(
                             modifier = Modifier
