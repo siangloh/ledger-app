@@ -36,7 +36,7 @@
     <string name="view_all_records">查看全部流水</string>
     <string name="no_transactions_yet">本期暂无交易记录</string>
     <string name="sync_status_guarding">守护中</string>
-    <string name="sync_status_offline">离线本地缓存</string>
+    <string name="sync_status_offline">离线就绪</string>
     <string name="sync_status_just_now">刚刚</string>
     <string name="sync_status_mins_ago">%1$d分钟前</string>
     <string name="sync_today_fmt">今天 %1$s</string>

@@ -36,7 +36,7 @@
     <string name="view_all_records">Lihat Semua Rekod</string>
     <string name="no_transactions_yet">Tiada rekod transaksi dalam tempoh ini</string>
     <string name="sync_status_guarding">Aktif</string>
-    <string name="sync_status_offline">Simpanan Luar Talian</string>
+    <string name="sync_status_offline">Sedia Luar Talian</string>
     <string name="sync_status_just_now">Sebentar tadi</string>
     <string name="sync_status_mins_ago">%1$d minit lalu</string>
     <string name="sync_today_fmt">Hari ini %1$s</string>

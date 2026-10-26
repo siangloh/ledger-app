@@ -36,7 +36,7 @@
     <string name="view_all_records">View All Records</string>
     <string name="no_transactions_yet">No transactions in this period</string>
     <string name="sync_status_guarding">Active</string>
-    <string name="sync_status_offline">Offline Cache</string>
+    <string name="sync_status_offline">Offline Ready</string>
     <string name="sync_status_just_now">Just now</string>
     <string name="sync_status_mins_ago">%1$d mins ago</string>
     <string name="sync_today_fmt">Today %1$s</string>

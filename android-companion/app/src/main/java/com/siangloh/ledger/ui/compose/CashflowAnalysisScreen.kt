@@ -1062,7 +1062,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                     IconButton(onClick = { refresh++ }, enabled = !loading) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cf_refresh), tint = Slate600) }
                 }
 
-                // 模式切换（按月度 / 自定义几号到几号）
+                // 模式切换（按月查看 / 自定义区间）
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1091,7 +1091,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                         leadingIcon = {
                             Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
                         },
-                        label = { Text("自定义几号到几号") },
+                        label = { Text("自定义区间") },
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = Color.White,
                             labelColor = Slate700,
@@ -1147,7 +1147,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                     ) {
                                         Icon(Icons.Default.CalendarToday, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
                                         Column {
-                                            Text("起始日期", fontSize = 9.sp, color = Slate500)
+                                            Text("开始日期", fontSize = 9.sp, color = Slate500)
                                             Text(startDate, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
                                         }
                                     }
@@ -1249,10 +1249,6 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                     }
                 }
 
-                if (result?.cached == true) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(stringResource(R.string.cf_cached), fontSize = 11.sp, color = WarningAmber)
-                }
                 if (loading) {
                     Spacer(Modifier.height(12.dp))
                     LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)), color = Teal700, trackColor = Slate200)
@@ -1279,7 +1275,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                     val availAmt = data.optDouble("available", incAmt - expAmt - savAmt)
                     val isPositive = availAmt >= 0
 
-                    // 突出呈现的总览卡片：总支出、总储蓄、总收入与实际结余
+                    // 突出呈现的总览卡片：总支出、储蓄总额、总收入与净结余
                     Surface(
                         modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp),
                         shape = RoundedCornerShape(16.dp),
@@ -1294,7 +1290,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = if (isCustomRange) "自定义区间收支总结" else "月度收支与储蓄总结",
+                                    text = if (isCustomRange) "区间收支总览" else "月度收支总览",
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Slate700
@@ -1314,7 +1310,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                             ) {
                                 Column {
                                     Text(
-                                        text = if (savAmt > 0) "实际收支结余 (已扣除储蓄)" else "实际收支结余",
+                                        text = if (savAmt > 0) "净结余 (已扣除储蓄)" else "净结余",
                                         fontSize = 11.sp,
                                         color = Slate500
                                     )
@@ -1334,7 +1330,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Column(Modifier.weight(1f)) {
-                                    Text("总支出 (Expenses)", fontSize = 11.sp, color = Slate500)
+                                    Text("总支出", fontSize = 11.sp, color = Slate500)
                                     Spacer(Modifier.height(2.dp))
                                     Text(
                                         "-$cur " + String.format(Locale.getDefault(), "%,.2f", expAmt),
@@ -1344,7 +1340,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                     )
                                 }
                                 Column(Modifier.weight(1f)) {
-                                    Text("总储蓄 (Savings)", fontSize = 11.sp, color = Slate500)
+                                    Text("储蓄总额", fontSize = 11.sp, color = Slate500)
                                     Spacer(Modifier.height(2.dp))
                                     Text(
                                         "$cur " + String.format(Locale.getDefault(), "%,.2f", savAmt),
@@ -1354,7 +1350,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                     )
                                 }
                                 Column(Modifier.weight(1f)) {
-                                    Text("总收入 (Income)", fontSize = 11.sp, color = Slate500)
+                                    Text("总收入", fontSize = 11.sp, color = Slate500)
                                     Spacer(Modifier.height(2.dp))
                                     Text(
                                         "+$cur " + String.format(Locale.getDefault(), "%,.2f", incAmt),
