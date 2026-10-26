@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.siangloh.ledger.R
 import com.siangloh.ledger.NetworkHelper
 import com.siangloh.ledger.data.AppDatabase
+import com.siangloh.ledger.data.LocalLedgerRepository
 import com.siangloh.ledger.ui.compose.components.OverviewSkeletonScreen
 import com.siangloh.ledger.ui.compose.components.SpendingHeroCardSkeleton
 import com.siangloh.ledger.ui.compose.components.SpendingTrendSkeleton
@@ -370,6 +371,56 @@ fun OverviewScreen(
     // Real-time revision state to refresh CashflowSummaryCard whenever data changes locally
     var localRevision by remember { mutableIntStateOf(0) }
 
+    // Trend Sparkline Date Filter State
+    var selectedSparklineDate by remember { mutableStateOf<String?>(null) }
+    var dateTransactions by remember { mutableStateOf<List<TransactionItem>?>(null) }
+    var isLoadingDateTxs by remember { mutableStateOf(false) }
+
+    LaunchedEffect(selectedSparklineDate) {
+        val selDate = selectedSparklineDate
+        if (selDate == null) {
+            dateTransactions = null
+            isLoadingDateTxs = false
+        } else {
+            val localMatches = overviewData.recentTransactions.filter { it.date.startsWith(selDate) }
+            dateTransactions = localMatches
+            isLoadingDateTxs = true
+            coroutineScope.launch(Dispatchers.IO) {
+                try {
+                    val res = LocalLedgerRepository.getTransactionsPage(
+                        context = context,
+                        startDate = selDate,
+                        endDate = selDate,
+                        limit = 50
+                    )
+                    withContext(Dispatchers.Main) {
+                        isLoadingDateTxs = false
+                        res.onSuccess { page ->
+                            val items = page.items.map { tx ->
+                                TransactionItem(
+                                    id = tx.id.toLong(),
+                                    date = tx.date,
+                                    type = tx.type,
+                                    category = CategoryUiHelper.cleanCategoryName(tx.category),
+                                    amount = tx.amount,
+                                    note = tx.note ?: "",
+                                    source = tx.source,
+                                    channel = tx.channel,
+                                    badgeText = if (tx.source == "auto_notification") "自动记账" else "手动记账",
+                                    badgeColor = if (tx.source == "auto_notification") "#0d9488" else "#64748b"
+                                )
+                            }
+                            dateTransactions = items
+                        }
+                    }
+                } catch (_: Exception) {
+                    withContext(Dispatchers.Main) {
+                        isLoadingDateTxs = false
+                    }
+                }
+            }
+        }
+    }
 
     fun prefetchAdjacentOverview(targetMonth: String, currentPeriod: String) {
         if (currentPeriod != "month") return
@@ -690,7 +741,11 @@ fun OverviewScreen(
                         // 5. Spending Trend Sparkline
                         SpendingTrendSection(
                             sparkline = overviewData.sparkline,
-                            total = overviewData.totalSpending
+                            total = overviewData.totalSpending,
+                            selectedDate = selectedSparklineDate,
+                            onDateSelected = { date ->
+                                selectedSparklineDate = date
+                            }
                         )
                     }
                 }
@@ -702,12 +757,43 @@ fun OverviewScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = stringResource(R.string.recent_transactions),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Slate900
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (selectedSparklineDate != null) "📅 $selectedSparklineDate 交易明细" else stringResource(R.string.recent_transactions),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Slate900
+                            )
+                            if (selectedSparklineDate != null) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = PrimaryTeal.copy(alpha = 0.1f),
+                                    modifier = Modifier.clickable {
+                                        selectedSparklineDate = null
+                                    }
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "全部",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = PrimaryTeal
+                                        )
+                                        Spacer(Modifier.width(2.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "取消筛选",
+                                            tint = PrimaryTeal,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -731,8 +817,14 @@ fun OverviewScreen(
                     }
                 }
 
-                // 7. Recent Transactions List Items
-                if (overviewData.recentTransactions.isEmpty()) {
+                // 7. Recent Transactions List Items (若点击折线图指定日期，则联动呈现当日明细)
+                val displayList = if (selectedSparklineDate != null) {
+                    dateTransactions ?: overviewData.recentTransactions.filter { it.date.startsWith(selectedSparklineDate!!) }
+                } else {
+                    overviewData.recentTransactions.take(10)
+                }
+
+                if (displayList.isEmpty()) {
                     item {
                         Box(
                             modifier = Modifier
@@ -741,14 +833,16 @@ fun OverviewScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = if (isLoading) "..." else stringResource(R.string.no_transactions_yet),
+                                text = if (isLoading || isLoadingDateTxs) "正在加载..."
+                                       else if (selectedSparklineDate != null) "该日期暂无交易记录"
+                                       else stringResource(R.string.no_transactions_yet),
                                 color = Slate400,
                                 fontSize = 14.sp
                             )
                         }
                     }
                 } else {
-                    items(overviewData.recentTransactions.take(10)) { tx ->
+                    items(displayList) { tx ->
                         TransactionCardItem(
                             tx = tx,
                             onClick = {
@@ -759,7 +853,7 @@ fun OverviewScreen(
                     }
                 }
 
-                if (overviewData.recentTransactions.isNotEmpty()) {
+                if (displayList.isNotEmpty()) {
                     item {
                         OutlinedButton(
                             onClick = onNavigateToRecords,
@@ -777,7 +871,7 @@ fun OverviewScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = stringResource(R.string.view_all_records_detail),
+                                text = if (selectedSparklineDate != null) "前往明细页查看详情" else stringResource(R.string.view_all_records_detail),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = PrimaryTeal
@@ -1387,9 +1481,17 @@ fun UncategorizedInboxBanner(
 @Composable
 fun SpendingTrendSection(
     sparkline: List<SparklinePoint>,
-    total: Double
+    total: Double,
+    selectedDate: String? = null,
+    onDateSelected: (String?) -> Unit = {}
 ) {
-    var selectedIndex by remember { mutableStateOf<Int?>(null) }
+    var selectedIndex by remember(selectedDate, sparkline) {
+        mutableStateOf(
+            selectedDate?.let { d ->
+                sparkline.indexOfFirst { it.date == d }.takeIf { it >= 0 }
+            }
+        )
+    }
     val activePoint = selectedIndex?.let { if (it in sparkline.indices) sparkline[it] else null }
 
     Card(
@@ -1451,18 +1553,23 @@ fun SpendingTrendSection(
                                     val step = size.width / (sparkline.size - 1)
                                     val idx = ((offset.x + step / 2) / step).toInt().coerceIn(0, sparkline.size - 1)
                                     selectedIndex = idx
+                                    onDateSelected(sparkline.getOrNull(idx)?.date)
                                 }
                             },
                             onDrag = { change, _ ->
                                 if (sparkline.size >= 2) {
                                     val step = size.width / (sparkline.size - 1)
                                     val idx = ((change.position.x + step / 2) / step).toInt().coerceIn(0, sparkline.size - 1)
-                                    selectedIndex = idx
+                                    if (selectedIndex != idx) {
+                                        selectedIndex = idx
+                                        onDateSelected(sparkline.getOrNull(idx)?.date)
+                                    }
                                 }
                             },
                             onDragEnd = {},
                             onDragCancel = {
                                 selectedIndex = null
+                                onDateSelected(null)
                             }
                         )
                     }
@@ -1472,7 +1579,9 @@ fun SpendingTrendSection(
                                 if (sparkline.size >= 2) {
                                     val step = size.width / (sparkline.size - 1)
                                     val idx = ((offset.x + step / 2) / step).toInt().coerceIn(0, sparkline.size - 1)
-                                    selectedIndex = if (selectedIndex == idx) null else idx
+                                    val newIdx = if (selectedIndex == idx) null else idx
+                                    selectedIndex = newIdx
+                                    onDateSelected(newIdx?.let { sparkline.getOrNull(it)?.date })
                                 }
                             },
                             onLongPress = { offset ->
@@ -1480,6 +1589,7 @@ fun SpendingTrendSection(
                                     val step = size.width / (sparkline.size - 1)
                                     val idx = ((offset.x + step / 2) / step).toInt().coerceIn(0, sparkline.size - 1)
                                     selectedIndex = idx
+                                    onDateSelected(sparkline.getOrNull(idx)?.date)
                                 }
                             }
                         )
@@ -1570,14 +1680,22 @@ fun SpendingTrendSection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "📅 ${activePoint.date}",
+                        text = "📅 ${activePoint.date} · 已筛选当日账目",
                         fontSize = 11.sp,
-                        color = Slate500
+                        fontWeight = FontWeight.Medium,
+                        color = PrimaryTeal
                     )
                     Text(
-                        text = "点击图表可取消固定",
+                        text = "点击可取消筛选",
                         fontSize = 11.sp,
-                        color = Slate400
+                        color = Slate400,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable {
+                                selectedIndex = null
+                                onDateSelected(null)
+                            }
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
                     )
                 }
             }
