@@ -2,6 +2,7 @@
 
 package com.siangloh.ledger.ui.compose
 
+import android.app.DatePickerDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.pager.HorizontalPager
@@ -25,9 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -90,12 +89,23 @@ private fun reportTime(raw: String, locale: Locale): String = try {
 }
 
 private fun shiftMonth(month: String, delta: Int): String {
-    val f = SimpleDateFormat("yyyy-MM", Locale.US)
+    val ymFormat = SimpleDateFormat("yyyy-MM", Locale.US)
     val c = Calendar.getInstance().apply {
-        time = f.parse(month)!!
+        time = ymFormat.parse(month)!!
         add(Calendar.MONTH, delta)
     }
-    return f.format(c.time)
+    return ymFormat.format(c.time)
+}
+
+private fun shiftDays(dateStr: String, deltaDays: Int): String {
+    return try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val cal = Calendar.getInstance().apply { time = sdf.parse(dateStr)!! }
+        cal.add(Calendar.DAY_OF_YEAR, deltaDays)
+        sdf.format(cal.time)
+    } catch (_: Exception) {
+        dateStr
+    }
 }
 
 private fun pctChange(cur: Double, prev: Double?): Double? =
@@ -921,6 +931,11 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     var month by rememberSaveable { mutableStateOf(initialMonth) }
+    var isCustomRange by rememberSaveable { mutableStateOf(false) }
+    val todayCal = remember { Calendar.getInstance() }
+    val todayStr = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(todayCal.time) }
+    var startDate by rememberSaveable { mutableStateOf("$initialMonth-01") }
+    var endDate by rememberSaveable { mutableStateOf(todayStr) }
     var currency by rememberSaveable { mutableStateOf("") }
     var refresh by remember { mutableIntStateOf(0) }
     var result by remember { mutableStateOf(CashflowRepository.getCached(context, initialMonth, currency)) }
@@ -938,15 +953,59 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
     var showCharts by rememberSaveable { mutableStateOf(false) }
     var expenseViewMode by rememberSaveable { mutableIntStateOf(0) }
 
-    LaunchedEffect(month, currency, refresh) {
-        result = CashflowRepository.getCached(context, month, currency)
-        prevData = CashflowRepository.getCached(context, shiftMonth(month, -1), currency)?.data
+    fun pickStartDate() {
+        val cal = Calendar.getInstance()
+        try {
+            val d = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(startDate)
+            if (d != null) cal.time = d
+        } catch (_: Exception) {}
+        DatePickerDialog(
+            context,
+            { _, year, m, dayOfMonth ->
+                val chosen = String.format(Locale.US, "%04d-%02d-%02d", year, m + 1, dayOfMonth)
+                startDate = chosen
+                if (startDate > endDate) {
+                    endDate = startDate
+                }
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    fun pickEndDate() {
+        val cal = Calendar.getInstance()
+        try {
+            val d = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(endDate)
+            if (d != null) cal.time = d
+        } catch (_: Exception) {}
+        DatePickerDialog(
+            context,
+            { _, year, m, dayOfMonth ->
+                val chosen = String.format(Locale.US, "%04d-%02d-%02d", year, m + 1, dayOfMonth)
+                endDate = chosen
+                if (endDate < startDate) {
+                    startDate = endDate
+                }
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    LaunchedEffect(month, currency, refresh, isCustomRange, startDate, endDate) {
+        val sDate = if (isCustomRange) startDate else null
+        val eDate = if (isCustomRange) endDate else null
+        result = CashflowRepository.getCached(context, month, currency, sDate, eDate)
+        prevData = if (!isCustomRange) CashflowRepository.getCached(context, shiftMonth(month, -1), currency)?.data else null
         loading = true
         failed = false
         selection = null
         selectedBill = null
         try {
-            result = CashflowRepository.load(context, month, currency, forceRefresh = true)
+            result = CashflowRepository.load(context, month, currency, forceRefresh = true, startDate = sDate, endDate = eDate)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -955,7 +1014,7 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
         } finally {
             loading = false
         }
-        if (result != null && prevData == null) {
+        if (!isCustomRange && result != null && prevData == null) {
             try {
                 prevData = CashflowRepository.load(context, shiftMonth(month, -1), currency).data
             } catch (error: CancellationException) {
@@ -1003,16 +1062,153 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                     IconButton(onClick = { refresh++ }, enabled = !loading) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cf_refresh), tint = Slate600) }
                 }
 
-                Surface(
-                    Modifier.fillMaxWidth().height(48.dp).padding(top = 4.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Slate200)
+                // 模式切换（按月度 / 自定义几号到几号）
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { changeMonth(-1) }) { Icon(Icons.Default.ChevronLeft, stringResource(R.string.prev_month), tint = Slate600) }
-                        Text(month, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                        IconButton(onClick = { changeMonth(1) }) { Icon(Icons.Default.ChevronRight, stringResource(R.string.next_month), tint = Slate600) }
+                    FilterChip(
+                        selected = !isCustomRange,
+                        onClick = { isCustomRange = false },
+                        label = { Text("按月查看") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = Color.White,
+                            labelColor = Slate700,
+                            selectedContainerColor = Teal50,
+                            selectedLabelColor = PrimaryTeal
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = !isCustomRange,
+                            borderColor = Slate200,
+                            selectedBorderColor = PrimaryTeal,
+                            borderWidth = 1.dp
+                        )
+                    )
+                    FilterChip(
+                        selected = isCustomRange,
+                        onClick = { isCustomRange = true },
+                        leadingIcon = {
+                            Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
+                        },
+                        label = { Text("自定义几号到几号") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = Color.White,
+                            labelColor = Slate700,
+                            selectedContainerColor = Teal50,
+                            selectedLabelColor = PrimaryTeal
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isCustomRange,
+                            borderColor = Slate200,
+                            selectedBorderColor = PrimaryTeal,
+                            borderWidth = 1.dp
+                        )
+                    )
+                }
+
+                if (!isCustomRange) {
+                    Surface(
+                        Modifier.fillMaxWidth().height(44.dp).padding(top = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Slate200)
+                    ) {
+                        Row(Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { changeMonth(-1) }) { Icon(Icons.Default.ChevronLeft, stringResource(R.string.prev_month), tint = Slate600) }
+                            Text(month, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                            IconButton(onClick = { changeMonth(1) }) { Icon(Icons.Default.ChevronRight, stringResource(R.string.next_month), tint = Slate600) }
+                        }
+                    }
+                } else {
+                    Surface(
+                        Modifier.fillMaxWidth().padding(top = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Slate200)
+                    ) {
+                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    modifier = Modifier.weight(1f).clickable { pickStartDate() },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Slate50,
+                                    border = BorderStroke(1.dp, Slate200)
+                                ) {
+                                    Row(
+                                        Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(Icons.Default.CalendarToday, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
+                                        Column {
+                                            Text("起始日期", fontSize = 9.sp, color = Slate500)
+                                            Text(startDate, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
+                                        }
+                                    }
+                                }
+
+                                Text("至", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate400, modifier = Modifier.padding(horizontal = 6.dp))
+
+                                Surface(
+                                    modifier = Modifier.weight(1f).clickable { pickEndDate() },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Slate50,
+                                    border = BorderStroke(1.dp, Slate200)
+                                ) {
+                                    Row(
+                                        Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(Icons.Default.CalendarToday, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
+                                        Column {
+                                            Text("结束日期", fontSize = 9.sp, color = Slate500)
+                                            Text(endDate, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 快捷预设按钮行
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val presets = listOf(
+                                    "本月" to Pair("$initialMonth-01", todayStr),
+                                    "近30天" to Pair(shiftDays(todayStr, -30), todayStr),
+                                    "今年至今" to Pair("${todayStr.substringBefore('-')}-01-01", todayStr),
+                                    "全部历史" to Pair("2020-01-01", todayStr)
+                                )
+                                presets.forEach { (label, range) ->
+                                    val isCur = startDate == range.first && endDate == range.second
+                                    Surface(
+                                        modifier = Modifier.weight(1f).clickable {
+                                            startDate = range.first
+                                            endDate = range.second
+                                        },
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = if (isCur) Teal50 else Slate100,
+                                        border = if (isCur) BorderStroke(1.dp, PrimaryTeal) else null
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isCur) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isCur) PrimaryTeal else Slate700,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -1077,10 +1273,99 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                     val prev = prevData?.takeIf { it.optString("currency") == cur && it.optString("month") == shiftMonth(month, -1) }
                     val daily = dailyExpense(data, month)
                     val todayDay = todayDayIfCurrent(month)
-                    val sav = data.optDouble("savings", 0.0)
-                    val savText = if (sav > 0) "\n储蓄存入 " + formatMoney(cur, sav) + " (已从可用结余中扣除)" else ""
-                    Text(stringResource(R.string.cfd_details_totals, formatMoney(cur, data.optDouble("income")),
-                        formatMoney(cur, data.optDouble("expense"))) + savText, fontSize = 12.sp, color = Slate600)
+                    val incAmt = data.optDouble("income", 0.0)
+                    val expAmt = data.optDouble("expense", 0.0)
+                    val savAmt = data.optDouble("savings", 0.0)
+                    val availAmt = data.optDouble("available", incAmt - expAmt - savAmt)
+                    val isPositive = availAmt >= 0
+
+                    // 突出呈现的总览卡片：总支出、总储蓄、总收入与实际结余
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Slate200),
+                        shadowElevation = 0.5.dp
+                    ) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isCustomRange) "自定义区间收支总结" else "月度收支与储蓄总结",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Slate700
+                                )
+                                Text(
+                                    text = if (isCustomRange) "$startDate ~ $endDate" else month,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PrimaryTeal
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                Column {
+                                    Text(
+                                        text = if (savAmt > 0) "实际收支结余 (已扣除储蓄)" else "实际收支结余",
+                                        fontSize = 11.sp,
+                                        color = Slate500
+                                    )
+                                    Text(
+                                        text = (if (availAmt < 0) "-$cur " else "$cur ") + String.format(Locale.getDefault(), "%,.2f", Math.abs(availAmt)),
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = if (isPositive) PrimaryTeal else ExpenseRed
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider(color = Slate100, thickness = 1.dp)
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("总支出 (Expenses)", fontSize = 11.sp, color = Slate500)
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        "-$cur " + String.format(Locale.getDefault(), "%,.2f", expAmt),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ExpenseRed
+                                    )
+                                }
+                                Column(Modifier.weight(1f)) {
+                                    Text("总储蓄 (Savings)", fontSize = 11.sp, color = Slate500)
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        "$cur " + String.format(Locale.getDefault(), "%,.2f", savAmt),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFD97706)
+                                    )
+                                }
+                                Column(Modifier.weight(1f)) {
+                                    Text("总收入 (Income)", fontSize = 11.sp, color = Slate500)
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        "+$cur " + String.format(Locale.getDefault(), "%,.2f", incAmt),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PrimaryTeal
+                                    )
+                                }
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(12.dp))
                     BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = 52.dp)
                         .clip(RoundedCornerShape(12.dp)).background(Slate100)) {

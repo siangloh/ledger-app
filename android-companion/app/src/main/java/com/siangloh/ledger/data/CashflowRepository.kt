@@ -14,11 +14,17 @@ import java.util.Locale
 object CashflowRepository {
     data class Result(val data: JSONObject, val cached: Boolean)
 
-    private fun getCacheKey(context: Context, month: String, currency: String): String {
+    private fun getCacheKey(
+        context: Context,
+        month: String,
+        currency: String,
+        startDate: String? = null,
+        endDate: String? = null
+    ): String {
         val server = NetworkHelper.getServerUrl(context).trimEnd('/')
         val key = NetworkHelper.getApiKey(context)
         val user = NetworkHelper.getUsername(context)
-        val scope = "$server|$user|$key|$month|$currency"
+        val scope = "$server|$user|$key|$month|$currency|${startDate.orEmpty()}|${endDate.orEmpty()}"
         return MessageDigest.getInstance("SHA-256").digest(scope.toByteArray()).joinToString("") { "%02x".format(it) }
     }
 
@@ -26,10 +32,16 @@ object CashflowRepository {
      * 100% 同步纯本地获取缓存。0ms 延迟，无网络开销。
      * 若当前指定币种未找到，会尝试用默认币种的本地缓存兜底。
      */
-    fun getCached(context: Context, month: String, currency: String = ""): Result? {
+    fun getCached(
+        context: Context,
+        month: String,
+        currency: String = "",
+        startDate: String? = null,
+        endDate: String? = null
+    ): Result? {
         return try {
             val cache = context.getSharedPreferences("cashflow_reports", Context.MODE_PRIVATE)
-            val directKey = getCacheKey(context, month, currency)
+            val directKey = getCacheKey(context, month, currency, startDate, endDate)
             val directSaved = cache.getString(directKey, null)
             if (directSaved != null) {
                 val directJson = JSONObject(directSaved)
@@ -38,7 +50,7 @@ object CashflowRepository {
                 }
             }
             if (currency.isNotEmpty()) {
-                val fallbackKey = getCacheKey(context, month, "")
+                val fallbackKey = getCacheKey(context, month, "", startDate, endDate)
                 val fallbackSaved = cache.getString(fallbackKey, null)
                 if (fallbackSaved != null) {
                     val fallbackJson = JSONObject(fallbackSaved)
@@ -62,21 +74,22 @@ object CashflowRepository {
 
     /**
      * 离线优先加载 (Local-First / Offline-First)
-     * - 如果 !forceRefresh 且本地已有缓存，立即返回本地缓存 (0ms 瞬切)，绝对不阻塞等待慢速网络
-     * - 仅当无本地缓存，或用户明确要求 forceRefresh (如手动点击刷新) 时，才发起网络请求
+     * 支持按月份（YYYY-MM）或自定义日期区间（startDate ~ endDate）加载
      */
     suspend fun load(
         context: Context,
         month: String,
         currency: String = "",
-        forceRefresh: Boolean = false
+        forceRefresh: Boolean = false,
+        startDate: String? = null,
+        endDate: String? = null
     ): Result = withContext(Dispatchers.IO) {
-        val cacheKey = getCacheKey(context, month, currency)
+        val cacheKey = getCacheKey(context, month, currency, startDate, endDate)
         val cache = context.getSharedPreferences("cashflow_reports", Context.MODE_PRIVATE)
 
         // 1. 本地优先：未强制刷新时，只要本地有缓存，直接返回本地数据！
         if (!forceRefresh) {
-            val cachedResult = getCached(context, month, currency)
+            val cachedResult = getCached(context, month, currency, startDate, endDate)
             if (cachedResult != null) {
                 return@withContext cachedResult
             }
@@ -84,7 +97,11 @@ object CashflowRepository {
 
         LocalLedgerRepository.initDefaultsIfNeeded(context)
         val db = AppDatabase.getInstance(context)
-        val txList = db.localTransactionDao().getByMonth("$month%")
+        val txList = if (!startDate.isNullOrBlank() && !endDate.isNullOrBlank()) {
+            db.localTransactionDao().getByDateRange(startDate, endDate)
+        } else {
+            db.localTransactionDao().getByMonth("$month%")
+        }
         val accounts = db.localAccountDao().getAll().associateBy { it.id }
 
         var inc = 0.0
@@ -179,9 +196,29 @@ object CashflowRepository {
         }
 
         val dailyArray = org.json.JSONArray()
-        for (d in 1..31) {
-            val dateStr = String.format(Locale.getDefault(), "%s-%02d", month, d)
-            dailyArray.put(dailyMap[dateStr] ?: 0.0)
+        if (!startDate.isNullOrBlank() && !endDate.isNullOrBlank()) {
+            try {
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                val cal = java.util.Calendar.getInstance().apply { time = sdf.parse(startDate)!! }
+                val endCal = java.util.Calendar.getInstance().apply { time = sdf.parse(endDate)!! }
+                var count = 0
+                while (!cal.after(endCal) && count < 62) {
+                    val dStr = sdf.format(cal.time)
+                    dailyArray.put(dailyMap[dStr] ?: 0.0)
+                    cal.add(java.util.Calendar.DATE, 1)
+                    count++
+                }
+            } catch (_: Exception) {
+                for (d in 1..31) {
+                    val dateStr = String.format(Locale.getDefault(), "%s-%02d", month, d)
+                    dailyArray.put(dailyMap[dateStr] ?: 0.0)
+                }
+            }
+        } else {
+            for (d in 1..31) {
+                val dateStr = String.format(Locale.getDefault(), "%s-%02d", month, d)
+                dailyArray.put(dailyMap[dateStr] ?: 0.0)
+            }
         }
 
         val cur = if (currency.isNotBlank()) currency else "RM"
@@ -227,9 +264,13 @@ object CashflowRepository {
 
         val nowIso = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(java.util.Date())
 
+        val isCustom = !startDate.isNullOrBlank() && !endDate.isNullOrBlank()
         val data = JSONObject().apply {
             put("ok", true)
-            put("month", month)
+            put("month", if (isCustom) "$startDate ~ $endDate" else month)
+            put("is_custom_range", isCustom)
+            put("start_date", startDate ?: "$month-01")
+            put("end_date", endDate ?: "$month-31")
             put("currency", cur)
             put("currencies", org.json.JSONArray().put(cur))
             put("income", inc)
