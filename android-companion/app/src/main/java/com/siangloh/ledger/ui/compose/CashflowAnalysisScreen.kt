@@ -1077,9 +1077,10 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                     val prev = prevData?.takeIf { it.optString("currency") == cur && it.optString("month") == shiftMonth(month, -1) }
                     val daily = dailyExpense(data, month)
                     val todayDay = todayDayIfCurrent(month)
-                    Spacer(Modifier.height(10.dp))
+                    val sav = data.optDouble("savings", 0.0)
+                    val savText = if (sav > 0) "\n储蓄存入 " + formatMoney(cur, sav) + " (已从可用结余中扣除)" else ""
                     Text(stringResource(R.string.cfd_details_totals, formatMoney(cur, data.optDouble("income")),
-                        formatMoney(cur, data.optDouble("expense"))), fontSize = 12.sp, color = Slate600)
+                        formatMoney(cur, data.optDouble("expense"))) + savText, fontSize = 12.sp, color = Slate600)
                     Spacer(Modifier.height(12.dp))
                     BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = 52.dp)
                         .clip(RoundedCornerShape(12.dp)).background(Slate100)) {

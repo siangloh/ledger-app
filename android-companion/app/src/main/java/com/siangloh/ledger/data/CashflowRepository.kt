@@ -32,14 +32,17 @@ object CashflowRepository {
             val directKey = getCacheKey(context, month, currency)
             val directSaved = cache.getString(directKey, null)
             if (directSaved != null) {
-                return Result(JSONObject(directSaved), cached = true)
+                val directJson = JSONObject(directSaved)
+                if (directJson.has("savings")) {
+                    return Result(directJson, cached = true)
+                }
             }
             if (currency.isNotEmpty()) {
                 val fallbackKey = getCacheKey(context, month, "")
                 val fallbackSaved = cache.getString(fallbackKey, null)
                 if (fallbackSaved != null) {
                     val fallbackJson = JSONObject(fallbackSaved)
-                    if (fallbackJson.optString("currency").equals(currency, ignoreCase = true)) {
+                    if (fallbackJson.optString("currency").equals(currency, ignoreCase = true) && fallbackJson.has("savings")) {
                         return Result(fallbackJson, cached = true)
                     }
                 }
@@ -86,6 +89,7 @@ object CashflowRepository {
 
         var inc = 0.0
         var exp = 0.0
+        var savings = 0.0
 
         val expCategoriesMap = mutableMapOf<String, Pair<Double, MutableList<Int>>>()
         val expPlatformMap = mutableMapOf<String, Pair<Double, MutableList<Int>>>()
@@ -111,6 +115,8 @@ object CashflowRepository {
                 inc += amt
                 val pEntry = incPlatformMap.getOrPut(platformName) { Pair(0.0, mutableListOf()) }
                 incPlatformMap[platformName] = Pair(pEntry.first + amt, pEntry.second.apply { add(tx.id.toInt()) })
+            } else if (tx.type == "savings") {
+                savings += amt
             }
 
             txArray.put(JSONObject().apply {
@@ -125,7 +131,8 @@ object CashflowRepository {
             })
         }
 
-        val avail = inc - exp
+        // 实际结余扣除支出与储蓄存入金额 (可用现金流 = 收入 - 支出 - 储蓄)
+        val avail = inc - exp - savings
 
         val expCategories = org.json.JSONArray()
         for ((cat, pair) in expCategoriesMap.entries.sortedByDescending { it.value.first }) {
@@ -227,6 +234,8 @@ object CashflowRepository {
             put("currencies", org.json.JSONArray().put(cur))
             put("income", inc)
             put("expense", exp)
+            put("savings", savings)
+            put("total_savings", savings)
             put("reserved", totalPending)
             put("planned", totalPlanned)
             put("paid", totalPaid)
@@ -234,6 +243,7 @@ object CashflowRepository {
             put("available", avail - totalPending)
             put("daily", dailyArray)
             put("expense_percent", if (inc > 0) (exp / inc * 100) else 0.0)
+            put("savings_percent", if (inc > 0) (savings / inc * 100) else 0.0)
             put("reserve_percent", if (inc > 0) (totalPending / inc * 100) else 0.0)
             put("available_percent", if (inc > 0) ((avail - totalPending) / inc * 100) else 0.0)
             put("transactions", txArray)

@@ -99,6 +99,7 @@ data class OverviewData(
     val expenseAmount: Double = 0.0,
     val transferAmount: Double = 0.0,
     val incomeAmount: Double = 0.0,
+    val savingsAmount: Double = 0.0,
     val netSavings: Double = 0.0,
     val uncategorizedCount: Int = 0,
     val uncategorizedAmount: Double = 0.0,
@@ -165,8 +166,18 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
         val incomeRaw = if (json.isNull("income")) 0.0 else json.optDouble("income", 0.0)
         val incomeAmount = if (incomeRaw.isNaN() || incomeRaw.isInfinite()) 0.0 else incomeRaw
 
-        val netRaw = if (json.isNull("net")) (incomeAmount - totalSpending) else json.optDouble("net", incomeAmount - totalSpending)
-        val netSavings = if (netRaw.isNaN() || netRaw.isInfinite()) (incomeAmount - totalSpending) else netRaw
+        val savingsRaw = if (json.isNull("savings")) {
+            if (json.isNull("total_savings")) {
+                if (json.isNull("savings_amount")) 0.0 else json.optDouble("savings_amount", 0.0)
+            } else json.optDouble("total_savings", 0.0)
+        } else json.optDouble("savings", 0.0)
+        val savingsAmount = if (savingsRaw.isNaN() || savingsRaw.isInfinite()) 0.0 else savingsRaw
+
+        val fallbackNet = incomeAmount - totalSpending - savingsAmount
+        val netRaw = if (json.isNull("net")) {
+            if (json.isNull("balance")) fallbackNet else json.optDouble("balance", fallbackNet)
+        } else json.optDouble("net", fallbackNet)
+        val netSavings = if (netRaw.isNaN() || netRaw.isInfinite()) fallbackNet else netRaw
 
         val transferAmountRaw = if (json.isNull("transfer_amount")) 0.0 else json.optDouble("transfer_amount", 0.0)
         val transferAmount = if (transferAmountRaw.isNaN() || transferAmountRaw.isInfinite()) 0.0 else transferAmountRaw
@@ -292,6 +303,7 @@ fun parseOverviewJson(result: String, isListeningActual: Boolean, isOfflineCache
             expenseAmount = expenseAmount,
             transferAmount = transferAmount,
             incomeAmount = incomeAmount,
+            savingsAmount = savingsAmount,
             netSavings = netSavings,
             uncategorizedCount = uncategorizedCount,
             uncategorizedAmount = uncategorizedAmount,
@@ -716,6 +728,7 @@ fun OverviewScreen(
                         rangeLabel = displayRangeLabel,
                         income = overviewData.incomeAmount,
                         expense = overviewData.totalSpending,
+                        savings = overviewData.savingsAmount,
                         net = overviewData.netSavings,
                         onOpenDetail = {
                             onNavigateToCashflow(currentMonthStr)
@@ -1127,11 +1140,13 @@ fun UnifiedOverviewHeroCard(
     rangeLabel: String,
     income: Double,
     expense: Double,
+    savings: Double = 0.0,
     net: Double,
     onOpenDetail: () -> Unit
 ) {
     val isPositive = net >= 0
     val expensePct = if (income > 0) (expense / income * 100.0).coerceIn(0.0, 100.0) else (if (expense > 0) 100.0 else 0.0)
+    val savingsPct = if (income > 0) (savings / income * 100.0).coerceIn(0.0, 100.0) else 0.0
 
     Card(
         onClick = onOpenDetail,
@@ -1180,9 +1195,9 @@ fun UnifiedOverviewHeroCard(
 
             Text(
                 text = when (period) {
-                    "year" -> "年度累计结余 / 净现金流"
-                    "3m" -> "近3个月累计结余"
-                    else -> "扣除预留后预计可用"
+                    "year" -> if (savings > 0) "年度累计结余 (已扣除储蓄)" else "年度累计结余 / 净现金流"
+                    "3m" -> if (savings > 0) "近3个月累计结余 (已扣除储蓄)" else "近3个月累计结余"
+                    else -> if (savings > 0) "实际收支结余 (已扣除储蓄)" else "扣除预留后预计可用"
                 },
                 fontSize = 12.sp,
                 color = Slate500
@@ -1197,7 +1212,7 @@ fun UnifiedOverviewHeroCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Column(Modifier.weight(1f)) {
                     Text("实际总收入", fontSize = 12.sp, color = Slate500)
@@ -1215,9 +1230,19 @@ fun UnifiedOverviewHeroCard(
                         color = Slate900
                     )
                 }
+                if (savings > 0) {
+                    Column(Modifier.weight(1f)) {
+                        Text("储蓄存入", fontSize = 12.sp, color = Slate500)
+                        Text(
+                            text = "-RM " + String.format(Locale.getDefault(), "%,.2f", savings),
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFD97706)
+                        )
+                    }
+                }
             }
 
-            if (income > 0 || expense > 0) {
+            if (income > 0 || expense > 0 || savings > 0) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1226,20 +1251,44 @@ fun UnifiedOverviewHeroCard(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Box(
-                                Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(HeroExpenseColor)
-                            )
-                            Text(
-                                "已用: RM " + String.format(Locale.getDefault(), "%,.2f", expense),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Slate800
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(HeroExpenseColor)
+                                )
+                                Text(
+                                    "已用: RM " + String.format(Locale.getDefault(), "%,.2f", expense),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Slate800
+                                )
+                            }
+                            if (savings > 0) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Box(
+                                        Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFD97706))
+                                    )
+                                    Text(
+                                        "储蓄: RM " + String.format(Locale.getDefault(), "%,.2f", savings),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFFD97706)
+                                    )
+                                }
+                            }
                         }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -1253,7 +1302,7 @@ fun UnifiedOverviewHeroCard(
                             )
                             Text(
                                 (if (isPositive) "结余: RM " else "超支: RM ") + String.format(Locale.getDefault(), "%,.2f", Math.abs(net)),
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isPositive) HeroAvailableColor else ExpenseRed
                             )
@@ -1271,6 +1320,7 @@ fun UnifiedOverviewHeroCard(
                         Row(modifier = Modifier.fillMaxSize()) {
                             if (income > 0) {
                                 val expFraction = (expense / income).coerceIn(0.0, 1.0).toFloat()
+                                val savFraction = (savings / income).coerceIn(0.0, 1.0).toFloat()
                                 val availFraction = if (isPositive) (net / income).coerceIn(0.0, 1.0).toFloat() else 0f
                                 if (expFraction > 0f) {
                                     Box(
@@ -1278,6 +1328,14 @@ fun UnifiedOverviewHeroCard(
                                             .weight(expFraction)
                                             .fillMaxHeight()
                                             .background(HeroExpenseColor)
+                                    )
+                                }
+                                if (savFraction > 0f) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(savFraction)
+                                            .fillMaxHeight()
+                                            .background(Color(0xFFD97706))
                                     )
                                 }
                                 if (availFraction > 0f) {
@@ -1288,7 +1346,7 @@ fun UnifiedOverviewHeroCard(
                                             .background(HeroAvailableColor)
                                     )
                                 }
-                            } else if (expense > 0) {
+                            } else if (expense > 0 || savings > 0) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -1304,7 +1362,11 @@ fun UnifiedOverviewHeroCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "已支出 ${String.format(Locale.getDefault(), "%.1f", expensePct)}%",
+                            text = if (savings > 0) {
+                                "支出 ${String.format(Locale.getDefault(), "%.1f", expensePct)}% · 储蓄 ${String.format(Locale.getDefault(), "%.1f", savingsPct)}%"
+                            } else {
+                                "已支出 ${String.format(Locale.getDefault(), "%.1f", expensePct)}%"
+                            },
                             fontSize = 11.sp,
                             color = Slate500
                         )

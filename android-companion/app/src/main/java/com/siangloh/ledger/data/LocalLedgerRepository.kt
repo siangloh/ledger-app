@@ -711,6 +711,7 @@ object LocalLedgerRepository {
 
             var totalExp = 0.0
             var totalInc = 0.0
+            var totalSavings = 0.0
             val catExpMap = mutableMapOf<String, Double>()
             val trendExpMap = mutableMapOf<String, Double>()
 
@@ -726,10 +727,13 @@ object LocalLedgerRepository {
                     trendExpMap[trendKey] = (trendExpMap[trendKey] ?: 0.0) + tx.amount
                 } else if (tx.type == "income") {
                     totalInc += tx.amount
+                } else if (tx.type == "savings") {
+                    totalSavings += tx.amount
                 }
             }
 
-            val net = totalInc - totalExp
+            // Web 端对齐：实际结余扣除支出与储蓄资金池存入 (balance = total_income - total_expense - total_savings)
+            val net = totalInc - totalExp - totalSavings
 
             val topCatsArray = JSONArray()
             catExpMap.entries.sortedByDescending { it.value }.take(8).forEach { (cat, amt) ->
@@ -796,6 +800,9 @@ object LocalLedgerRepository {
                 put("expense", totalExp)
                 put("total_spending", totalExp)
                 put("expense_amount", totalExp)
+                put("savings", totalSavings)
+                put("total_savings", totalSavings)
+                put("savings_amount", totalSavings)
                 put("transfer_amount", 0.0)
                 put("uncategorized_count", 0)
                 put("uncategorized_amount", 0.0)
