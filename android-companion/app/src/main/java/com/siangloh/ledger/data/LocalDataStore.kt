@@ -258,7 +258,8 @@ object LocalDataStore {
             LocalLedgerRepository.initDefaultsIfNeeded(context)
 
             for ((p, m) in listOf(Pair("month", today), Pair("month", prevMonth), Pair("month", prev2Month), Pair("3m", today), Pair("year", today))) {
-                val ovJson = LocalLedgerRepository.getOverviewJson(context, m).getOrNull()?.toString()
+                val yr = m.substringBefore('-').toIntOrNull() ?: Calendar.getInstance().get(Calendar.YEAR)
+                val ovJson = LocalLedgerRepository.getOverviewJson(context, month = m, period = p, year = yr).getOrNull()?.toString()
                 if (ovJson != null) {
                     saveOverview(context, username, p, m, ovJson)
                 }

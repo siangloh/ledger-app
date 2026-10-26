@@ -48,6 +48,8 @@ fun MainAppScreen(
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(initialTab) }
     var cashflowMonth by rememberSaveable { mutableStateOf<String?>(null) }
+    var cashflowStartDate by rememberSaveable { mutableStateOf<String?>(null) }
+    var cashflowEndDate by rememberSaveable { mutableStateOf<String?>(null) }
     var cashflowVisible by rememberSaveable { mutableStateOf(false) }
     var cashflowRevision by remember { mutableIntStateOf(0) }
     val saveableStateHolder = rememberSaveableStateHolder()
@@ -144,7 +146,12 @@ fun MainAppScreen(
                                 onNavigateToTools = { selectedTab = 4 },
                                 onScanReceipt = onScanReceipt,
                                 onOpenSettings = onOpenSettings,
-                                onNavigateToCashflow = { cashflowMonth = it; cashflowVisible = true },
+                                onNavigateToCashflow = { m, sDate, eDate ->
+                                    cashflowMonth = m
+                                    cashflowStartDate = sDate
+                                    cashflowEndDate = eDate
+                                    cashflowVisible = true
+                                },
                                 cashflowRevision = cashflowRevision
                             )
                         }
@@ -181,7 +188,11 @@ fun MainAppScreen(
                 exit = slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(220))
             ) {
                 cashflowMonth?.let { month ->
-                    CashflowAnalysisScreen(month) { cashflowVisible = false; cashflowRevision++ }
+                    CashflowAnalysisScreen(
+                        initialMonth = month,
+                        initialStartDate = cashflowStartDate,
+                        initialEndDate = cashflowEndDate
+                    ) { cashflowVisible = false; cashflowRevision++ }
                 }
             }
         }

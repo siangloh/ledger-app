@@ -336,7 +336,7 @@ fun OverviewScreen(
     onOpenSettings: () -> Unit = {},
     onNavigateToWeb: () -> Unit = onNavigateToRecords,
     onQuickAdd: () -> Unit = onNavigateToAdd,
-    onNavigateToCashflow: (String) -> Unit = {},
+    onNavigateToCashflow: (month: String, startDate: String?, endDate: String?) -> Unit = { _, _, _ -> },
     cashflowRevision: Int = 0
 ) {
     val context = LocalContext.current
@@ -361,12 +361,15 @@ fun OverviewScreen(
         mutableStateOf(NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName))
     }
 
-    val initialCache = remember {
+    val initialCache = remember(period, currentMonthStr) {
         val username = NetworkHelper.getUsername(context)
         val cached = com.siangloh.ledger.data.LocalDataStore.getOverview(context, username, period, currentMonthStr)
         if (!cached.isNullOrBlank()) {
             try {
-                parseOverviewJson(cached, isListeningActual, isOfflineCache = true)
+                val jObj = JSONObject(cached)
+                if (jObj.optString("period", "month") == period) {
+                    parseOverviewJson(cached, isListeningActual, isOfflineCache = true)
+                } else null
             } catch (_: Exception) { null }
         } else null
     }
@@ -399,10 +402,20 @@ fun OverviewScreen(
             isLoadingDateTxs = true
             coroutineScope.launch(Dispatchers.IO) {
                 try {
+                    val (queryStart, queryEnd) = if (selDate.length == 7) {
+                        val cal = Calendar.getInstance().apply {
+                            val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                            time = sdf.parse(selDate) ?: Date()
+                        }
+                        val lastDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                        Pair("$selDate-01", String.format(Locale.getDefault(), "%s-%02d", selDate, lastDay))
+                    } else {
+                        Pair(selDate, selDate)
+                    }
                     val res = LocalLedgerRepository.getTransactionsPage(
                         context = context,
-                        startDate = selDate,
-                        endDate = selDate,
+                        startDate = queryStart,
+                        endDate = queryEnd,
                         limit = 50
                     )
                     withContext(Dispatchers.Main) {
@@ -474,11 +487,15 @@ fun OverviewScreen(
 
         if (!cachedJson.isNullOrBlank() && !forceRefresh) {
             try {
-                overviewData = parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = !isFresh)
-                isLoading = false
-                hasNetworkError = false
-                networkErrorMessage = ""
-                return
+                val jObj = JSONObject(cachedJson)
+                val cachedPeriod = jObj.optString("period", "month")
+                if (cachedPeriod == period) {
+                    overviewData = parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = !isFresh)
+                    isLoading = false
+                    hasNetworkError = false
+                    networkErrorMessage = ""
+                    if (isFresh) return
+                }
             } catch (_: Exception) {
                 isLoading = true
             }
@@ -689,7 +706,13 @@ fun OverviewScreen(
                 PeriodSelector(
                     period = period,
                     rangeLabel = displayRangeLabel,
-                    onPeriodChanged = { newPeriod -> period = newPeriod },
+                    onPeriodChanged = { newPeriod ->
+                        if (period != newPeriod) {
+                            period = newPeriod
+                            selectedSparklineDate = null
+                            refreshData(forceRefresh = true)
+                        }
+                    },
                     onPrevMonth = {
                         when (period) {
                             "month" -> calendar.add(Calendar.MONTH, -1)
@@ -697,6 +720,8 @@ fun OverviewScreen(
                             "year" -> calendar.add(Calendar.YEAR, -1)
                         }
                         currentMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
+                        selectedSparklineDate = null
+                        refreshData(forceRefresh = true)
                     },
                     onNextMonth = {
                         when (period) {
@@ -705,6 +730,8 @@ fun OverviewScreen(
                             "year" -> calendar.add(Calendar.YEAR, 1)
                         }
                         currentMonthStr = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
+                        selectedSparklineDate = null
+                        refreshData(forceRefresh = true)
                     }
                 )
             }
@@ -731,7 +758,28 @@ fun OverviewScreen(
                         savings = overviewData.savingsAmount,
                         net = overviewData.netSavings,
                         onOpenDetail = {
-                            onNavigateToCashflow(currentMonthStr)
+                            when (period) {
+                                "3m" -> {
+                                    val startMonth = shiftMonthString(currentMonthStr, -2)
+                                    val startDate = "$startMonth-01"
+                                    val cal = Calendar.getInstance().apply {
+                                        val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                                        time = sdf.parse(currentMonthStr) ?: Date()
+                                    }
+                                    val lastDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                                    val endDate = String.format(Locale.getDefault(), "%s-%02d", currentMonthStr, lastDay)
+                                    onNavigateToCashflow(currentMonthStr, startDate, endDate)
+                                }
+                                "year" -> {
+                                    val yr = calendar.get(Calendar.YEAR)
+                                    val startDate = "$yr-01-01"
+                                    val endDate = "$yr-12-31"
+                                    onNavigateToCashflow(currentMonthStr, startDate, endDate)
+                                }
+                                else -> {
+                                    onNavigateToCashflow(currentMonthStr, null, null)
+                                }
+                            }
                         }
                     )
                 }
@@ -1168,7 +1216,7 @@ fun UnifiedOverviewHeroCard(
                 Text(
                     text = when (period) {
                         "month" -> "收支详情 · $rangeLabel"
-                        "3m" -> "收支概览 · 近3个月"
+                        "3m" -> "收支概览 · $rangeLabel"
                         "year" -> "年度收支概览 · $rangeLabel"
                         else -> "收支概览 · $rangeLabel"
                     },

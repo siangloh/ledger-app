@@ -969,17 +969,22 @@ private fun BillGroup(title: String, bills: List<JSONObject>, currency: String, 
 // 主屏幕
 // =========================================================================
 @Composable
-fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
+fun CashflowAnalysisScreen(
+    initialMonth: String,
+    initialStartDate: String? = null,
+    initialEndDate: String? = null,
+    onBack: () -> Unit
+) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     var month by rememberSaveable { mutableStateOf(initialMonth) }
-    var isCustomRange by rememberSaveable { mutableStateOf(false) }
+    var isCustomRange by rememberSaveable { mutableStateOf(!initialStartDate.isNullOrBlank() && !initialEndDate.isNullOrBlank()) }
     val todayCal = remember { Calendar.getInstance() }
     val todayStr = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(todayCal.time) }
-    var startDate by rememberSaveable { mutableStateOf("$initialMonth-01") }
-    var endDate by rememberSaveable { mutableStateOf(todayStr) }
+    var startDate by rememberSaveable { mutableStateOf(initialStartDate ?: "$initialMonth-01") }
+    var endDate by rememberSaveable { mutableStateOf(initialEndDate ?: todayStr) }
     var currency by rememberSaveable { mutableStateOf("") }
     var refresh by remember { mutableIntStateOf(0) }
     var result by remember { mutableStateOf(CashflowRepository.getCached(context, initialMonth, currency)) }

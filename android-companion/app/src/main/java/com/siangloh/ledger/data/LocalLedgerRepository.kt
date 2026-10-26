@@ -691,16 +691,21 @@ object LocalLedgerRepository {
             val currentMonth = month ?: SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
             val db = AppDatabase.getInstance(context)
 
+            val targetYear = year ?: (currentMonth.substringBefore('-').toIntOrNull() ?: Calendar.getInstance().get(Calendar.YEAR))
             val txList = when (period) {
                 "3m" -> {
                     val endMonth = currentMonth
                     val startMonth = shiftMonthStringHelper(endMonth, -2)
                     val startDate = "$startMonth-01"
-                    val endDate = "$endMonth-31"
+                    val cal = Calendar.getInstance().apply {
+                        val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                        time = sdf.parse(endMonth) ?: Date()
+                    }
+                    val lastDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                    val endDate = String.format(Locale.getDefault(), "%s-%02d", endMonth, lastDay)
                     db.localTransactionDao().getByDateRange(startDate, endDate)
                 }
                 "year" -> {
-                    val targetYear = year ?: (currentMonth.substringBefore('-').toIntOrNull() ?: Calendar.getInstance().get(Calendar.YEAR))
                     db.localTransactionDao().getByYear("$targetYear%")
                 }
                 else -> {
@@ -714,6 +719,13 @@ object LocalLedgerRepository {
             var totalSavings = 0.0
             val catExpMap = mutableMapOf<String, Double>()
             val trendExpMap = mutableMapOf<String, Double>()
+
+            if (period == "year") {
+                for (m in 1..12) {
+                    val mKey = String.format(Locale.getDefault(), "%04d-%02d", targetYear, m)
+                    trendExpMap[mKey] = 0.0
+                }
+            }
 
             txList.forEach { tx ->
                 if (tx.type == "expense") {
