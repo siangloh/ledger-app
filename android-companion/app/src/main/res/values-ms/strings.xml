@@ -409,6 +409,7 @@
     <string name="cf_tab_overview">Ringkasan</string>
     <string name="cf_tab_expense">Belanja</string>
     <string name="cf_tab_income">Pendapatan</string>
+    <string name="cf_tab_savings">Simpanan</string>
     <string name="cf_tab_bills">Bil</string>
     <string name="cf_donut_center_expense">Perbelanjaan</string>
     <string name="cf_donut_center_income">Pendapatan</string>

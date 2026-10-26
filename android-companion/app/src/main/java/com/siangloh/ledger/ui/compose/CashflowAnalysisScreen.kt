@@ -170,7 +170,7 @@ data class DonutSliceData(
     val incomePercent: Double? = null
 )
 
-enum class CashflowDashboardTab { OVERVIEW, EXPENSE, INCOME, BILLS }
+enum class CashflowDashboardTab { OVERVIEW, EXPENSE, INCOME, SAVINGS, BILLS }
 
 private data class TxSelection(val title: String, val ids: List<Int>)
 
@@ -238,6 +238,50 @@ private fun incomeSlices(data: JSONObject): List<DonutSliceData> {
             transactionIds = group.optJSONArray("transaction_ids")
                 ?.let { arr -> (0 until arr.length()).map { arr.getInt(it) } } ?: emptyList(),
             key = raw
+        )
+    }
+}
+
+@Composable
+private fun savingsSlices(data: JSONObject): List<DonutSliceData> {
+    val unknown = "常规储蓄"
+    val rows = data.rows("savings_categories").sortedByDescending { it.optDouble("amount", 0.0) }
+    val total = rows.sumOf { it.optDouble("amount", 0.0).coerceAtLeast(0.0) }
+    return rows.mapIndexed { idx, group ->
+        val raw = group.optString("label")
+        val amt = group.optDouble("amount", 0.0)
+        DonutSliceData(
+            label = if (raw.isBlank() || raw == "null") unknown else raw,
+            amount = amt,
+            percent = if (total > 0) amt / total * 100.0 else 0.0,
+            color = ChartPalette[idx % ChartPalette.size],
+            iconEmoji = CategoryUiHelper.getCategoryEmoji(raw, "savings"),
+            transactionIds = group.optJSONArray("transaction_ids")
+                ?.let { arr -> (0 until arr.length()).map { arr.getInt(it) } } ?: emptyList(),
+            key = raw,
+            incomePercent = if (group.isNull("income_percent")) null else group.optDouble("income_percent")
+        )
+    }
+}
+
+@Composable
+private fun savingsPlatformSlices(data: JSONObject): List<DonutSliceData> {
+    val unknown = "未指定账户"
+    val rows = data.rows("savings_platforms").sortedByDescending { it.optDouble("amount", 0.0) }
+    val total = rows.sumOf { it.optDouble("amount", 0.0).coerceAtLeast(0.0) }
+    return rows.mapIndexed { idx, group ->
+        val raw = group.optString("label")
+        val amt = group.optDouble("amount", 0.0)
+        DonutSliceData(
+            label = if (raw.isBlank() || raw == "null") unknown else raw,
+            amount = amt,
+            percent = if (total > 0) amt / total * 100.0 else 0.0,
+            color = ChartPalette[idx % ChartPalette.size],
+            iconEmoji = "🏦",
+            transactionIds = group.optJSONArray("transaction_ids")
+                ?.let { arr -> (0 until arr.length()).map { arr.getInt(it) } } ?: emptyList(),
+            key = raw,
+            incomePercent = if (group.isNull("income_percent")) null else group.optDouble("income_percent")
         )
     }
 }
@@ -947,11 +991,17 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
     var selectedBill by remember { mutableStateOf<JSONObject?>(null) }
     var busy by remember { mutableStateOf(false) }
     var correctedAmount by remember { mutableStateOf("") }
-    val detailPages = listOf(CashflowDashboardTab.INCOME, CashflowDashboardTab.EXPENSE, CashflowDashboardTab.BILLS)
+    val detailPages = listOf(
+        CashflowDashboardTab.EXPENSE,
+        CashflowDashboardTab.INCOME,
+        CashflowDashboardTab.SAVINGS,
+        CashflowDashboardTab.BILLS
+    )
     val pager = rememberPagerState(pageCount = { detailPages.size })
     var includeTransfer by rememberSaveable { mutableStateOf(false) }
     var showCharts by rememberSaveable { mutableStateOf(false) }
     var expenseViewMode by rememberSaveable { mutableIntStateOf(0) }
+    var savingsViewMode by rememberSaveable { mutableIntStateOf(0) }
 
     fun pickStartDate() {
         val cal = Calendar.getInstance()
@@ -1329,7 +1379,11 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Column(Modifier.weight(1f)) {
+                                Column(
+                                    Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable {
+                                        scope.launch { pager.animateScrollToPage(0) }
+                                    }.padding(vertical = 2.dp)
+                                ) {
                                     Text("总支出", fontSize = 11.sp, color = Slate500)
                                     Spacer(Modifier.height(2.dp))
                                     Text(
@@ -1339,7 +1393,11 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                         color = ExpenseRed
                                     )
                                 }
-                                Column(Modifier.weight(1f)) {
+                                Column(
+                                    Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable {
+                                        scope.launch { pager.animateScrollToPage(2) }
+                                    }.padding(vertical = 2.dp)
+                                ) {
                                     Text("储蓄总额", fontSize = 11.sp, color = Slate500)
                                     Spacer(Modifier.height(2.dp))
                                     Text(
@@ -1349,7 +1407,11 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                         color = Color(0xFFD97706)
                                     )
                                 }
-                                Column(Modifier.weight(1f)) {
+                                Column(
+                                    Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable {
+                                        scope.launch { pager.animateScrollToPage(1) }
+                                    }.padding(vertical = 2.dp)
+                                ) {
                                     Text("总收入", fontSize = 11.sp, color = Slate500)
                                     Spacer(Modifier.height(2.dp))
                                     Text(
@@ -1372,14 +1434,14 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                 .background(Color.White, RoundedCornerShape(9.dp)))
                         }
                         Row(Modifier.fillMaxWidth()) {
-                            val labels = listOf(R.string.cf_tab_income, R.string.cf_tab_expense, R.string.cf_tab_bills)
+                            val labels = listOf(R.string.cf_tab_expense, R.string.cf_tab_income, R.string.cf_tab_savings, R.string.cf_tab_bills)
                             detailPages.forEachIndexed { index, _ ->
                                 val selected = pager.currentPage == index
                                 val emphasis = 1f - kotlin.math.abs(position - index).coerceIn(0f, 1f)
                                 Box(Modifier.weight(1f).selectable(selected = selected,
                                     role = androidx.compose.ui.semantics.Role.Tab,
                                     onClick = { scope.launch { pager.animateScrollToPage(index, animationSpec = tween(300, easing = FastOutSlowInEasing)) } })
-                                    .padding(horizontal = 4.dp, vertical = 14.dp), contentAlignment = Alignment.Center) {
+                                    .padding(horizontal = 2.dp, vertical = 14.dp), contentAlignment = Alignment.Center) {
                                     Text(stringResource(labels[index]), fontSize = 13.sp,
                                         color = androidx.compose.ui.graphics.lerp(Slate600, PrimaryTeal, emphasis),
                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, textAlign = TextAlign.Center)
@@ -1511,6 +1573,133 @@ fun CashflowAnalysisScreen(initialMonth: String, onBack: () -> Unit) {
                                     }
                                     item {
                                         PlatformCashflowCard(data, cur, onItemClick = { selection = it })
+                                    }
+                                }
+
+                                // ================= 储蓄 =================
+                                CashflowDashboardTab.SAVINGS -> {
+                                    val totalSavingsAmt = data.optDouble("savings", 0.0)
+                                    val incomeAmt = data.optDouble("income", 0.0)
+                                    val savingsRate = if (incomeAmt > 0) totalSavingsAmt / incomeAmt * 100.0 else 0.0
+                                    val hasSavings = totalSavingsAmt > 0 || data.rows("savings_categories").isNotEmpty() || data.rows("savings_platforms").isNotEmpty()
+
+                                    if (!hasSavings) {
+                                        item {
+                                            Surface(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                                shape = RoundedCornerShape(16.dp),
+                                                color = Color.White,
+                                                border = BorderStroke(1.dp, Slate200)
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.fillMaxWidth().padding(28.dp),
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.Center
+                                                ) {
+                                                    Text("💰", fontSize = 36.sp)
+                                                    Spacer(Modifier.height(10.dp))
+                                                    Text("所选期间暂无储蓄记录", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
+                                                    Spacer(Modifier.height(4.dp))
+                                                    Text("定投、基金或理财存入将自动汇集统计在此", fontSize = 12.sp, color = Slate400, textAlign = TextAlign.Center)
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        item {
+                                            val isPlatformMode = savingsViewMode == 1
+                                            val slices = if (isPlatformMode) savingsPlatformSlices(data) else savingsSlices(data)
+                                            BreakdownCard(
+                                                title = "储蓄结构分析",
+                                                totalLabel = "储蓄总额",
+                                                currency = cur,
+                                                slices = slices,
+                                                unitLabel = if (isPlatformMode) "存入账户" else "储蓄类别",
+                                                showIncomeShare = true,
+                                                headerExtra = {
+                                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        FilterChip(
+                                                            selected = savingsViewMode == 0,
+                                                            onClick = { savingsViewMode = 0 },
+                                                            label = { Text("按类别") },
+                                                            colors = FilterChipDefaults.filterChipColors(
+                                                                containerColor = Color.White,
+                                                                labelColor = Slate700,
+                                                                selectedContainerColor = Teal50,
+                                                                selectedLabelColor = PrimaryTeal
+                                                            ),
+                                                            border = FilterChipDefaults.filterChipBorder(
+                                                                enabled = true,
+                                                                selected = savingsViewMode == 0,
+                                                                borderColor = Slate200,
+                                                                selectedBorderColor = PrimaryTeal,
+                                                                borderWidth = 1.dp
+                                                            )
+                                                        )
+                                                        FilterChip(
+                                                            selected = savingsViewMode == 1,
+                                                            onClick = { savingsViewMode = 1 },
+                                                            label = { Text("按账户") },
+                                                            colors = FilterChipDefaults.filterChipColors(
+                                                                containerColor = Color.White,
+                                                                labelColor = Slate700,
+                                                                selectedContainerColor = Teal50,
+                                                                selectedLabelColor = PrimaryTeal
+                                                            ),
+                                                            border = FilterChipDefaults.filterChipBorder(
+                                                                enabled = true,
+                                                                selected = savingsViewMode == 1,
+                                                                borderColor = Slate200,
+                                                                selectedBorderColor = PrimaryTeal,
+                                                                borderWidth = 1.dp
+                                                            )
+                                                        )
+                                                    }
+                                                },
+                                                onItemClick = { selection = it }
+                                            )
+                                        }
+                                        item {
+                                            Surface(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(14.dp),
+                                                color = Color.White,
+                                                border = BorderStroke(1.dp, Slate200)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(14.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Column(Modifier.weight(1f)) {
+                                                        Text("储蓄率 (储蓄 / 收入)", fontSize = 12.sp, color = Slate500)
+                                                        Spacer(Modifier.height(2.dp))
+                                                        Text(
+                                                            String.format(Locale.getDefault(), "%.1f%%", savingsRate),
+                                                            fontSize = 20.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = PrimaryTeal
+                                                        )
+                                                    }
+                                                    Surface(
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        color = if (savingsRate >= 20.0) Teal50 else Color(0xFFFEF3C7)
+                                                    ) {
+                                                        Text(
+                                                            text = when {
+                                                                savingsRate >= 40.0 -> "极佳储蓄"
+                                                                savingsRate >= 20.0 -> "稳健达标"
+                                                                savingsRate > 0.0 -> "起步积累"
+                                                                else -> "待存入"
+                                                            },
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = if (savingsRate >= 20.0) PrimaryTeal else Color(0xFFD97706),
+                                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
 

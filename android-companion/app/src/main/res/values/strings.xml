@@ -409,6 +409,7 @@
     <string name="cf_tab_overview">概览</string>
     <string name="cf_tab_expense">支出</string>
     <string name="cf_tab_income">收入</string>
+    <string name="cf_tab_savings">储蓄</string>
     <string name="cf_tab_bills">账单</string>
     <string name="cf_donut_center_expense">总支出</string>
     <string name="cf_donut_center_income">总收入</string>

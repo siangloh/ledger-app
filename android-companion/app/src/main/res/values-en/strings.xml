@@ -409,6 +409,7 @@
     <string name="cf_tab_overview">Overview</string>
     <string name="cf_tab_expense">Expenses</string>
     <string name="cf_tab_income">Income</string>
+    <string name="cf_tab_savings">Savings</string>
     <string name="cf_tab_bills">Bills</string>
     <string name="cf_donut_center_expense">Expenses</string>
     <string name="cf_donut_center_income">Income</string>
