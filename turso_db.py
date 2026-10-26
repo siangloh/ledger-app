@@ -8,6 +8,21 @@ import requests
 TURSO_URL = os.environ.get('TURSO_URL')
 TURSO_AUTH_TOKEN = os.environ.get('TURSO_AUTH_TOKEN')
 
+# Load .env if present and not in a test session
+if (not TURSO_URL or not TURSO_AUTH_TOKEN) and "ledger-app-tests-" not in os.environ.get("DATA_DIR", "") and os.environ.get("TESTING") != "1":
+    env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if os.path.isfile(env_file):
+        try:
+            with open(env_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('TURSO_URL='):
+                        TURSO_URL = TURSO_URL or line.split('=', 1)[1].strip()
+                    elif line.startswith('TURSO_AUTH_TOKEN='):
+                        TURSO_AUTH_TOKEN = TURSO_AUTH_TOKEN or line.split('=', 1)[1].strip()
+        except Exception:
+            pass
+
 
 class TursoRow(dict):
     """Row that supports both dict indexing r['name'] and integer indexing r[0]"""
