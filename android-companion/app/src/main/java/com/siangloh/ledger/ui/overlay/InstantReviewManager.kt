@@ -44,7 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger
 object InstantReviewManager {
 
     private const val TAG = "InstantReviewManager"
-    private const val QUIET_CHANNEL_ID = "instant_expense_quiet"
+    private const val ALERT_CHANNEL_ID = "instant_expense_alert_v1"
     private val notifIdGenerator = AtomicInteger(2000)
 
     /** 分类名为空或属于这些“兜底分类”时，视为系统没把握，只进待整理，不打扰用户 */
@@ -190,12 +190,12 @@ object InstantReviewManager {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notifChannel = NotificationChannel(
-                QUIET_CHANNEL_ID,
-                "自动记账提示",
-                NotificationManager.IMPORTANCE_LOW
+                ALERT_CHANNEL_ID,
+                "交易即时提醒",
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "自动记账后的静音提示，可在此撤销"
-                setShowBadge(false)
+                description = "自动记账即时提醒，支持快速撤销与查看"
+                setShowBadge(true)
             }
             notificationManager.createNotificationChannel(notifChannel)
         }
@@ -210,13 +210,12 @@ object InstantReviewManager {
         )
 
         val suffix = channel.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
-        val builder = NotificationCompat.Builder(context, QUIET_CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, ALERT_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("已记账 · $merchant")
+            .setContentTitle("已自动记账 · $merchant")
             .setContentText("$currency ${String.format("%.2f", amount)} · $category$suffix")
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
-            .setTimeoutAfter(15_000)
             .setContentIntent(contentIntent)
 
         if (transactionId > 0) {
