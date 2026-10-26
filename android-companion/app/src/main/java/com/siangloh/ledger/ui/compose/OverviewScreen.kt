@@ -142,7 +142,8 @@ fun formatFriendlyTime(rawIso: String, context: Context? = null): String {
                     val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
                     context?.getString(R.string.sync_today_fmt, timeStr) ?: "今天 $timeStr"
                 } else {
-                    SimpleDateFormat("M月d日 HH:mm", Locale.getDefault()).format(date)
+                    val pattern = if (Locale.getDefault().language == "zh") "M月d日 HH:mm" else "MMM d, HH:mm"
+                    SimpleDateFormat(pattern, Locale.getDefault()).format(date)
                 }
             }
         }
@@ -431,7 +432,7 @@ fun OverviewScreen(
                                     note = tx.note ?: "",
                                     source = tx.source,
                                     channel = tx.channel,
-                                    badgeText = if (tx.source == "auto_notification") "自动记账" else "手动记账",
+                                    badgeText = if (tx.source == "auto_notification") context.getString(R.string.badge_auto) else context.getString(R.string.badge_manual),
                                     badgeColor = if (tx.source == "auto_notification") "#0d9488" else "#64748b"
                                 )
                             }
@@ -537,9 +538,9 @@ fun OverviewScreen(
                         }
                         overviewData = parsed
                         hasNetworkError = true
-                        networkErrorMessage = "网络连接受阻，已呈现最近快照数据"
+                        networkErrorMessage = context.getString(R.string.network_blocked_cached)
                     } else if (isFutureMonth) {
-                        overviewData = OverviewData(lastActiveTime = "刚刚", isListening = isListeningActual)
+                        overviewData = OverviewData(lastActiveTime = context.getString(R.string.sync_status_just_now), isListening = isListeningActual)
                         hasNetworkError = false
                         networkErrorMessage = ""
                     } else {
@@ -566,16 +567,16 @@ fun OverviewScreen(
                             totalSpending = total,
                             expenseAmount = total,
                             recentTransactions = txList,
-                            lastActiveTime = "离线本地缓存",
+                            lastActiveTime = context.getString(R.string.sync_status_offline),
                             isListening = isListeningActual,
                             isOfflineCache = true
                         )
-                        networkErrorMessage = "网络未连接，且尚无历史缓存"
+                        networkErrorMessage = context.getString(R.string.network_offline_no_cache)
                     }
                 }
             } catch (e: Exception) {
                 if (isFutureMonth) {
-                    overviewData = OverviewData(lastActiveTime = "刚刚", isListening = isListeningActual)
+                    overviewData = OverviewData(lastActiveTime = context.getString(R.string.sync_status_just_now), isListening = isListeningActual)
                     hasNetworkError = false
                 } else {
                     hasNetworkError = true
@@ -585,7 +586,7 @@ fun OverviewScreen(
                             parseOverviewJson(cachedJsonRetry, isListeningActual, isOfflineCache = true)
                         }
                         overviewData = parsed
-                        networkErrorMessage = "网络连接异常，已呈现最近快照数据"
+                        networkErrorMessage = context.getString(R.string.network_error_cached_simple)
                     }
                 }
             } finally {
@@ -820,7 +821,7 @@ fun OverviewScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = if (selectedSparklineDate != null) "📅 $selectedSparklineDate 交易明细" else stringResource(R.string.recent_transactions),
+                                text = if (selectedSparklineDate != null) stringResource(R.string.sparkline_date_detail_fmt, selectedSparklineDate!!) else stringResource(R.string.recent_transactions),
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Slate900
@@ -839,7 +840,7 @@ fun OverviewScreen(
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
                                         Text(
-                                            text = "全部",
+                                            text = stringResource(R.string.filter_all),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = PrimaryTeal
@@ -847,7 +848,7 @@ fun OverviewScreen(
                                         Spacer(Modifier.width(2.dp))
                                         Icon(
                                             imageVector = Icons.Default.Close,
-                                            contentDescription = "取消筛选",
+                                            contentDescription = stringResource(R.string.cancel_filter),
                                             tint = PrimaryTeal,
                                             modifier = Modifier.size(12.dp)
                                         )
@@ -894,8 +895,8 @@ fun OverviewScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = if (isLoading || isLoadingDateTxs) "正在加载..."
-                                       else if (selectedSparklineDate != null) "该日期暂无交易记录"
+                                text = if (isLoading || isLoadingDateTxs) stringResource(R.string.loading)
+                                       else if (selectedSparklineDate != null) stringResource(R.string.no_transactions_for_date)
                                        else stringResource(R.string.no_transactions_yet),
                                 color = Slate400,
                                 fontSize = 14.sp
@@ -932,7 +933,7 @@ fun OverviewScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = if (selectedSparklineDate != null) "前往明细页查看详情" else stringResource(R.string.view_all_records_detail),
+                                text = if (selectedSparklineDate != null) stringResource(R.string.go_to_detail_page) else stringResource(R.string.view_all_records_detail),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = PrimaryTeal
@@ -1215,10 +1216,10 @@ fun UnifiedOverviewHeroCard(
             ) {
                 Text(
                     text = when (period) {
-                        "month" -> "收支详情 · $rangeLabel"
-                        "3m" -> "收支概览 · $rangeLabel"
-                        "year" -> "年度收支概览 · $rangeLabel"
-                        else -> "收支概览 · $rangeLabel"
+                        "month" -> stringResource(R.string.overview_detail_title_fmt, rangeLabel)
+                        "3m" -> stringResource(R.string.overview_3m_title_fmt, rangeLabel)
+                        "year" -> stringResource(R.string.overview_year_title_fmt, rangeLabel)
+                        else -> stringResource(R.string.overview_general_title_fmt, rangeLabel)
                     },
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
@@ -1226,7 +1227,7 @@ fun UnifiedOverviewHeroCard(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "查看收支详情",
+                        text = stringResource(R.string.view_cashflow_detail),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = PrimaryTeal
@@ -1243,9 +1244,9 @@ fun UnifiedOverviewHeroCard(
 
             Text(
                 text = when (period) {
-                    "year" -> if (savings > 0) "年度累计结余 (已扣除储蓄)" else "年度累计结余 / 净现金流"
-                    "3m" -> if (savings > 0) "近3个月累计结余 (已扣除储蓄)" else "近3个月累计结余"
-                    else -> if (savings > 0) "实际收支结余 (已扣除储蓄)" else "扣除预留后预计可用"
+                    "year" -> if (savings > 0) stringResource(R.string.overview_year_net_sub_savings) else stringResource(R.string.overview_year_net_sub)
+                    "3m" -> if (savings > 0) stringResource(R.string.overview_3m_net_sub_savings) else stringResource(R.string.overview_3m_net_sub)
+                    else -> if (savings > 0) stringResource(R.string.overview_month_net_sub_savings) else stringResource(R.string.overview_month_net_sub)
                 },
                 fontSize = 12.sp,
                 color = Slate500
@@ -1263,7 +1264,7 @@ fun UnifiedOverviewHeroCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("实际总收入", fontSize = 12.sp, color = Slate500)
+                    Text(stringResource(R.string.total_actual_income), fontSize = 12.sp, color = Slate500)
                     Text(
                         text = "+RM " + String.format(Locale.getDefault(), "%,.2f", income),
                         fontWeight = FontWeight.SemiBold,
@@ -1271,7 +1272,7 @@ fun UnifiedOverviewHeroCard(
                     )
                 }
                 Column(Modifier.weight(1f)) {
-                    Text("实际总支出", fontSize = 12.sp, color = Slate500)
+                    Text(stringResource(R.string.total_actual_expense), fontSize = 12.sp, color = Slate500)
                     Text(
                         text = "-RM " + String.format(Locale.getDefault(), "%,.2f", expense),
                         fontWeight = FontWeight.SemiBold,
@@ -1280,7 +1281,7 @@ fun UnifiedOverviewHeroCard(
                 }
                 if (savings > 0) {
                     Column(Modifier.weight(1f)) {
-                        Text("储蓄存入", fontSize = 12.sp, color = Slate500)
+                        Text(stringResource(R.string.savings_deposited), fontSize = 12.sp, color = Slate500)
                         Text(
                             text = "-RM " + String.format(Locale.getDefault(), "%,.2f", savings),
                             fontWeight = FontWeight.SemiBold,
@@ -1312,7 +1313,7 @@ fun UnifiedOverviewHeroCard(
                                         .background(HeroExpenseColor)
                                 )
                                 Text(
-                                    "已用: RM " + String.format(Locale.getDefault(), "%,.2f", expense),
+                                    stringResource(R.string.used_amount_fmt, String.format(Locale.getDefault(), "%,.2f", expense)),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Slate800
@@ -1330,7 +1331,7 @@ fun UnifiedOverviewHeroCard(
                                             .background(Color(0xFFD97706))
                                     )
                                     Text(
-                                        "储蓄: RM " + String.format(Locale.getDefault(), "%,.2f", savings),
+                                        stringResource(R.string.savings_amount_fmt, String.format(Locale.getDefault(), "%,.2f", savings)),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = Color(0xFFD97706)
@@ -1349,7 +1350,8 @@ fun UnifiedOverviewHeroCard(
                                     .background(if (isPositive) HeroAvailableColor else HeroDangerColor)
                             )
                             Text(
-                                (if (isPositive) "结余: RM " else "超支: RM ") + String.format(Locale.getDefault(), "%,.2f", Math.abs(net)),
+                                if (isPositive) stringResource(R.string.net_surplus_fmt, String.format(Locale.getDefault(), "%,.2f", net))
+                                else stringResource(R.string.net_deficit_fmt, String.format(Locale.getDefault(), "%,.2f", Math.abs(net))),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isPositive) HeroAvailableColor else ExpenseRed
@@ -1411,15 +1413,22 @@ fun UnifiedOverviewHeroCard(
                     ) {
                         Text(
                             text = if (savings > 0) {
-                                "支出 ${String.format(Locale.getDefault(), "%.1f", expensePct)}% · 储蓄 ${String.format(Locale.getDefault(), "%.1f", savingsPct)}%"
+                                stringResource(
+                                    R.string.overview_stat_breakdown_fmt,
+                                    String.format(Locale.getDefault(), "%.1f", expensePct),
+                                    String.format(Locale.getDefault(), "%.1f", savingsPct)
+                                )
                             } else {
-                                "已支出 ${String.format(Locale.getDefault(), "%.1f", expensePct)}%"
+                                stringResource(
+                                    R.string.overview_stat_expense_only_fmt,
+                                    String.format(Locale.getDefault(), "%.1f", expensePct)
+                                )
                             },
                             fontSize = 11.sp,
                             color = Slate500
                         )
                         Text(
-                            text = (if (isPositive) "结余率 " else "超支率 ") +
+                            text = (if (isPositive) stringResource(R.string.overview_surplus_rate) else stringResource(R.string.overview_deficit_rate)) +
                                 (if (income > 0) "${String.format(Locale.getDefault(), "%.1f", Math.abs(net / income * 100.0))}%"
                                  else "100.0%"),
                             fontSize = 11.sp,
@@ -1790,13 +1799,13 @@ fun SpendingTrendSection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "📅 ${activePoint.date} · 已筛选当日账目",
+                        text = stringResource(R.string.sparkline_filtered_date_fmt, activePoint.date),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = PrimaryTeal
                     )
                     Text(
-                        text = "点击可取消筛选",
+                        text = stringResource(R.string.sparkline_click_to_clear),
                         fontSize = 11.sp,
                         color = Slate400,
                         modifier = Modifier
@@ -1942,7 +1951,7 @@ fun NativeBottomBar(
         ) {
             BottomNavItem(
                 icon = Icons.Default.Dashboard,
-                label = "概览",
+                label = stringResource(R.string.nav_overview),
                 tint = PrimaryTeal,
                 selected = true,
                 onClick = onHome,
@@ -1951,7 +1960,7 @@ fun NativeBottomBar(
 
             BottomNavItem(
                 icon = Icons.Default.AddCircle,
-                label = "记一笔",
+                label = stringResource(R.string.nav_add),
                 tint = Slate700,
                 selected = false,
                 onClick = onAdd,
@@ -1960,7 +1969,7 @@ fun NativeBottomBar(
 
             BottomNavItem(
                 icon = Icons.Default.CameraAlt,
-                label = "拍小票",
+                label = stringResource(R.string.nav_scan_receipt),
                 tint = Slate700,
                 selected = false,
                 onClick = onScan,
@@ -1969,7 +1978,7 @@ fun NativeBottomBar(
 
             BottomNavItem(
                 icon = Icons.Default.ReceiptLong,
-                label = "流水明细",
+                label = stringResource(R.string.nav_records),
                 tint = Slate700,
                 selected = false,
                 onClick = onRecords,
@@ -2062,14 +2071,14 @@ fun QuickCategoryBottomSheet(
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
             Text(
-                text = "修改交易分类",
+                text = stringResource(R.string.category_dialog_title),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = Slate900
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "${transaction.note.ifBlank { "未知商户" }} · MYR ${String.format("%.2f", transaction.amount)}",
+                text = "${transaction.note.ifBlank { stringResource(R.string.unknown_merchant) }} · MYR ${String.format("%.2f", transaction.amount)}",
                 fontSize = 13.sp,
                 color = Slate600
             )
@@ -2129,7 +2138,7 @@ fun QuickCategoryBottomSheet(
                     .fillMaxWidth()
                     .height(48.dp)
             ) {
-                Text("保存分类", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(stringResource(R.string.btn_save_category), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
 
             Spacer(modifier = Modifier.height(24.dp))

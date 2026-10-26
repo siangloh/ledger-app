@@ -244,7 +244,7 @@ private fun incomeSlices(data: JSONObject): List<DonutSliceData> {
 
 @Composable
 private fun savingsSlices(data: JSONObject): List<DonutSliceData> {
-    val unknown = "常规储蓄"
+    val unknown = stringResource(R.string.cf_regular_savings)
     val rows = data.rows("savings_categories").sortedByDescending { it.optDouble("amount", 0.0) }
     val total = rows.sumOf { it.optDouble("amount", 0.0).coerceAtLeast(0.0) }
     return rows.mapIndexed { idx, group ->
@@ -266,7 +266,7 @@ private fun savingsSlices(data: JSONObject): List<DonutSliceData> {
 
 @Composable
 private fun savingsPlatformSlices(data: JSONObject): List<DonutSliceData> {
-    val unknown = "未指定账户"
+    val unknown = stringResource(R.string.cf_unspecified_account)
     val rows = data.rows("savings_platforms").sortedByDescending { it.optDouble("amount", 0.0) }
     val total = rows.sumOf { it.optDouble("amount", 0.0).coerceAtLeast(0.0) }
     return rows.mapIndexed { idx, group ->
@@ -711,21 +711,21 @@ fun CashflowSummaryCard(month: String, revision: Int = 0, onOpen: () -> Unit) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Box(Modifier.size(8.dp).clip(CircleShape).background(ExpenseColor))
-                                Text("已用: " + formatMoney(currency, expense), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate800)
+                                Text(stringResource(R.string.cf_used_prefix) + formatMoney(currency, expense), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate800)
                             }
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Box(Modifier.size(8.dp).clip(CircleShape).background(if (available < 0) DangerColor else AvailableColor))
-                                Text((if (available < 0) "超支: " else "剩下: ") + formatMoney(currency, available),
+                                Text((if (available < 0) stringResource(R.string.cf_deficit_prefix) else stringResource(R.string.cf_remaining_prefix)) + formatMoney(currency, available),
                                     fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (available < 0) ExpenseRed else AvailableColor)
                             }
                         }
                         AllocationBar(income, expense, reserved, available, track = Slate100, barHeight = 14.dp)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text("已支出 " + formatPct(data.optDouble("expense_percent")), fontSize = 11.sp, color = Slate500)
+                            Text(stringResource(R.string.cf_expended_prefix) + formatPct(data.optDouble("expense_percent")), fontSize = 11.sp, color = Slate500)
                             if (reserved > 0) {
-                                Text("预留 " + formatPct(data.optDouble("reserve_percent")), fontSize = 11.sp, color = Slate500)
+                                Text(stringResource(R.string.cf_reserved_prefix) + formatPct(data.optDouble("reserve_percent")), fontSize = 11.sp, color = Slate500)
                             }
-                            Text((if (available < 0) "超支 " else "可用 ") + formatPct(data.optDouble("available_percent")),
+                            Text((if (available < 0) stringResource(R.string.cf_deficit_prefix) else stringResource(R.string.cf_available_prefix)) + formatPct(data.optDouble("available_percent")),
                                 fontSize = 11.sp, color = if (available < 0) ExpenseRed else AvailableColor, fontWeight = FontWeight.SemiBold)
                         }
                     }
@@ -1125,7 +1125,7 @@ fun CashflowAnalysisScreen(
                     FilterChip(
                         selected = !isCustomRange,
                         onClick = { isCustomRange = false },
-                        label = { Text("按月查看") },
+                        label = { Text(stringResource(R.string.view_by_month)) },
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = Color.White,
                             labelColor = Slate700,
@@ -1146,7 +1146,7 @@ fun CashflowAnalysisScreen(
                         leadingIcon = {
                             Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
                         },
-                        label = { Text("自定义区间") },
+                        label = { Text(stringResource(R.string.view_by_custom_range)) },
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = Color.White,
                             labelColor = Slate700,
@@ -1202,13 +1202,13 @@ fun CashflowAnalysisScreen(
                                     ) {
                                         Icon(Icons.Default.CalendarToday, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
                                         Column {
-                                            Text("开始日期", fontSize = 9.sp, color = Slate500)
+                                            Text(stringResource(R.string.start_date), fontSize = 9.sp, color = Slate500)
                                             Text(startDate, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
                                         }
                                     }
                                 }
 
-                                Text("至", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate400, modifier = Modifier.padding(horizontal = 6.dp))
+                                Text(stringResource(R.string.to_date), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate400, modifier = Modifier.padding(horizontal = 6.dp))
 
                                 Surface(
                                     modifier = Modifier.weight(1f).clickable { pickEndDate() },
@@ -1223,7 +1223,7 @@ fun CashflowAnalysisScreen(
                                     ) {
                                         Icon(Icons.Default.CalendarToday, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
                                         Column {
-                                            Text("结束日期", fontSize = 9.sp, color = Slate500)
+                                            Text(stringResource(R.string.end_date), fontSize = 9.sp, color = Slate500)
                                             Text(endDate, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
                                         }
                                     }
@@ -1236,10 +1236,10 @@ fun CashflowAnalysisScreen(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 val presets = listOf(
-                                    "本月" to Pair("$initialMonth-01", todayStr),
-                                    "近30天" to Pair(shiftDays(todayStr, -30), todayStr),
-                                    "今年至今" to Pair("${todayStr.substringBefore('-')}-01-01", todayStr),
-                                    "全部历史" to Pair("2020-01-01", todayStr)
+                                    stringResource(R.string.preset_this_month) to Pair("$initialMonth-01", todayStr),
+                                    stringResource(R.string.preset_last_30_days) to Pair(shiftDays(todayStr, -30), todayStr),
+                                    stringResource(R.string.preset_year_to_date) to Pair("${todayStr.substringBefore('-')}-01-01", todayStr),
+                                    stringResource(R.string.preset_all_history) to Pair("2020-01-01", todayStr)
                                 )
                                 presets.forEach { (label, range) ->
                                     val isCur = startDate == range.first && endDate == range.second
@@ -1345,7 +1345,7 @@ fun CashflowAnalysisScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = if (isCustomRange) "区间收支总览" else "月度收支总览",
+                                    text = if (isCustomRange) stringResource(R.string.cf_overview_custom) else stringResource(R.string.cf_overview_month),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Slate700
@@ -1365,7 +1365,7 @@ fun CashflowAnalysisScreen(
                             ) {
                                 Column {
                                     Text(
-                                        text = if (savAmt > 0) "净结余 (已扣除储蓄)" else "净结余",
+                                        text = if (savAmt > 0) stringResource(R.string.cf_net_savings_deducted) else stringResource(R.string.cf_net_balance),
                                         fontSize = 11.sp,
                                         color = Slate500
                                     )
@@ -1389,7 +1389,7 @@ fun CashflowAnalysisScreen(
                                         scope.launch { pager.animateScrollToPage(0) }
                                     }.padding(vertical = 2.dp)
                                 ) {
-                                    Text("总支出", fontSize = 11.sp, color = Slate500)
+                                    Text(stringResource(R.string.cf_total_expense), fontSize = 11.sp, color = Slate500)
                                     Spacer(Modifier.height(2.dp))
                                     Text(
                                         "-$cur " + String.format(Locale.getDefault(), "%,.2f", expAmt),
@@ -1403,7 +1403,7 @@ fun CashflowAnalysisScreen(
                                         scope.launch { pager.animateScrollToPage(2) }
                                     }.padding(vertical = 2.dp)
                                 ) {
-                                    Text("储蓄总额", fontSize = 11.sp, color = Slate500)
+                                    Text(stringResource(R.string.cf_total_savings), fontSize = 11.sp, color = Slate500)
                                     Spacer(Modifier.height(2.dp))
                                     Text(
                                         "$cur " + String.format(Locale.getDefault(), "%,.2f", savAmt),
@@ -1417,7 +1417,7 @@ fun CashflowAnalysisScreen(
                                         scope.launch { pager.animateScrollToPage(1) }
                                     }.padding(vertical = 2.dp)
                                 ) {
-                                    Text("总收入", fontSize = 11.sp, color = Slate500)
+                                    Text(stringResource(R.string.cf_total_income), fontSize = 11.sp, color = Slate500)
                                     Spacer(Modifier.height(2.dp))
                                     Text(
                                         "+$cur " + String.format(Locale.getDefault(), "%,.2f", incAmt),
@@ -1603,9 +1603,9 @@ fun CashflowAnalysisScreen(
                                                 ) {
                                                     Text("💰", fontSize = 36.sp)
                                                     Spacer(Modifier.height(10.dp))
-                                                    Text("所选期间暂无储蓄记录", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
+                                                    Text(stringResource(R.string.cf_no_savings_in_period), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
                                                     Spacer(Modifier.height(4.dp))
-                                                    Text("定投、基金或理财存入将自动汇集统计在此", fontSize = 12.sp, color = Slate400, textAlign = TextAlign.Center)
+                                                    Text(stringResource(R.string.cf_savings_empty_hint), fontSize = 12.sp, color = Slate400, textAlign = TextAlign.Center)
                                                 }
                                             }
                                         }
@@ -1614,18 +1614,18 @@ fun CashflowAnalysisScreen(
                                             val isPlatformMode = savingsViewMode == 1
                                             val slices = if (isPlatformMode) savingsPlatformSlices(data) else savingsSlices(data)
                                             BreakdownCard(
-                                                title = "储蓄结构分析",
-                                                totalLabel = "储蓄总额",
+                                                title = stringResource(R.string.cf_savings_structure_title),
+                                                totalLabel = stringResource(R.string.cf_total_savings),
                                                 currency = cur,
                                                 slices = slices,
-                                                unitLabel = if (isPlatformMode) "存入账户" else "储蓄类别",
+                                                unitLabel = if (isPlatformMode) stringResource(R.string.cf_deposit_account) else stringResource(R.string.cf_savings_category),
                                                 showIncomeShare = true,
                                                 headerExtra = {
                                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                         FilterChip(
                                                             selected = savingsViewMode == 0,
                                                             onClick = { savingsViewMode = 0 },
-                                                            label = { Text("按类别") },
+                                                            label = { Text(stringResource(R.string.cf_by_category)) },
                                                             colors = FilterChipDefaults.filterChipColors(
                                                                 containerColor = Color.White,
                                                                 labelColor = Slate700,
@@ -1643,7 +1643,7 @@ fun CashflowAnalysisScreen(
                                                         FilterChip(
                                                             selected = savingsViewMode == 1,
                                                             onClick = { savingsViewMode = 1 },
-                                                            label = { Text("按账户") },
+                                                            label = { Text(stringResource(R.string.cf_by_account)) },
                                                             colors = FilterChipDefaults.filterChipColors(
                                                                 containerColor = Color.White,
                                                                 labelColor = Slate700,
@@ -1676,7 +1676,7 @@ fun CashflowAnalysisScreen(
                                                     horizontalArrangement = Arrangement.SpaceBetween
                                                 ) {
                                                     Column(Modifier.weight(1f)) {
-                                                        Text("储蓄率 (储蓄 / 收入)", fontSize = 12.sp, color = Slate500)
+                                                        Text(stringResource(R.string.cf_savings_rate_label), fontSize = 12.sp, color = Slate500)
                                                         Spacer(Modifier.height(2.dp))
                                                         Text(
                                                             String.format(Locale.getDefault(), "%.1f%%", savingsRate),
@@ -1691,10 +1691,10 @@ fun CashflowAnalysisScreen(
                                                     ) {
                                                         Text(
                                                             text = when {
-                                                                savingsRate >= 40.0 -> "极佳储蓄"
-                                                                savingsRate >= 20.0 -> "稳健达标"
-                                                                savingsRate > 0.0 -> "起步积累"
-                                                                else -> "待存入"
+                                                                savingsRate >= 40.0 -> stringResource(R.string.cf_savings_grade_excellent)
+                                                                savingsRate >= 20.0 -> stringResource(R.string.cf_savings_grade_good)
+                                                                savingsRate > 0.0 -> stringResource(R.string.cf_savings_grade_starting)
+                                                                else -> stringResource(R.string.cf_savings_grade_pending)
                                                             },
                                                             fontSize = 12.sp,
                                                             fontWeight = FontWeight.SemiBold,
