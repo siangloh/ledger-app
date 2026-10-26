@@ -748,7 +748,7 @@ fun OverviewScreen(
                         }
                     }
                 } else {
-                    items(overviewData.recentTransactions) { tx ->
+                    items(overviewData.recentTransactions.take(10)) { tx ->
                         TransactionCardItem(
                             tx = tx,
                             onClick = {
