@@ -567,5 +567,10 @@
     <string name="cf_savings_grade_good">On Target</string>
     <string name="cf_savings_grade_starting">Starting Out</string>
     <string name="cf_savings_grade_pending">Pending Deposit</string>
+    <string name="notif_recorded_channel_name">Transaction Alerts</string>
+    <string name="notif_recorded_channel_desc">Instant notification when a transaction is auto-recorded</string>
+    <string name="notif_recorded_title">Recorded · %1$s</string>
+    <string name="notif_recorded_body">%1$s %2$s · %3$s%4$s</string>
+    <string name="notif_action_undo">Undo</string>
 </resources>
 

@@ -87,16 +87,9 @@ object InstantReviewManager {
 
         Handler(Looper.getMainLooper()).post {
             try {
-                if (Settings.canDrawOverlays(context)) {
-                    showFloatingToast(context, cleanMerchant, amount, cleanCategory, transactionId, currency)
-                } else {
-                    showQuietNotification(context, cleanMerchant, amount, cleanCategory, channel, transactionId, currency)
-                }
+                showStandardNotification(context, cleanMerchant, amount, cleanCategory, channel, transactionId, currency)
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to display instant review UI: ${e.message}, falling back to quiet notification")
-                try {
-                    showQuietNotification(context, cleanMerchant, amount, cleanCategory, channel, transactionId, currency)
-                } catch (_: Exception) {}
+                Log.w(TAG, "Failed to display transaction notification: ${e.message}", e)
             }
         }
     }
@@ -178,7 +171,9 @@ object InstantReviewManager {
     // ------------------------------------------------------------------
     // 没有悬浮窗权限时：静音通知（不响、不震动、不弹横幅），15 秒自动消失
     // ------------------------------------------------------------------
-    private fun showQuietNotification(
+    // 标准应用通知：提示交易已自动记录入账，支持查看明细与快速撤销
+    // ------------------------------------------------------------------
+    private fun showStandardNotification(
         context: Context,
         merchant: String,
         amount: Double,
@@ -191,10 +186,10 @@ object InstantReviewManager {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notifChannel = NotificationChannel(
                 ALERT_CHANNEL_ID,
-                "交易即时提醒",
+                context.getString(R.string.notif_recorded_channel_name),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "自动记账即时提醒，支持快速撤销与查看"
+                description = context.getString(R.string.notif_recorded_channel_desc)
                 setShowBadge(true)
             }
             notificationManager.createNotificationChannel(notifChannel)
@@ -210,10 +205,14 @@ object InstantReviewManager {
         )
 
         val suffix = channel.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
+        val formattedAmount = String.format("%.2f", amount)
+        val title = context.getString(R.string.notif_recorded_title, merchant)
+        val body = context.getString(R.string.notif_recorded_body, currency, formattedAmount, category, suffix)
+
         val builder = NotificationCompat.Builder(context, ALERT_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("已自动记账 · $merchant")
-            .setContentText("$currency ${String.format("%.2f", amount)} · $category$suffix")
+            .setContentTitle(title)
+            .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(contentIntent)
@@ -229,7 +228,7 @@ object InstantReviewManager {
                 undoIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            builder.addAction(0, "撤销", undoPending)
+            builder.addAction(0, context.getString(R.string.notif_action_undo), undoPending)
         }
 
         notificationManager.notify(notifId, builder.build())

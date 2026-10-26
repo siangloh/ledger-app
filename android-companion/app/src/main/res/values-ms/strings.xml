@@ -567,5 +567,10 @@
     <string name="cf_savings_grade_good">Capai Sasaran</string>
     <string name="cf_savings_grade_starting">Permulaan</string>
     <string name="cf_savings_grade_pending">Belum Menyimpan</string>
+    <string name="notif_recorded_channel_name">Pemberitahuan Transaksi</string>
+    <string name="notif_recorded_channel_desc">Pemberitahuan segera apabila transaksi direkodkan secara automatik</string>
+    <string name="notif_recorded_title">Berjaya Direkodkan · %1$s</string>
+    <string name="notif_recorded_body">%1$s %2$s · %3$s%4$s</string>
+    <string name="notif_action_undo">Batal</string>
 </resources>
 
