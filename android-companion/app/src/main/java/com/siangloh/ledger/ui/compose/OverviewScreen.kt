@@ -879,7 +879,7 @@ fun OverviewScreen(
                 showCategorizeDialog = false
                 selectedTxForCategorize = null
             },
-            onConfirmCategory = { newCategory, remember ->
+            onConfirmCategory = { newCategory ->
                 showCategorizeDialog = false
                 selectedTxForCategorize = null
                 coroutineScope.launch {
@@ -1792,11 +1792,10 @@ fun QuickCategoryBottomSheet(
     transaction: TransactionItem,
     availableCategories: List<String> = emptyList(),
     onDismiss: () -> Unit,
-    onConfirmCategory: (String, Boolean) -> Unit
+    onConfirmCategory: (String) -> Unit
 ) {
     val initialCleanCat = CategoryUiHelper.cleanCategoryName(transaction.category)
     var selectedCat by remember { mutableStateOf(initialCleanCat.ifBlank { "餐饮" }) }
-    var rememberRule by remember { mutableStateOf(true) }
 
     val emojiMap = mapOf(
         "餐饮" to "🍔", "交通" to "🚗", "杂货" to "🛒", "账单" to "💡",
@@ -1894,27 +1893,8 @@ fun QuickCategoryBottomSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { rememberRule = !rememberRule }
-            ) {
-                Checkbox(
-                    checked = rememberRule,
-                    onCheckedChange = { rememberRule = it },
-                    colors = CheckboxDefaults.colors(checkedColor = Emerald500)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "以后该商户所有消费自动归为此分类 (商户记忆)",
-                    fontSize = 13.sp,
-                    color = Slate700
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
             Button(
-                onClick = { onConfirmCategory(selectedCat, rememberRule) },
+                onClick = { onConfirmCategory(selectedCat) },
                 colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
