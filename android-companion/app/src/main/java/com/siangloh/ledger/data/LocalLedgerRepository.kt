@@ -1101,9 +1101,34 @@ object LocalLedgerRepository {
                 sp.edit().putString("fixed_incomes_json", arr.toString()).apply()
             }
 
+            val savingsJson = sp.getString("fixed_savings_json", null)
+            val fixedSavings = mutableListOf<FixedSavingsRecord>()
+            if (!savingsJson.isNullOrBlank()) {
+                val arr = JSONArray(savingsJson)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    val accId = if (obj.has("account_id") && !obj.isNull("account_id")) obj.optInt("account_id") else null
+                    val accName = if (obj.has("account_name") && !obj.isNull("account_name")) obj.optString("account_name").takeIf { it != "null" && it.isNotBlank() } else null
+                    fixedSavings.add(
+                        FixedSavingsRecord(
+                            id = obj.optInt("id", i + 1),
+                            name = obj.optString("name", "固定储蓄"),
+                            category = obj.optString("category", "定期存款"),
+                            amount = obj.optDouble("amount", 0.0),
+                            currency = obj.optString("currency", "MYR"),
+                            arrivalDay = obj.optString("arrival_day", "每月1号"),
+                            isActive = obj.optBoolean("is_active", true),
+                            accountId = accId,
+                            accountName = accName ?: (accId?.let { accountsMap[it] })
+                        )
+                    )
+                }
+            }
+
             val totalMonthly = subscriptions.sumOf { it.cost }
             val totalRemaining = installments.sumOf { it.remainingAmount }
             val totalMonthlyIncome = fixedIncomes.filter { it.isActive }.sumOf { it.amount }
+            val totalMonthlySavings = fixedSavings.filter { it.isActive }.sumOf { it.amount }
 
             Result.success(
                 ToolsSummary(
@@ -1112,7 +1137,9 @@ object LocalLedgerRepository {
                     installments = installments,
                     totalRemainingInst = totalRemaining,
                     fixedIncomes = fixedIncomes,
-                    totalMonthlyIncome = totalMonthlyIncome
+                    totalMonthlyIncome = totalMonthlyIncome,
+                    fixedSavings = fixedSavings,
+                    totalMonthlySavings = totalMonthlySavings
                 )
             )
         } catch (e: Exception) {
@@ -1406,6 +1433,35 @@ object LocalLedgerRepository {
             }
             sp.edit().putString("fixed_incomes_json", incsArr.toString()).apply()
 
+            val onlineSavings = json.optJSONArray("fixed_savings") ?: JSONArray()
+            val savsArr = JSONArray()
+            for (i in 0 until onlineSavings.length()) {
+                val obj = onlineSavings.getJSONObject(i)
+                val accName = obj.optString("account_name", "")
+                val matchedAcc = if (accName.isNotBlank()) {
+                    localAccs.firstOrNull { it.name.equals(accName, ignoreCase = true) || it.name.contains(accName, ignoreCase = true) || accName.contains(it.name, ignoreCase = true) }
+                } else null
+
+                val savItem = JSONObject().apply {
+                    put("id", obj.optInt("id", i + 1))
+                    put("name", obj.optString("name"))
+                    put("category", obj.optString("category"))
+                    put("amount", obj.optDouble("amount", 0.0))
+                    put("currency", obj.optString("currency", "MYR"))
+                    put("arrival_day", obj.optString("arrival_day", "每月1号"))
+                    put("is_active", obj.optBoolean("is_active", true))
+                    if (matchedAcc != null) {
+                        put("account_id", matchedAcc.id)
+                        put("account_name", matchedAcc.name)
+                    } else if (obj.has("account_id") && !obj.isNull("account_id")) {
+                        put("account_id", obj.optInt("account_id"))
+                        put("account_name", obj.optString("account_name"))
+                    }
+                }
+                savsArr.put(savItem)
+            }
+            sp.edit().putString("fixed_savings_json", savsArr.toString()).apply()
+
             getToolsSummary(context)
         } catch (e: Exception) {
             Log.e(TAG, "syncToolsFromOnline error: ${e.message}", e)
@@ -1429,6 +1485,91 @@ object LocalLedgerRepository {
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "deleteFixedIncome error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun saveFixedSavings(
+        context: Context,
+        id: Int?,
+        name: String,
+        category: String,
+        amount: Double,
+        currency: String = "MYR",
+        arrivalDay: String = "每月1号",
+        isActive: Boolean = true,
+        accountId: Int? = null,
+        accountName: String? = null
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
+            val json = sp.getString("fixed_savings_json", null)
+            val arr = if (!json.isNullOrBlank()) JSONArray(json) else JSONArray()
+            val list = mutableListOf<JSONObject>()
+            for (i in 0 until arr.length()) {
+                list.add(arr.getJSONObject(i))
+            }
+
+            if (id != null && id > 0) {
+                val idx = list.indexOfFirst { it.optInt("id") == id }
+                val updated = JSONObject().apply {
+                    put("id", id)
+                    put("name", name)
+                    put("category", category)
+                    put("amount", amount)
+                    put("currency", currency)
+                    put("arrival_day", arrivalDay)
+                    put("is_active", isActive)
+                    if (accountId != null) put("account_id", accountId) else remove("account_id")
+                    if (accountName != null) put("account_name", accountName) else remove("account_name")
+                }
+                if (idx >= 0) {
+                    list[idx] = updated
+                } else {
+                    list.add(updated)
+                }
+            } else {
+                val maxId = list.maxOfOrNull { it.optInt("id", 0) } ?: 0
+                val newItem = JSONObject().apply {
+                    put("id", maxId + 1)
+                    put("name", name)
+                    put("category", category)
+                    put("amount", amount)
+                    put("currency", currency)
+                    put("arrival_day", arrivalDay)
+                    put("is_active", isActive)
+                    if (accountId != null) put("account_id", accountId)
+                    if (accountName != null) put("account_name", accountName)
+                }
+                list.add(newItem)
+            }
+
+            val newArr = JSONArray()
+            list.forEach { newArr.put(it) }
+            sp.edit().putString("fixed_savings_json", newArr.toString()).apply()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "saveFixedSavings error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteFixedSavings(context: Context, id: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val sp = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
+            val json = sp.getString("fixed_savings_json", null)
+            val arr = if (!json.isNullOrBlank()) JSONArray(json) else JSONArray()
+            val newArr = JSONArray()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                if (obj.optInt("id") != id) {
+                    newArr.put(obj)
+                }
+            }
+            sp.edit().putString("fixed_savings_json", newArr.toString()).apply()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "deleteFixedSavings error: ${e.message}", e)
             Result.failure(e)
         }
     }

@@ -1116,6 +1116,36 @@ def get_native_tools_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
     except Exception as e:
         logger.debug("Fetch recurring income rules error: %s", e)
 
+    # 2.5 固定储蓄列表 (recurring_rules savings)
+    fixed_savings = []
+    total_monthly_savings = Decimal("0.0")
+    try:
+        sav_rows = db.execute('''
+            SELECT r.id, r.category, r.amount, r.day_of_month, r.note, r.account_id, a.name AS account_name
+            FROM recurring_rules r
+            LEFT JOIN accounts a ON r.account_id = a.id
+            WHERE r.user_id = ? AND r.type = 'savings' AND r.is_active = 1
+            ORDER BY r.day_of_month ASC
+        ''', (str(user_id),)).fetchall()
+        for r in sav_rows:
+            amt = Decimal(str(r['amount'] or 0.0))
+            total_monthly_savings += amt
+            dom = r['day_of_month'] or 1
+            name = r['category'] if not r['note'] else f"{r['category']} - {r['note']}"
+            fixed_savings.append({
+                'id': r['id'],
+                'name': name,
+                'category': r['category'] or '储蓄',
+                'amount': float(amt),
+                'currency': 'MYR',
+                'arrival_day': f"每月{dom}号",
+                'is_active': True,
+                'account_id': r['account_id'],
+                'account_name': r['account_name']
+            })
+    except Exception as e:
+        logger.debug("Fetch recurring savings rules error: %s", e)
+
     # 3. 分期与负债
     inst_rows = db.execute('''
         SELECT id, title, total_amount, tenure_months, paid_periods, monthly_amount, status
@@ -1149,6 +1179,8 @@ def get_native_tools_summary(user_id: Any, db: Any = None) -> Dict[str, Any]:
         'total_monthly_sub': float(round(total_monthly_sub, 2)),
         'fixed_incomes': fixed_incomes,
         'total_monthly_income': float(round(total_monthly_income, 2)),
+        'fixed_savings': fixed_savings,
+        'total_monthly_savings': float(round(total_monthly_savings, 2)),
         'installments': installments,
         'total_remaining_inst': round(total_remaining_inst, 2)
     }

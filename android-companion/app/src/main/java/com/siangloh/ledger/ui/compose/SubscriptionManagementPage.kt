@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,11 +36,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material.icons.filled.Sync
+import androidx.compose.foundation.verticalScroll
 import com.siangloh.ledger.R
 import androidx.compose.foundation.ExperimentalFoundationApi
 import com.siangloh.ledger.data.AccountRecord
 import com.siangloh.ledger.data.FixedIncomeRecord
+import com.siangloh.ledger.data.FixedSavingsRecord
 import com.siangloh.ledger.data.LocalLedgerRepository
 import com.siangloh.ledger.data.NativeLedgerApi
 import com.siangloh.ledger.data.SubscriptionRecord
@@ -46,10 +49,14 @@ import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+private val SavingsBlue = Color(0xFF0284C7)
+private val SavingsBg = Color(0xFFF0F9FF)
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SubscriptionManagementPage(
     subscriptions: List<SubscriptionRecord>,
+    fixedSavings: List<FixedSavingsRecord> = emptyList(),
     fixedIncomes: List<FixedIncomeRecord> = emptyList(),
     userCategories: List<String> = emptyList(),
     userIncomeCategories: List<String> = emptyList(),
@@ -59,7 +66,7 @@ fun SubscriptionManagementPage(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
     var localAccounts by remember { mutableStateOf(accounts) }
     var isSyncing by remember { mutableStateOf(false) }
 
@@ -94,6 +101,9 @@ fun SubscriptionManagementPage(
     var editingSub by remember { mutableStateOf<SubscriptionRecord?>(null) }
     var showAddSubDialog by remember { mutableStateOf(false) }
 
+    var editingSavings by remember { mutableStateOf<FixedSavingsRecord?>(null) }
+    var showAddSavingsDialog by remember { mutableStateOf(false) }
+
     var editingIncome by remember { mutableStateOf<FixedIncomeRecord?>(null) }
     var showAddIncomeDialog by remember { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
@@ -106,7 +116,11 @@ fun SubscriptionManagementPage(
                 TopAppBar(
                     title = {
                         Text(
-                            text = if (pagerState.currentPage == 0) "固定支出与订阅" else "固定收入计划",
+                            text = when (pagerState.currentPage) {
+                                0 -> "固定支出与订阅"
+                                1 -> "固定储蓄计划"
+                                else -> "固定收入计划"
+                            },
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate900
@@ -129,7 +143,7 @@ fun SubscriptionManagementPage(
                                     val syncRes = NativeLedgerApi.syncToolsFromOnline(context)
                                     isSyncing = false
                                     syncRes.onSuccess {
-                                        Toast.makeText(context, "已从在线数据库同步固定支出与收入", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "已从在线数据库同步固定收支与储蓄", Toast.LENGTH_SHORT).show()
                                         LocalLedgerRepository.getAccountsSummary(context).onSuccess { localAccounts = it.accounts }
                                         onRefresh()
                                     }.onFailure {
@@ -142,16 +156,28 @@ fun SubscriptionManagementPage(
                             Icon(
                                 imageVector = Icons.Default.Sync,
                                 contentDescription = "同步在线数据",
-                                tint = if (pagerState.currentPage == 0) PrimaryTeal else IncomeGreen
+                                tint = when (pagerState.currentPage) {
+                                    0 -> PrimaryTeal
+                                    1 -> SavingsBlue
+                                    else -> IncomeGreen
+                                }
                             )
                         }
                         IconButton(onClick = {
-                            if (pagerState.currentPage == 0) showAddSubDialog = true else showAddIncomeDialog = true
+                            when (pagerState.currentPage) {
+                                0 -> showAddSubDialog = true
+                                1 -> showAddSavingsDialog = true
+                                else -> showAddIncomeDialog = true
+                            }
                         }) {
                             Icon(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = "添加",
-                                tint = if (pagerState.currentPage == 0) PrimaryTeal else IncomeGreen
+                                tint = when (pagerState.currentPage) {
+                                    0 -> PrimaryTeal
+                                    1 -> SavingsBlue
+                                    else -> IncomeGreen
+                                }
                             )
                         }
                     },
@@ -161,7 +187,11 @@ fun SubscriptionManagementPage(
                 TabRow(
                     selectedTabIndex = pagerState.currentPage,
                     containerColor = Color.White,
-                    contentColor = if (pagerState.currentPage == 0) PrimaryTeal else IncomeGreen,
+                    contentColor = when (pagerState.currentPage) {
+                        0 -> PrimaryTeal
+                        1 -> SavingsBlue
+                        else -> IncomeGreen
+                    },
                     divider = { HorizontalDivider(color = Slate200) }
                 ) {
                     Tab(
@@ -188,9 +218,24 @@ fun SubscriptionManagementPage(
                         },
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Savings, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("固定储蓄 (${fixedSavings.size})", fontWeight = if (pagerState.currentPage == 1) FontWeight.Bold else FontWeight.Normal)
+                            }
+                        }
+                    )
+                    Tab(
+                        selected = pagerState.currentPage == 2,
+                        onClick = {
+                            scope.launch {
+                                pagerState.animateScrollToPage(2)
+                            }
+                        },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("固定收入 (${fixedIncomes.size})", fontWeight = if (pagerState.currentPage == 1) FontWeight.Bold else FontWeight.Normal)
+                                Text("固定收入 (${fixedIncomes.size})", fontWeight = if (pagerState.currentPage == 2) FontWeight.Bold else FontWeight.Normal)
                             }
                         }
                     )
@@ -386,6 +431,230 @@ fun SubscriptionManagementPage(
 
                                         Spacer(modifier = Modifier.width(6.dp))
                                         IconButton(onClick = { editingSub = sub }, modifier = Modifier.size(30.dp)) {
+                                            Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Slate400, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            } else if (page == 1) {
+                // 固定储蓄列表
+                val totalSavings = fixedSavings.filter { it.isActive }.sumOf { it.amount }
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Slate200),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(text = "月度固定储蓄计划", fontSize = 13.sp, color = Slate600)
+                                Text(
+                                    text = "共 ${fixedSavings.size} 项计划存钱",
+                                    fontSize = 11.sp,
+                                    color = Slate400
+                                )
+                            }
+                            Text(
+                                text = String.format(Locale.getDefault(), "RM %.2f / 月", totalSavings),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SavingsBlue
+                            )
+                        }
+                    }
+                }
+
+                if (fixedSavings.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 48.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(CircleShape)
+                                    .background(SavingsBlue.copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Savings,
+                                    contentDescription = null,
+                                    tint = SavingsBlue,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "暂无固定储蓄与存钱计划",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Slate700
+                            )
+                            Text(
+                                text = "设定每月定存、基金定投或心愿储备，独立记账不计入日常消费",
+                                fontSize = 12.sp,
+                                color = Slate400,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(top = 4.dp, start = 32.dp, end = 32.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(
+                                onClick = { showAddSavingsDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = SavingsBlue),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("添加固定储蓄计划", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                } else {
+                    items(fixedSavings) { saving ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            border = BorderStroke(1.dp, Slate200)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .clip(CircleShape)
+                                                .background(SavingsBlue.copy(alpha = 0.12f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Savings,
+                                                contentDescription = null,
+                                                tint = SavingsBlue,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                text = saving.name,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Slate900
+                                            )
+                                            Text(
+                                                text = "周期: ${saving.arrivalDay} · ${saving.category}",
+                                                fontSize = 11.sp,
+                                                color = Slate500
+                                            )
+                                        }
+                                    }
+
+                                    Text(
+                                        text = String.format(Locale.getDefault(), "RM %.2f", saving.amount),
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = SavingsBlue
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+                                HorizontalDivider(color = Slate100)
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val accText = saving.accountName ?: "未指定账户"
+                                    val icon = when {
+                                        accText.contains("Touch") || accText.contains("TNG") -> "📱 "
+                                        accText.contains("卡") || accText.contains("Credit") -> "💳 "
+                                        accText.contains("现金") -> "💵 "
+                                        else -> "🏦 "
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = if (!saving.accountName.isNullOrBlank()) SavingsBg else Slate100
+                                    ) {
+                                        Text(
+                                            text = if (!saving.accountName.isNullOrBlank()) "$icon$accText" else "未指定账户",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = if (!saving.accountName.isNullOrBlank()) SavingsBlue else Slate500,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = if (saving.isActive) SavingsBg else Slate100
+                                        ) {
+                                            Text(
+                                                text = if (saving.isActive) "✓ 生效中" else "已暂停",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = if (saving.isActive) SavingsBlue else Slate500,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.width(6.dp))
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                scope.launch {
+                                                    val res = NativeLedgerApi.recordFixedSavingsAsTransaction(context, saving)
+                                                    res.onSuccess {
+                                                        Toast.makeText(context, "已成功将「${saving.name}」记入本月储蓄流水", Toast.LENGTH_SHORT).show()
+                                                        onRefresh()
+                                                    }.onFailure {
+                                                        Toast.makeText(context, "存入记账失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                            modifier = Modifier.height(30.dp),
+                                            shape = RoundedCornerShape(6.dp),
+                                            border = BorderStroke(1.dp, SavingsBlue.copy(alpha = 0.5f))
+                                        ) {
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = SavingsBlue, modifier = Modifier.size(14.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("一键存入", fontSize = 11.sp, color = SavingsBlue, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        IconButton(onClick = { editingSavings = saving }, modifier = Modifier.size(30.dp)) {
                                             Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Slate400, modifier = Modifier.size(16.dp))
                                         }
                                     }
@@ -1131,6 +1400,284 @@ fun SubscriptionManagementPage(
                 title = "选择每月入账日",
                 currentValue = dayInput,
                 accentColor = IncomeGreen,
+                onDaySelected = { selected ->
+                    dayInput = selected
+                    showDayPicker = false
+                },
+                onDismissRequest = { showDayPicker = false }
+            )
+        }
+    }
+
+    // 新增/编辑固定储蓄子弹窗
+    val activeSaving = editingSavings
+    if (showAddSavingsDialog || activeSaving != null) {
+        var nameInput by remember { mutableStateOf(activeSaving?.name ?: "") }
+        var amountInput by remember { mutableStateOf(if (activeSaving != null) String.format(Locale.getDefault(), "%.2f", activeSaving.amount) else "") }
+        var categoryInput by remember { mutableStateOf(activeSaving?.category ?: "定期存款") }
+        var dayInput by remember { mutableStateOf(activeSaving?.arrivalDay ?: "每月1号") }
+        var selectedAccountId by remember { mutableStateOf(activeSaving?.accountId) }
+        var selectedAccountName by remember { mutableStateOf(activeSaving?.accountName) }
+        var isActiveInput by remember { mutableStateOf(activeSaving?.isActive ?: true) }
+        var showDayPicker by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = {
+                showAddSavingsDialog = false
+                editingSavings = null
+            },
+            containerColor = Color.White,
+            tonalElevation = 0.dp,
+            title = {
+                Text(
+                    text = if (activeSaving != null) "编辑固定储蓄计划" else "添加新的固定储蓄计划",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = nameInput,
+                        onValueChange = { nameInput = it },
+                        label = { Text("储蓄目标名称 (如: 应急基金、定期存钱、基金定投)", color = Slate600) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
+                    )
+                    OutlinedTextField(
+                        value = amountInput,
+                        onValueChange = { amountInput = it },
+                        label = { Text("每月计划存入金额 (MYR)", color = Slate600) },
+                        placeholder = { Text("0.00", color = Slate400) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
+                    )
+
+                    OutlinedTextField(
+                        value = categoryInput,
+                        onValueChange = { categoryInput = it },
+                        label = { Text("储蓄分类 (可手填或点击下方快速选择)", color = Slate600) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(color = Slate900),
+                        colors = ledgerInputColors()
+                    )
+
+                    // 储蓄分类快捷点选
+                    Column {
+                        Text("点击快速选择储蓄分类:", fontSize = 12.sp, color = Slate600)
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val options = listOf("定期存款", "应急基金", "投资理财", "心愿基金", "买房基金", "教育金", "退休金", "黄金储蓄", "其他")
+                            options.forEach { opt ->
+                                val sel = categoryInput == opt
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (sel) SavingsBlue else Slate100,
+                                    modifier = Modifier.clickable { categoryInput = opt }
+                                ) {
+                                    Text(
+                                        text = opt,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (sel) Color.White else Slate700,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 存入账户选择
+                    Column {
+                        Text("存入/目标账户 (储蓄账户/投资账户):", fontSize = 12.sp, color = Slate600)
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val noneSelected = selectedAccountId == null && selectedAccountName == null
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (noneSelected) SavingsBlue else Slate100,
+                                modifier = Modifier.clickable {
+                                    selectedAccountId = null
+                                    selectedAccountName = null
+                                }
+                            ) {
+                                Text(
+                                    text = "未指定账户",
+                                    fontSize = 11.sp,
+                                    fontWeight = if (noneSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (noneSelected) Color.White else Slate700,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                            localAccounts.forEach { acc ->
+                                val sel = selectedAccountId == acc.id || (selectedAccountId == null && selectedAccountName == acc.name)
+                                val icon = when {
+                                    acc.type.equals("savings", ignoreCase = true) -> "🏦 "
+                                    acc.type.equals("investment", ignoreCase = true) -> "📈 "
+                                    acc.name.contains("Touch") || acc.name.contains("TNG") -> "📱 "
+                                    else -> "💳 "
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (sel) SavingsBlue else Slate100,
+                                    modifier = Modifier.clickable {
+                                        selectedAccountId = acc.id
+                                        selectedAccountName = acc.name
+                                    }
+                                ) {
+                                    Text(
+                                        text = "$icon${acc.name}",
+                                        fontSize = 11.sp,
+                                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (sel) Color.White else Slate700,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = dayInput,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("预计存入周期 (点击选择日期)", color = Slate600) },
+                            trailingIcon = {
+                                IconButton(onClick = { showDayPicker = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarToday,
+                                        contentDescription = "选择存入日",
+                                        tint = SavingsBlue,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(color = Slate900),
+                            colors = ledgerInputColors()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showDayPicker = true }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = isActiveInput,
+                            onCheckedChange = { isActiveInput = it },
+                            colors = CheckboxDefaults.colors(checkedColor = SavingsBlue)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("计划生效中", fontSize = 13.sp, color = Slate800)
+                    }
+                }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (activeSaving != null) {
+                        TextButton(
+                            onClick = {
+                                isSubmitting = true
+                                scope.launch {
+                                    NativeLedgerApi.deleteFixedSavings(context, activeSaving.id)
+                                    isSubmitting = false
+                                    editingSavings = null
+                                    Toast.makeText(context, "固定储蓄计划已删除", Toast.LENGTH_SHORT).show()
+                                    onRefresh()
+                                }
+                            },
+                            enabled = !isSubmitting
+                        ) {
+                            Text("删除", color = ExpenseRed)
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            val name = nameInput.trim()
+                            val amount = amountInput.toDoubleOrNull() ?: 0.0
+                            if (name.isEmpty() || amount <= 0.0) {
+                                Toast.makeText(context, "请输入有效的储蓄名称与大于0的金额", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            isSubmitting = true
+                            scope.launch {
+                                val res = NativeLedgerApi.saveFixedSavings(
+                                    context = context,
+                                    id = activeSaving?.id,
+                                    name = name,
+                                    category = categoryInput.trim().ifEmpty { "定期存款" },
+                                    amount = amount,
+                                    currency = "MYR",
+                                    arrivalDay = dayInput.trim().ifEmpty { "每月1号" },
+                                    isActive = isActiveInput,
+                                    accountId = selectedAccountId,
+                                    accountName = selectedAccountName
+                                )
+                                isSubmitting = false
+                                res.onSuccess {
+                                    showAddSavingsDialog = false
+                                    editingSavings = null
+                                    Toast.makeText(context, "固定储蓄计划已保存", Toast.LENGTH_SHORT).show()
+                                    onRefresh()
+                                }.onFailure {
+                                    Toast.makeText(context, "保存失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = SavingsBlue),
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = !isSubmitting
+                    ) {
+                        Text("保存")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showAddSavingsDialog = false
+                        editingSavings = null
+                    }
+                ) {
+                    Text("取消", color = Slate600)
+                }
+            }
+        )
+
+        if (showDayPicker) {
+            MonthlyDayPickerDialog(
+                title = "选择每月计划存入日",
+                currentValue = dayInput,
+                accentColor = SavingsBlue,
                 onDaySelected = { selected ->
                     dayInput = selected
                     showDayPicker = false

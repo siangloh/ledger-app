@@ -163,13 +163,27 @@ data class FixedIncomeRecord(
     val accountName: String? = null
 )
 
+data class FixedSavingsRecord(
+    val id: Int,
+    val name: String,
+    val category: String,
+    val amount: Double,
+    val currency: String = "MYR",
+    val arrivalDay: String = "每月1号",
+    val isActive: Boolean = true,
+    val accountId: Int? = null,
+    val accountName: String? = null
+)
+
 data class ToolsSummary(
     val subscriptions: List<SubscriptionRecord>,
     val totalMonthlySub: Double,
     val installments: List<InstallmentRecord>,
     val totalRemainingInst: Double,
     val fixedIncomes: List<FixedIncomeRecord> = emptyList(),
-    val totalMonthlyIncome: Double = 0.0
+    val totalMonthlyIncome: Double = 0.0,
+    val fixedSavings: List<FixedSavingsRecord> = emptyList(),
+    val totalMonthlySavings: Double = 0.0
 )
 
 data class TransactionMatchRecord(
@@ -591,13 +605,36 @@ object NativeLedgerApi {
             )
         }
 
+        val savArr = json.optJSONArray("fixed_savings") ?: JSONArray()
+        val fixedSavings = mutableListOf<FixedSavingsRecord>()
+        for (i in 0 until savArr.length()) {
+            val obj = savArr.getJSONObject(i)
+            val accId = if (obj.has("account_id") && !obj.isNull("account_id")) obj.optInt("account_id") else null
+            val accName = if (obj.has("account_name") && !obj.isNull("account_name")) obj.optString("account_name").takeIf { it != "null" && it.isNotBlank() } else null
+            fixedSavings.add(
+                FixedSavingsRecord(
+                    id = obj.optInt("id"),
+                    name = obj.optString("name"),
+                    category = obj.optString("category"),
+                    amount = obj.optDouble("amount", 0.0),
+                    currency = obj.optString("currency", "MYR"),
+                    arrivalDay = obj.optString("arrival_day", "每月1号"),
+                    isActive = obj.optBoolean("is_active", true),
+                    accountId = accId,
+                    accountName = accName
+                )
+            )
+        }
+
         return ToolsSummary(
             subscriptions = subs,
             totalMonthlySub = json.optDouble("total_monthly_sub", 0.0),
             installments = insts,
             totalRemainingInst = json.optDouble("total_remaining_inst", 0.0),
             fixedIncomes = fixedIncomes,
-            totalMonthlyIncome = json.optDouble("total_monthly_income", 0.0)
+            totalMonthlyIncome = json.optDouble("total_monthly_income", 0.0),
+            fixedSavings = fixedSavings,
+            totalMonthlySavings = json.optDouble("total_monthly_savings", 0.0)
         )
     }
 
@@ -947,6 +984,45 @@ object NativeLedgerApi {
             note = "${income.name} (固定收入)",
             tags = "#fixed_income",
             accountId = income.accountId,
+            groupName = "main"
+        )
+    }
+
+    suspend fun saveFixedSavings(
+        context: Context,
+        id: Int?,
+        name: String,
+        category: String,
+        amount: Double,
+        currency: String = "MYR",
+        arrivalDay: String = "每月1号",
+        isActive: Boolean = true,
+        accountId: Int? = null,
+        accountName: String? = null
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        cachedTools = null
+        LocalLedgerRepository.saveFixedSavings(context, id, name, category, amount, currency, arrivalDay, isActive, accountId, accountName)
+    }
+
+    suspend fun deleteFixedSavings(context: Context, id: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        cachedTools = null
+        LocalLedgerRepository.deleteFixedSavings(context, id)
+    }
+
+    suspend fun recordFixedSavingsAsTransaction(
+        context: Context,
+        saving: FixedSavingsRecord
+    ): Result<Long> = withContext(Dispatchers.IO) {
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        addTransaction(
+            context = context,
+            type = "savings",
+            amount = saving.amount,
+            category = saving.category,
+            date = today,
+            note = "${saving.name} (固定储蓄)",
+            tags = "#fixed_savings",
+            accountId = saving.accountId,
             groupName = "main"
         )
     }

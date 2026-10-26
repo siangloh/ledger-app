@@ -32,6 +32,20 @@ object CategoryUiHelper {
     fun getCategoryEmoji(category: String, type: String = "expense"): String {
         val clean = cleanCategoryName(category).trim().lowercase()
         if (clean.contains("内部") || clean.contains("划转") || clean.contains("自转") || clean.contains("转账") || clean.contains("transfer") || clean.contains("pindahan")) return "🔄"
+        if (type == "savings") {
+            return when {
+                clean.contains("定期") || clean.contains("存款") || clean.contains("fixed") || clean.contains("deposit") -> "🏦"
+                clean.contains("应急") || clean.contains("备用") || clean.contains("emergency") -> "🛡️"
+                clean.contains("投资") || clean.contains("理财") || clean.contains("基金") || clean.contains("股票") || clean.contains("invest") -> "📈"
+                clean.contains("车") || clean.contains("car") -> "🚗"
+                clean.contains("房") || clean.contains("house") || clean.contains("home") -> "🏠"
+                clean.contains("心愿") || clean.contains("愿望") || clean.contains("wish") || clean.contains("dream") -> "⭐"
+                clean.contains("教育") || clean.contains("学费") || clean.contains("edu") -> "🎓"
+                clean.contains("退休") || clean.contains("养老") || clean.contains("retire") -> "🌴"
+                clean.contains("黄金") || clean.contains("gold") -> "🪙"
+                else -> "💰"
+            }
+        }
         if (type == "income") {
             return when {
                 clean.contains("工资") || clean.contains("薪水") || clean.contains("salary") || clean.contains("gaji") -> "💰"

@@ -227,6 +227,7 @@ fun MoreToolsScreen(
             "subscription" -> {
                 SubscriptionManagementPage(
                     subscriptions = toolsSummary?.subscriptions ?: emptyList(),
+                    fixedSavings = toolsSummary?.fixedSavings ?: emptyList(),
                     fixedIncomes = toolsSummary?.fixedIncomes ?: emptyList(),
                     userCategories = userCategories,
                     userIncomeCategories = userIncomeCategories,
@@ -362,6 +363,7 @@ fun MoreToolsScreen(
                 SubscriptionsCard(
                     subscriptions = toolsSummary?.subscriptions ?: emptyList(),
                     totalMonthly = toolsSummary?.totalMonthlySub ?: 0.0,
+                    totalMonthlySavings = toolsSummary?.totalMonthlySavings ?: 0.0,
                     totalMonthlyIncome = toolsSummary?.totalMonthlyIncome ?: 0.0,
                     errorMessage = toolsError,
                     onRetry = { refreshAll() },
@@ -941,6 +943,7 @@ fun ReceiptOcrBannerCard(
 fun SubscriptionsCard(
     subscriptions: List<SubscriptionRecord>,
     totalMonthly: Double,
+    totalMonthlySavings: Double = 0.0,
     totalMonthlyIncome: Double = 0.0,
     errorMessage: String? = null,
     onRetry: () -> Unit = {},
@@ -996,7 +999,7 @@ fun SubscriptionsCard(
                         )
                         Text(
                             text = if (errorMessage != null) "加载失败：$errorMessage"
-                                   else "支出 RM ${String.format(Locale.getDefault(), "%.2f", totalMonthly)} · 收入 RM ${String.format(Locale.getDefault(), "%.2f", totalMonthlyIncome)}",
+                                   else "支出 RM ${String.format(Locale.getDefault(), "%.2f", totalMonthly)} · 储蓄 RM ${String.format(Locale.getDefault(), "%.2f", totalMonthlySavings)} · 收入 RM ${String.format(Locale.getDefault(), "%.2f", totalMonthlyIncome)}",
                             fontSize = 12.sp,
                             color = if (errorMessage != null) ExpenseRed else Slate500
                         )
