@@ -50,8 +50,7 @@ fun LoginScreen(
 
     var username by remember { mutableStateOf(NetworkHelper.getUsername(context).ifBlank { "" }) }
     var password by remember { mutableStateOf("") }
-    var serverUrl by remember { mutableStateOf(NetworkHelper.getServerUrl(context)) }
-    var showServerConfig by remember { mutableStateOf(false) }
+    val serverUrl = remember { NetworkHelper.getServerUrl(context) }
     var passwordVisible by remember { mutableStateOf(false) }
 
     var isLoading by remember { mutableStateOf(false) }
@@ -81,8 +80,7 @@ fun LoginScreen(
 
             isLoading = false
             result.onSuccess { auth ->
-                val tip = if (auth.isLocalCache) "本地秒级离线登入成功 ✓" else "联网登录成功并已存入本机 ✓"
-                Toast.makeText(context, tip, Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "登入成功 ✓", Toast.LENGTH_SHORT).show()
                 onLoginSuccess(auth.username)
             }.onFailure { err ->
                 errorMessage = err.message ?: "登录失败，请检查网络或用户名密码"
@@ -266,56 +264,6 @@ fun LoginScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Advanced Server Settings Toggle
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { showServerConfig = !showServerConfig }
-                            .padding(vertical = 4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Dns,
-                            contentDescription = "服务器",
-                            tint = Slate500,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (showServerConfig) "收起服务器配置" else "高级服务器设置 (当前: $serverUrl)",
-                            fontSize = 12.sp,
-                            color = Slate600
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        Icon(
-                            imageVector = if (showServerConfig) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = null,
-                            tint = Slate500,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    AnimatedVisibility(visible = showServerConfig) {
-                        Column(modifier = Modifier.padding(top = 10.dp)) {
-                            OutlinedTextField(
-                                value = serverUrl,
-                                onValueChange = { serverUrl = it },
-                                label = { Text("服务器地址", fontSize = 12.sp) },
-                                placeholder = { Text("http://192.168.1.12:5000", color = Slate400, fontSize = 13.sp) },
-                                singleLine = true,
-                                textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = PrimaryTeal,
-                                    unfocusedBorderColor = Slate200
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
 
                     // Error Message Banner
                     AnimatedVisibility(visible = errorMessage != null) {
@@ -394,20 +342,6 @@ fun LoginScreen(
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Bottom Policy & Tip
-            Text(
-                text = "提示：首次联网登录成功后，用户与密码将自动加密保存在手机本地。下次或断网环境下无需联网即可极速进入。",
-                fontSize = 11.sp,
-                color = Slate400,
-                textAlign = TextAlign.Center,
-                lineHeight = 16.sp,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }
