@@ -11,6 +11,7 @@
 
     <!-- 通知读取与电量优化权限 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- 系统级即时记账悬浮卡片权限 (仿 ExpenseMY，用于付款后浮现快捷确认与分类修正) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />

@@ -1,6 +1,7 @@
 package com.siangloh.ledger.data
 
 import android.content.Context
+import androidx.biometric.BiometricManager
 import com.siangloh.ledger.NetworkHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,6 +21,84 @@ object AuthManager {
     private const val KEY_CURRENT_USERNAME = "current_username"
     private const val KEY_CURRENT_USER_ID = "current_user_id"
     private const val KEY_USERS_CACHE = "cached_users_json"
+    private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
+
+    fun isBiometricSupported(context: Context): Boolean {
+        return try {
+            val bm = BiometricManager.from(context)
+            val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.BIOMETRIC_WEAK
+            bm.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun isBiometricEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_BIOMETRIC_ENABLED, true)
+    }
+
+    fun setBiometricEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_BIOMETRIC_ENABLED, enabled)
+            .apply()
+    }
+
+    fun getLastUsername(context: Context): String {
+        val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val cur = sp.getString(KEY_CURRENT_USERNAME, "") ?: ""
+        if (cur.isNotBlank()) return cur
+        val cacheStr = sp.getString(KEY_USERS_CACHE, "{}") ?: "{}"
+        return try {
+            val obj = JSONObject(cacheStr)
+            val keys = obj.keys()
+            if (keys.hasNext()) {
+                obj.optJSONObject(keys.next())?.optString("username", "") ?: ""
+            } else ""
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    fun canUseBiometricLogin(context: Context): Boolean {
+        if (!isBiometricSupported(context)) return false
+        if (!isBiometricEnabled(context)) return false
+        val user = getLastUsername(context)
+        return user.isNotBlank() && hasCachedUser(context, user)
+    }
+
+    fun loginWithBiometric(context: Context, targetUsername: String? = null): Result<AuthResult> {
+        val usernameToUse = targetUsername?.takeIf { it.isNotBlank() } ?: getLastUsername(context)
+        if (usernameToUse.isBlank()) {
+            return Result.failure(Exception("未找到可快速登录的账号，请先使用密码登录"))
+        }
+        val cleanUser = usernameToUse.trim()
+        val userKey = cleanUser.lowercase(Locale.ROOT)
+        val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val cacheStr = sp.getString(KEY_USERS_CACHE, "{}") ?: "{}"
+        val cacheObj = try { JSONObject(cacheStr) } catch (_: Exception) { JSONObject() }
+
+        val userRecord = cacheObj.optJSONObject(userKey)
+            ?: return Result.failure(Exception("该账号尚未缓存离线凭据，请先使用密码登录一次"))
+
+        val userId = userRecord.optString("user_id")
+        val origName = userRecord.optString("username", cleanUser)
+        val apiKey = userRecord.optString("api_key")
+
+        sp.edit()
+            .putBoolean(KEY_IS_LOGGED_IN, true)
+            .putString(KEY_CURRENT_USERNAME, origName)
+            .putString(KEY_CURRENT_USER_ID, userId)
+            .apply()
+
+        NetworkHelper.setUsername(context, origName)
+        if (apiKey.isNotEmpty()) {
+            NetworkHelper.setApiKey(context, apiKey)
+        }
+
+        return Result.success(AuthResult(origName, userId, isLocalCache = true))
+    }
 
     fun isLoggedIn(context: Context): Boolean {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -91,6 +170,7 @@ object AuthManager {
                         .putBoolean(KEY_IS_LOGGED_IN, true)
                         .putString(KEY_CURRENT_USERNAME, origName)
                         .putString(KEY_CURRENT_USER_ID, userId)
+                        .putBoolean(KEY_BIOMETRIC_ENABLED, true)
                         .apply()
 
                     NetworkHelper.setUsername(context, origName)
@@ -130,6 +210,7 @@ object AuthManager {
                     .putString(KEY_CURRENT_USERNAME, retUsername)
                     .putString(KEY_CURRENT_USER_ID, userId)
                     .putString(KEY_USERS_CACHE, cacheObj.toString())
+                    .putBoolean(KEY_BIOMETRIC_ENABLED, true)
                     .apply()
 
                 NetworkHelper.setUsername(context, retUsername)

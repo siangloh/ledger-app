@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.siangloh.ledger.NetworkHelper
 import com.siangloh.ledger.data.AuthManager
+import com.siangloh.ledger.data.BiometricHelper
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.launch
 
@@ -48,13 +49,50 @@ fun LoginScreen(
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
-    var username by remember { mutableStateOf(NetworkHelper.getUsername(context).ifBlank { "" }) }
+    val lastUsername = remember { AuthManager.getLastUsername(context) }
+    var username by remember {
+        mutableStateOf(NetworkHelper.getUsername(context).ifBlank { lastUsername })
+    }
     var password by remember { mutableStateOf("") }
     val serverUrl = remember { NetworkHelper.getServerUrl(context) }
     var passwordVisible by remember { mutableStateOf(false) }
 
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val canUseBiometric = remember { AuthManager.canUseBiometricLogin(context) }
+    val fragmentActivity = remember(context) { BiometricHelper.findFragmentActivity(context) }
+
+    fun triggerBiometricLogin() {
+        val targetUser = username.ifBlank { lastUsername }
+        val act = fragmentActivity ?: return
+        BiometricHelper.authenticate(
+            activity = act,
+            title = "生物识别登录",
+            subtitle = if (targetUser.isNotBlank()) "验证账号 [$targetUser] 的面容或指纹" else "使用指纹或面容快速登入",
+            negativeButtonText = "使用密码登录",
+            onSuccess = {
+                val result = AuthManager.loginWithBiometric(context, targetUser)
+                result.onSuccess { auth ->
+                    Toast.makeText(context, "登入成功 ✓", Toast.LENGTH_SHORT).show()
+                    onLoginSuccess(auth.username)
+                }.onFailure { err ->
+                    errorMessage = err.message ?: "生物识别登录失败，请使用密码"
+                }
+            },
+            onError = { _, _ ->
+                // User pressed negative button or canceled; stay on normal login screen
+            }
+        )
+    }
+
+    var hasAutoPrompted by remember { mutableStateOf(false) }
+    LaunchedEffect(canUseBiometric, fragmentActivity) {
+        if (canUseBiometric && fragmentActivity != null && !hasAutoPrompted) {
+            hasAutoPrompted = true
+            triggerBiometricLogin()
+        }
+    }
 
     fun handleLogin() {
         focusManager.clearFocus()
@@ -298,46 +336,72 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Login Action Button
-                    Button(
-                        onClick = { handleLogin() },
-                        enabled = !isLoading,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = PrimaryTeal,
-                            disabledContainerColor = Slate300
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
+                    // Login Action Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                color = Color.White,
-                                strokeWidth = 2.5.dp,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "正在验证登录...",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        } else {
-                            Text(
-                                text = "登 录",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
+                        Button(
+                            onClick = { handleLogin() },
+                            enabled = !isLoading,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PrimaryTeal,
+                                disabledContainerColor = Slate300
+                            ),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(50.dp)
+                        ) {
+                            if (isLoading) {
+                                CircularProgressIndicator(
+                                    color = Color.White,
+                                    strokeWidth = 2.5.dp,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "正在验证登录...",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            } else {
+                                Text(
+                                    text = "登 录",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        if (canUseBiometric) {
+                            Spacer(modifier = Modifier.width(12.dp))
+                            FilledTonalIconButton(
+                                onClick = { triggerBiometricLogin() },
+                                modifier = Modifier
+                                    .size(50.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .border(1.dp, PrimaryTealSubtle, RoundedCornerShape(14.dp)),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = Teal50,
+                                    contentColor = PrimaryTeal
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Fingerprint,
+                                    contentDescription = "面容或指纹登录",
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
                         }
                     }
                 }
