@@ -572,5 +572,22 @@
     <string name="notif_recorded_title">已成功记账 · %1$s</string>
     <string name="notif_recorded_body">%1$s %2$s · %3$s%4$s</string>
     <string name="notif_action_undo">撤销</string>
+    <string name="cf_tab_calendar">日历</string>
+    <string name="cf_calendar_title">每日支出日历</string>
+    <string name="cf_calendar_subtitle">点击日期查看当日交易明细</string>
+    <string name="cf_calendar_daily_avg">日均支出</string>
+    <string name="cf_calendar_peak_day">最高支出日</string>
+    <string name="cf_calendar_zero_days">零支出天数</string>
+    <string name="cf_calendar_no_expense_day">当日无支出记录</string>
+    <string name="cf_calendar_day_detail_title">%1$s 支出明细</string>
+    <string name="cf_calendar_day_count_fmt">%1$d 笔支出</string>
+    <string name="cal_mon">一</string>
+    <string name="cal_tue">二</string>
+    <string name="cal_wed">三</string>
+    <string name="cal_thu">四</string>
+    <string name="cal_fri">五</string>
+    <string name="cal_sat">六</string>
+    <string name="cal_sun">日</string>
+    <string name="cal_today">今天</string>
 </resources>
 

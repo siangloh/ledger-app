@@ -572,5 +572,22 @@
     <string name="notif_recorded_title">Recorded · %1$s</string>
     <string name="notif_recorded_body">%1$s %2$s · %3$s%4$s</string>
     <string name="notif_action_undo">Undo</string>
+    <string name="cf_tab_calendar">Calendar</string>
+    <string name="cf_calendar_title">Daily Spending Calendar</string>
+    <string name="cf_calendar_subtitle">Tap a date to inspect transactions</string>
+    <string name="cf_calendar_daily_avg">Daily Avg</string>
+    <string name="cf_calendar_peak_day">Peak Day</string>
+    <string name="cf_calendar_zero_days">Zero-Spend Days</string>
+    <string name="cf_calendar_no_expense_day">No expenses recorded on this day</string>
+    <string name="cf_calendar_day_detail_title">%1$s Expenses</string>
+    <string name="cf_calendar_day_count_fmt">%1$d transactions</string>
+    <string name="cal_mon">Mon</string>
+    <string name="cal_tue">Tue</string>
+    <string name="cal_wed">Wed</string>
+    <string name="cal_thu">Thu</string>
+    <string name="cal_fri">Fri</string>
+    <string name="cal_sat">Sat</string>
+    <string name="cal_sun">Sun</string>
+    <string name="cal_today">Today</string>
 </resources>
 

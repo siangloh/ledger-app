@@ -572,5 +572,22 @@
     <string name="notif_recorded_title">Berjaya Direkodkan · %1$s</string>
     <string name="notif_recorded_body">%1$s %2$s · %3$s%4$s</string>
     <string name="notif_action_undo">Batal</string>
+    <string name="cf_tab_calendar">Kalendar</string>
+    <string name="cf_calendar_title">Kalendar Perbelanjaan Harian</string>
+    <string name="cf_calendar_subtitle">Ketik tarikh untuk melihat perincian transaksi</string>
+    <string name="cf_calendar_daily_avg">Purata Harian</string>
+    <string name="cf_calendar_peak_day">Hari Tertinggi</string>
+    <string name="cf_calendar_zero_days">Hari Tanpa Belanja</string>
+    <string name="cf_calendar_no_expense_day">Tiada perbelanjaan direkodkan pada hari ini</string>
+    <string name="cf_calendar_day_detail_title">Perbelanjaan %1$s</string>
+    <string name="cf_calendar_day_count_fmt">%1$d transaksi</string>
+    <string name="cal_mon">Isn</string>
+    <string name="cal_tue">Sel</string>
+    <string name="cal_wed">Rab</string>
+    <string name="cal_thu">Kha</string>
+    <string name="cal_fri">Jum</string>
+    <string name="cal_sat">Sab</string>
+    <string name="cal_sun">Ahd</string>
+    <string name="cal_today">Hari Ini</string>
 </resources>
 
