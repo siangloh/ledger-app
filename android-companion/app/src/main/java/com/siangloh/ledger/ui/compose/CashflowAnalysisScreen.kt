@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -1442,9 +1443,45 @@ fun CashflowAnalysisScreen(
 
                 val listState = androidx.compose.foundation.lazy.rememberLazyListState()
 
+                fun switchToTab(tab: CashflowDashboardTab) {
+                    if (selectedTab != tab) {
+                        selectedTab = tab
+                        if (listState.firstVisibleItemIndex > 5) {
+                            scope.launch {
+                                listState.animateScrollToItem(4)
+                            }
+                        }
+                    }
+                }
+
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                        .pointerInput(selectedTab, detailPages) {
+                            var totalDragX = 0f
+                            val swipeThreshold = 40.dp.toPx()
+                            detectHorizontalDragGestures(
+                                onDragStart = { totalDragX = 0f },
+                                onDragEnd = {
+                                    val currentIndex = detailPages.indexOf(selectedTab)
+                                    if (totalDragX < -swipeThreshold && currentIndex < detailPages.size - 1) {
+                                        switchToTab(detailPages[currentIndex + 1])
+                                    } else if (totalDragX > swipeThreshold && currentIndex > 0) {
+                                        switchToTab(detailPages[currentIndex - 1])
+                                    }
+                                    totalDragX = 0f
+                                },
+                                onDragCancel = { totalDragX = 0f },
+                                onHorizontalDrag = { change, dragAmount ->
+                                    totalDragX += dragAmount
+                                    if (Math.abs(totalDragX) > 15f) {
+                                        change.consume()
+                                    }
+                                }
+                            )
+                        },
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
@@ -1727,7 +1764,7 @@ fun CashflowAnalysisScreen(
                                     ) {
                                         Column(
                                             Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable {
-                                                selectedTab = CashflowDashboardTab.EXPENSE
+                                                switchToTab(CashflowDashboardTab.EXPENSE)
                                             }.padding(vertical = 2.dp)
                                         ) {
                                             Text(stringResource(R.string.cf_total_expense), fontSize = 11.sp, color = Slate500)
@@ -1741,7 +1778,7 @@ fun CashflowAnalysisScreen(
                                         }
                                         Column(
                                             Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable {
-                                                selectedTab = CashflowDashboardTab.SAVINGS
+                                                switchToTab(CashflowDashboardTab.SAVINGS)
                                             }.padding(vertical = 2.dp)
                                         ) {
                                             Text(stringResource(R.string.cf_total_savings), fontSize = 11.sp, color = Slate500)
@@ -1755,7 +1792,7 @@ fun CashflowAnalysisScreen(
                                         }
                                         Column(
                                             Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable {
-                                                selectedTab = CashflowDashboardTab.INCOME
+                                                switchToTab(CashflowDashboardTab.INCOME)
                                             }.padding(vertical = 2.dp)
                                         ) {
                                             Text(stringResource(R.string.cf_total_income), fontSize = 11.sp, color = Slate500)
@@ -1820,7 +1857,7 @@ fun CashflowAnalysisScreen(
                                                     .selectable(
                                                         selected = selected,
                                                         role = androidx.compose.ui.semantics.Role.Tab,
-                                                        onClick = { selectedTab = tab }
+                                                        onClick = { switchToTab(tab) }
                                                     )
                                                     .padding(horizontal = 2.dp, vertical = 12.dp),
                                                 contentAlignment = Alignment.Center
