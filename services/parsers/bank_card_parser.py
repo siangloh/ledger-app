@@ -17,28 +17,35 @@ class BankCardParser(NotificationParserStrategy):
     SPEND_PATTERNS = [
         re.compile(r'(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:spent at|charged at|purchase at|deducted for|paid to)\s+([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{2,40})', re.IGNORECASE),
         re.compile(r'(?:spent|charged|purchase of)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:at|to)\s+([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{2,40})', re.IGNORECASE),
+        re.compile(r'using\s+your\s+(?:cd|card)(?:\s+ending\s+\d+)?\s+(?:@|at)\s+([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{2,40})\s+(?:rm|myr)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)', re.IGNORECASE),
     ]
 
     def can_handle(self, text: str) -> bool:
         t = text.lower()
-        return any(k in t for k in self.BANK_KEYWORDS) or 'card ending' in t or 'cardmember' in t
+        return any(k in t for k in self.BANK_KEYWORDS) or 'card ending' in t or 'cd ending' in t or 'cardmember' in t
 
     def parse(self, text: str) -> Optional[ParsedNotification]:
         today_str = date.today().isoformat()
         lower_text = text.lower()
 
         # 1. 尝试匹配各种消费模式
-        for pattern in self.SPEND_PATTERNS:
+        for idx, pattern in enumerate(self.SPEND_PATTERNS):
             m = pattern.search(text)
             if m:
                 try:
-                    amt = float(m.group(1).replace(',', ''))
-                    raw_merchant = m.group(2).strip()
+                    if idx == 2:
+                        raw_merchant = m.group(1).strip()
+                        amt = float(m.group(2).replace(',', ''))
+                    else:
+                        amt = float(m.group(1).replace(',', ''))
+                        raw_merchant = m.group(2).strip()
+
                     cleaned_merchant = re.split(
-                        r'[\.\n\r]|\s+(?:on|via|ref|using|with|at|date|txid)\b',
+                        r'[\.\n\r]|\s+(?:via|on|ref|using|with|at|date|txid)\b',
                         raw_merchant,
                         flags=re.IGNORECASE
-                    )[0].strip(' .,-')
+                    )[0].strip(' .,-@')
+                    cleaned_merchant = re.sub(r'\s+#?\d{3,10}$', '', cleaned_merchant).strip()
 
                     channel_name = 'Bank'
                     for kw in self.BANK_KEYWORDS:

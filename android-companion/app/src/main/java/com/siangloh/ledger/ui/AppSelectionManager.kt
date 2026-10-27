@@ -11,7 +11,7 @@ object AppSelectionManager {
     private const val KEY_INITIALIZED = "is_initialized"
 
     val KNOWN_BANK_KEYWORDS = listOf(
-        "tng", "touch", "ewallet", "publicbank", "mypb", "maybank",
+        "tng", "touch", "ewallet", "publicbank", "mypb", "pbb", "maybank",
         "cimb", "rhb", "hongleong", "ambank", "boost", "grabpay",
         "shopeepay", "bigpay", "merchantrade", "hsbc", "ocbc", "uob",
         "affin", "bankislam", "alliance", "mms", "sms", "messaging"
@@ -32,6 +32,7 @@ object AppSelectionManager {
         "com.alliancedirect.mobile",
         "com.publicbank.pbe",
         "com.publicbank.mypb",
+        "com.pbb.mypb",
         "com.myboost",
         "com.grabtaxi.passenger",
         "com.shopee.my",

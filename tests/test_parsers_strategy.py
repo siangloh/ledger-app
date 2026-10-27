@@ -519,4 +519,25 @@ def test_auto_track_gxbank_triggers_on_hold_and_confirm_workflow(client, admin_u
         assert new_tx["source"] in ("notification", "auto_track_confirmed")
 
 
+def test_public_bank_parser_card_transaction_alert():
+    """验证 Public Bank 银行卡/借记卡扣款通知成功解析，并自动剔除店号数字且智能分类至餐饮"""
+    from services.parsers.public_bank_parser import PublicBankParser
+    from services.notification_service import parse_auto_track_notification
 
+    raw_text = "Card Transaction Alert PBB/PIBB: Thank you for using your cd ending 1515 @ McDonalds 101041 RM13.95 Oct27 07:42pm. Pls call Public Bank if you didn't use it."
+    parser = PublicBankParser()
+    assert parser.can_handle(raw_text) is True
+    res = parser.parse(raw_text)
+    assert res is not None
+    assert res.amount == 13.95
+    assert res.type == "expense"
+    assert res.merchant == "McDonalds"
+    assert res.channel == "Public Bank"
+    assert res.is_on_hold is False
+
+    top_result = parse_auto_track_notification(raw_text)
+    assert top_result is not None
+    assert top_result["amount"] == 13.95
+    assert top_result["type"] == "expense"
+    assert top_result["category"] == "餐饮"
+    assert top_result["merchant"] == "McDonalds"

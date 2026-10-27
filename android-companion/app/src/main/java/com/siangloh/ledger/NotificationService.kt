@@ -45,14 +45,16 @@ class NotificationService : NotificationListenerService() {
             "duitnow to", "duitnow from", "duitnow qr payment", "qr pay", "paid to",
             "transfer to", "transferred to", "sent to", "payment to", "received from",
             "transfer from", "transferred from", "refund from", "payment from", "successful",
-            "completed", "you have paid", "you've paid", "sent", "reload", "top up"
+            "completed", "you have paid", "you've paid", "sent", "reload", "top up",
+            "using your cd", "using your card", "card transaction alert", "card transaction"
         )
 
         // 明确的已完成交易动词特征
         val COMPLETED_TXN_VERBS = listOf(
             "paid", "you have paid", "you've paid", "spent", "deducted", "debited", "charged",
             "transferred", "successful", "completed", "has been deducted", "payment to", "payment of",
-            "已支付", "成功支付", "成功转账", "成功扣款", "扣款", "支出"
+            "已支付", "成功支付", "成功转账", "成功扣款", "扣款", "支出",
+            "using your cd", "using your card", "card transaction alert", "card transaction"
         )
 
         // 宽松金额格式正则：支持带 RM/MYR/$ 货币符号，或纯数字小数金额 (例如 RM15, RM 15.5, RM 15.50, 15.50, RM 1,250.00, MYR 20, $15.00)

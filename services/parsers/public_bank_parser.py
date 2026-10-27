@@ -45,6 +45,16 @@ class PublicBankParser(NotificationParserStrategy):
         re.IGNORECASE
     )
 
+    # 3. 银行卡消费通知模式 (Card Transaction Alert: using your cd ending ... @ ... RM...)
+    CARD_PATTERN_MERCHANT_FIRST = re.compile(
+        r'using\s+your\s+(?:cd|card)(?:\s+ending\s+\d+)?\s+(?:@|at)\s+([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_()]{2,50})\s+(?:rm|myr)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)',
+        re.IGNORECASE
+    )
+    CARD_PATTERN_AMOUNT_FIRST = re.compile(
+        r'using\s+your\s+(?:cd|card)(?:\s+ending\s+\d+)?\s+(?:rm|myr)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:@|at)\s+([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_()]{2,50})',
+        re.IGNORECASE
+    )
+
     def can_handle(self, text: str) -> bool:
         t = text.lower()
         return any(k in t for k in ['mypb', 'public bank', 'pbb', 'publicbank'])
@@ -67,7 +77,8 @@ class PublicBankParser(NotificationParserStrategy):
                     r'[\.\n\r]|\s+(?:via|on|ref|using|with|at|date|txid)\b',
                     raw_sender,
                     flags=re.IGNORECASE
-                )[0].strip(' .,-')
+                )[0].strip(' .,-@')
+                cleaned_sender = re.sub(r'\s+#?\d{3,10}$', '', cleaned_sender).strip()
                 return ParsedNotification(
                     amount=amt,
                     type='income',
@@ -84,7 +95,60 @@ class PublicBankParser(NotificationParserStrategy):
             except ValueError:
                 pass
 
-        # 2. 检查转出 / 付款
+        # 2. 检查银行卡消费通知 (using your cd/card ending ... @ 商户 RM金额)
+        m_card1 = self.CARD_PATTERN_MERCHANT_FIRST.search(text)
+        if m_card1:
+            try:
+                raw_target = m_card1.group(1).strip()
+                amt = float(m_card1.group(2).replace(',', ''))
+                cleaned_target = re.split(
+                    r'[\.\n\r]|\s+(?:via|on|ref|using|with|at|date|txid)\b',
+                    raw_target,
+                    flags=re.IGNORECASE
+                )[0].strip(' .,-@')
+                cleaned_target = re.sub(r'\s+#?\d{3,10}$', '', cleaned_target).strip()
+                return ParsedNotification(
+                    amount=amt,
+                    type='expense',
+                    category='其他',
+                    merchant=cleaned_target or 'Public Bank银行卡消费',
+                    note=cleaned_target or 'Public Bank银行卡消费',
+                    date=today_str,
+                    is_on_hold=False,
+                    channel='Public Bank',
+                    confidence=0.96,
+                    raw_text=text
+                )
+            except ValueError:
+                pass
+
+        m_card2 = self.CARD_PATTERN_AMOUNT_FIRST.search(text)
+        if m_card2:
+            try:
+                amt = float(m_card2.group(1).replace(',', ''))
+                raw_target = m_card2.group(2).strip()
+                cleaned_target = re.split(
+                    r'[\.\n\r]|\s+(?:via|on|ref|using|with|at|date|txid)\b',
+                    raw_target,
+                    flags=re.IGNORECASE
+                )[0].strip(' .,-@')
+                cleaned_target = re.sub(r'\s+#?\d{3,10}$', '', cleaned_target).strip()
+                return ParsedNotification(
+                    amount=amt,
+                    type='expense',
+                    category='其他',
+                    merchant=cleaned_target or 'Public Bank银行卡消费',
+                    note=cleaned_target or 'Public Bank银行卡消费',
+                    date=today_str,
+                    is_on_hold=False,
+                    channel='Public Bank',
+                    confidence=0.96,
+                    raw_text=text
+                )
+            except ValueError:
+                pass
+
+        # 3. 检查转出 / 付款
         for pattern in self.SENT_PATTERNS:
             m_sent = pattern.search(text)
             if m_sent:
@@ -95,7 +159,8 @@ class PublicBankParser(NotificationParserStrategy):
                         r'[\.\n\r]|\s+(?:via|on|ref|using|with|at|date|txid)\b',
                         raw_target,
                         flags=re.IGNORECASE
-                    )[0].strip(' .,-')
+                    )[0].strip(' .,-@')
+                    cleaned_target = re.sub(r'\s+#?\d{3,10}$', '', cleaned_target).strip()
 
                     cleaned_lower = cleaned_target.lower()
 

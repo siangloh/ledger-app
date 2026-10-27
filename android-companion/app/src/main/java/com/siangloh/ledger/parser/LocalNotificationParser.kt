@@ -79,13 +79,28 @@ object LocalNotificationParser {
         Pattern.CASE_INSENSITIVE
     )
 
+    private val PBB_CARD_PATTERN = Pattern.compile(
+        """using\s+your\s+(?:cd|card)(?:\s+ending\s+\d+)?\s+(?:@|at)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})\s+(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)""",
+        Pattern.CASE_INSENSITIVE
+    )
+
+    private val PBB_CARD_PATTERN_ALT = Pattern.compile(
+        """using\s+your\s+(?:cd|card)(?:\s+ending\s+\d+)?\s+(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:@|at)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})""",
+        Pattern.CASE_INSENSITIVE
+    )
+
+    private val PBB_PAYMENT_PATTERN = Pattern.compile(
+        """(?:payment|transfer)\s+of\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+to\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})""",
+        Pattern.CASE_INSENSITIVE
+    )
+
     private val GENERIC_RM_PATTERN = Pattern.compile(
         """(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)""",
         Pattern.CASE_INSENSITIVE
     )
 
     private val GENERIC_MERCHANT_PATTERN = Pattern.compile(
-        """(?:to|at|paid to|transfer to|transferred to|transfer of|payment to|转账给|付款给)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,35})""",
+        """(?:to|at|@|paid to|transfer to|transferred to|transfer of|payment to|转账给|付款给)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,35})""",
         Pattern.CASE_INSENSITIVE
     )
 
@@ -147,6 +162,7 @@ object LocalNotificationParser {
         val isTng = pkg.contains("touchngo") || pkg.contains("tng") || pkg.contains("ewallet") || lower.contains("touch 'n go") || lower.contains("tng") || lower.contains("ewallet")
         val isGrab = pkg.contains("grab") || lower.contains("grab")
         val isMaybank = pkg.contains("maybank") || pkg.contains("m2u") || pkg.contains("mae") || lower.contains("maybank") || lower.contains("mae")
+        val isPublicBank = pkg.contains("pbb") || pkg.contains("publicbank") || pkg.contains("mypb") || lower.contains("public bank") || lower.contains("pbb") || lower.contains("mypb")
 
         val today = getToday()
 
@@ -241,9 +257,42 @@ object LocalNotificationParser {
             }
         }
 
-        // 6. 通用兜底解析 (DuitNow QR, CIMB, Public Bank, 银行短信等)
+        // 6. Public Bank 解析
+        if (isPublicBank) {
+            val mCard = PBB_CARD_PATTERN.matcher(trimmed)
+            if (mCard.find()) {
+                val rawMerchant = cleanMerchant(mCard.group(1) ?: "")
+                val amt = parseAmount(mCard.group(2))
+                if (amt > 0) {
+                    val cat = predictCategory(rawMerchant, lower)
+                    return LocalParsedResult(amt, "expense", cat, rawMerchant, rawMerchant, "Public Bank", today)
+                }
+            }
+            val mCardAlt = PBB_CARD_PATTERN_ALT.matcher(trimmed)
+            if (mCardAlt.find()) {
+                val amt = parseAmount(mCardAlt.group(1))
+                val rawMerchant = cleanMerchant(mCardAlt.group(2) ?: "")
+                if (amt > 0) {
+                    val cat = predictCategory(rawMerchant, lower)
+                    return LocalParsedResult(amt, "expense", cat, rawMerchant, rawMerchant, "Public Bank", today)
+                }
+            }
+            val mPbbPay = PBB_PAYMENT_PATTERN.matcher(trimmed)
+            if (mPbbPay.find()) {
+                val amt = parseAmount(mPbbPay.group(1))
+                val rawMerchant = cleanMerchant(mPbbPay.group(2) ?: "Public Bank支出")
+                if (amt > 0) {
+                    val isTf = lower.contains("transfer")
+                    val cat = if (isTf) "转账" else predictCategory(rawMerchant, lower)
+                    val type = if (isTf) "transfer" else "expense"
+                    return LocalParsedResult(amt, type, cat, rawMerchant, rawMerchant, "Public Bank", today)
+                }
+            }
+        }
+
+        // 7. 通用兜底解析 (DuitNow QR, CIMB, Public Bank, 银行短信等)
         val isTransfer = listOf("transfer", "transferred", "duitnow transfer", "转账", "duitnow to").any { lower.contains(it) }
-        val isExpense = isTransfer || listOf("paid", "spent", "payment to", "payment of", "deducted", "debited", "transfer to", "transferred to", "transfer of", "duitnow qr", "扣款", "支付", "支出", "转账给").any { lower.contains(it) }
+        val isExpense = isTransfer || listOf("paid", "spent", "payment to", "payment of", "deducted", "debited", "transfer to", "transferred to", "transfer of", "duitnow qr", "扣款", "支付", "支出", "转账给", "using your cd", "using your card", "card transaction").any { lower.contains(it) }
         val isIncome = listOf("received from", "received", "credited", "duitnow transfer from", "transfer from", "收款", "转入", "到账").any { lower.contains(it) }
 
         if (isExpense || isIncome) {
@@ -263,7 +312,7 @@ object LocalNotificationParser {
                         type == "income" -> "其他收入"
                         else -> predictCategory(rawMerchant, lower)
                     }
-                    val channel = if (isTng) "Touch 'n Go" else if (isGrab) "Grab" else if (isMaybank) "Maybank" else "银行/卡"
+                    val channel = if (isTng) "Touch 'n Go" else if (isGrab) "Grab" else if (isMaybank) "Maybank" else if (isPublicBank) "Public Bank" else "银行/卡"
                     return LocalParsedResult(amt, type, cat, rawMerchant, rawMerchant, channel, today)
                 }
             }
@@ -283,7 +332,8 @@ object LocalNotificationParser {
 
     private fun cleanMerchant(raw: String): String {
         var cleaned = raw.split(Regex("""[\.\r\n]|\s+(?:on|via|ref|using|with|at|date|txid|claim|get|earn)\b""", RegexOption.IGNORE_CASE))[0].trim()
-        cleaned = cleaned.trim(' ', '.', '-', ':', ',')
+        cleaned = cleaned.trim(' ', '.', '-', ':', ',', '@')
+        cleaned = cleaned.replace(Regex("""\s+#?\d{3,10}$"""), "").trim()
         val words = cleaned.split(" ").filter { it.isNotBlank() }
         if (words.size >= 2 && words.size % 2 == 0) {
             val half = words.size / 2
