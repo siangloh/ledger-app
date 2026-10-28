@@ -1041,10 +1041,11 @@ fun OverviewScreen(
                 coroutineScope.launch {
                     val res = com.siangloh.ledger.data.LocalLedgerRepository.updateTransactionCategory(context, tx.id, newCategory)
                     res.onSuccess {
-                        Toast.makeText(context, "已修改为【$newCategory】", Toast.LENGTH_SHORT).show()
+                        val locCat = CategoryUiHelper.getLocalizedCategoryName(context, newCategory)
+                        Toast.makeText(context, context.getString(R.string.tools_categorized_fmt, locCat), Toast.LENGTH_SHORT).show()
                         refreshData(forceRefresh = true)
                     }.onFailure { e ->
-                        Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, context.getString(R.string.tools_operation_failed_fmt, e.message ?: ""), Toast.LENGTH_LONG).show()
                     }
                 }
             }

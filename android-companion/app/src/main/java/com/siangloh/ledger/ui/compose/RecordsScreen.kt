@@ -748,7 +748,7 @@ fun RecordsScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
-                                    Text("分类: $cat", fontSize = 11.sp, color = PrimaryTeal)
+                                    Text("${stringResource(R.string.filter_category_label)}: ${CategoryUiHelper.getLocalizedCategoryName(context, cat)}", fontSize = 11.sp, color = PrimaryTeal)
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Icon(Icons.Default.Close, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(12.dp))
                                 }
@@ -984,7 +984,7 @@ fun RecordsScreen(
                                                                 )
                                                             }
                                                             Text(
-                                                                text = "${pt.category} · ${pt.note.ifBlank { "离线记账" }}",
+                                                                text = "${CategoryUiHelper.getLocalizedCategoryName(context, pt.category)} · ${pt.note.ifBlank { stringResource(R.string.common_offline) }}",
                                                                 fontSize = 13.sp,
                                                                 fontWeight = FontWeight.Medium,
                                                                 color = Slate800,
@@ -994,7 +994,7 @@ fun RecordsScreen(
                                                         }
                                                         Spacer(modifier = Modifier.height(2.dp))
                                                         Text(
-                                                            text = "${pt.date} · 本地队列",
+                                                            text = "${pt.date} · ${stringResource(R.string.sync_status_local_only)}",
                                                             fontSize = 11.sp,
                                                             color = Slate500
                                                         )
@@ -1488,6 +1488,11 @@ fun EditTransactionBottomSheet(
     var txType by remember { mutableStateOf(tx.type) }
     var isSaving by remember { mutableStateOf(false) }
     var accountsList by remember { mutableStateOf(availableAccounts) }
+    var expenseCategories by remember { mutableStateOf<List<com.siangloh.ledger.data.CategoryRecord>>(emptyList()) }
+    var incomeCategories by remember { mutableStateOf<List<com.siangloh.ledger.data.CategoryRecord>>(emptyList()) }
+    var savingsCategories by remember { mutableStateOf<List<com.siangloh.ledger.data.CategoryRecord>>(emptyList()) }
+    var showCustomCategoryDialog by remember { mutableStateOf(false) }
+    var customCategoryInput by remember { mutableStateOf("") }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(Unit) {
@@ -1495,6 +1500,17 @@ fun EditTransactionBottomSheet(
             NativeLedgerApi.getAccounts(context).onSuccess {
                 accountsList = it.accounts
             }
+        }
+        NativeLedgerApi.getCategories(context).onSuccess { catGroup ->
+            expenseCategories = catGroup.expenses
+            incomeCategories = catGroup.incomes
+            savingsCategories = catGroup.savings
+        }
+    }
+
+    LaunchedEffect(txType) {
+        if (txType == "transfer") {
+            category = "内部划转"
         }
     }
 
@@ -1612,15 +1628,57 @@ fun EditTransactionBottomSheet(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
-                        value = category,
-                        onValueChange = { category = it },
-                        label = { Text(stringResource(R.string.records_edit_category_label), color = Slate600) },
-                        singleLine = true,
-                        textStyle = LocalTextStyle.current.copy(color = Slate900),
-                        modifier = Modifier.weight(1f),
-                        colors = fieldColors
-                    )
+                    val localizedCat = CategoryUiHelper.getLocalizedCategoryName(context, category)
+                    val catEmoji = CategoryUiHelper.getCategoryEmoji(category, txType)
+
+                    // 类别选择卡片：展示本地化图标与分类名称，点击唤出自定义输入
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Slate300),
+                        color = Slate50,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp)
+                            .clickable {
+                                if (txType != "transfer") {
+                                    customCategoryInput = category
+                                    showCustomCategoryDialog = true
+                                }
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(verticalArrangement = Arrangement.Center) {
+                                Text(stringResource(R.string.records_edit_category_label), fontSize = 10.sp, color = Slate500)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(catEmoji, fontSize = 14.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = localizedCat.ifBlank { stringResource(R.string.uncategorized_status) },
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Slate900,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            if (txType != "transfer") {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = stringResource(R.string.common_edit),
+                                    tint = PrimaryTeal,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
 
                     // 日期选择卡片：展示日期并附带日历图标，点击唤出原生日历
                     Surface(
@@ -1657,6 +1715,108 @@ fun EditTransactionBottomSheet(
                             )
                         }
                     }
+                }
+
+                // 快速分类胶囊选择条 (非转账模式下，基于应用语言动态本地化)
+                if (txType != "transfer") {
+                    val currentCats = when (txType) {
+                        "income" -> if (incomeCategories.isNotEmpty()) incomeCategories else listOf("工资", "兼职", "奖金", "投资", "其他").map { com.siangloh.ledger.data.CategoryRecord(0, it, txType) }
+                        "savings" -> if (savingsCategories.isNotEmpty()) savingsCategories else listOf("定期存款", "应急基金", "投资理财", "心愿基金").map { com.siangloh.ledger.data.CategoryRecord(0, it, txType) }
+                        else -> if (expenseCategories.isNotEmpty()) expenseCategories else listOf("餐饮", "交通", "杂货", "账单", "购物", "娱乐", "医疗", "其他").map { com.siangloh.ledger.data.CategoryRecord(0, it, txType) }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        currentCats.forEach { cat ->
+                            val isSelected = category == cat.name ||
+                                CategoryUiHelper.getLocalizedCategoryName(context, category) == CategoryUiHelper.getLocalizedCategoryName(context, cat.name)
+                            val emoji = CategoryUiHelper.getCategoryEmoji(cat.name, txType)
+                            val locName = CategoryUiHelper.getLocalizedCategoryName(context, cat.name)
+
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) PrimaryTeal else Slate100,
+                                border = if (isSelected) null else BorderStroke(0.8.dp, Slate200),
+                                modifier = Modifier.clickable { category = cat.name }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                                ) {
+                                    Text(emoji, fontSize = 12.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = locName,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else Slate700
+                                    )
+                                }
+                            }
+                        }
+
+                        // 自定义输入分类项
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Slate100,
+                            border = BorderStroke(0.8.dp, Slate300),
+                            modifier = Modifier.clickable {
+                                customCategoryInput = ""
+                                showCustomCategoryDialog = true
+                            }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = Slate600, modifier = Modifier.size(12.dp))
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(stringResource(R.string.common_add), fontSize = 11.sp, color = Slate700)
+                            }
+                        }
+                    }
+                }
+
+                if (showCustomCategoryDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showCustomCategoryDialog = false },
+                        title = { Text(stringResource(R.string.records_edit_category_label), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Slate900) },
+                        text = {
+                            OutlinedTextField(
+                                value = customCategoryInput,
+                                onValueChange = { customCategoryInput = it },
+                                placeholder = { Text(stringResource(R.string.tools_custom_category_placeholder)) },
+                                singleLine = true,
+                                colors = fieldColors,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    val trimmed = customCategoryInput.trim()
+                                    if (trimmed.isNotBlank()) {
+                                        category = trimmed
+                                    }
+                                    showCustomCategoryDialog = false
+                                }
+                            ) {
+                                Text(stringResource(R.string.common_confirm), color = PrimaryTeal, fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showCustomCategoryDialog = false }) {
+                                Text(stringResource(R.string.common_cancel), color = Slate600)
+                            }
+                        },
+                        containerColor = Color.White
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -1857,6 +2017,7 @@ fun AdvancedFilterBottomSheet(
     onSaveAsPresetClick: () -> Unit,
     onApply: (type: String, category: String?, accountId: Int?, minAmount: Double?, maxAmount: Double?, source: String?, channel: String?) -> Unit
 ) {
+    val context = LocalContext.current
     var tempType by remember { mutableStateOf(currentType) }
     var tempCategory by remember { mutableStateOf(currentCategory) }
     var tempAccountId by remember { mutableStateOf(currentAccountId) }
@@ -2164,7 +2325,7 @@ fun AdvancedFilterBottomSheet(
                             modifier = Modifier.clickable { tempCategory = if (isSel) null else cat }
                         ) {
                             Text(
-                                text = cat,
+                                text = CategoryUiHelper.getLocalizedCategoryName(context, cat),
                                 fontSize = 12.sp,
                                 fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSel) Color.White else Slate700,
