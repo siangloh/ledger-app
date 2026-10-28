@@ -15,13 +15,17 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +39,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -42,17 +47,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import com.siangloh.ledger.R
 import com.siangloh.ledger.data.CashflowRepository
 import com.siangloh.ledger.ui.compose.theme.*
@@ -1443,6 +1454,92 @@ fun CashflowAnalysisScreen(
                     IconButton(onClick = { refresh++ }, enabled = !loading) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cf_refresh), tint = Slate600) }
                 }
 
+                val expenseListState = rememberLazyListState()
+                val calendarListState = rememberLazyListState()
+                val incomeListState = rememberLazyListState()
+                val savingsListState = rememberLazyListState()
+                val billsListState = rememberLazyListState()
+                val pageListStates = remember(
+                    expenseListState,
+                    calendarListState,
+                    incomeListState,
+                    savingsListState,
+                    billsListState
+                ) {
+                    listOf(
+                        expenseListState,
+                        calendarListState,
+                        incomeListState,
+                        savingsListState,
+                        billsListState
+                    )
+                }
+
+                var headerHeightPx by remember { mutableFloatStateOf(0f) }
+                var headerOffsetPx by rememberSaveable { mutableFloatStateOf(0f) }
+
+                val nestedScrollConnection = remember {
+                    object : NestedScrollConnection {
+                        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                            val delta = available.y
+                            if (delta < 0f && headerHeightPx > 0f) {
+                                val oldOffset = headerOffsetPx
+                                val newOffset = (oldOffset + delta).coerceIn(-headerHeightPx, 0f)
+                                val consumed = newOffset - oldOffset
+                                if (consumed != 0f) {
+                                    headerOffsetPx = newOffset
+                                    return Offset(0f, consumed)
+                                }
+                            }
+                            return Offset.Zero
+                        }
+
+                        override fun onPostScroll(
+                            consumed: Offset,
+                            available: Offset,
+                            source: NestedScrollSource
+                        ): Offset {
+                            val delta = available.y
+                            if (delta > 0f && headerHeightPx > 0f) {
+                                val oldOffset = headerOffsetPx
+                                val newOffset = (oldOffset + delta).coerceIn(-headerHeightPx, 0f)
+                                val consumedByHeader = newOffset - oldOffset
+                                if (consumedByHeader != 0f) {
+                                    headerOffsetPx = newOffset
+                                    return Offset(0f, consumedByHeader)
+                                }
+                            }
+                            return Offset.Zero
+                        }
+                    }
+                }
+
+                val headerScrollState = rememberScrollableState { delta ->
+                    val hHeight = headerHeightPx
+                    if (delta < 0f && hHeight > 0f) {
+                        val oldOffset = headerOffsetPx
+                        val newOffset = (oldOffset + delta).coerceIn(-hHeight, 0f)
+                        val consumedByHeader = newOffset - oldOffset
+                        headerOffsetPx = newOffset
+                        val remaining = delta - consumedByHeader
+                        if (remaining < 0f && result != null) {
+                            val activeList = pageListStates[pagerState.currentPage]
+                            val consumedByList = -activeList.dispatchRawDelta(-remaining)
+                            consumedByHeader + consumedByList
+                        } else {
+                            consumedByHeader
+                        }
+                    } else if (delta > 0f && hHeight > 0f) {
+                        val oldOffset = headerOffsetPx
+                        val newOffset = (oldOffset + delta).coerceIn(-hHeight, 0f)
+                        val consumedByHeader = newOffset - oldOffset
+                        headerOffsetPx = newOffset
+                        consumedByHeader
+                    } else {
+                        0f
+                    }
+                }
+
                 fun switchToTab(tab: CashflowDashboardTab) {
                     val idx = detailPages.indexOf(tab)
                     if (idx >= 0 && idx != pagerState.currentPage) {
@@ -1452,437 +1549,455 @@ fun CashflowAnalysisScreen(
                     }
                 }
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .pointerInput(detailPages) {
-                            var totalDragX = 0f
-                            val swipeThreshold = 40.dp.toPx()
-                            detectHorizontalDragGestures(
-                                onDragStart = { totalDragX = 0f },
-                                onDragEnd = {
-                                    val currentIndex = pagerState.currentPage
-                                    if (totalDragX < -swipeThreshold && currentIndex < detailPages.size - 1) {
-                                        scope.launch {
-                                            pagerState.animateScrollToPage(currentIndex + 1, animationSpec = tween(300, easing = FastOutSlowInEasing))
-                                        }
-                                    } else if (totalDragX > swipeThreshold && currentIndex > 0) {
-                                        scope.launch {
-                                            pagerState.animateScrollToPage(currentIndex - 1, animationSpec = tween(300, easing = FastOutSlowInEasing))
-                                        }
-                                    }
-                                    totalDragX = 0f
-                                },
-                                onDragCancel = { totalDragX = 0f },
-                                onHorizontalDrag = { change, dragAmount ->
-                                    totalDragX += dragAmount
-                                    if (kotlin.math.abs(totalDragX) > 15f) {
-                                        change.consume()
-                                    }
-                                }
-                            )
-                        },
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // 模式切换（按月查看 / 自定义区间）
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilterChip(
-                            selected = !isCustomRange,
-                            onClick = { isCustomRange = false },
-                            label = { Text(stringResource(R.string.view_by_month)) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = Color.White,
-                                labelColor = Slate700,
-                                selectedContainerColor = Teal50,
-                                selectedLabelColor = PrimaryTeal
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = !isCustomRange,
-                                borderColor = Slate200,
-                                selectedBorderColor = PrimaryTeal,
-                                borderWidth = 1.dp
-                            )
-                        )
-                        FilterChip(
-                            selected = isCustomRange,
-                            onClick = { isCustomRange = true },
-                            leadingIcon = {
-                                Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
-                            },
-                            label = { Text(stringResource(R.string.view_by_custom_range)) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = Color.White,
-                                labelColor = Slate700,
-                                selectedContainerColor = Teal50,
-                                selectedLabelColor = PrimaryTeal
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = isCustomRange,
-                                borderColor = Slate200,
-                                selectedBorderColor = PrimaryTeal,
-                                borderWidth = 1.dp
-                            )
-                        )
-                    }
-
-                    if (!isCustomRange) {
-                        Surface(
-                            Modifier.fillMaxWidth().height(42.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.White,
-                            border = BorderStroke(1.dp, Slate200)
-                        ) {
-                            Row(Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { changeMonth(-1) }) { Icon(Icons.Default.ChevronLeft, stringResource(R.string.prev_month), tint = Slate600) }
-                                Text(month, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                                IconButton(onClick = { changeMonth(1) }) { Icon(Icons.Default.ChevronRight, stringResource(R.string.next_month), tint = Slate600) }
-                            }
-                        }
-                    } else {
-                        Surface(
-                            Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.White,
-                            border = BorderStroke(1.dp, Slate200)
-                        ) {
-                            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Surface(
-                                        modifier = Modifier.weight(1f).clickable { pickStartDate() },
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = Slate50,
-                                        border = BorderStroke(1.dp, Slate200)
-                                    ) {
-                                        Row(
-                                            Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Icon(Icons.Default.CalendarToday, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
-                                            Column {
-                                                Text(stringResource(R.string.start_date), fontSize = 9.sp, color = Slate500)
-                                                Text(startDate, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
-                                            }
-                                        }
-                                    }
-
-                                    Text(stringResource(R.string.to_date), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate400, modifier = Modifier.padding(horizontal = 6.dp))
-
-                                    Surface(
-                                        modifier = Modifier.weight(1f).clickable { pickEndDate() },
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = Slate50,
-                                        border = BorderStroke(1.dp, Slate200)
-                                    ) {
-                                        Row(
-                                            Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Icon(Icons.Default.CalendarToday, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
-                                            Column {
-                                                Text(stringResource(R.string.end_date), fontSize = 9.sp, color = Slate500)
-                                                Text(endDate, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // 快捷预设按钮行
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    val presets = listOf(
-                                        stringResource(R.string.preset_this_month) to Pair("$initialMonth-01", todayStr),
-                                        stringResource(R.string.preset_last_30_days) to Pair(shiftDays(todayStr, -30), todayStr),
-                                        stringResource(R.string.preset_year_to_date) to Pair("${todayStr.substringBefore('-')}-01-01", todayStr),
-                                        stringResource(R.string.preset_all_history) to Pair("2020-01-01", todayStr)
-                                    )
-                                    presets.forEach { (label, range) ->
-                                        val isCur = startDate == range.first && endDate == range.second
-                                        Surface(
-                                            modifier = Modifier.weight(1f).clickable {
-                                                startDate = range.first
-                                                endDate = range.second
-                                            },
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = if (isCur) Teal50 else Slate100,
-                                            border = if (isCur) BorderStroke(1.dp, PrimaryTeal) else null
-                                        ) {
-                                            Text(
-                                                text = label,
-                                                fontSize = 11.sp,
-                                                fontWeight = if (isCur) FontWeight.Bold else FontWeight.Normal,
-                                                color = if (isCur) PrimaryTeal else Slate700,
-                                                textAlign = TextAlign.Center,
-                                                modifier = Modifier.padding(vertical = 4.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    result?.data?.optJSONArray("currencies")?.let { codes ->
-                        if (codes.length() > 1) {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items((0 until codes.length()).map { codes.getString(it) }) { code ->
-                                    val isSelected = code == currency.ifEmpty { result?.data?.optString("currency") ?: "" }
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = {
-                                            val target = code
-                                            val cached = CashflowRepository.getCached(context, month, target)
-                                            result = cached
-                                            prevData = CashflowRepository.getCached(context, shiftMonth(month, -1), target)?.data
-                                            loading = true
-                                            failed = false
-                                            currency = target
-                                        },
-                                        label = { Text(code) },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            containerColor = Color.White,
-                                            labelColor = Slate700,
-                                            selectedContainerColor = Teal50,
-                                            selectedLabelColor = PrimaryTeal
-                                        ),
-                                        border = FilterChipDefaults.filterChipBorder(
-                                            enabled = true,
-                                            selected = isSelected,
-                                            borderColor = Slate200,
-                                            selectedBorderColor = PrimaryTeal,
-                                            borderWidth = 1.dp
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    if (loading) {
-                        Spacer(Modifier.height(4.dp))
-                        LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)), color = Teal700, trackColor = Slate200)
-                    }
-                    if (failed) {
-                        Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFFEF2F2), border = BorderStroke(1.dp, Color(0xFFFECDD3)), modifier = Modifier.fillMaxWidth()) {
-                            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(stringResource(R.string.cf_error), color = ExpenseRed, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                                TextButton(onClick = { refresh++ }) { Text(stringResource(R.string.cfu_retry), color = PrimaryTeal) }
-                            }
-                        }
-                    }
-
-                    result?.let { report ->
-                        val data = report.data
-                        val cur = data.optString("currency")
-                        val incAmt = data.optDouble("income", 0.0)
-                        val expAmt = data.optDouble("expense", 0.0)
-                        val savAmt = data.optDouble("savings", 0.0)
-                        val availAmt = data.optDouble("available", incAmt - expAmt - savAmt)
-                        val isPositive = availAmt >= 0
-
-                        // 突出呈现的总览卡片：总支出、储蓄总额、总收入与净结余
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 2.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            color = Color.White,
-                            border = BorderStroke(1.dp, Slate200),
-                            shadowElevation = 0.5.dp
-                        ) {
-                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = if (isCustomRange) stringResource(R.string.cf_overview_custom) else stringResource(R.string.cf_overview_month),
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Slate700
-                                    )
-                                    Text(
-                                        text = if (isCustomRange) "$startDate ~ $endDate" else month,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = PrimaryTeal
-                                    )
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.Bottom
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = if (savAmt > 0) stringResource(R.string.cf_net_savings_deducted) else stringResource(R.string.cf_net_balance),
-                                            fontSize = 11.sp,
-                                            color = Slate500
-                                        )
-                                        Text(
-                                            text = (if (availAmt < 0) "-$cur " else "$cur ") + String.format(Locale.getDefault(), "%,.2f", Math.abs(availAmt)),
-                                            fontSize = 24.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = if (isPositive) PrimaryTeal else ExpenseRed
-                                        )
-                                    }
-                                }
-
-                                HorizontalDivider(color = Slate100, thickness = 1.dp)
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Column(
-                                        Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable {
-                                            switchToTab(CashflowDashboardTab.EXPENSE)
-                                        }.padding(vertical = 2.dp)
-                                    ) {
-                                        Text(stringResource(R.string.cf_total_expense), fontSize = 11.sp, color = Slate500)
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(
-                                            "-$cur " + String.format(Locale.getDefault(), "%,.2f", expAmt),
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = ExpenseRed
-                                        )
-                                    }
-                                    Column(
-                                        Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable {
-                                            switchToTab(CashflowDashboardTab.SAVINGS)
-                                        }.padding(vertical = 2.dp)
-                                    ) {
-                                        Text(stringResource(R.string.cf_total_savings), fontSize = 11.sp, color = Slate500)
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(
-                                            "$cur " + String.format(Locale.getDefault(), "%,.2f", savAmt),
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFFD97706)
-                                        )
-                                    }
-                                    Column(
-                                        Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable {
-                                            switchToTab(CashflowDashboardTab.INCOME)
-                                        }.padding(vertical = 2.dp)
-                                    ) {
-                                        Text(stringResource(R.string.cf_total_income), fontSize = 11.sp, color = Slate500)
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(
-                                            "+$cur " + String.format(Locale.getDefault(), "%,.2f", incAmt),
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = PrimaryTeal
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // Tab 切换条
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp)
-                        ) {
-                            BoxWithConstraints(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 46.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Slate100)
-                            ) {
-                                val width = maxWidth / detailPages.size
-                                val position = (pagerState.currentPage + pagerState.currentPageOffsetFraction).coerceIn(0f, (detailPages.size - 1).toFloat())
-                                Box(Modifier.matchParentSize()) {
-                                    Box(
-                                        Modifier
-                                            .offset(x = width * position)
-                                            .width(width)
-                                            .fillMaxHeight()
-                                            .padding(3.dp)
-                                            .background(Color.White, RoundedCornerShape(9.dp))
-                                    )
-                                }
-                                Row(Modifier.fillMaxWidth()) {
-                                    val labels = listOf(
-                                        R.string.cf_tab_expense,
-                                        R.string.cf_tab_calendar,
-                                        R.string.cf_tab_income,
-                                        R.string.cf_tab_savings,
-                                        R.string.cf_tab_bills
-                                    )
-                                    detailPages.forEachIndexed { index, tab ->
-                                        val selected = pagerState.currentPage == index
-                                        val emphasis = (1f - kotlin.math.abs(position - index)).coerceIn(0f, 1f)
-                                        Box(
-                                            Modifier
-                                                .weight(1f)
-                                                .selectable(
-                                                    selected = selected,
-                                                    role = androidx.compose.ui.semantics.Role.Tab,
-                                                    onClick = { switchToTab(tab) }
-                                                )
-                                                .padding(horizontal = 2.dp, vertical = 12.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                stringResource(labels[index]),
-                                                fontSize = 12.sp,
-                                                color = androidx.compose.ui.graphics.lerp(Slate600, PrimaryTeal, emphasis),
-                                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                                textAlign = TextAlign.Center
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                result?.let { report ->
-                    val data = report.data
-                    val cur = data.optString("currency")
-                    val isOnline = !report.cached
-                    val prev = prevData?.takeIf { it.optString("currency") == cur && it.optString("month") == shiftMonth(month, -1) }
-                    val daily = dailyExpense(data, month)
-                    val todayDay = todayDayIfCurrent(month)
-
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        key = { detailPages[it].name },
-                        beyondBoundsPageCount = 1
-                    ) { page ->
-                        val listState = rememberSaveable(saver = androidx.compose.foundation.lazy.LazyListState.Saver) {
-                            androidx.compose.foundation.lazy.LazyListState()
-                        }
-                        LazyColumn(
-                            state = listState,
+                Layout(
+                    content = {
+                        // Child 0: 可随整页上下滑动折叠的顶部区域（模式切换、日期选择、总览卡片）
+                        Column(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .scrollable(
+                                    state = headerScrollState,
+                                    orientation = Orientation.Vertical
+                                )
+                                .pointerInput(detailPages) {
+                                    var totalDragX = 0f
+                                    val swipeThreshold = 40.dp.toPx()
+                                    detectHorizontalDragGestures(
+                                        onDragStart = { totalDragX = 0f },
+                                        onDragEnd = {
+                                            val currentIndex = pagerState.currentPage
+                                            if (totalDragX < -swipeThreshold && currentIndex < detailPages.size - 1) {
+                                                scope.launch {
+                                                    pagerState.animateScrollToPage(currentIndex + 1, animationSpec = tween(300, easing = FastOutSlowInEasing))
+                                                }
+                                            } else if (totalDragX > swipeThreshold && currentIndex > 0) {
+                                                scope.launch {
+                                                    pagerState.animateScrollToPage(currentIndex - 1, animationSpec = tween(300, easing = FastOutSlowInEasing))
+                                                }
+                                            }
+                                            totalDragX = 0f
+                                        },
+                                        onDragCancel = { totalDragX = 0f },
+                                        onHorizontalDrag = { change, dragAmount ->
+                                            totalDragX += dragAmount
+                                            if (kotlin.math.abs(totalDragX) > 15f) {
+                                                change.consume()
+                                            }
+                                        }
+                                    )
+                                },
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            when (detailPages[page]) {
+                            // 模式切换（按月查看 / 自定义区间）
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilterChip(
+                                    selected = !isCustomRange,
+                                    onClick = { isCustomRange = false },
+                                    label = { Text(stringResource(R.string.view_by_month)) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        containerColor = Color.White,
+                                        labelColor = Slate700,
+                                        selectedContainerColor = Teal50,
+                                        selectedLabelColor = PrimaryTeal
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = !isCustomRange,
+                                        borderColor = Slate200,
+                                        selectedBorderColor = PrimaryTeal,
+                                        borderWidth = 1.dp
+                                    )
+                                )
+                                FilterChip(
+                                    selected = isCustomRange,
+                                    onClick = { isCustomRange = true },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    },
+                                    label = { Text(stringResource(R.string.view_by_custom_range)) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        containerColor = Color.White,
+                                        labelColor = Slate700,
+                                        selectedContainerColor = Teal50,
+                                        selectedLabelColor = PrimaryTeal
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = isCustomRange,
+                                        borderColor = Slate200,
+                                        selectedBorderColor = PrimaryTeal,
+                                        borderWidth = 1.dp
+                                    )
+                                )
+                            }
+
+                            if (!isCustomRange) {
+                                Surface(
+                                    Modifier.fillMaxWidth().height(42.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color.White,
+                                    border = BorderStroke(1.dp, Slate200)
+                                ) {
+                                    Row(Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(onClick = { changeMonth(-1) }) { Icon(Icons.Default.ChevronLeft, stringResource(R.string.prev_month), tint = Slate600) }
+                                        Text(month, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                                        IconButton(onClick = { changeMonth(1) }) { Icon(Icons.Default.ChevronRight, stringResource(R.string.next_month), tint = Slate600) }
+                                    }
+                                }
+                            } else {
+                                Surface(
+                                    Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color.White,
+                                    border = BorderStroke(1.dp, Slate200)
+                                ) {
+                                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Row(
+                                            Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Surface(
+                                                modifier = Modifier.weight(1f).clickable { pickStartDate() },
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = Slate50,
+                                                border = BorderStroke(1.dp, Slate200)
+                                            ) {
+                                                Row(
+                                                    Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Icon(Icons.Default.CalendarToday, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
+                                                    Column {
+                                                        Text(stringResource(R.string.start_date), fontSize = 9.sp, color = Slate500)
+                                                        Text(startDate, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
+                                                    }
+                                                }
+                                            }
+
+                                            Text(stringResource(R.string.to_date), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate400, modifier = Modifier.padding(horizontal = 6.dp))
+
+                                            Surface(
+                                                modifier = Modifier.weight(1f).clickable { pickEndDate() },
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = Slate50,
+                                                border = BorderStroke(1.dp, Slate200)
+                                            ) {
+                                                Row(
+                                                    Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Icon(Icons.Default.CalendarToday, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
+                                                    Column {
+                                                        Text(stringResource(R.string.end_date), fontSize = 9.sp, color = Slate500)
+                                                        Text(endDate, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // 快捷预设按钮行
+                                        Row(
+                                            Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            val presets = listOf(
+                                                stringResource(R.string.preset_this_month) to Pair("$initialMonth-01", todayStr),
+                                                stringResource(R.string.preset_last_30_days) to Pair(shiftDays(todayStr, -30), todayStr),
+                                                stringResource(R.string.preset_year_to_date) to Pair("${todayStr.substringBefore('-')}-01-01", todayStr),
+                                                stringResource(R.string.preset_all_history) to Pair("2020-01-01", todayStr)
+                                            )
+                                            presets.forEach { (label, range) ->
+                                                val isCur = startDate == range.first && endDate == range.second
+                                                Surface(
+                                                    modifier = Modifier.weight(1f).clickable {
+                                                        startDate = range.first
+                                                        endDate = range.second
+                                                    },
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = if (isCur) Teal50 else Slate100,
+                                                    border = if (isCur) BorderStroke(1.dp, PrimaryTeal) else null
+                                                ) {
+                                                    Text(
+                                                        text = label,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = if (isCur) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (isCur) PrimaryTeal else Slate700,
+                                                        textAlign = TextAlign.Center,
+                                                        modifier = Modifier.padding(vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            result?.data?.optJSONArray("currencies")?.let { codes ->
+                                if (codes.length() > 1) {
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        items((0 until codes.length()).map { codes.getString(it) }) { code ->
+                                            val isSelected = code == currency.ifEmpty { result?.data?.optString("currency") ?: "" }
+                                            FilterChip(
+                                                selected = isSelected,
+                                                onClick = {
+                                                    val target = code
+                                                    val cached = CashflowRepository.getCached(context, month, target)
+                                                    result = cached
+                                                    prevData = CashflowRepository.getCached(context, shiftMonth(month, -1), target)?.data
+                                                    loading = true
+                                                    failed = false
+                                                    currency = target
+                                                },
+                                                label = { Text(code) },
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    containerColor = Color.White,
+                                                    labelColor = Slate700,
+                                                    selectedContainerColor = Teal50,
+                                                    selectedLabelColor = PrimaryTeal
+                                                ),
+                                                border = FilterChipDefaults.filterChipBorder(
+                                                    enabled = true,
+                                                    selected = isSelected,
+                                                    borderColor = Slate200,
+                                                    selectedBorderColor = PrimaryTeal,
+                                                    borderWidth = 1.dp
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (loading) {
+                                Spacer(Modifier.height(4.dp))
+                                LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)), color = Teal700, trackColor = Slate200)
+                            }
+                            if (failed) {
+                                Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFFEF2F2), border = BorderStroke(1.dp, Color(0xFFFECDD3)), modifier = Modifier.fillMaxWidth()) {
+                                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(stringResource(R.string.cf_error), color = ExpenseRed, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                        TextButton(onClick = { refresh++ }) { Text(stringResource(R.string.cfu_retry), color = PrimaryTeal) }
+                                    }
+                                }
+                            }
+
+                            result?.let { report ->
+                                val data = report.data
+                                val cur = data.optString("currency")
+                                val incAmt = data.optDouble("income", 0.0)
+                                val expAmt = data.optDouble("expense", 0.0)
+                                val savAmt = data.optDouble("savings", 0.0)
+                                val availAmt = data.optDouble("available", incAmt - expAmt - savAmt)
+                                val isPositive = availAmt >= 0
+
+                                // 突出呈现的总览卡片：总支出、储蓄总额、总收入与净结余
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color.White,
+                                    border = BorderStroke(1.dp, Slate200),
+                                    shadowElevation = 0.5.dp
+                                ) {
+                                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = if (isCustomRange) stringResource(R.string.cf_overview_custom) else stringResource(R.string.cf_overview_month),
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Slate700
+                                            )
+                                            Text(
+                                                text = if (isCustomRange) "$startDate ~ $endDate" else month,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = PrimaryTeal
+                                            )
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.Bottom
+                                        ) {
+                                            Column {
+                                                Text(
+                                                    text = if (savAmt > 0) stringResource(R.string.cf_net_savings_deducted) else stringResource(R.string.cf_net_balance),
+                                                    fontSize = 11.sp,
+                                                    color = Slate500
+                                                )
+                                                Text(
+                                                    text = (if (availAmt < 0) "-$cur " else "$cur ") + String.format(Locale.getDefault(), "%,.2f", Math.abs(availAmt)),
+                                                    fontSize = 24.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = if (isPositive) PrimaryTeal else ExpenseRed
+                                                )
+                                            }
+                                        }
+
+                                        HorizontalDivider(color = Slate100, thickness = 1.dp)
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Column(
+                                                Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable {
+                                                    switchToTab(CashflowDashboardTab.EXPENSE)
+                                                }.padding(vertical = 2.dp)
+                                            ) {
+                                                Text(stringResource(R.string.cf_total_expense), fontSize = 11.sp, color = Slate500)
+                                                Spacer(Modifier.height(2.dp))
+                                                Text(
+                                                    "-$cur " + String.format(Locale.getDefault(), "%,.2f", expAmt),
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = ExpenseRed
+                                                )
+                                            }
+                                            Column(
+                                                Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable {
+                                                    switchToTab(CashflowDashboardTab.SAVINGS)
+                                                }.padding(vertical = 2.dp)
+                                            ) {
+                                                Text(stringResource(R.string.cf_total_savings), fontSize = 11.sp, color = Slate500)
+                                                Spacer(Modifier.height(2.dp))
+                                                Text(
+                                                    "$cur " + String.format(Locale.getDefault(), "%,.2f", savAmt),
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFFD97706)
+                                                )
+                                            }
+                                            Column(
+                                                Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable {
+                                                    switchToTab(CashflowDashboardTab.INCOME)
+                                                }.padding(vertical = 2.dp)
+                                            ) {
+                                                Text(stringResource(R.string.cf_total_income), fontSize = 11.sp, color = Slate500)
+                                                Spacer(Modifier.height(2.dp))
+                                                Text(
+                                                    "+$cur " + String.format(Locale.getDefault(), "%,.2f", incAmt),
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = PrimaryTeal
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Child 1: 吸顶的 Tab 切换条
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Slate50)
+                                .padding(horizontal = 16.dp)
+                                .scrollable(
+                                    state = headerScrollState,
+                                    orientation = Orientation.Vertical
+                                )
+                        ) {
+                            if (result != null) {
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    BoxWithConstraints(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 46.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(Slate100)
+                                    ) {
+                                        val width = maxWidth / detailPages.size
+                                        val position = (pagerState.currentPage + pagerState.currentPageOffsetFraction).coerceIn(0f, (detailPages.size - 1).toFloat())
+                                        Box(Modifier.matchParentSize()) {
+                                            Box(
+                                                Modifier
+                                                    .offset(x = width * position)
+                                                    .width(width)
+                                                    .fillMaxHeight()
+                                                    .padding(3.dp)
+                                                    .background(Color.White, RoundedCornerShape(9.dp))
+                                            )
+                                        }
+                                        Row(Modifier.fillMaxWidth()) {
+                                            val labels = listOf(
+                                                R.string.cf_tab_expense,
+                                                R.string.cf_tab_calendar,
+                                                R.string.cf_tab_income,
+                                                R.string.cf_tab_savings,
+                                                R.string.cf_tab_bills
+                                            )
+                                            detailPages.forEachIndexed { index, tab ->
+                                                val selected = pagerState.currentPage == index
+                                                val emphasis = (1f - kotlin.math.abs(position - index)).coerceIn(0f, 1f)
+                                                Box(
+                                                    Modifier
+                                                        .weight(1f)
+                                                        .selectable(
+                                                            selected = selected,
+                                                            role = androidx.compose.ui.semantics.Role.Tab,
+                                                            onClick = { switchToTab(tab) }
+                                                        )
+                                                        .padding(horizontal = 2.dp, vertical = 12.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        stringResource(labels[index]),
+                                                        fontSize = 12.sp,
+                                                        color = androidx.compose.ui.graphics.lerp(Slate600, PrimaryTeal, emphasis),
+                                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Child 2: 整体横向滑动的 HorizontalPager
+                        Box(Modifier.fillMaxSize()) {
+                            result?.let { report ->
+                                val data = report.data
+                                val cur = data.optString("currency")
+                                val isOnline = !report.cached
+                                val prev = prevData?.takeIf { it.optString("currency") == cur && it.optString("month") == shiftMonth(month, -1) }
+                                val daily = dailyExpense(data, month)
+                                val todayDay = todayDayIfCurrent(month)
+
+                                HorizontalPager(
+                                    state = pagerState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    key = { detailPages[it].name },
+                                    beyondBoundsPageCount = 1
+                                ) { page ->
+                                    val listState = pageListStates[page]
+                                    LazyColumn(
+                                        state = listState,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                                        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
+                                    ) {
+                                        when (detailPages[page]) {
                             // ================= 支出 =================
                             CashflowDashboardTab.EXPENSE -> {
                                 item {
@@ -2241,12 +2356,50 @@ fun CashflowAnalysisScreen(
                             }
                         }
                         item { Spacer(Modifier.height(18.dp)) }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .clipToBounds()
+                        .nestedScroll(nestedScrollConnection)
+                ) { measurables, constraints ->
+                    val maxWidth = constraints.maxWidth
+                    val maxHeight = constraints.maxHeight
+
+                    val headerPlaceable = measurables[0].measure(
+                        constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
+                    )
+                    val tabsPlaceable = measurables[1].measure(
+                        constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
+                    )
+
+                    val hHeight = headerPlaceable.height.toFloat()
+                    val tHeight = tabsPlaceable.height
+                    headerHeightPx = hHeight
+
+                    val currentOffset = headerOffsetPx.coerceIn(-hHeight, 0f)
+                    val headerY = currentOffset.roundToInt()
+                    val tabsY = (hHeight + currentOffset).roundToInt()
+                    val pagerY = tabsY + tHeight
+                    val pagerHeight = (maxHeight - pagerY).coerceAtLeast(0)
+
+                    val pagerPlaceable = measurables[2].measure(
+                        Constraints.fixed(maxWidth, pagerHeight)
+                    )
+
+                    layout(maxWidth, maxHeight) {
+                        headerPlaceable.placeRelative(0, headerY)
+                        tabsPlaceable.placeRelative(0, tabsY)
+                        pagerPlaceable.placeRelative(0, pagerY)
                     }
                 }
             }
         }
     }
-}
 
     // ---------------- 交易明细 Bottom Sheet ----------------
     selection?.let { sel ->
