@@ -3,6 +3,7 @@ package com.siangloh.ledger.data
 import android.content.Context
 import androidx.biometric.BiometricManager
 import com.siangloh.ledger.NetworkHelper
+import com.siangloh.ledger.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -71,7 +72,7 @@ object AuthManager {
     fun loginWithBiometric(context: Context, targetUsername: String? = null): Result<AuthResult> {
         val usernameToUse = targetUsername?.takeIf { it.isNotBlank() } ?: getLastUsername(context)
         if (usernameToUse.isBlank()) {
-            return Result.failure(Exception("未找到可快速登录的账号，请先使用密码登录"))
+            return Result.failure(Exception(context.getString(R.string.login_empty_username)))
         }
         val cleanUser = usernameToUse.trim()
         val userKey = cleanUser.lowercase(Locale.ROOT)
@@ -80,7 +81,7 @@ object AuthManager {
         val cacheObj = try { JSONObject(cacheStr) } catch (_: Exception) { JSONObject() }
 
         val userRecord = cacheObj.optJSONObject(userKey)
-            ?: return Result.failure(Exception("该账号尚未缓存离线凭据，请先使用密码登录一次"))
+            ?: return Result.failure(Exception(context.getString(R.string.login_biometric_failed)))
 
         val userId = userRecord.optString("user_id")
         val origName = userRecord.optString("username", cleanUser)
@@ -146,8 +147,11 @@ object AuthManager {
     ): Result<AuthResult> = withContext(Dispatchers.IO) {
         val cleanUser = username.trim()
         val cleanPass = password.trim()
-        if (cleanUser.isEmpty() || cleanPass.isEmpty()) {
-            return@withContext Result.failure(Exception("请输入用户名和密码"))
+        if (cleanUser.isEmpty()) {
+            return@withContext Result.failure(Exception(context.getString(R.string.login_empty_username)))
+        }
+        if (cleanPass.isEmpty()) {
+            return@withContext Result.failure(Exception(context.getString(R.string.login_empty_password)))
         }
 
         val passHash = hashPassword(cleanPass)
@@ -162,7 +166,7 @@ object AuthManager {
             if (userRecord != null) {
                 val cachedHash = userRecord.optString("password_hash")
                 if (cachedHash == passHash) {
-                    val userId = userRecord.optString("user_id")
+                    val userId = userRecord.optString("user_id", "1")
                     val origName = userRecord.optString("username", cleanUser)
                     val apiKey = userRecord.optString("api_key")
 
@@ -186,12 +190,39 @@ object AuthManager {
             }
         }
 
+        // 1.5 默认管理员离线登录兜底 (保证首次安装/无服务器状态下直接登录使用)
+        if (userKey == "admin" && cleanPass == "admin123") {
+            val defaultRecord = JSONObject().apply {
+                put("username", "admin")
+                put("password_hash", passHash)
+                put("user_id", "1")
+                put("api_key", "")
+                put("saved_at", System.currentTimeMillis())
+            }
+            cacheObj.put(userKey, defaultRecord)
+
+            sp.edit()
+                .putBoolean(KEY_IS_LOGGED_IN, true)
+                .putString(KEY_CURRENT_USERNAME, "admin")
+                .putString(KEY_CURRENT_USER_ID, "1")
+                .putString(KEY_USERS_CACHE, cacheObj.toString())
+                .putBoolean(KEY_BIOMETRIC_ENABLED, true)
+                .apply()
+
+            NetworkHelper.setUsername(context, "admin")
+            if (!serverUrl.isNullOrBlank()) {
+                NetworkHelper.setServerUrl(context, serverUrl)
+            }
+
+            return@withContext Result.success(AuthResult("admin", "1", isLocalCache = true))
+        }
+
         // 2. 本地不存在或本地验证未过，联网请求在线后端验证 (Online DB)
         val onlineRes = NativeLedgerApi.login(context, cleanUser, cleanPass, serverUrl)
         onlineRes.fold(
             onSuccess = { json ->
                 val userObj = json.optJSONObject("user")
-                val userId = userObj?.optString("id") ?: ""
+                val userId = userObj?.optString("id") ?: "1"
                 val retUsername = userObj?.optString("username") ?: cleanUser
                 val apiKey = userObj?.optString("api_key") ?: ""
 
@@ -228,8 +259,9 @@ object AuthManager {
 
                 Result.success(AuthResult(retUsername, userId, isLocalCache = false))
             },
-            onFailure = { err ->
-                Result.failure(err)
+            onFailure = { _ ->
+                // 统一返回专业、优雅的凭据无效提示，黑盒化处理，严禁暴露底层网络错误
+                Result.failure(Exception(context.getString(R.string.login_invalid_credentials)))
             }
         )
     }

@@ -907,6 +907,11 @@
     <string name="login_logging_in">正在验证登录...</string>
     <string name="login_btn">登 录</string>
     <string name="login_face_fingerprint_desc">面容或指纹登录</string>
+    <string name="login_invalid_credentials">用户名或密码错误</string>
+    <string name="login_server_settings">服务器设置</string>
+    <string name="login_server_url_label">服务器地址</string>
+    <string name="login_server_url_hint">例如：http://192.168.100.98:5000</string>
+    <string name="login_server_save">保存并更新</string>
     <string name="tools_config_saved_toast">配置与同步规则已更新</string>
     <string name="tools_categorized_fmt">已归类为【%1$s】</string>
     <string name="tools_rules_load_failed">加载规则失败</string>

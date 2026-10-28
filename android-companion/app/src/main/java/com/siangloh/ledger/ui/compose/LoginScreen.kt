@@ -56,7 +56,8 @@ fun LoginScreen(
         mutableStateOf(NetworkHelper.getUsername(context).ifBlank { lastUsername })
     }
     var password by remember { mutableStateOf("") }
-    val serverUrl = remember { NetworkHelper.getServerUrl(context) }
+    var serverUrl by remember { mutableStateOf(NetworkHelper.getServerUrl(context)) }
+    var showServerSettings by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
 
     var isLoading by remember { mutableStateOf(false) }
@@ -123,7 +124,7 @@ fun LoginScreen(
                 Toast.makeText(context, context.getString(R.string.login_success_toast), Toast.LENGTH_SHORT).show()
                 onLoginSuccess(auth.username)
             }.onFailure { err ->
-                errorMessage = err.message ?: context.getString(R.string.login_failed_general)
+                errorMessage = err.message ?: context.getString(R.string.login_invalid_credentials)
             }
         }
     }
@@ -404,6 +405,74 @@ fun LoginScreen(
                                     modifier = Modifier.size(26.dp)
                                 )
                             }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Server Configuration Expander
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        TextButton(
+                            onClick = { showServerSettings = !showServerSettings }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = null,
+                                tint = Slate500,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = stringResource(R.string.login_server_settings),
+                                fontSize = 12.sp,
+                                color = Slate500
+                            )
+                        }
+                    }
+
+                    AnimatedVisibility(visible = showServerSettings) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp)
+                                .background(Slate50, RoundedCornerShape(12.dp))
+                                .border(1.dp, Slate200, RoundedCornerShape(12.dp))
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.login_server_url_label),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Slate700
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = serverUrl,
+                                onValueChange = {
+                                    serverUrl = it
+                                    NetworkHelper.setServerUrl(context, it.trim())
+                                },
+                                placeholder = {
+                                    Text(
+                                        stringResource(R.string.login_server_url_hint),
+                                        color = Slate400,
+                                        fontSize = 12.sp
+                                    )
+                                },
+                                singleLine = true,
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = PrimaryTeal,
+                                    unfocusedBorderColor = Slate300,
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
                     }
                 }

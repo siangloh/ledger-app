@@ -907,6 +907,11 @@
     <string name="login_logging_in">Mengesahkan kelayakan...</string>
     <string name="login_btn">Log Masuk</string>
     <string name="login_face_fingerprint_desc">Log masuk biometrik</string>
+    <string name="login_invalid_credentials">Nama pengguna atau kata laluan tidak sah</string>
+    <string name="login_server_settings">Tetapan Pelayan</string>
+    <string name="login_server_url_label">Alamat Pelayan</string>
+    <string name="login_server_url_hint">cth. http://192.168.100.98:5000</string>
+    <string name="login_server_save">Simpan &amp; Kemas Kini</string>
     <string name="tools_config_saved_toast">Peraturan konfigurasi dan penyelarasan dikemas kini</string>
     <string name="tools_categorized_fmt">Dikategorikan sebagai [%1$s]</string>
     <string name="tools_rules_load_failed">Gagal memuatkan peraturan</string>
