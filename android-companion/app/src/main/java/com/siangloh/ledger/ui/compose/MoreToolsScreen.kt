@@ -749,7 +749,7 @@ fun PendingInboxCard(
                                         }
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = "${item.date} · ${item.category.ifBlank { if (isPending) "转账" else "未分类" }}",
+                                            text = "${item.date} · ${item.category.ifBlank { if (isPending) stringResource(R.string.type_transfer) else stringResource(R.string.uncategorized_status) }}",
                                             fontSize = 12.sp,
                                             color = Slate500
                                         )
@@ -1151,7 +1151,7 @@ fun SubscriptionsCard(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "📅 ${match.txDate} · ${match.txNote.ifEmpty { "支出" }}",
+                                            text = "📅 ${match.txDate} · ${match.txNote.ifEmpty { stringResource(R.string.type_expense) }}",
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = Slate800,
@@ -1912,7 +1912,7 @@ fun QuickCategorizeDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "${item.note.ifBlank { "未命名消费" }} · RM ${String.format(Locale.getDefault(), "%.2f", item.amount)}",
+                    text = "${item.note.ifBlank { stringResource(R.string.tools_unnamed_expense) }} · RM ${String.format(Locale.getDefault(), "%.2f", item.amount)}",
                     fontSize = 13.sp,
                     color = Slate600
                 )

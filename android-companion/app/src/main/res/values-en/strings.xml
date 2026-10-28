@@ -917,5 +917,6 @@
     <string name="nav_not_logged_in">Not logged in</string>
     <string name="records_load_error_prefix">Failed to load: </string>
     <string name="records_badge_manual">Manual</string>
+    <string name="tools_unnamed_expense">Unnamed Expense</string>
 </resources>
 

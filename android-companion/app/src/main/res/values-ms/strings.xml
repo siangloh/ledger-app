@@ -917,5 +917,6 @@
     <string name="nav_not_logged_in">Belum log masuk</string>
     <string name="records_load_error_prefix">Gagal memuatkan: </string>
     <string name="records_badge_manual">Manual</string>
+    <string name="tools_unnamed_expense">Perbelanjaan Tanpa Nama</string>
 </resources>
 

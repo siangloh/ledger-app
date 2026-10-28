@@ -157,4 +157,38 @@ object CategoryUiHelper {
             else -> cleanCat
         }
     }
+
+    fun formatBillingCycle(context: Context, raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.isBlank()) return ""
+        val digitMatch = Regex("""\d+""").find(trimmed)
+        val dayNum = digitMatch?.value?.toIntOrNull()
+        val lang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
+
+        if (trimmed.contains("最后") || trimmed.contains("月底") || trimmed.lowercase().contains("last")) {
+            return when (lang) {
+                "en" -> "Last day of month"
+                "ms" -> "Hari terakhir setiap bulan"
+                else -> "每月最后一天"
+            }
+        }
+
+        if (dayNum != null) {
+            return when (lang) {
+                "en" -> {
+                    val suffix = when {
+                        dayNum in 11..13 -> "th"
+                        dayNum % 10 == 1 -> "st"
+                        dayNum % 10 == 2 -> "nd"
+                        dayNum % 10 == 3 -> "rd"
+                        else -> "th"
+                    }
+                    "Day ${dayNum}${suffix} of month"
+                }
+                "ms" -> "Hari ke-$dayNum setiap bulan"
+                else -> "每月${dayNum}号"
+            }
+        }
+        return trimmed
+    }
 }

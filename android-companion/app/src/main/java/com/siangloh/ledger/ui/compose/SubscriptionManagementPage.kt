@@ -365,7 +365,7 @@ fun SubscriptionManagementPage(
                                         Text(text = sub.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = stringResource(R.string.sub_item_cat_date_fmt, CategoryUiHelper.getLocalizedCategoryName(context, sub.category), sub.nextBillingDate),
+                                            text = stringResource(R.string.sub_item_cat_date_fmt, CategoryUiHelper.getLocalizedCategoryName(context, sub.category), CategoryUiHelper.formatBillingCycle(context, sub.nextBillingDate)),
                                             fontSize = 11.sp,
                                             color = Slate500
                                         )
@@ -572,7 +572,7 @@ fun SubscriptionManagementPage(
                                                 color = Slate900
                                             )
                                             Text(
-                                                text = stringResource(R.string.sub_saving_item_fmt, saving.arrivalDay, CategoryUiHelper.getLocalizedCategoryName(context, saving.category)),
+                                                text = stringResource(R.string.sub_saving_item_fmt, CategoryUiHelper.formatBillingCycle(context, saving.arrivalDay), CategoryUiHelper.getLocalizedCategoryName(context, saving.category)),
                                                 fontSize = 11.sp,
                                                 color = Slate500
                                             )
@@ -803,7 +803,7 @@ fun SubscriptionManagementPage(
                                                 color = Slate900
                                             )
                                             Text(
-                                                text = stringResource(R.string.sub_saving_item_fmt, income.arrivalDay, CategoryUiHelper.getLocalizedCategoryName(context, income.category)),
+                                                text = stringResource(R.string.sub_saving_item_fmt, CategoryUiHelper.formatBillingCycle(context, income.arrivalDay), CategoryUiHelper.getLocalizedCategoryName(context, income.category)),
                                                 fontSize = 11.sp,
                                                 color = Slate500
                                             )
