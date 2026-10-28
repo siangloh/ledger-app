@@ -101,7 +101,7 @@ fun AccountsScreen() {
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "刷新",
+                            contentDescription = stringResource(R.string.common_refresh),
                             tint = Slate600
                         )
                     }
@@ -485,7 +485,7 @@ fun AccountCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "本月出入统计",
+                    text = stringResource(R.string.accounts_stat_in_out),
                     fontSize = 11.sp,
                     color = Slate400
                 )
@@ -494,7 +494,7 @@ fun AccountCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("进 ", fontSize = 11.sp, color = Slate400)
+                        Text(stringResource(R.string.accounts_inflow_prefix), fontSize = 11.sp, color = Slate400)
                         Text(
                             text = "+${account.currency} ${String.format(Locale.US, "%,.2f", account.monthlyInflow)}",
                             fontSize = 12.sp,
@@ -503,7 +503,7 @@ fun AccountCard(
                         )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("出 ", fontSize = 11.sp, color = Slate400)
+                        Text(stringResource(R.string.accounts_outflow_prefix), fontSize = 11.sp, color = Slate400)
                         Text(
                             text = "-${account.currency} ${String.format(Locale.US, "%,.2f", account.monthlyOutflow)}",
                             fontSize = 12.sp,
@@ -627,12 +627,12 @@ fun AddAccountDialog(
                 enabled = !isSaving,
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal)
             ) {
-                Text("添加", color = Color.White)
+                Text(stringResource(R.string.accounts_btn_add), color = Color.White)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消", color = Slate600)
+                Text(stringResource(R.string.common_cancel), color = Slate600)
             }
         }
     )
@@ -894,7 +894,7 @@ fun AccountReconcileDialog(
                     ) {
                         Column {
                             Text(
-                                text = stringResource(R.string.accounts_title) + " " + (if (account.type == "credit_card") "欠款" else "结余"),
+                                text = stringResource(R.string.accounts_title) + " " + (if (account.type == "credit_card") stringResource(R.string.accounts_reconcile_debt) else stringResource(R.string.accounts_reconcile_balance)),
                                 fontSize = 11.sp,
                                 color = Slate500
                             )
@@ -965,7 +965,7 @@ fun AccountReconcileDialog(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = if (isBalanced) stringResource(R.string.balanced_status)
-                                   else "差额将被自动核算为平账校准交易",
+                                   else stringResource(R.string.accounts_reconcile_diff_hint),
                             fontSize = 11.sp,
                             color = if (isBalanced) IncomeGreen else Amber700
                         )
@@ -1012,7 +1012,7 @@ fun AccountReconcileDialog(
                     }
                 } else if (reconciliationData != null && reconciliationData!!.transactions.isNotEmpty()) {
                     Text(
-                        text = "📋 交易明细核对 (${reconciliationData!!.transactions.size})",
+                        text = stringResource(R.string.accounts_reconcile_tx_check, reconciliationData!!.transactions.size),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate800,
@@ -1044,7 +1044,7 @@ fun AccountReconcileDialog(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "${tx.category} ${if (tx.note.isNotBlank()) "- " + tx.note else ""}",
+                                        text = "${CategoryUiHelper.getLocalizedCategoryName(context, tx.category)} ${if (tx.note.isNotBlank()) "- " + tx.note else ""}",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = Slate800,
@@ -1069,7 +1069,7 @@ fun AccountReconcileDialog(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                     ) {
                         Text(
-                            text = "暂无待核对交易",
+                            text = stringResource(R.string.accounts_reconcile_no_tx),
                             fontSize = 12.sp,
                             color = Slate400,
                             modifier = Modifier.padding(12.dp),

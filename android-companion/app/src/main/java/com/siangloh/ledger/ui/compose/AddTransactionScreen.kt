@@ -583,13 +583,13 @@ fun AddTransactionScreen(
                         // 收入专属分组 (主业 / 副业)
                         if (draft.txType == "income") {
                             Spacer(modifier = Modifier.height(10.dp))
-                            Text("收入分组", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Slate700)
+                            Text(stringResource(R.string.income_group), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Slate700)
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                val groups = listOf("main" to "💼 主业收入", "side" to "📈 副业/理财")
+                                val groups = listOf("main" to stringResource(R.string.income_main), "side" to stringResource(R.string.income_side))
                                 groups.forEach { (grpKey, grpLabel) ->
                                     val isGrpSelected = draft.incomeGroup == grpKey
                                     Surface(
@@ -747,8 +747,8 @@ fun AddTransactionScreen(
                         OutlinedTextField(
                             value = draft.note,
                             onValueChange = { draft.note = it },
-                            label = { Text("商户 / 备注说明", fontSize = 12.sp, color = Slate600) },
-                            placeholder = { Text("如：Starbucks、麦当劳、超市买菜", fontSize = 12.sp, color = Slate400) },
+                            label = { Text(stringResource(R.string.add_tx_note_label), fontSize = 12.sp, color = Slate600) },
+                            placeholder = { Text(stringResource(R.string.add_tx_note_placeholder), fontSize = 12.sp, color = Slate400) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -760,8 +760,8 @@ fun AddTransactionScreen(
                         OutlinedTextField(
                             value = draft.tags,
                             onValueChange = { draft.tags = it },
-                            label = { Text("标签 (Tags)", fontSize = 12.sp, color = Slate600) },
-                            placeholder = { Text("如：#出差 #聚会 #报销", fontSize = 12.sp, color = Slate400) },
+                            label = { Text(stringResource(R.string.add_tx_tags_label), fontSize = 12.sp, color = Slate600) },
+                            placeholder = { Text(stringResource(R.string.add_tx_tags_placeholder), fontSize = 12.sp, color = Slate400) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -787,13 +787,13 @@ fun AddTransactionScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column {
-                                    Text("记账日期", fontSize = 10.sp, color = Slate500)
+                                    Text(stringResource(R.string.add_tx_date_label), fontSize = 10.sp, color = Slate500)
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(draft.dateStr, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
                                 }
                                 Icon(
                                     imageVector = Icons.Default.CalendarMonth,
-                                    contentDescription = "选择日期",
+                                    contentDescription = stringResource(R.string.add_tx_pick_date),
                                     tint = PrimaryTeal,
                                     modifier = Modifier.size(20.dp)
                                 )

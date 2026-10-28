@@ -478,7 +478,7 @@ fun MoreToolsScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "当前登录账户",
+                                    text = stringResource(R.string.tools_current_account),
                                     fontSize = 11.sp,
                                     color = Slate500
                                 )
@@ -507,7 +507,7 @@ fun MoreToolsScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "退出登录",
+                                text = stringResource(R.string.tools_logout),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -530,7 +530,7 @@ fun MoreToolsScreen(
                         color = Slate500
                     )
                     Text(
-                        text = "原生伴侣架构 · 数据实时双向同步",
+                        text = stringResource(R.string.tools_footer_desc),
                         fontSize = 11.sp,
                         color = Slate400
                     )
@@ -652,16 +652,16 @@ fun PendingInboxCard(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "待整理收件箱",
+                            text = stringResource(R.string.tools_inbox_title),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate800
                         )
                         Text(
-                            text = if (isLoading) "正在同步待整理收件箱..."
+                            text = if (isLoading) stringResource(R.string.tools_inbox_syncing)
                                    else if (errorMessage != null) "加载失败：$errorMessage"
-                                   else if (pendingCount > 0) "有 $pendingCount 笔账目需整理确认"
-                                   else "所有账目已整理完毕 (Inbox Zero)",
+                                   else if (pendingCount > 0) stringResource(R.string.tools_inbox_has_items_fmt, pendingCount)
+                                   else stringResource(R.string.tools_inbox_zero),
                             fontSize = 12.sp,
                             color = if (errorMessage != null) ExpenseRed else if (pendingCount > 0) Color(0xFFD97706) else Slate500
                         )
@@ -675,7 +675,7 @@ fun PendingInboxCard(
                 } else if (pendingCount > 0) {
                     TextButton(onClick = { expanded = !expanded }) {
                         Text(
-                            text = if (expanded) "收起" else "查看 (${pendingCount})",
+                            text = if (expanded) stringResource(R.string.tools_collapse) else stringResource(R.string.tools_view_count_fmt, pendingCount),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFFD97706)
@@ -708,10 +708,10 @@ fun PendingInboxCard(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             val badgeText = when {
-                                                item.reviewReason == "suspected_duplicate" || item.suspectedDuplicateId != null -> "⚠️ 疑似重复"
-                                                item.reviewReason == "unmatched_account" -> "🏦 待指定账户"
-                                                isPending -> "待确认划转"
-                                                else -> "未分类支出"
+                                                item.reviewReason == "suspected_duplicate" || item.suspectedDuplicateId != null -> stringResource(R.string.tools_reason_suspected_dup)
+                                                item.reviewReason == "unmatched_account" -> stringResource(R.string.tools_reason_unmatched_acc)
+                                                isPending -> stringResource(R.string.tools_reason_pending_transfer)
+                                                else -> stringResource(R.string.tools_reason_unclassified)
                                             }
                                             val badgeBg = when {
                                                 item.reviewReason == "suspected_duplicate" || item.suspectedDuplicateId != null -> Color(0xFFFEF3C7)
@@ -739,7 +739,7 @@ fun PendingInboxCard(
                                                 )
                                             }
                                             Text(
-                                                text = item.note.ifBlank { if (isPending) "待确认转账" else "自动捕获账单" },
+                                                text = item.note.ifBlank { if (isPending) stringResource(R.string.tools_default_transfer_note) else stringResource(R.string.tools_default_captured_note) },
                                                 fontSize = 14.sp,
                                                 fontWeight = FontWeight.Medium,
                                                 color = Slate800,
@@ -792,7 +792,7 @@ fun PendingInboxCard(
                                                 shape = RoundedCornerShape(8.dp),
                                                 modifier = Modifier.height(48.dp)
                                             ) {
-                                                Text("标记非重复", fontSize = 12.sp, color = Slate600)
+                                                Text(stringResource(R.string.tools_mark_not_duplicate), fontSize = 12.sp, color = Slate600)
                                             }
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Button(
@@ -802,7 +802,7 @@ fun PendingInboxCard(
                                                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                                                 modifier = Modifier.height(48.dp)
                                             ) {
-                                                Text("合并重复", fontSize = 12.sp, color = Color.White)
+                                                Text(stringResource(R.string.tools_merge_duplicate), fontSize = 12.sp, color = Color.White)
                                             }
                                         } else {
                                             OutlinedButton(
@@ -811,7 +811,7 @@ fun PendingInboxCard(
                                                 shape = RoundedCornerShape(8.dp),
                                                 modifier = Modifier.height(48.dp)
                                             ) {
-                                                Text("本人自转", fontSize = 12.sp, color = Slate600)
+                                                Text(stringResource(R.string.tools_self_transfer), fontSize = 12.sp, color = Slate600)
                                             }
                                             Spacer(modifier = Modifier.width(6.dp))
                                             OutlinedButton(
@@ -820,7 +820,7 @@ fun PendingInboxCard(
                                                 shape = RoundedCornerShape(8.dp),
                                                 modifier = Modifier.height(48.dp)
                                             ) {
-                                                Text("内部调拨", fontSize = 12.sp, color = Slate600)
+                                                Text(stringResource(R.string.tools_internal_transfer), fontSize = 12.sp, color = Slate600)
                                             }
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Button(
@@ -830,7 +830,7 @@ fun PendingInboxCard(
                                                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                                                 modifier = Modifier.height(48.dp)
                                             ) {
-                                                Text("记为支出", fontSize = 12.sp, color = Color.White)
+                                                Text(stringResource(R.string.tools_record_as_expense), fontSize = 12.sp, color = Color.White)
                                             }
                                         }
                                     } else {
@@ -843,7 +843,7 @@ fun PendingInboxCard(
                                         ) {
                                             Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
-                                            Text("去分类", fontSize = 12.sp, color = Color.White)
+                                            Text(stringResource(R.string.tools_go_categorize), fontSize = 12.sp, color = Color.White)
                                         }
                                     }
                                 }
@@ -911,13 +911,13 @@ fun ReceiptOcrBannerCard(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "拍小票 AI 智能识别",
+                        text = stringResource(R.string.tools_ocr_title),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate800
                     )
                     Text(
-                        text = "本地 ML Kit 离线 OCR，提取金额商家",
+                        text = stringResource(R.string.tools_ocr_desc),
                         fontSize = 12.sp,
                         color = Slate600
                     )
@@ -930,7 +930,7 @@ fun ReceiptOcrBannerCard(
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
             ) {
-                Text("拍照/选图", fontSize = 13.sp, color = Color.White)
+                Text(stringResource(R.string.tools_ocr_btn), fontSize = 13.sp, color = Color.White)
             }
         }
     }
@@ -992,7 +992,7 @@ fun SubscriptionsCard(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "固定收支与周期记账",
+                            text = stringResource(R.string.tools_subscriptions_title),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate800
@@ -2015,7 +2015,7 @@ fun ServerConfigDialog(
         titleContentColor = Slate900,
         textContentColor = Slate800,
         title = {
-            Text("修改服务器与同步配置", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
+            Text(stringResource(R.string.tools_config_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -2053,8 +2053,8 @@ fun ServerConfigDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("仅在 WiFi 下自动同步", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                            Text("无 WiFi 时先存入手机本地；连上 WiFi 时自动上传到云端", fontSize = 11.sp, color = Slate500)
+                            Text(stringResource(R.string.tools_wifi_only_title), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                            Text(stringResource(R.string.tools_wifi_only_desc), fontSize = 11.sp, color = Slate500)
                         }
                         Switch(
                             checked = wifiOnly,
@@ -2075,7 +2075,7 @@ fun ServerConfigDialog(
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
             ) {
-                Text("保存配置", color = Color.White)
+                Text(stringResource(R.string.tools_save_config), color = Color.White)
             }
         },
         dismissButton = {
@@ -2148,7 +2148,7 @@ fun RecycleBinCard(
                 modifier = Modifier.defaultMinSize(minHeight = 48.dp)
             ) {
                 Text(
-                    text = "查看",
+                    text = stringResource(R.string.tools_view_btn),
                     fontSize = 13.sp,
                     color = Slate700,
                     fontWeight = FontWeight.SemiBold

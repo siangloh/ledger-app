@@ -1595,7 +1595,7 @@ fun EditTransactionBottomSheet(
                 OutlinedTextField(
                     value = amountStr,
                     onValueChange = { amountStr = it },
-                    label = { Text("金额 (MYR)", color = Slate600) },
+                    label = { Text(stringResource(R.string.records_edit_amount_label), color = Slate600) },
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(color = Slate900),
                     modifier = Modifier.fillMaxWidth(),
@@ -1613,7 +1613,7 @@ fun EditTransactionBottomSheet(
                     OutlinedTextField(
                         value = category,
                         onValueChange = { category = it },
-                        label = { Text("分类", color = Slate600) },
+                        label = { Text(stringResource(R.string.records_edit_category_label), color = Slate600) },
                         singleLine = true,
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
                         modifier = Modifier.weight(1f),
@@ -1638,10 +1638,10 @@ fun EditTransactionBottomSheet(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(verticalArrangement = Arrangement.Center) {
-                                Text("日期", fontSize = 10.sp, color = Slate500)
+                                Text(stringResource(R.string.records_edit_date_label), fontSize = 10.sp, color = Slate500)
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = dateStr.ifBlank { "选择日期" },
+                                    text = dateStr.ifBlank { stringResource(R.string.add_tx_pick_date) },
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Slate900
@@ -1661,7 +1661,7 @@ fun EditTransactionBottomSheet(
 
                 // 资金账户选择 (Transaction From / 交易支付来源)
                 Text(
-                    text = "账户来源 (From)",
+                    text = stringResource(R.string.records_edit_account_label),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = Slate800
@@ -1688,7 +1688,7 @@ fun EditTransactionBottomSheet(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
                         ) {
                             Text(
-                                text = "未指定",
+                                text = stringResource(R.string.records_edit_unspecified),
                                 fontSize = 12.sp,
                                 fontWeight = if (isNoneSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isNoneSelected) Color.White else Slate700
@@ -1733,7 +1733,7 @@ fun EditTransactionBottomSheet(
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("商户 / 备注", color = Slate600) },
+                    label = { Text(stringResource(R.string.records_edit_note_label), color = Slate600) },
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(color = Slate900),
                     modifier = Modifier.fillMaxWidth(),
@@ -1746,7 +1746,7 @@ fun EditTransactionBottomSheet(
                 OutlinedTextField(
                     value = tags,
                     onValueChange = { tags = it },
-                    label = { Text("标签 (如: #food #lunch)", color = Slate600) },
+                    label = { Text(stringResource(R.string.records_edit_tags_label), color = Slate600) },
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(color = Slate900),
                     modifier = Modifier.fillMaxWidth(),
@@ -1908,10 +1908,10 @@ fun AdvancedFilterBottomSheet(
             Spacer(modifier = Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 listOf(
-                    "all" to "全部",
-                    "expense" to "支出",
-                    "income" to "收入",
-                    "transfer" to "自转"
+                    "all" to stringResource(R.string.records_type_all),
+                    "expense" to stringResource(R.string.type_expense),
+                    "income" to stringResource(R.string.type_income),
+                    "transfer" to stringResource(R.string.records_type_transfer)
                 ).forEach { (tKey, tLabel) ->
                     val isSel = tempType == tKey
                     Surface(
@@ -1962,15 +1962,15 @@ fun AdvancedFilterBottomSheet(
                     )
                 }
                 val sources = listOf(
-                    "notification" to "📱 手机通知",
-                    "manual" to "✍️ 手动记账",
-                    "import" to "📥 文件导入",
-                    "api" to "⚡ API 接入",
-                    "nlp" to "🤖 智能记账",
-                    "recurring" to "🔄 固定收支",
-                    "split_bill" to "👥 AA分账",
-                    "reconciliation" to "⚖️ 平账调整",
-                    "unknown" to "❓ 未知/历史"
+                    "notification" to stringResource(R.string.source_label_notification),
+                    "manual" to stringResource(R.string.source_label_manual),
+                    "import" to stringResource(R.string.source_label_import),
+                    "api" to stringResource(R.string.source_label_api),
+                    "nlp" to stringResource(R.string.source_label_nlp),
+                    "recurring" to stringResource(R.string.source_label_recurring),
+                    "split_bill" to stringResource(R.string.source_label_split_bill),
+                    "reconciliation" to stringResource(R.string.source_label_reconciliation),
+                    "unknown" to stringResource(R.string.source_label_unknown)
                 )
                 sources.forEach { (srcKey, srcLabel) ->
                     val isSel = tempSource == srcKey
@@ -2016,7 +2016,7 @@ fun AdvancedFilterBottomSheet(
                         modifier = Modifier.clickable { tempChannel = null }
                     ) {
                         Text(
-                            text = "全部渠道",
+                            text = stringResource(R.string.records_all_channels),
                             fontSize = 11.sp,
                             fontWeight = if (isAllChan) FontWeight.Bold else FontWeight.Medium,
                             color = if (isAllChan) Color.White else Slate700,
@@ -2029,8 +2029,8 @@ fun AdvancedFilterBottomSheet(
                         "grab" to "Grab",
                         "public_bank" to "Public Bank",
                         "shopee" to "ShopeePay",
-                        "bank_card" to "银行短信",
-                        "generic" to "其他通知"
+                        "bank_card" to stringResource(R.string.records_channel_bank_card),
+                        "generic" to stringResource(R.string.records_channel_generic)
                     )
                     channels.forEach { (chanKey, chanLabel) ->
                         val isSel = tempChannel == chanKey

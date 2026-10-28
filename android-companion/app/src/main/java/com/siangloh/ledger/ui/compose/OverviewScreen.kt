@@ -2031,6 +2031,7 @@ fun QuickCategoryBottomSheet(
     onDismiss: () -> Unit,
     onConfirmCategory: (String) -> Unit
 ) {
+    val context = LocalContext.current
     val initialCleanCat = CategoryUiHelper.cleanCategoryName(transaction.category)
     var selectedCat by remember { mutableStateOf(initialCleanCat.ifBlank { "餐饮" }) }
 
@@ -2109,7 +2110,7 @@ fun QuickCategoryBottomSheet(
                                     Text(text = emoji, fontSize = 20.sp)
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = catName,
+                                        text = CategoryUiHelper.getLocalizedCategoryName(context, catName),
                                         fontSize = 12.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         color = if (isSelected) Color.White else Slate700,
