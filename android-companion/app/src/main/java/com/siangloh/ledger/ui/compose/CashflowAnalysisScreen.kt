@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import com.siangloh.ledger.R
+import com.siangloh.ledger.util.AppLanguageManager
 import com.siangloh.ledger.data.CashflowRepository
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.CancellationException
@@ -238,12 +239,13 @@ private fun expensePlatformSlices(data: JSONObject): List<DonutSliceData> {
 
 @Composable
 private fun incomeSlices(data: JSONObject): List<DonutSliceData> {
+    val context = LocalContext.current
     val unknown = stringResource(R.string.cf_unknown)
     return data.rows("income_platforms").sortedByDescending { it.optDouble("amount", 0.0) }.mapIndexed { idx, group ->
         val raw = group.optString("label")
         val pct = if (group.has("income_percent")) group.optDouble("income_percent", 0.0) else group.optDouble("total_percent", 0.0)
         DonutSliceData(
-            label = if (raw.isBlank() || raw == "null") unknown else raw,
+            label = if (raw.isBlank() || raw == "null") unknown else CategoryUiHelper.getLocalizedCategoryName(context, raw),
             amount = group.optDouble("amount", 0.0),
             percent = pct,
             color = ChartPalette[idx % ChartPalette.size],
@@ -257,6 +259,7 @@ private fun incomeSlices(data: JSONObject): List<DonutSliceData> {
 
 @Composable
 private fun savingsSlices(data: JSONObject): List<DonutSliceData> {
+    val context = LocalContext.current
     val unknown = stringResource(R.string.cf_regular_savings)
     val rows = data.rows("savings_categories").sortedByDescending { it.optDouble("amount", 0.0) }
     val total = rows.sumOf { it.optDouble("amount", 0.0).coerceAtLeast(0.0) }
@@ -264,7 +267,7 @@ private fun savingsSlices(data: JSONObject): List<DonutSliceData> {
         val raw = group.optString("label")
         val amt = group.optDouble("amount", 0.0)
         DonutSliceData(
-            label = if (raw.isBlank() || raw == "null") unknown else raw,
+            label = if (raw.isBlank() || raw == "null") unknown else CategoryUiHelper.getLocalizedCategoryName(context, raw),
             amount = amt,
             percent = if (total > 0) amt / total * 100.0 else 0.0,
             color = ChartPalette[idx % ChartPalette.size],
@@ -692,7 +695,7 @@ fun CashflowSummaryCard(month: String, revision: Int = 0, onOpen: () -> Unit) {
     Card(onClick = onOpen, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White), border = BorderStroke(1.dp, Slate200)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(stringResource(R.string.cfd_summary_title) + " · " + month, fontWeight = FontWeight.Bold, color = Slate900)
+            Text(stringResource(R.string.cfd_summary_title) + " · " + formatDisplayMonth(month, context), fontWeight = FontWeight.Bold, color = Slate900)
             val report = result
             if (report == null) {
                 Text(stringResource(if (failed) R.string.cf_error else R.string.cf_loading), color = Slate500)
@@ -842,6 +845,7 @@ private fun MonthlyDailyCalendarCard(
     onSelectDay: (Int?) -> Unit,
     onItemClick: ((TxSelection) -> Unit)? = null
 ) {
+    val context = LocalContext.current
     val ymFormat = remember { SimpleDateFormat("yyyy-MM", Locale.US) }
     val cal = remember(month) {
         Calendar.getInstance().apply {
@@ -1027,12 +1031,12 @@ private fun MonthlyDailyCalendarCard(
             if (maxExpenseDay != null) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(stringResource(R.string.cf_calendar_peak_day), fontSize = 11.sp, color = Slate500)
-                    Text("${maxExpenseDay}日 · " + formatMoney(currency, maxExpenseAmt), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ExpenseRed)
+                    Text(stringResource(R.string.cfu_day, maxExpenseDay) + " · " + formatMoney(currency, maxExpenseAmt), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ExpenseRed)
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(stringResource(R.string.cf_calendar_zero_days), fontSize = 11.sp, color = Slate500)
-                Text("${zeroDays}天", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = IncomeGreen)
+                Text(stringResource(R.string.cf_calendar_zero_days_count, zeroDays), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = IncomeGreen)
             }
         }
 
@@ -1074,7 +1078,7 @@ private fun MonthlyDailyCalendarCard(
                                 onClick = { onSelectDay(null) },
                                 modifier = Modifier.size(24.dp)
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = "Close", tint = Slate500, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_close), tint = Slate500, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -1088,7 +1092,8 @@ private fun MonthlyDailyCalendarCard(
                         )
                     } else {
                         txs.forEach { tx ->
-                            val cat = tx.optString("category").ifBlank { stringResource(R.string.cf_unknown) }
+                            val rawCat = tx.optString("category").ifBlank { stringResource(R.string.cf_unknown) }
+                            val cat = CategoryUiHelper.getLocalizedCategoryName(context, rawCat)
                             val note = tx.optString("note").ifBlank { cat }
                             val amt = tx.optDouble("amount", 0.0)
                             val acc = tx.optString("account_name").ifBlank { tx.optString("channel") }
@@ -1644,7 +1649,7 @@ fun CashflowAnalysisScreen(
                                 ) {
                                     Row(Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                         IconButton(onClick = { changeMonth(-1) }) { Icon(Icons.Default.ChevronLeft, stringResource(R.string.prev_month), tint = Slate600) }
-                                        Text(month, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                                        Text(formatDisplayMonth(month, context), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Slate900)
                                         IconButton(onClick = { changeMonth(1) }) { Icon(Icons.Default.ChevronRight, stringResource(R.string.next_month), tint = Slate600) }
                                     }
                                 }
@@ -1818,7 +1823,7 @@ fun CashflowAnalysisScreen(
                                                 color = Slate700
                                             )
                                             Text(
-                                                text = if (isCustomRange) "$startDate ~ $endDate" else month,
+                                                text = if (isCustomRange) "$startDate ~ $endDate" else formatDisplayMonth(month, context),
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = PrimaryTeal
@@ -2447,7 +2452,7 @@ fun CashflowAnalysisScreen(
                                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                         Column(Modifier.weight(1f)) {
-                                            Text(tx.optString("note").ifEmpty { tx.optString("category") }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
+                                            Text(tx.optString("note").ifEmpty { CategoryUiHelper.getLocalizedCategoryName(context, tx.optString("category")) }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
                                             Text(tx.optString("date"), fontSize = 11.sp, color = Slate500)
                                         }
                                         Text(

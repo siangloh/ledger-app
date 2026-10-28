@@ -589,5 +589,6 @@
     <string name="cal_sat">六</string>
     <string name="cal_sun">日</string>
     <string name="cal_today">今天</string>
+    <string name="cf_calendar_zero_days_count">%1$d天</string>
 </resources>
 

@@ -589,5 +589,6 @@
     <string name="cal_sat">Sat</string>
     <string name="cal_sun">Sun</string>
     <string name="cal_today">Today</string>
+    <string name="cf_calendar_zero_days_count">%1$d days</string>
 </resources>
 
