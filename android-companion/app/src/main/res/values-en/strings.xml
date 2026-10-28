@@ -922,5 +922,12 @@
     <string name="tag_repayment_offset">Offset by repayment %1$s</string>
     <string name="tag_repayment_offset_alt">Offset by repayment %1$s</string>
     <string name="tag_mirror_pair">Mirror transfer aligned</string>
+    <string name="records_tx_deleted_fmt">Deleted \"%1$s\"</string>
+    <string name="records_tx_restored">Transaction restored</string>
+    <string name="records_tx_restore_failed_fmt">Undo failed: %1$s</string>
+    <string name="records_tx_update_success">Transaction updated</string>
+    <string name="records_tx_update_failed_fmt">Update failed: %1$s</string>
+    <string name="records_load_failed_fmt">Failed to load transactions: %1$s</string>
+    <string name="records_edit_amount_invalid">Please enter a valid amount</string>
 </resources>
 

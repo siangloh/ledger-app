@@ -159,27 +159,48 @@ object CategoryUiHelper {
     }
 
     
-    fun getLocalizedTagName(context: Context, rawTag: String): String {
-        val trimmed = rawTag.trim()
-        val clean = trimmed.lowercase().removePrefix("#")
+    fun getLocalizedAccountName(context: Context, rawName: String?): String {
+        if (rawName == null) return ""
+        val trimmed = rawName.trim()
+        if (trimmed.isBlank()) return ""
+        val lower = trimmed.lowercase()
         return when {
-            clean.contains("自动记账") || clean.contains("自动") || clean.contains("auto") -> {
-                val prefix = if (trimmed.startsWith("#")) "#" else ""
-                prefix + context.getString(R.string.badge_auto)
-            }
-            clean.contains("手动记账") || clean.contains("手动") || clean.contains("manual") -> {
-                val prefix = if (trimmed.startsWith("#")) "#" else ""
-                prefix + context.getString(R.string.badge_manual)
-            }
-            clean.contains("小票") || clean.contains("ocr") || clean.contains("receipt") -> {
-                val prefix = if (trimmed.startsWith("#")) "#" else ""
-                prefix + context.getString(R.string.source_label_import)
-            }
-            clean.contains("转账") || clean.contains("transfer") -> {
-                val prefix = if (trimmed.startsWith("#")) "#" else ""
-                prefix + context.getString(R.string.type_transfer)
-            }
+            trimmed == "现金" || trimmed == "现金钱包" || lower == "cash" || lower == "cash wallet" || lower == "tunai" || lower == "dompet tunai" ->
+                context.getString(R.string.account_type_cash)
+            trimmed == "信用卡" || lower == "credit card" || lower == "kad kredit" ->
+                context.getString(R.string.account_type_credit_card)
+            trimmed == "未指定" || trimmed == "未指定账户" || lower == "unspecified" || lower == "tidak ditentukan" ->
+                context.getString(R.string.records_edit_unspecified)
+            trimmed == "内部划转" || trimmed == "自转" || trimmed == "转账" || lower == "internal transfer" || lower == "pindahan dalaman" ->
+                context.getString(R.string.category_transfer)
+            trimmed == "储蓄账户" || lower == "savings" || lower == "simpanan" ->
+                context.getString(R.string.account_type_savings)
+            trimmed == "往来账户" || lower == "current account" || lower == "akaun semasa" ->
+                context.getString(R.string.account_type_current)
+            trimmed == "电子钱包" || lower == "e-wallet" || lower == "ewallet" ->
+                context.getString(R.string.account_type_e_wallet)
+            trimmed == "投资理财" || lower == "investment" || lower == "pelaburan" ->
+                context.getString(R.string.account_type_investment)
             else -> trimmed
+        }
+    }
+
+    fun getLocalizedTagName(context: Context, rawTag: String): String {
+        if (rawTag.isBlank()) return rawTag
+        val tokens = rawTag.split(Regex("(?<=\\s)|(?=\\s)|(?<=,)|(?=,)"))
+        return tokens.joinToString("") { token ->
+            val trimmed = token.trim()
+            if (trimmed.isEmpty() || token == ",") return@joinToString token
+            val isHash = trimmed.startsWith("#")
+            val clean = trimmed.removePrefix("#").trim().lowercase()
+            val loc = when {
+                clean == "自动记账" || clean == "自动" || clean == "auto" || clean == "auto track" || clean == "auto rekod" -> context.getString(R.string.badge_auto)
+                clean == "手动记账" || clean == "手动" || clean == "manual" || clean == "manual rekod" -> context.getString(R.string.badge_manual)
+                clean == "小票" || clean == "ocr" || clean == "receipt" || clean == "resit" -> context.getString(R.string.source_label_import)
+                clean == "转账" || clean == "transfer" || clean == "pindahan" -> context.getString(R.string.type_transfer)
+                else -> trimmed.removePrefix("#")
+            }
+            if (isHash) "#$loc" else loc
         }
     }
 

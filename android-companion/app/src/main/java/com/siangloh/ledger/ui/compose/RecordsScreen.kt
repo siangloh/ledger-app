@@ -246,7 +246,7 @@ fun RecordsScreen(
             }.onFailure { err ->
                 if (err !is kotlinx.coroutines.CancellationException) {
                     if (!isFutureMonth) {
-                        Toast.makeText(context, "加载流水失败：${err.message}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.records_load_failed_fmt, err.message ?: ""), Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -683,15 +683,15 @@ fun RecordsScreen(
                     ) {
                         filterSource?.let { src ->
                             val srcLabel = when (src) {
-                                "notification" -> "📱 手机通知"
-                                "manual" -> "✍️ 手动记账"
-                                "import" -> "📥 文件导入"
-                                "api" -> "⚡ API接入"
-                                "nlp" -> "🤖 智能记账"
-                                "recurring" -> "🔄 固定收支"
-                                "split_bill" -> "👥 AA分账"
-                                "reconciliation" -> "⚖️ 平账"
-                                "unknown" -> "❓ 未知/历史"
+                                "notification" -> stringResource(R.string.source_label_notification)
+                                "manual" -> stringResource(R.string.source_label_manual)
+                                "import" -> stringResource(R.string.source_label_import)
+                                "api" -> stringResource(R.string.source_label_api)
+                                "nlp" -> stringResource(R.string.source_label_nlp)
+                                "recurring" -> stringResource(R.string.source_label_recurring)
+                                "split_bill" -> stringResource(R.string.source_label_split_bill)
+                                "reconciliation" -> stringResource(R.string.source_label_reconciliation)
+                                "unknown" -> stringResource(R.string.source_label_unknown)
                                 else -> src
                             }
                             Surface(
@@ -706,7 +706,7 @@ fun RecordsScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
-                                    Text("来源: $srcLabel", fontSize = 11.sp, color = PrimaryTeal)
+                                    Text(stringResource(R.string.records_source_prefix, srcLabel), fontSize = 11.sp, color = PrimaryTeal)
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Icon(Icons.Default.Close, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(12.dp))
                                 }
@@ -719,8 +719,8 @@ fun RecordsScreen(
                                 "grab" -> "Grab"
                                 "public_bank" -> "Public Bank"
                                 "shopee" -> "ShopeePay"
-                                "bank_card" -> "银行短信"
-                                "generic" -> "其他通知"
+                                "bank_card" -> stringResource(R.string.records_channel_bank_card)
+                                "generic" -> stringResource(R.string.records_channel_generic)
                                 else -> ch
                             }
                             Surface(
@@ -732,7 +732,7 @@ fun RecordsScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
-                                    Text("渠道: $chLabel", fontSize = 11.sp, color = PrimaryTeal)
+                                    Text(stringResource(R.string.records_channel_prefix, chLabel), fontSize = 11.sp, color = PrimaryTeal)
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Icon(Icons.Default.Close, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(12.dp))
                                 }
@@ -748,14 +748,15 @@ fun RecordsScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
-                                    Text("${stringResource(R.string.filter_category_label)}: ${CategoryUiHelper.getLocalizedCategoryName(context, cat)}", fontSize = 11.sp, color = PrimaryTeal)
+                                    Text(stringResource(R.string.records_category_prefix, CategoryUiHelper.getLocalizedCategoryName(context, cat)), fontSize = 11.sp, color = PrimaryTeal)
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Icon(Icons.Default.Close, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(12.dp))
                                 }
                             }
                         }
                         filterAccountId?.let { aid ->
-                            val accName = availableAccounts.find { it.id == aid }?.name ?: "账户#$aid"
+                            val rawAccName = availableAccounts.find { it.id == aid }?.name ?: "#$aid"
+                            val accName = CategoryUiHelper.getLocalizedAccountName(context, rawAccName)
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = PrimaryTealSubtle,
@@ -765,14 +766,14 @@ fun RecordsScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
-                                    Text("账户: $accName", fontSize = 11.sp, color = PrimaryTeal)
+                                    Text(stringResource(R.string.records_account_prefix, accName), fontSize = 11.sp, color = PrimaryTeal)
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Icon(Icons.Default.Close, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(12.dp))
                                 }
                             }
                         }
                         if (filterMinAmount != null || filterMaxAmount != null) {
-                            val amtLabel = "金额: " + (filterMinAmount?.let { "≥$it" } ?: "") +
+                            val amtRange = (filterMinAmount?.let { "≥$it" } ?: "") +
                                     (if (filterMinAmount != null && filterMaxAmount != null) " ~ " else "") +
                                     (filterMaxAmount?.let { "≤$it" } ?: "")
                             Surface(
@@ -787,7 +788,7 @@ fun RecordsScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
-                                    Text(amtLabel, fontSize = 11.sp, color = PrimaryTeal)
+                                    Text(stringResource(R.string.records_amount_prefix, amtRange), fontSize = 11.sp, color = PrimaryTeal)
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Icon(Icons.Default.Close, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(12.dp))
                                 }
@@ -818,14 +819,14 @@ fun RecordsScreen(
                     Text(text = "📭", fontSize = 48.sp)
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "本期暂无符合条件的流水",
+                        text = stringResource(R.string.records_empty_title),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Slate700
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "可尝试切换月份，或点击下方【记一笔】快速记账",
+                        text = stringResource(R.string.records_empty_desc),
                         fontSize = 12.sp,
                         color = Slate400,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -838,7 +839,7 @@ fun RecordsScreen(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("记一笔支出/收入", fontSize = 13.sp)
+                        Text(stringResource(R.string.records_add_tx_btn), fontSize = 13.sp)
                     }
                 }
             } else {
@@ -873,18 +874,17 @@ fun RecordsScreen(
                                             Text(text = if (hasFailures) "⚠️" else "💾", fontSize = 18.sp)
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Column {
+                                                val anomalyText = stringResource(R.string.records_sync_anomaly_fmt, failedCount, pendingCount)
+                                                val localText = if (localCount > 0) stringResource(R.string.records_offline_local_fmt, localCount) else ""
+                                                val offlineText = stringResource(R.string.records_offline_queue_fmt, pendingCount, localText)
                                                 Text(
-                                                    text = if (hasFailures) {
-                                                        "同步异常 ($failedCount 笔失败 / $pendingCount 笔待同步)"
-                                                    } else {
-                                                        "离线存储队列 ($pendingCount 笔待同步${if (localCount > 0) " · $localCount 笔仅本机" else ""})"
-                                                    },
+                                                    text = if (hasFailures) anomalyText else offlineText,
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = if (hasFailures) Rose600 else Amber700
                                                 )
                                                 Text(
-                                                    text = if (hasFailures) "检测到网络或校验错误，支持手动安全重试" else "账目已持久保存在本机，连网后将安全同步",
+                                                    text = if (hasFailures) stringResource(R.string.records_sync_anomaly_hint) else stringResource(R.string.records_offline_queue_hint),
                                                     fontSize = 11.sp,
                                                     color = Slate500
                                                 )
@@ -930,7 +930,7 @@ fun RecordsScreen(
                                                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp))
                                             } else {
                                                 Text(
-                                                    text = if (hasFailures) stringResource(R.string.sync_retry_btn) else "立即同步",
+                                                    text = if (hasFailures) stringResource(R.string.sync_retry_btn) else stringResource(R.string.records_sync_now),
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -1015,7 +1015,7 @@ fun RecordsScreen(
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
                                                         Text(
-                                                            text = stringResource(R.string.sync_failed_reason, pt.sync_error ?: "网络通信异常"),
+                                                            text = stringResource(R.string.sync_failed_reason, pt.sync_error ?: stringResource(R.string.network_error_cached_simple)),
                                                             fontSize = 11.sp,
                                                             color = Rose600,
                                                             modifier = Modifier.weight(1f),
@@ -1087,7 +1087,7 @@ fun RecordsScreen(
                                     ) {
                                         Icon(Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(18.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("加载更多流水 (已展示 ${transactions.size} / $totalCount 条)", fontSize = 13.sp, color = PrimaryTeal)
+                                        Text(stringResource(R.string.records_load_more_fmt, transactions.size, totalCount), fontSize = 13.sp, color = PrimaryTeal)
                                     }
                                 }
                             }
@@ -1101,7 +1101,7 @@ fun RecordsScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "已展示全部 $totalCount 笔记录",
+                                    text = stringResource(R.string.records_total_fmt, totalCount),
                                     fontSize = 12.sp,
                                     color = Slate400
                                 )
@@ -1154,18 +1154,19 @@ fun RecordsScreen(
                             res.onSuccess {
                                 loadData()
                                 val noteOrCat = toDelete.note.ifBlank { toDelete.category }
+                                val locNoteOrCat = CategoryUiHelper.getLocalizedNote(context, noteOrCat).ifBlank { CategoryUiHelper.getLocalizedCategoryName(context, noteOrCat) }
                                 val snackResult = snackbarHostState.showSnackbar(
-                                    message = "已删除「$noteOrCat」",
-                                    actionLabel = "撤销",
+                                    message = context.getString(R.string.records_tx_deleted_fmt, locNoteOrCat),
+                                    actionLabel = context.getString(R.string.notif_action_undo),
                                     duration = SnackbarDuration.Long
                                 )
                                 if (snackResult == SnackbarResult.ActionPerformed) {
                                     val restoreRes = NativeLedgerApi.restoreTransaction(context, toDelete)
                                     if (restoreRes.isSuccess) {
-                                        Toast.makeText(context, "已恢复交易", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.records_tx_restored), Toast.LENGTH_SHORT).show()
                                         loadData()
                                     } else {
-                                        Toast.makeText(context, "撤销失败: ${restoreRes.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.records_tx_restore_failed_fmt, restoreRes.exceptionOrNull()?.message ?: ""), Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             }.onFailure {
@@ -1352,7 +1353,7 @@ fun TransactionCard(
                                 BrandIcon(config = badgeCfg, modifier = Modifier.size(13.dp))
                                 Spacer(modifier = Modifier.width(3.5.dp))
                                 Text(
-                                    text = tx.accountName,
+                                    text = CategoryUiHelper.getLocalizedAccountName(context, tx.accountName),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = badgeCfg.contentColor,
@@ -1375,7 +1376,7 @@ fun TransactionCard(
                                 BrandIcon(config = badgeCfg, modifier = Modifier.size(13.dp))
                                 Spacer(modifier = Modifier.width(3.5.dp))
                                 Text(
-                                    text = badgeCfg.label,
+                                    text = CategoryUiHelper.getLocalizedAccountName(context, badgeCfg.label),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = badgeCfg.contentColor,
@@ -1483,8 +1484,8 @@ fun EditTransactionBottomSheet(
     var category by remember { mutableStateOf(tx.category) }
     var dateStr by remember { mutableStateOf(tx.date) }
     var selectedAccountId by remember { mutableStateOf<Int?>(tx.accountId) }
-    var note by remember { mutableStateOf(tx.note) }
-    var tags by remember { mutableStateOf(tx.tags) }
+    var note by remember { mutableStateOf(CategoryUiHelper.getLocalizedNote(context, tx.note)) }
+    var tags by remember { mutableStateOf(CategoryUiHelper.getLocalizedTagName(context, tx.tags)) }
     var txType by remember { mutableStateOf(tx.type) }
     var isSaving by remember { mutableStateOf(false) }
     var accountsList by remember { mutableStateOf(availableAccounts) }
@@ -1641,7 +1642,7 @@ fun EditTransactionBottomSheet(
                             .height(56.dp)
                             .clickable {
                                 if (txType != "transfer") {
-                                    customCategoryInput = category
+                                    customCategoryInput = localizedCat
                                     showCustomCategoryDialog = true
                                 }
                             }
@@ -1709,7 +1710,7 @@ fun EditTransactionBottomSheet(
                             }
                             Icon(
                                 imageVector = Icons.Default.CalendarMonth,
-                                contentDescription = "选择日期",
+                                contentDescription = stringResource(R.string.add_tx_pick_date),
                                 tint = PrimaryTeal,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1879,7 +1880,7 @@ fun EditTransactionBottomSheet(
                                 BrandIcon(config = badgeCfg, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(5.dp))
                                 Text(
-                                    text = acc.name,
+                                    text = CategoryUiHelper.getLocalizedAccountName(context, acc.name),
                                     fontSize = 12.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = chipFg
@@ -1922,7 +1923,7 @@ fun EditTransactionBottomSheet(
                     onClick = {
                         val amt = amountStr.toDoubleOrNull() ?: 0.0
                         if (amt <= 0) {
-                            Toast.makeText(context, "请输入有效金额", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.records_edit_amount_invalid), Toast.LENGTH_SHORT).show()
                             return@Button
                         }
                         isSaving = true
@@ -1940,10 +1941,10 @@ fun EditTransactionBottomSheet(
                             )
                             isSaving = false
                             res.onSuccess {
-                                Toast.makeText(context, "更新成功", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.records_tx_update_success), Toast.LENGTH_SHORT).show()
                                 onSaveSuccess()
                             }.onFailure {
-                                Toast.makeText(context, "更新失败：${it.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.records_tx_update_failed_fmt, it.message ?: ""), Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
