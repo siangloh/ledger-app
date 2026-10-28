@@ -6,10 +6,20 @@ import com.siangloh.ledger.R
 import com.siangloh.ledger.ui.compose.theme.*
 
 object CategoryUiHelper {
+    private val REGEX_CATEGORY_JSON = Regex("""['"]?category['"]?\s*:\s*['"]([^'"}]+)['"]""")
+    private val REGEX_TAG_TOKENS = Regex("(?<=\\s)|(?=\\s)|(?<=,)|(?=,)")
+    private val REGEX_REFUND = Regex("""\[(?:已扣减退款|已扣減退款|Refund deducted|Ditolak bayaran balik)\s+([^\]]+)\]""", RegexOption.IGNORE_CASE)
+    private val REGEX_OFFSET = Regex("""\[(?:收到还款冲减|收到還款衝減|收到还款冲抵|收到還款沖抵|Offset by repayment|Diimbangi bayaran balik)\s+([^\]]+)\]""", RegexOption.IGNORE_CASE)
+    private val REGEX_MIRROR = Regex("""\[(?:镜像互转对齐|鏡像互轉對齊|Mirror transfer aligned|Pindahan cermin diselaraskan)\]""", RegexOption.IGNORE_CASE)
+    private val REGEX_DIGIT = Regex("""\d+""")
+
     fun cleanCategoryName(raw: String?): String {
         if (raw == null) return "其他"
         val trimmed = raw.trim()
         if (trimmed.isBlank() || trimmed == "null") return "其他"
+        if (!trimmed.contains("{") && !trimmed.contains(":") && !trimmed.startsWith("\"") && !trimmed.startsWith("'")) {
+            return trimmed
+        }
         if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
             try {
                 val obj = org.json.JSONObject(trimmed)
@@ -18,9 +28,8 @@ object CategoryUiHelper {
                 if (!extracted.isNullOrBlank()) return cleanCategoryName(extracted)
             } catch (_: Exception) {}
         }
-        if (trimmed.contains("category") && (trimmed.startsWith("{") || trimmed.contains(":"))) {
-            val regex = Regex("""['"]?category['"]?\s*:\s*['"]([^'"}]+)['"]""")
-            val match = regex.find(trimmed)
+        if (trimmed.contains("category")) {
+            val match = REGEX_CATEGORY_JSON.find(trimmed)
             if (match != null) {
                 val extracted = match.groupValues[1].trim()
                 if (extracted.isNotBlank()) return cleanCategoryName(extracted)
@@ -187,7 +196,10 @@ object CategoryUiHelper {
 
     fun getLocalizedTagName(context: Context, rawTag: String): String {
         if (rawTag.isBlank()) return rawTag
-        val tokens = rawTag.split(Regex("(?<=\\s)|(?=\\s)|(?<=,)|(?=,)"))
+        if (!rawTag.contains("自动") && !rawTag.contains("手动") && !rawTag.contains("auto", ignoreCase = true) && !rawTag.contains("manual", ignoreCase = true) && !rawTag.contains("transfer", ignoreCase = true) && !rawTag.contains("转账")) {
+            return rawTag
+        }
+        val tokens = rawTag.split(REGEX_TAG_TOKENS)
         return tokens.joinToString("") { token ->
             val trimmed = token.trim()
             if (trimmed.isEmpty() || token == ",") return@joinToString token
@@ -205,27 +217,30 @@ object CategoryUiHelper {
     }
 
     fun getLocalizedNote(context: Context, rawNote: String): String {
-        if (rawNote.isBlank()) return rawNote
+        if (rawNote.isBlank() || !rawNote.contains("[")) return rawNote
         var result = rawNote
 
         // 1. 退款扣减标签: [已扣减退款 RM 29.30] -> [Refund deducted RM 29.30]
-        val refundRegex = Regex("""\[(?:已扣减退款|已扣減退款|Refund deducted|Ditolak bayaran balik)\s+([^\]]+)\]""", RegexOption.IGNORE_CASE)
-        result = refundRegex.replace(result) { match ->
-            val amt = match.groupValues[1]
-            "[" + context.getString(R.string.tag_refund_deducted, amt) + "]"
+        if (result.contains("退款", ignoreCase = true) || result.contains("refund", ignoreCase = true) || result.contains("bayaran balik", ignoreCase = true)) {
+            result = REGEX_REFUND.replace(result) { match ->
+                val amt = match.groupValues[1]
+                "[" + context.getString(R.string.tag_refund_deducted, amt) + "]"
+            }
         }
 
-        // 2. 还款冲减/冲抵标签: [收到还款冲减 RM 30.00] / [收到还款冲抵 RM 25.00] -> [Offset by repayment RM 30.00]
-        val offsetRegex = Regex("""\[(?:收到还款冲减|收到還款衝減|收到还款冲抵|收到還款沖抵|Offset by repayment|Diimbangi bayaran balik)\s+([^\]]+)\]""", RegexOption.IGNORE_CASE)
-        result = offsetRegex.replace(result) { match ->
-            val amt = match.groupValues[1]
-            "[" + context.getString(R.string.tag_repayment_offset, amt) + "]"
+        // 2. 还款冲减/冲抵标签
+        if (result.contains("还款", ignoreCase = true) || result.contains("repayment", ignoreCase = true) || result.contains("diimbangi", ignoreCase = true)) {
+            result = REGEX_OFFSET.replace(result) { match ->
+                val amt = match.groupValues[1]
+                "[" + context.getString(R.string.tag_repayment_offset, amt) + "]"
+            }
         }
 
         // 3. 镜像互转对齐
-        val mirrorRegex = Regex("""\[(?:镜像互转对齐|鏡像互轉對齊|Mirror transfer aligned|Pindahan cermin diselaraskan)\]""", RegexOption.IGNORE_CASE)
-        result = mirrorRegex.replace(result) {
-            "[" + context.getString(R.string.tag_mirror_pair) + "]"
+        if (result.contains("镜像", ignoreCase = true) || result.contains("mirror", ignoreCase = true) || result.contains("cermin", ignoreCase = true)) {
+            result = REGEX_MIRROR.replace(result) {
+                "[" + context.getString(R.string.tag_mirror_pair) + "]"
+            }
         }
 
         return result
@@ -234,7 +249,7 @@ object CategoryUiHelper {
     fun formatBillingCycle(context: Context, raw: String): String {
         val trimmed = raw.trim()
         if (trimmed.isBlank()) return ""
-        val digitMatch = Regex("""\d+""").find(trimmed)
+        val digitMatch = REGEX_DIGIT.find(trimmed)
         val dayNum = digitMatch?.value?.toIntOrNull()
         val lang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
 

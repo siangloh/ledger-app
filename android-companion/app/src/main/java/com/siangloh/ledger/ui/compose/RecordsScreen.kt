@@ -1257,19 +1257,60 @@ fun TransactionCard(
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val emoji = CategoryUiHelper.getCategoryEmoji(tx.category, tx.type)
-    val catColor = CategoryUiHelper.getCategoryColor(tx.category)
 
-    val amountColor = when (tx.type) {
-        "income" -> Emerald600
-        "transfer" -> Sky500
-        else -> Slate900
+    // Remember expensive computations & string formatting so lazy list scrolling stays buttery smooth
+    val emoji = remember(tx.category, tx.type) { CategoryUiHelper.getCategoryEmoji(tx.category, tx.type) }
+    val catColor = remember(tx.category) { CategoryUiHelper.getCategoryColor(tx.category) }
+
+    val amountColor = remember(tx.type) {
+        when (tx.type) {
+            "income" -> Emerald600
+            "transfer" -> Sky500
+            else -> Slate900
+        }
     }
 
-    val amountPrefix = when (tx.type) {
-        "income" -> "+"
-        "transfer" -> ""
-        else -> "-"
+    val amountPrefix = remember(tx.type) {
+        when (tx.type) {
+            "income" -> "+"
+            "transfer" -> ""
+            else -> "-"
+        }
+    }
+
+    val localizedCat = remember(tx.category, context) { CategoryUiHelper.getLocalizedCategoryName(context, tx.category) }
+    val localizedNote = remember(tx.note, context) { CategoryUiHelper.getLocalizedNote(context, tx.note) }
+    val merchantTitle = remember(localizedNote, localizedCat) { localizedNote.ifBlank { localizedCat } }
+
+    val normChannel = remember(tx.channel, tx.note) { SourceBrandBadgeHelper.normalizeChannel(tx.channel, tx.note) }
+    val hasAccount = remember(tx.accountName) {
+        tx.accountName.isNotBlank() && tx.accountName != "未指定" && tx.accountName != "未指定账户"
+    }
+
+    val badgeCfg = remember(hasAccount, tx.accountName, normChannel, tx.channel, tx.note) {
+        if (hasAccount) {
+            SourceBrandBadgeHelper.getAccountBrandConfig(tx.accountName, tx.channel, tx.note)
+        } else if (normChannel != null && normChannel != "generic") {
+            SourceBrandBadgeHelper.getAccountBrandConfig(normChannel.uppercase(), normChannel, tx.note)
+        } else {
+            null
+        }
+    }
+
+    val displayAccountName = remember(badgeCfg, hasAccount, tx.accountName, context) {
+        if (hasAccount) CategoryUiHelper.getLocalizedAccountName(context, tx.accountName)
+        else badgeCfg?.let { CategoryUiHelper.getLocalizedAccountName(context, it.label) } ?: ""
+    }
+
+    val isAuto = remember(tx.tags) {
+        tx.tags.contains("自动记账") || tx.tags.contains("自动") || tx.tags.lowercase().contains("auto")
+    }
+    val displayTag = remember(tx.tags, context) {
+        if (tx.tags.isNotBlank()) CategoryUiHelper.getLocalizedTagName(context, tx.tags) else ""
+    }
+
+    val formattedAmount = remember(tx.amount) {
+        String.format(Locale.US, "%.2f", tx.amount)
     }
 
     Surface(
@@ -1303,9 +1344,6 @@ fun TransactionCard(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                val localizedCat = CategoryUiHelper.getLocalizedCategoryName(context, tx.category)
-                val localizedNote = CategoryUiHelper.getLocalizedNote(context, tx.note)
-                val merchantTitle = localizedNote.ifBlank { localizedCat }
                 Text(
                     text = merchantTitle,
                     fontSize = 15.sp,
@@ -1336,11 +1374,7 @@ fun TransactionCard(
                     }
 
                     // (2) 智能账户与渠道徽标 (自动去重合并，绝不重复显示 TNG + Touch 'n Go)
-                    val normChannel = SourceBrandBadgeHelper.normalizeChannel(tx.channel, tx.note)
-                    val hasAccount = tx.accountName.isNotBlank() && tx.accountName != "未指定" && tx.accountName != "未指定账户"
-
-                    if (hasAccount) {
-                        val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(tx.accountName, tx.channel, tx.note)
+                    if (badgeCfg != null) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = badgeCfg.containerColor,
@@ -1353,30 +1387,7 @@ fun TransactionCard(
                                 BrandIcon(config = badgeCfg, modifier = Modifier.size(13.dp))
                                 Spacer(modifier = Modifier.width(3.5.dp))
                                 Text(
-                                    text = CategoryUiHelper.getLocalizedAccountName(context, tx.accountName),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = badgeCfg.contentColor,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    } else if (normChannel != null && normChannel != "generic") {
-                        val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(normChannel.uppercase(), normChannel, tx.note)
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = badgeCfg.containerColor,
-                            border = if (badgeCfg.borderColor != Color.Transparent) BorderStroke(0.6.dp, badgeCfg.borderColor) else null
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                BrandIcon(config = badgeCfg, modifier = Modifier.size(13.dp))
-                                Spacer(modifier = Modifier.width(3.5.dp))
-                                Text(
-                                    text = CategoryUiHelper.getLocalizedAccountName(context, badgeCfg.label),
+                                    text = displayAccountName,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = badgeCfg.contentColor,
@@ -1388,9 +1399,7 @@ fun TransactionCard(
                     }
 
                     // (3) 业务标签 / 自动记账标识
-                    if (tx.tags.isNotBlank()) {
-                        val isAuto = tx.tags.contains("自动记账") || tx.tags.contains("自动") || tx.tags.lowercase().contains("auto")
-                        val displayTag = CategoryUiHelper.getLocalizedTagName(context, tx.tags)
+                    if (displayTag.isNotBlank()) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = if (isAuto) Emerald50 else Teal50,
@@ -1446,7 +1455,7 @@ fun TransactionCard(
                         }
                     }
                     Text(
-                        text = "$amountPrefix MYR ${String.format(Locale.US, "%.2f", tx.amount)}",
+                        text = "$amountPrefix MYR $formattedAmount",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = amountColor,

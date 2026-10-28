@@ -283,8 +283,8 @@ object NativeLedgerApi {
         val url = URL("$serverUrl$endpoint")
         val conn = url.openConnection() as HttpURLConnection
         conn.requestMethod = method
-        conn.connectTimeout = 12000
-        conn.readTimeout = 15000
+        conn.connectTimeout = 3500
+        conn.readTimeout = 5000
         conn.setRequestProperty("User-Agent", "LedgerAppNative/1.0 (Android; Dalvik)")
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
         val key = NetworkHelper.getApiKey(context)
@@ -824,18 +824,13 @@ object NativeLedgerApi {
     }
 
     suspend fun getSavedFilters(context: Context): Result<List<SavedFilterRecord>> = withContext(Dispatchers.IO) {
-        try {
-            val username = NetworkHelper.getUsername(context)
-            val endpoint = "/api/native/saved-filters" + if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
-            val conn = openConnection(context, endpoint, "GET")
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
-                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-            conn.disconnect()
-            val json = JSONObject(respBody)
-            if (json.optBoolean("ok", false)) {
-                val arr = json.optJSONArray("filters") ?: JSONArray()
-                val list = mutableListOf<SavedFilterRecord>()
+        val prefs = context.getSharedPreferences("saved_filters_cache", Context.MODE_PRIVATE)
+        val cachedJson = prefs.getString("filters_json", null)
+        fun parseList(jsonStr: String): List<SavedFilterRecord> {
+            val list = mutableListOf<SavedFilterRecord>()
+            try {
+                val j = JSONObject(jsonStr)
+                val arr = j.optJSONArray("filters") ?: JSONArray()
                 for (i in 0 until arr.length()) {
                     val obj = arr.getJSONObject(i)
                     list.add(
@@ -848,13 +843,34 @@ object NativeLedgerApi {
                         )
                     )
                 }
-                Result.success(list)
+            } catch (_: Exception) {}
+            return list
+        }
+
+        try {
+            val username = NetworkHelper.getUsername(context)
+            val endpoint = "/api/native/saved-filters" + if (username.isNotEmpty()) "?username=${URLEncoder.encode(username, "UTF-8")}" else ""
+            val conn = openConnection(context, endpoint, "GET")
+            val respCode = conn.responseCode
+            val respBody = if (respCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() }
+                           else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            conn.disconnect()
+            val json = JSONObject(respBody)
+            if (json.optBoolean("ok", false)) {
+                prefs.edit().putString("filters_json", respBody).apply()
+                Result.success(parseList(respBody))
+            } else if (!cachedJson.isNullOrBlank()) {
+                Result.success(parseList(cachedJson))
             } else {
                 Result.failure(Exception(json.optString("message", "获取筛选预设失败")))
             }
         } catch (e: Exception) {
-            Log.e(TAG, "getSavedFilters error: ${e.message}", e)
-            Result.failure(e)
+            Log.d(TAG, "getSavedFilters network unavailable: ${e.message}")
+            if (!cachedJson.isNullOrBlank()) {
+                Result.success(parseList(cachedJson))
+            } else {
+                Result.failure(e)
+            }
         }
     }
 
