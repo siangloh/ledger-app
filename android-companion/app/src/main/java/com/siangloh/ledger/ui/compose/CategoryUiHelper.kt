@@ -88,7 +88,7 @@ object CategoryUiHelper {
             clean.contains("购") || clean.contains("shop") || clean.contains("beli") -> Rose500
             clean.contains("娱乐") || clean.contains("entertain") || clean.contains("hiburan") -> Sky500
             clean.contains("医疗") || clean.contains("health") || clean.contains("perubatan") -> Color(0xFFEF4444) // Red
-            clean.contains("内部") || clean.contains("划转") || clean.contains("transfer") -> Slate600
+            clean.contains("内部") || clean.contains("划转") || clean.contains("自转") || clean.contains("转账") || clean.contains("转") || clean.contains("transfer") || clean.contains("pindahan") -> Slate600
             else -> Slate500
         }
     }
@@ -135,7 +135,7 @@ object CategoryUiHelper {
         return when {
             clean.contains("餐") || clean.contains("food") || clean.contains("makan") || clean.contains("dining") -> context.getString(R.string.category_dining)
             clean.contains("交通") || clean.contains("transport") || clean.contains("pengangkutan") -> context.getString(R.string.category_transport)
-            clean.contains("杂货") || clean.contains("grocer") || clean.contains("runcit") -> context.getString(R.string.category_groceries)
+            clean.contains("买菜") || clean.contains("杂货") || clean.contains("grocer") || clean.contains("runcit") -> context.getString(R.string.category_groceries)
             clean.contains("账单") || clean.contains("bill") || clean.contains("bil") || clean.contains("utilit") -> context.getString(R.string.category_bills)
             clean.contains("购") || clean.contains("shop") || clean.contains("beli") -> context.getString(R.string.category_shopping)
             clean.contains("娱乐") || clean.contains("entertain") || clean.contains("hiburan") || clean.contains("game") -> context.getString(R.string.category_entertainment)
@@ -151,13 +151,37 @@ object CategoryUiHelper {
             clean.contains("应急") || clean.contains("emergency") -> context.getString(R.string.category_emergency_fund)
             clean.contains("心愿") || clean.contains("wish") -> context.getString(R.string.category_wish_fund)
             clean.contains("投资") || clean.contains("invest") || clean.contains("pelaburan") -> context.getString(R.string.category_investments)
-            clean.contains("内部") || clean.contains("划转") || clean.contains("transfer") || clean.contains("pindahan") -> context.getString(R.string.category_transfer)
+            clean.contains("转账") || clean.contains("转") || clean.contains("内部") || clean.contains("划转") || clean.contains("transfer") || clean.contains("pindahan") -> context.getString(R.string.category_transfer)
             clean.contains("其他") || clean.contains("other") || clean.contains("lain") -> context.getString(R.string.category_other)
             clean.contains("未分类") || clean.contains("待分类") || clean.contains("uncategorized") || clean.isBlank() -> context.getString(R.string.uncategorized_status)
             else -> cleanCat
         }
     }
 
+    
+    fun getLocalizedTagName(context: Context, rawTag: String): String {
+        val trimmed = rawTag.trim()
+        val clean = trimmed.lowercase().removePrefix("#")
+        return when {
+            clean.contains("自动记账") || clean.contains("自动") || clean.contains("auto") -> {
+                val prefix = if (trimmed.startsWith("#")) "#" else ""
+                prefix + context.getString(R.string.badge_auto)
+            }
+            clean.contains("手动记账") || clean.contains("手动") || clean.contains("manual") -> {
+                val prefix = if (trimmed.startsWith("#")) "#" else ""
+                prefix + context.getString(R.string.badge_manual)
+            }
+            clean.contains("小票") || clean.contains("ocr") || clean.contains("receipt") -> {
+                val prefix = if (trimmed.startsWith("#")) "#" else ""
+                prefix + context.getString(R.string.source_label_import)
+            }
+            clean.contains("转账") || clean.contains("transfer") -> {
+                val prefix = if (trimmed.startsWith("#")) "#" else ""
+                prefix + context.getString(R.string.type_transfer)
+            }
+            else -> trimmed
+        }
+    }
     fun formatBillingCycle(context: Context, raw: String): String {
         val trimmed = raw.trim()
         if (trimmed.isBlank()) return ""

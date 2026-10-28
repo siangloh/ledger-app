@@ -1387,14 +1387,15 @@ fun TransactionCard(
 
                     // (3) 业务标签 / 自动记账标识
                     if (tx.tags.isNotBlank()) {
-                        val isAuto = tx.tags.contains("自动记账")
+                        val isAuto = tx.tags.contains("自动记账") || tx.tags.contains("自动") || tx.tags.lowercase().contains("auto")
+                        val displayTag = CategoryUiHelper.getLocalizedTagName(context, tx.tags)
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = if (isAuto) Emerald50 else Teal50,
                             border = BorderStroke(0.6.dp, if (isAuto) Emerald100 else Teal100)
                         ) {
                             Text(
-                                text = tx.tags,
+                                text = displayTag,
                                 fontSize = 10.sp,
                                 color = if (isAuto) Emerald700 else PrimaryTeal,
                                 fontWeight = FontWeight.Medium,

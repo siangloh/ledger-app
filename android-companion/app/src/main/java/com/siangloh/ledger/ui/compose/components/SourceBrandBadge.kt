@@ -177,7 +177,7 @@ object SourceBrandBadgeHelper {
 
         // 2. 根据来源进行多语言本地化映射
         return when (normSource) {
-            "notification", "auto_track", "auto_track_confirmed" -> BrandBadgeConfig(
+            "notification", "auto_track", "auto_track_confirmed", "auto_notification", "auto" -> BrandBadgeConfig(
                 label = stringResource(R.string.source_label_notification),
                 emoji = "📱",
                 containerColor = com.siangloh.ledger.ui.compose.theme.PrimaryTealSubtle,
@@ -234,7 +234,13 @@ object SourceBrandBadgeHelper {
                 borderColor = Color(0xFFD1FAE5)    // Emerald 100
             )
             else -> {
-                val label = fallbackBadgeText.ifBlank { stringResource(R.string.source_label_unknown) }
+                val label = when {
+                    fallbackBadgeText.contains("自动") || fallbackBadgeText.lowercase().contains("auto") -> stringResource(R.string.badge_auto)
+                    fallbackBadgeText.contains("手动") || fallbackBadgeText.lowercase().contains("manual") -> stringResource(R.string.badge_manual)
+                    fallbackBadgeText.contains("转账") || fallbackBadgeText.lowercase().contains("transfer") -> stringResource(R.string.category_transfer)
+                    fallbackBadgeText.isNotBlank() -> fallbackBadgeText
+                    else -> stringResource(R.string.source_label_unknown)
+                }
                 val emoji = fallbackBadgeEmoji.ifBlank { "❓" }
                 BrandBadgeConfig(
                     label = label,
