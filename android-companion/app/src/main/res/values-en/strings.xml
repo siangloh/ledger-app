@@ -918,5 +918,9 @@
     <string name="records_load_error_prefix">Failed to load: </string>
     <string name="records_badge_manual">Manual</string>
     <string name="tools_unnamed_expense">Unnamed Expense</string>
+    <string name="tag_refund_deducted">Refund deducted %1$s</string>
+    <string name="tag_repayment_offset">Offset by repayment %1$s</string>
+    <string name="tag_repayment_offset_alt">Offset by repayment %1$s</string>
+    <string name="tag_mirror_pair">Mirror transfer aligned</string>
 </resources>
 

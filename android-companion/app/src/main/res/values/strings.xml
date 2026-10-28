@@ -918,5 +918,9 @@
     <string name="records_load_error_prefix">加载失败：</string>
     <string name="records_badge_manual">手动记账</string>
     <string name="tools_unnamed_expense">未命名消费</string>
+    <string name="tag_refund_deducted">已扣减退款 %1$s</string>
+    <string name="tag_repayment_offset">收到还款冲减 %1$s</string>
+    <string name="tag_repayment_offset_alt">收到还款冲抵 %1$s</string>
+    <string name="tag_mirror_pair">镜像互转对齐</string>
 </resources>
 

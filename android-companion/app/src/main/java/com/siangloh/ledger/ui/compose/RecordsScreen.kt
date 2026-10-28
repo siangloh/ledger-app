@@ -1142,7 +1142,7 @@ fun RecordsScreen(
             titleContentColor = Slate900,
             textContentColor = Slate800,
             title = { Text(stringResource(R.string.delete_tx_title), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Slate900) },
-            text = { Text(stringResource(R.string.delete_tx_confirm_msg, String.format(Locale.US, "%.2f", tx.amount), tx.note.ifBlank { "-" }), fontSize = 13.sp, color = Slate600) },
+            text = { Text(stringResource(R.string.delete_tx_confirm_msg, String.format(Locale.US, "%.2f", tx.amount), CategoryUiHelper.getLocalizedNote(context, tx.note).ifBlank { "-" }), fontSize = 13.sp, color = Slate600) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -1303,7 +1303,8 @@ fun TransactionCard(
                 modifier = Modifier.weight(1f)
             ) {
                 val localizedCat = CategoryUiHelper.getLocalizedCategoryName(context, tx.category)
-                val merchantTitle = tx.note.ifBlank { localizedCat }
+                val localizedNote = CategoryUiHelper.getLocalizedNote(context, tx.note)
+                val merchantTitle = localizedNote.ifBlank { localizedCat }
                 Text(
                     text = merchantTitle,
                     fontSize = 15.sp,

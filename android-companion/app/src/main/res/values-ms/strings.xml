@@ -918,5 +918,9 @@
     <string name="records_load_error_prefix">Gagal memuatkan: </string>
     <string name="records_badge_manual">Manual</string>
     <string name="tools_unnamed_expense">Perbelanjaan Tanpa Nama</string>
+    <string name="tag_refund_deducted">Ditolak bayaran balik %1$s</string>
+    <string name="tag_repayment_offset">Diimbangi bayaran balik %1$s</string>
+    <string name="tag_repayment_offset_alt">Diimbangi bayaran balik %1$s</string>
+    <string name="tag_mirror_pair">Pindahan cermin diselaraskan</string>
 </resources>
 

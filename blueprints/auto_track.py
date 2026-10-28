@@ -28,7 +28,7 @@ from services.notification_dedup_service import (
 from services.ai_service import classify_notification_with_llm
 from core.utils import money_filter, check_and_record_budget_alerts
 from core.extensions import csrf
-from core.i18n import t
+from core.i18n import t, t_cat
 from services.native_api_service import (
     get_native_overview_summary,
     update_transaction_quick_category,
@@ -208,6 +208,20 @@ def api_auto_track():
     hash_input = package_name + '\n' + clean_text if package_name else clean_text
     content_hash = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
     payload = request.get_json(silent=True)
+    user_settings = get_user_settings(target_user_id, db=db)
+    user_lang = (
+        (payload.get('lang') if isinstance(payload, dict) else None) or
+        data.get('lang') or
+        request.args.get('lang') or
+        (request.headers.get('Accept-Language', '')[:2].lower() if request.headers.get('Accept-Language') else None) or
+        user_settings.get('language') or
+        'zh'
+    )
+    if user_lang not in ('zh', 'en', 'ms', 'zh_TW'):
+        user_lang = user_settings.get('language') or 'zh'
+        if user_lang not in ('zh', 'en', 'ms', 'zh_TW'):
+            user_lang = 'zh'
+
     event_id = payload.get('notification_event_id') if isinstance(payload, dict) else None
     if event_id is not None:
         if not isinstance(event_id, str) or not re.fullmatch(r'[A-Za-z0-9:_-]{1,160}', event_id):
@@ -518,7 +532,7 @@ def api_auto_track():
                 refund_amount = float(parsed['amount'])
                 new_amount = max(0.0, round(old_amount - refund_amount, 2))
 
-                tag = f"[已扣减退款 {money_filter(refund_amount)}]"
+                tag = t('transactions.refund_tag', '[已扣减退款 {amount}]', lang=user_lang, amount=money_filter(refund_amount))
                 old_note = (matched_expense['note'] or '').strip()
                 new_note = f"{old_note} {tag}".strip()
 
@@ -544,12 +558,29 @@ def api_auto_track():
                 except Exception as e:
                     logger.debug("Failed to record processed_notification on refund: %s", e)
 
-                notif_title = "加油/消费退款已冲减 ⛽"
-                notif_body = f"收到退款 {money_filter(refund_amount)}，已自动从原【{matched_expense['category']}】支出中扣除（由 {money_filter(old_amount)} 变更为 {money_filter(new_amount)}）"
+                cat_display = t_cat(matched_expense['category'], lang=user_lang)
+                notif_title = t('auto_track.refund_title', '加油/消费退款已冲减 ⛽', lang=user_lang)
+                notif_body = t(
+                    'auto_track.refund_body',
+                    '收到退款 {refund_amt}，已自动从原【{category}】支出中扣除（由 {old_amt} 变更为 {new_amt}）',
+                    lang=user_lang,
+                    refund_amt=money_filter(refund_amount),
+                    category=cat_display,
+                    old_amt=money_filter(old_amount),
+                    new_amt=money_filter(new_amount)
+                )
+                ret_msg = t(
+                    'auto_track.refund_msg',
+                    '收到退款 {refund_amt}，已自动冲减原支出【{category}】（现为 {new_amt}）！',
+                    lang=user_lang,
+                    refund_amt=money_filter(refund_amount),
+                    category=cat_display,
+                    new_amt=money_filter(new_amount)
+                )
                 return jsonify({
                     'ok': True,
                     'verdict': 'refund_offset_success',
-                    'message': f"收到退款 {money_filter(refund_amount)}，已自动冲减原支出【{matched_expense['category']}】（现为 {money_filter(new_amount)}）！",
+                    'message': ret_msg,
                     'offset_expense_id': matched_expense['id'],
                     'original_amount': old_amount,
                     'new_amount': new_amount,
@@ -560,7 +591,6 @@ def api_auto_track():
                 }), 200
 
         # 5. 智能朋友还款冲抵支出 (支持时间窗口限定、自己转账自转排除与品类安全门禁)
-        user_settings = get_user_settings(target_user_id, db=db)
         offset_window_minutes = int(user_settings.get('repayment_offset_window_minutes', 120))
 
         # 排除自己转账给自己的关键词 (Self-Transfer / Own Account)
@@ -719,7 +749,7 @@ def api_auto_track():
                 offset_amount = float(parsed['amount'])
                 new_amount = max(0.0, round(old_amount - offset_amount, 2))
 
-                tag = f"[收到还款冲减 {money_filter(offset_amount)}]"
+                tag = t('transactions.repayment_offset_tag', '[收到还款冲减 {amount}]', lang=user_lang, amount=money_filter(offset_amount))
                 old_note = (last_expense['note'] or '').strip()
                 new_note = f"{old_note} {tag}".strip()
 
@@ -745,12 +775,29 @@ def api_auto_track():
                 except Exception as e:
                     logger.debug("Failed to record processed_notification on repayment: %s", e)
 
-                notif_title = "已自动冲抵支出 💸"
-                notif_body = f"收到还款 {money_filter(offset_amount)}，已自动冲减上一笔【{last_expense['category']}】支出（由 {money_filter(old_amount)} 扣减为 {money_filter(new_amount)}）"
+                cat_display = t_cat(last_expense['category'], lang=user_lang)
+                notif_title = t('auto_track.repayment_title', '已自动冲抵支出 💸', lang=user_lang)
+                notif_body = t(
+                    'auto_track.repayment_body',
+                    '收到还款 {offset_amt}，已自动冲减上一笔【{category}】支出（由 {old_amt} 扣减为 {new_amt}）',
+                    lang=user_lang,
+                    offset_amt=money_filter(offset_amount),
+                    category=cat_display,
+                    old_amt=money_filter(old_amount),
+                    new_amt=money_filter(new_amount)
+                )
+                ret_msg = t(
+                    'auto_track.repayment_msg',
+                    '收到朋友还款 {offset_amt}，已自动从上一笔支出【{category}】中扣除（现为 {new_amt}）！',
+                    lang=user_lang,
+                    offset_amt=money_filter(offset_amount),
+                    category=cat_display,
+                    new_amt=money_filter(new_amount)
+                )
                 return jsonify({
                     'ok': True,
                     'verdict': 'offset_success',
-                    'message': f"收到朋友还款 {money_filter(offset_amount)}，已自动从上一笔支出【{last_expense['category']}】中扣除（现为 {money_filter(new_amount)}）！",
+                    'message': ret_msg,
                     'offset_expense_id': last_expense['id'],
                     'original_amount': old_amount,
                     'new_amount': new_amount,
@@ -822,11 +869,20 @@ def api_auto_track():
             'user_id': target_user_id
         })
 
-        type_text = '支出' if parsed['type'] == 'expense' else '收入' if parsed['type'] == 'income' else '储蓄'
+        type_text = t(f'common.{parsed["type"]}', '支出' if parsed['type'] == 'expense' else '收入', lang=user_lang)
+        cat_display = t_cat(parsed['category'], lang=user_lang)
         note_str = f" ({parsed['note']})" if parsed['note'] else ""
         if not match_info.get('subscription') or not match_info['subscription'].get('target_to_cancel'):
-            notification_title = "自动记账成功 💸"
-            notification_body = f"已自动记入【{type_text} · {parsed['category']}】{money_filter(parsed['amount'])}{note_str}"
+            notification_title = t('auto_track.success_title', '自动记账成功 💸', lang=user_lang)
+            notification_body = t(
+                'auto_track.success_body',
+                '已自动记入【{type_text} · {category}】{amount}{note}',
+                lang=user_lang,
+                type_text=type_text,
+                category=cat_display,
+                amount=money_filter(parsed['amount']),
+                note=note_str
+            )
 
         # 自动顺延匹配的订阅或递增分期期数
         if match_info.get('subscription') and match_info['subscription'].get('confidence') in ('exact', 'high'):
@@ -857,7 +913,14 @@ def api_auto_track():
         return jsonify({
             'ok': True,
             'verdict': 'accepted',
-            'message': f"成功自动记账：{parsed['note']} {money_filter(parsed['amount'])} ({parsed['category']})",
+            'message': t(
+                'auto_track.success_msg',
+                '成功自动记账：{note} {amount} ({category})',
+                lang=user_lang,
+                note=parsed['note'],
+                amount=money_filter(parsed['amount']),
+                category=cat_display
+            ),
             'transaction_id': cur.lastrowid,
             'parsed': parsed,
             'matched_subscription': match_info.get('subscription'),

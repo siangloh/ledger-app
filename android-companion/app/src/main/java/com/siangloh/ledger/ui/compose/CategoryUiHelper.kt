@@ -182,6 +182,34 @@ object CategoryUiHelper {
             else -> trimmed
         }
     }
+
+    fun getLocalizedNote(context: Context, rawNote: String): String {
+        if (rawNote.isBlank()) return rawNote
+        var result = rawNote
+
+        // 1. 退款扣减标签: [已扣减退款 RM 29.30] -> [Refund deducted RM 29.30]
+        val refundRegex = Regex("""\[(?:已扣减退款|已扣減退款|Refund deducted|Ditolak bayaran balik)\s+([^\]]+)\]""", RegexOption.IGNORE_CASE)
+        result = refundRegex.replace(result) { match ->
+            val amt = match.groupValues[1]
+            "[" + context.getString(R.string.tag_refund_deducted, amt) + "]"
+        }
+
+        // 2. 还款冲减/冲抵标签: [收到还款冲减 RM 30.00] / [收到还款冲抵 RM 25.00] -> [Offset by repayment RM 30.00]
+        val offsetRegex = Regex("""\[(?:收到还款冲减|收到還款衝減|收到还款冲抵|收到還款沖抵|Offset by repayment|Diimbangi bayaran balik)\s+([^\]]+)\]""", RegexOption.IGNORE_CASE)
+        result = offsetRegex.replace(result) { match ->
+            val amt = match.groupValues[1]
+            "[" + context.getString(R.string.tag_repayment_offset, amt) + "]"
+        }
+
+        // 3. 镜像互转对齐
+        val mirrorRegex = Regex("""\[(?:镜像互转对齐|鏡像互轉對齊|Mirror transfer aligned|Pindahan cermin diselaraskan)\]""", RegexOption.IGNORE_CASE)
+        result = mirrorRegex.replace(result) {
+            "[" + context.getString(R.string.tag_mirror_pair) + "]"
+        }
+
+        return result
+    }
+
     fun formatBillingCycle(context: Context, raw: String): String {
         val trimmed = raw.trim()
         if (trimmed.isBlank()) return ""
