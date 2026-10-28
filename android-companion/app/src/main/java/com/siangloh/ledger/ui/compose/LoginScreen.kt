@@ -33,6 +33,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.siangloh.ledger.R
 import com.siangloh.ledger.NetworkHelper
 import com.siangloh.ledger.data.AuthManager
 import com.siangloh.ledger.data.BiometricHelper
@@ -68,16 +70,16 @@ fun LoginScreen(
         val act = fragmentActivity ?: return
         BiometricHelper.authenticate(
             activity = act,
-            title = "生物识别登录",
-            subtitle = if (targetUser.isNotBlank()) "验证账号 [$targetUser] 的面容或指纹" else "使用指纹或面容快速登入",
-            negativeButtonText = "使用密码登录",
+            title = context.getString(R.string.login_biometric_title),
+            subtitle = if (targetUser.isNotBlank()) context.getString(R.string.login_biometric_sub_user_fmt, targetUser) else context.getString(R.string.login_biometric_sub_quick),
+            negativeButtonText = context.getString(R.string.login_biometric_pwd_fallback),
             onSuccess = {
                 val result = AuthManager.loginWithBiometric(context, targetUser)
                 result.onSuccess { auth ->
-                    Toast.makeText(context, "登入成功 ✓", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.login_success_toast), Toast.LENGTH_SHORT).show()
                     onLoginSuccess(auth.username)
                 }.onFailure { err ->
-                    errorMessage = err.message ?: "生物识别登录失败，请使用密码"
+                    errorMessage = err.message ?: context.getString(R.string.login_biometric_failed)
                 }
             },
             onError = { _, _ ->
@@ -97,11 +99,11 @@ fun LoginScreen(
     fun handleLogin() {
         focusManager.clearFocus()
         if (username.isBlank()) {
-            errorMessage = "请输入用户名"
+            errorMessage = context.getString(R.string.login_empty_username)
             return
         }
         if (password.isBlank()) {
-            errorMessage = "请输入密码"
+            errorMessage = context.getString(R.string.login_empty_password)
             return
         }
 
@@ -118,10 +120,10 @@ fun LoginScreen(
 
             isLoading = false
             result.onSuccess { auth ->
-                Toast.makeText(context, "登入成功 ✓", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.login_success_toast), Toast.LENGTH_SHORT).show()
                 onLoginSuccess(auth.username)
             }.onFailure { err ->
-                errorMessage = err.message ?: "登录失败，请检查网络或用户名密码"
+                errorMessage = err.message ?: context.getString(R.string.login_failed_general)
             }
         }
     }
@@ -172,7 +174,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "欢迎使用智能记账",
+                text = stringResource(R.string.login_welcome_title),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = Slate900
@@ -181,7 +183,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "登录您的记账账户以进入完整功能",
+                text = stringResource(R.string.login_welcome_sub),
                 fontSize = 13.sp,
                 color = Slate600
             )
@@ -203,7 +205,7 @@ fun LoginScreen(
                 ) {
                     // Username Field
                     Text(
-                        text = "用户名",
+                        text = stringResource(R.string.login_username_label),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Slate700
@@ -215,11 +217,11 @@ fun LoginScreen(
                             username = it
                             errorMessage = null
                         },
-                        placeholder = { Text("例如：admin 或您的用户名", color = Slate400, fontSize = 14.sp) },
+                        placeholder = { Text(stringResource(R.string.login_username_placeholder), color = Slate400, fontSize = 14.sp) },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Person,
-                                contentDescription = "用户",
+                                contentDescription = stringResource(R.string.login_username_label),
                                 tint = if (username.isNotBlank()) PrimaryTeal else Slate400
                             )
                         },
@@ -228,7 +230,7 @@ fun LoginScreen(
                                 IconButton(onClick = { username = "" }) {
                                     Icon(
                                         imageVector = Icons.Default.Clear,
-                                        contentDescription = "清除",
+                                        contentDescription = stringResource(R.string.common_cancel),
                                         tint = Slate400,
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -254,7 +256,7 @@ fun LoginScreen(
 
                     // Password Field
                     Text(
-                        text = "密码",
+                        text = stringResource(R.string.login_password_label),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Slate700
@@ -266,11 +268,11 @@ fun LoginScreen(
                             password = it
                             errorMessage = null
                         },
-                        placeholder = { Text("请输入密码", color = Slate400, fontSize = 14.sp) },
+                        placeholder = { Text(stringResource(R.string.login_password_placeholder), color = Slate400, fontSize = 14.sp) },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Lock,
-                                contentDescription = "密码",
+                                contentDescription = stringResource(R.string.login_password_label),
                                 tint = if (password.isNotBlank()) PrimaryTeal else Slate400
                             )
                         },
@@ -278,7 +280,7 @@ fun LoginScreen(
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
                                     imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = if (passwordVisible) "隐藏密码" else "显示密码",
+                                    contentDescription = null,
                                     tint = Slate400
                                 )
                             }
@@ -319,7 +321,7 @@ fun LoginScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.ErrorOutline,
-                                    contentDescription = "错误",
+                                    contentDescription = null,
                                     tint = ExpenseRed,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -361,14 +363,14 @@ fun LoginScreen(
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "正在验证登录...",
+                                    text = stringResource(R.string.login_logging_in),
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
                             } else {
                                 Text(
-                                    text = "登 录",
+                                    text = stringResource(R.string.login_btn),
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -398,7 +400,7 @@ fun LoginScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Fingerprint,
-                                    contentDescription = "面容或指纹登录",
+                                    contentDescription = stringResource(R.string.login_face_fingerprint_desc),
                                     modifier = Modifier.size(26.dp)
                                 )
                             }

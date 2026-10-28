@@ -63,7 +63,7 @@ fun BudgetManagementPage(
             res.onSuccess {
                 overview = it
             }.onFailure {
-                errorMessage = it.message ?: "加载预算概览失败"
+                errorMessage = it.message ?: context.getString(R.string.budget_load_error)
             }
         }
     }
@@ -87,7 +87,7 @@ fun BudgetManagementPage(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.common_back),
                             tint = Slate800
                         )
                     }
@@ -393,7 +393,7 @@ fun BudgetManagementPage(
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = cat.category,
+                                                text = CategoryUiHelper.getLocalizedCategoryName(context, cat.category),
                                                 fontSize = 14.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = Slate800
@@ -418,7 +418,7 @@ fun BudgetManagementPage(
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Edit,
-                                                    contentDescription = "修改",
+                                                    contentDescription = stringResource(R.string.common_edit),
                                                     tint = Slate400,
                                                     modifier = Modifier.size(16.dp)
                                                 )
@@ -432,20 +432,20 @@ fun BudgetManagementPage(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            text = "已花: RM ${String.format(Locale.getDefault(), "%.0f", cat.spent)} / 限额: RM ${String.format(Locale.getDefault(), "%.0f", cat.limit)}",
+                                            text = stringResource(R.string.budget_spent_limit_fmt, String.format(Locale.getDefault(), "%.0f", cat.spent), String.format(Locale.getDefault(), "%.0f", cat.limit)),
                                             fontSize = 11.sp,
                                             color = Slate500
                                         )
                                         if (cat.remaining < 0) {
                                             Text(
-                                                text = "超支 RM ${String.format(Locale.getDefault(), "%.0f", -cat.remaining)}",
+                                                text = stringResource(R.string.budget_overspent_format, String.format(Locale.getDefault(), "%.0f", -cat.remaining)),
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color(0xFFDC2626)
                                             )
                                         } else {
                                             Text(
-                                                text = "剩余 RM ${String.format(Locale.getDefault(), "%.0f", cat.remaining)}",
+                                                text = stringResource(R.string.budget_remaining_format, String.format(Locale.getDefault(), "%.0f", cat.remaining)),
                                                 fontSize = 11.sp,
                                                 color = Slate500
                                             )
@@ -504,7 +504,7 @@ fun BudgetManagementPage(
             text = {
                 Column {
                     Text(
-                        text = "输入每月最高支出限额。输入 0 或留空可取消总预算。",
+                        text = stringResource(R.string.budget_overall_dialog_tip),
                         fontSize = 13.sp,
                         color = Slate500
                     )
@@ -512,7 +512,7 @@ fun BudgetManagementPage(
                     OutlinedTextField(
                         value = limitInput,
                         onValueChange = { limitInput = it },
-                        label = { Text("总预算限额 (MYR)", color = Slate600) },
+                        label = { Text(stringResource(R.string.budget_overall_limit_label), color = Slate600) },
                         placeholder = { Text(stringResource(R.string.budget_amount_hint), color = Slate400) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -530,11 +530,11 @@ fun BudgetManagementPage(
                             val res = NativeLedgerApi.saveOverallBudget(context, num)
                             isSubmitting = false
                             res.onSuccess {
-                                Toast.makeText(context, "总预算设置成功", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.budget_overall_set_success), Toast.LENGTH_SHORT).show()
                                 showSetOverallDialog = false
                                 loadBudget()
                             }.onFailure {
-                                Toast.makeText(context, "设置失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
@@ -575,7 +575,7 @@ fun BudgetManagementPage(
             text = {
                 Column {
                     Text(
-                        text = "输入「${cat.category}」每月的支出上限金额。",
+                        text = stringResource(R.string.budget_cat_dialog_tip_fmt, CategoryUiHelper.getLocalizedCategoryName(context, cat.category)),
                         fontSize = 13.sp,
                         color = Slate500
                     )
@@ -583,7 +583,7 @@ fun BudgetManagementPage(
                     OutlinedTextField(
                         value = catLimitInput,
                         onValueChange = { catLimitInput = it },
-                        label = { Text("限额 (MYR)", color = Slate600) },
+                        label = { Text(stringResource(R.string.budget_limit_myr_label), color = Slate600) },
                         placeholder = { Text(stringResource(R.string.budget_amount_hint), color = Slate400) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -601,11 +601,11 @@ fun BudgetManagementPage(
                                 val res = NativeLedgerApi.deleteCategoryBudget(context, cat.category)
                                 isSubmitting = false
                                 res.onSuccess {
-                                    Toast.makeText(context, "已清除分类预算", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.budget_cat_cleared_toast), Toast.LENGTH_SHORT).show()
                                     editingCategoryBudget = null
                                     loadBudget()
                                 }.onFailure {
-                                    Toast.makeText(context, "清除失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -623,11 +623,11 @@ fun BudgetManagementPage(
                                 val res = NativeLedgerApi.saveCategoryBudget(context, cat.category, num)
                                 isSubmitting = false
                                 res.onSuccess {
-                                    Toast.makeText(context, "分类预算已保存", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.budget_cat_saved_toast), Toast.LENGTH_SHORT).show()
                                     editingCategoryBudget = null
                                     loadBudget()
                                 }.onFailure {
-                                    Toast.makeText(context, "保存失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -659,7 +659,7 @@ fun BudgetManagementPage(
             containerColor = Color.White,
             title = {
                 Text(
-                    text = "添加分类预算",
+                    text = stringResource(R.string.budget_add_category_btn),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Slate900
@@ -668,14 +668,14 @@ fun BudgetManagementPage(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "输入需要设定月度限额的分类名称与金额：",
+                        text = stringResource(R.string.budget_cat_dialog_hint),
                         fontSize = 13.sp,
                         color = Slate500
                     )
                     OutlinedTextField(
                         value = newCatName,
                         onValueChange = { newCatName = it },
-                        label = { Text("分类名称 (如: 餐饮)", color = Slate600) },
+                        label = { Text(stringResource(R.string.budget_cat_name_label), color = Slate600) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -684,8 +684,8 @@ fun BudgetManagementPage(
                     OutlinedTextField(
                         value = newCatLimit,
                         onValueChange = { newCatLimit = it },
-                        label = { Text("月度限额 (MYR)", color = Slate600) },
-                        placeholder = { Text("如: 800.00", color = Slate400) },
+                        label = { Text(stringResource(R.string.budget_monthly_limit_label), color = Slate600) },
+                        placeholder = { Text(stringResource(R.string.budget_monthly_limit_placeholder), color = Slate400) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -699,7 +699,7 @@ fun BudgetManagementPage(
                         val name = newCatName.trim()
                         val num = newCatLimit.toDoubleOrNull() ?: 0.0
                         if (name.isEmpty() || num <= 0.0) {
-                            Toast.makeText(context, "请输入有效的分类名称与大于0的金额", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.budget_cat_input_invalid), Toast.LENGTH_SHORT).show()
                             return@Button
                         }
                         isSubmitting = true
@@ -707,11 +707,11 @@ fun BudgetManagementPage(
                             val res = NativeLedgerApi.saveCategoryBudget(context, name, num)
                             isSubmitting = false
                             res.onSuccess {
-                                Toast.makeText(context, "已为「$name」设定预算", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.budget_cat_set_success_fmt, CategoryUiHelper.getLocalizedCategoryName(context, name)), Toast.LENGTH_SHORT).show()
                                 showAddCategoryBudgetDialog = false
                                 loadBudget()
                             }.onFailure {
-                                Toast.makeText(context, "设定失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
                     },

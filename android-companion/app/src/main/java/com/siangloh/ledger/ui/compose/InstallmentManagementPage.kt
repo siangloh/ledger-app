@@ -54,7 +54,7 @@ fun InstallmentManagementPage(
             TopAppBar(
                 title = {
                     Text(
-                        text = "分期与债务追踪",
+                        text = stringResource(R.string.inst_title),
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
@@ -64,7 +64,7 @@ fun InstallmentManagementPage(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.common_back),
                             tint = Slate800
                         )
                     }
@@ -73,7 +73,7 @@ fun InstallmentManagementPage(
                     IconButton(onClick = { showAddDialog = true }) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "添加",
+                            contentDescription = stringResource(R.string.common_add),
                             tint = Color(0xFFD97706)
                         )
                     }
@@ -107,9 +107,9 @@ fun InstallmentManagementPage(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text(text = "累计剩余待还总额", fontSize = 13.sp, color = Slate600)
+                            Text(text = stringResource(R.string.inst_total_remaining_label), fontSize = 13.sp, color = Slate600)
                             Text(
-                                text = "共 ${installments.size} 个还款计划",
+                                text = stringResource(R.string.inst_count_fmt, installments.size),
                                 fontSize = 11.sp,
                                 color = Slate400
                             )
@@ -149,14 +149,14 @@ fun InstallmentManagementPage(
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "暂无活跃分期计划",
+                            text = stringResource(R.string.inst_empty_title),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate800
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "添加信用卡分期、贷款或大额购买分期计划",
+                            text = stringResource(R.string.inst_empty_desc),
                             fontSize = 12.sp,
                             color = Slate500,
                             textAlign = TextAlign.Center
@@ -170,7 +170,7 @@ fun InstallmentManagementPage(
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("添加首个分期计划")
+                            Text(stringResource(R.string.inst_add_first_btn))
                         }
                     }
                 }
@@ -205,7 +205,7 @@ fun InstallmentManagementPage(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "进度: ${inst.paidPeriods}/${inst.tenureMonths} 期 · 月供 RM ${String.format(Locale.getDefault(), "%.2f", inst.monthlyAmount)}",
+                                    text = stringResource(R.string.inst_progress_fmt, inst.paidPeriods, inst.tenureMonths, String.format(Locale.getDefault(), "%.2f", inst.monthlyAmount)),
                                     fontSize = 11.sp,
                                     color = Slate500
                                 )
@@ -217,19 +217,19 @@ fun InstallmentManagementPage(
                                                 val res = NativeLedgerApi.payInstallmentPeriod(context, inst.id)
                                                 isSubmitting = false
                                                 res.onSuccess {
-                                                    Toast.makeText(context, "已成功打卡本期还款", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, context.getString(R.string.inst_checkin_success), Toast.LENGTH_SHORT).show()
                                                     onRefresh()
                                                 }.onFailure {
-                                                    Toast.makeText(context, it.message ?: "打卡失败", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, it.message ?: context.getString(R.string.inst_checkin_fail), Toast.LENGTH_SHORT).show()
                                                 }
                                             }
                                         },
                                         enabled = inst.paidPeriods < inst.tenureMonths && !isSubmitting
                                     ) {
-                                        Text("打卡本期", fontSize = 12.sp, color = PrimaryTeal, fontWeight = FontWeight.Bold)
+                                        Text(stringResource(R.string.inst_checkin_btn), fontSize = 12.sp, color = PrimaryTeal, fontWeight = FontWeight.Bold)
                                     }
                                     IconButton(onClick = { editingInst = inst }, modifier = Modifier.size(36.dp)) {
-                                        Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Slate400, modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.common_edit), tint = Slate400, modifier = Modifier.size(16.dp))
                                     }
                                 }
                             }
@@ -272,7 +272,7 @@ fun InstallmentManagementPage(
             containerColor = Color.White,
             title = {
                 Text(
-                    text = if (activeInst != null) "编辑分期项目" else "添加新的分期/借款",
+                    text = if (activeInst != null) stringResource(R.string.inst_dialog_edit_title) else stringResource(R.string.inst_dialog_add_title),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Slate900
@@ -283,7 +283,7 @@ fun InstallmentManagementPage(
                     OutlinedTextField(
                         value = titleInput,
                         onValueChange = { titleInput = it },
-                        label = { Text("分期/债务名称 (如: iPhone 免息分期)", color = Slate600) },
+                        label = { Text(stringResource(R.string.inst_name_hint), color = Slate600) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -292,7 +292,7 @@ fun InstallmentManagementPage(
                     OutlinedTextField(
                         value = totalAmountInput,
                         onValueChange = { totalAmountInput = it },
-                        label = { Text("总欠款金额 (MYR)", color = Slate600) },
+                        label = { Text(stringResource(R.string.inst_total_amount_label), color = Slate600) },
                         placeholder = { Text("0.00", color = Slate400) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -303,7 +303,7 @@ fun InstallmentManagementPage(
                         OutlinedTextField(
                             value = tenureInput,
                             onValueChange = { tenureInput = it },
-                            label = { Text("总期数", color = Slate600) },
+                            label = { Text(stringResource(R.string.inst_tenure_label), color = Slate600) },
                             placeholder = { Text("12", color = Slate400) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
@@ -313,7 +313,7 @@ fun InstallmentManagementPage(
                         OutlinedTextField(
                             value = paidInput,
                             onValueChange = { paidInput = it },
-                            label = { Text("已还期数", color = Slate600) },
+                            label = { Text(stringResource(R.string.inst_paid_periods_label), color = Slate600) },
                             placeholder = { Text("0", color = Slate400) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
@@ -324,8 +324,8 @@ fun InstallmentManagementPage(
                     OutlinedTextField(
                         value = monthlyInput,
                         onValueChange = { monthlyInput = it },
-                        label = { Text("月供金额 (留空按期数自动计算)", color = Slate600) },
-                        placeholder = { Text("可选", color = Slate400) },
+                        label = { Text(stringResource(R.string.inst_monthly_amount_label), color = Slate600) },
+                        placeholder = { Text(stringResource(R.string.inst_optional_placeholder), color = Slate400) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -343,18 +343,18 @@ fun InstallmentManagementPage(
                                     val res = NativeLedgerApi.deleteInstallment(context, activeInst.id)
                                     isSubmitting = false
                                     res.onSuccess {
-                                        Toast.makeText(context, "已删除分期记录", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.inst_deleted_toast), Toast.LENGTH_SHORT).show()
                                         editingInst = null
                                         onRefresh()
                                     }.onFailure {
-                                        Toast.makeText(context, "删除失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
                             enabled = !isSubmitting,
                             modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                         ) {
-                            Text("删除", color = ExpenseRed)
+                            Text(stringResource(R.string.common_delete), color = ExpenseRed)
                         }
                     }
 
@@ -366,7 +366,7 @@ fun InstallmentManagementPage(
                             val pd = paidInput.toIntOrNull() ?: 0
                             val mo = monthlyInput.toDoubleOrNull()
                             if (t.isEmpty() || tot <= 0.0 || ten <= 0) {
-                                Toast.makeText(context, "请输入有效的分期名称、总金额及期数", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.inst_input_valid_error), Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
                             isSubmitting = true
@@ -382,12 +382,12 @@ fun InstallmentManagementPage(
                                 )
                                 isSubmitting = false
                                 res.onSuccess {
-                                    Toast.makeText(context, "分期记录已保存", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.inst_saved_toast), Toast.LENGTH_SHORT).show()
                                     showAddDialog = false
                                     editingInst = null
                                     onRefresh()
                                 }.onFailure {
-                                    Toast.makeText(context, "保存失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -395,7 +395,7 @@ fun InstallmentManagementPage(
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
                         modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                     ) {
-                        Text("保存", color = Color.White)
+                        Text(stringResource(R.string.common_save), color = Color.White)
                     }
                 }
             },

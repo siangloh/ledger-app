@@ -96,7 +96,7 @@ fun RecycleBinPage(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.common_back),
                             tint = Slate800
                         )
                     }
@@ -149,7 +149,7 @@ fun RecycleBinPage(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = errorMessage ?: "加载失败",
+                            text = errorMessage ?: stringResource(R.string.recycle_bin_load_error),
                             fontSize = 13.sp,
                             color = ExpenseRed,
                             modifier = Modifier.padding(bottom = 12.dp)
@@ -216,7 +216,7 @@ fun RecycleBinPage(
                             val cat = item.optString("category")
                             val note = item.optString("note")
                             val amount = item.optDouble("amount")
-                            val accName = item.optString("account_name", "默认账户")
+                            val accName = item.optString("account_name", stringResource(R.string.recycle_bin_default_account))
                             val isExpense = type == "expense"
 
                             Surface(
@@ -233,7 +233,7 @@ fun RecycleBinPage(
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                text = note.ifBlank { cat.ifBlank { "已删除记录" } },
+                                                text = note.ifBlank { cat.ifBlank { stringResource(R.string.recycle_bin_deleted_record) } },
                                                 fontSize = 14.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = Slate800,
@@ -289,10 +289,10 @@ fun RecycleBinPage(
                                                     val res = LocalLedgerRepository.restoreRecycleBinItem(context, id)
                                                     isOperating = false
                                                     res.onSuccess {
-                                                        Toast.makeText(context, "已成功恢复", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, context.getString(R.string.recycle_bin_restore_success), Toast.LENGTH_SHORT).show()
                                                         loadItems()
                                                     }.onFailure {
-                                                        Toast.makeText(context, it.message ?: "恢复失败", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, it.message ?: context.getString(R.string.recycle_bin_restore_failed), Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             },
@@ -348,10 +348,10 @@ fun RecycleBinPage(
                             val res = LocalLedgerRepository.permanentDeleteRecycleBinItem(context, toDel)
                             isOperating = false
                             res.onSuccess {
-                                Toast.makeText(context, "已彻底删除", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.recycle_bin_delete_success), Toast.LENGTH_SHORT).show()
                                 loadItems()
                             }.onFailure {
-                                Toast.makeText(context, it.message ?: "删除失败", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, it.message ?: context.getString(R.string.recycle_bin_delete_failed), Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
@@ -402,10 +402,10 @@ fun RecycleBinPage(
                             val res = LocalLedgerRepository.emptyRecycleBin(context)
                             isOperating = false
                             res.onSuccess {
-                                Toast.makeText(context, "回收站已清空", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.recycle_bin_empty_success), Toast.LENGTH_SHORT).show()
                                 loadItems()
                             }.onFailure {
-                                Toast.makeText(context, it.message ?: "清空失败", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, it.message ?: context.getString(R.string.recycle_bin_empty_failed), Toast.LENGTH_SHORT).show()
                             }
                         }
                     },

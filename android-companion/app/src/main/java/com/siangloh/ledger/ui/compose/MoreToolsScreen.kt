@@ -124,7 +124,7 @@ fun MoreToolsScreen(
                 toolsSummary = it
                 toolsError = null
             }.onFailure {
-                toolsError = it.message ?: "加载订阅与分期数据失败"
+                toolsError = it.message ?: context.getString(R.string.tools_error_load_subs_inst)
             }
 
             // 2. Load Pending Transactions from Overview API
@@ -186,10 +186,10 @@ fun MoreToolsScreen(
                     pendingItems = list
                     pendingError = null
                 } else {
-                    pendingError = "无法连接服务器获取待整理条目"
+                    pendingError = context.getString(R.string.tools_error_fetch_pending_failed)
                 }
             } catch (e: Exception) {
-                pendingError = e.message ?: "获取待整理条目异常"
+                pendingError = e.message ?: context.getString(R.string.tools_error_fetch_pending_exception)
             }
 
             isPendingLoading = false
@@ -297,14 +297,14 @@ fun MoreToolsScreen(
                         onClick = {
                             isSyncing = true
                             SyncWorker.enqueueSync(context)
-                            Toast.makeText(context, "已触发多端数据双向同步", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.tools_sync_triggered), Toast.LENGTH_SHORT).show()
                             refreshAll()
                             isSyncing = false
                         }
                     ) {
                         Icon(
                             imageVector = Icons.Default.Sync,
-                            contentDescription = "同步",
+                            contentDescription = stringResource(R.string.tools_sync_action),
                             tint = PrimaryBlue
                         )
                     }
@@ -338,10 +338,10 @@ fun MoreToolsScreen(
                         scope.launch {
                             val res = NativeLedgerApi.handlePendingAction(context, id, action)
                             res.onSuccess {
-                                Toast.makeText(context, "操作成功", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.common_success), Toast.LENGTH_SHORT).show()
                                 refreshAll()
                             }.onFailure {
-                                Toast.makeText(context, "失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
@@ -442,7 +442,7 @@ fun MoreToolsScreen(
             // 8. 当前账户与退出登录 (Account & Logout)
             item {
                 val currentUsername = com.siangloh.ledger.data.AuthManager.getCurrentUsername(context).ifBlank {
-                    NetworkHelper.getUsername(context).ifBlank { "未登录" }
+                    NetworkHelper.getUsername(context).ifBlank { stringResource(R.string.nav_not_logged_in) }
                 }
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -470,7 +470,7 @@ fun MoreToolsScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.AccountCircle,
-                                    contentDescription = "当前用户",
+                                    contentDescription = stringResource(R.string.tools_user_icon_desc),
                                     tint = PrimaryTeal,
                                     modifier = Modifier.size(22.dp)
                                 )
@@ -502,7 +502,7 @@ fun MoreToolsScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                                contentDescription = "退出登录",
+                                contentDescription = stringResource(R.string.tools_logout),
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
@@ -559,7 +559,7 @@ fun MoreToolsScreen(
                 currentServerUrl = newUrl
                 currentApiKey = newKey
                 showServerConfigDialog = false
-                Toast.makeText(context, "配置与同步规则已更新", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.tools_config_saved_toast), Toast.LENGTH_SHORT).show()
                 refreshAll()
             }
         )
@@ -581,11 +581,11 @@ fun MoreToolsScreen(
                 scope.launch {
                     val res = NativeLedgerApi.quickCategorize(context, item.id, cat)
                     res.onSuccess {
-                        Toast.makeText(context, "已归类为【$cat】", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.tools_categorized_fmt, CategoryUiHelper.getLocalizedCategoryName(context, cat)), Toast.LENGTH_SHORT).show()
                         categorizingItem = null
                         refreshAll()
                     }.onFailure {
-                        Toast.makeText(context, "归类失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -659,7 +659,7 @@ fun PendingInboxCard(
                         )
                         Text(
                             text = if (isLoading) stringResource(R.string.tools_inbox_syncing)
-                                   else if (errorMessage != null) "加载失败：$errorMessage"
+                                   else if (errorMessage != null) stringResource(R.string.records_load_error_prefix) + errorMessage
                                    else if (pendingCount > 0) stringResource(R.string.tools_inbox_has_items_fmt, pendingCount)
                                    else stringResource(R.string.tools_inbox_zero),
                             fontSize = 12.sp,
@@ -670,7 +670,7 @@ fun PendingInboxCard(
 
                 if (errorMessage != null) {
                     TextButton(onClick = onRetry) {
-                        Text("重试", fontSize = 13.sp, color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.tools_retry), fontSize = 13.sp, color = PrimaryBlue, fontWeight = FontWeight.Bold)
                     }
                 } else if (pendingCount > 0) {
                     TextButton(onClick = { expanded = !expanded }) {
@@ -770,7 +770,7 @@ fun PendingInboxCard(
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Text(
-                                            text = "参考已有记录 #${item.suspectedDuplicateId ?: 0}: ${item.suspectedDuplicateNote ?: "交易"}",
+                                            text = stringResource(R.string.tools_pending_ref_record_fmt, item.suspectedDuplicateId ?: 0, item.suspectedDuplicateNote ?: stringResource(R.string.records_badge_manual)),
                                             fontSize = 11.sp,
                                             color = Slate600,
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -857,7 +857,7 @@ fun PendingInboxCard(
                             modifier = Modifier.align(Alignment.CenterHorizontally)
                         ) {
                             Text(
-                                text = if (showAll) "收起仅显示前 5 条" else "展开查看全部待整理条目 (共 ${pendingItems.size} 条)",
+                                text = if (showAll) stringResource(R.string.tools_collapse_top5) else stringResource(R.string.tools_expand_all_fmt, pendingItems.size),
                                 fontSize = 12.sp,
                                 color = Slate600,
                                 fontWeight = FontWeight.Medium
@@ -903,7 +903,7 @@ fun ReceiptOcrBannerCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.CameraAlt,
-                        contentDescription = "拍小票",
+                        contentDescription = stringResource(R.string.tools_ocr_camera_desc),
                         tint = Color.White,
                         modifier = Modifier.size(24.dp)
                     )
@@ -998,8 +998,8 @@ fun SubscriptionsCard(
                             color = Slate800
                         )
                         Text(
-                            text = if (errorMessage != null) "加载失败：$errorMessage"
-                                   else "支出 RM ${String.format(Locale.getDefault(), "%.2f", totalMonthly)} · 储蓄 RM ${String.format(Locale.getDefault(), "%.2f", totalMonthlySavings)} · 收入 RM ${String.format(Locale.getDefault(), "%.2f", totalMonthlyIncome)}",
+                            text = if (errorMessage != null) stringResource(R.string.records_load_error_prefix) + errorMessage
+                                   else stringResource(R.string.tools_subs_summary_fmt, String.format(Locale.getDefault(), "%.2f", totalMonthly), String.format(Locale.getDefault(), "%.2f", totalMonthlySavings), String.format(Locale.getDefault(), "%.2f", totalMonthlyIncome)),
                             fontSize = 12.sp,
                             color = if (errorMessage != null) ExpenseRed else Slate500
                         )
@@ -1010,7 +1010,7 @@ fun SubscriptionsCard(
                     IconButton(onClick = onOpenManage) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "添加订阅",
+                            contentDescription = stringResource(R.string.tools_add_subscription_desc),
                             tint = PrimaryTeal
                         )
                     }
@@ -1051,7 +1051,7 @@ fun SubscriptionsCard(
                                     color = Slate800
                                 )
                                 Text(
-                                    text = "下次扣款: ${sub.nextBillingDate} · ${sub.category}",
+                                    text = stringResource(R.string.tools_sub_next_billing_fmt, sub.nextBillingDate, CategoryUiHelper.getLocalizedCategoryName(context, sub.category)),
                                     fontSize = 11.sp,
                                     color = Slate500
                                 )
@@ -1064,7 +1064,7 @@ fun SubscriptionsCard(
                                     color = Slate800
                                 )
                                 Text(
-                                    text = "点击编辑/管理",
+                                    text = stringResource(R.string.tools_click_to_manage),
                                     fontSize = 10.sp,
                                     color = Slate400
                                 )
@@ -1089,7 +1089,7 @@ fun SubscriptionsCard(
                     ) {
                         Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("智能匹配流水", fontSize = 12.sp, color = Color.White)
+                        Text(stringResource(R.string.tools_smart_match_btn), fontSize = 12.sp, color = Color.White)
                     }
                 }
             }
@@ -1103,7 +1103,7 @@ fun SubscriptionsCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("智能流水配对候选", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                    Text(stringResource(R.string.tools_smart_match_title), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Slate900)
                 }
             },
             text = {
@@ -1124,7 +1124,7 @@ fun SubscriptionsCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "🎉 暂无待匹配流水，所有近期扣费均已对齐或已关联！",
+                            text = stringResource(R.string.tools_smart_match_empty),
                             fontSize = 13.sp,
                             color = Slate500,
                             textAlign = TextAlign.Center
@@ -1176,7 +1176,7 @@ fun SubscriptionsCard(
                                                 modifier = Modifier.fillMaxWidth()
                                             ) {
                                                 Text(
-                                                    text = "⚠️【打算退订拦截预警】已标记退订但发生扣款！",
+                                                    text = stringResource(R.string.tools_smart_match_warning),
                                                     fontSize = 11.sp,
                                                     color = Color(0xFFB91C1C),
                                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
@@ -1185,7 +1185,7 @@ fun SubscriptionsCard(
                                             }
                                         } else {
                                             Text(
-                                                text = "💡 匹配订阅: ${match.matchedSubName} · 下期: ${match.matchedSubNextBilling ?: "-"}",
+                                                text = stringResource(R.string.tools_match_sub_fmt, match.matchedSubName ?: "", match.matchedSubNextBilling ?: "-"),
                                                 fontSize = 11.sp,
                                                 color = PrimaryTeal
                                             )
@@ -1197,10 +1197,10 @@ fun SubscriptionsCard(
                                                 scope.launch {
                                                     val res = NativeLedgerApi.applySubscriptionMatch(context, match.matchedSubId, match.txId)
                                                     if (res.isSuccess) {
-                                                        Toast.makeText(context, "已成功顺延订阅下期扣款日", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, context.getString(R.string.tools_postpone_sub_success), Toast.LENGTH_SHORT).show()
                                                         matchRecords = matchRecords.filter { it.txId != match.txId }
                                                     } else {
-                                                        Toast.makeText(context, "操作失败: ${res.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, context.getString(R.string.tools_operation_failed_fmt, res.exceptionOrNull()?.message ?: ""), Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             },
@@ -1208,12 +1208,12 @@ fun SubscriptionsCard(
                                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                                             shape = RoundedCornerShape(6.dp)
                                         ) {
-                                            Text("顺延下期扣款日", fontSize = 11.sp, color = Color.White)
+                                            Text(stringResource(R.string.tools_postpone_sub_btn), fontSize = 11.sp, color = Color.White)
                                         }
                                     } else if (match.matchedInstId != null) {
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = "💡 匹配分期: ${match.matchedInstTitle} (第 ${match.matchedInstNextPeriod}/${match.matchedInstTenure} 期)",
+                                            text = stringResource(R.string.tools_match_inst_fmt, match.matchedInstTitle ?: "", match.matchedInstNextPeriod ?: 0, match.matchedInstTenure ?: 0),
                                             fontSize = 11.sp,
                                             color = PrimaryTeal
                                         )
@@ -1223,10 +1223,10 @@ fun SubscriptionsCard(
                                                 scope.launch {
                                                     val res = NativeLedgerApi.applyInstallmentMatch(context, match.matchedInstId, match.txId)
                                                     if (res.isSuccess) {
-                                                        Toast.makeText(context, "已成功推进分期还款进度", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, context.getString(R.string.tools_advance_inst_success), Toast.LENGTH_SHORT).show()
                                                         matchRecords = matchRecords.filter { it.txId != match.txId }
                                                     } else {
-                                                        Toast.makeText(context, "操作失败: ${res.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, context.getString(R.string.tools_operation_failed_fmt, res.exceptionOrNull()?.message ?: ""), Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             },
@@ -1234,7 +1234,7 @@ fun SubscriptionsCard(
                                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                                             shape = RoundedCornerShape(6.dp)
                                         ) {
-                                            Text("记录当期分期已还", fontSize = 11.sp, color = Color.White)
+                                            Text(stringResource(R.string.tools_record_inst_paid_btn), fontSize = 11.sp, color = Color.White)
                                         }
                                     }
                                 }
@@ -1245,7 +1245,7 @@ fun SubscriptionsCard(
             },
             confirmButton = {
                 TextButton(onClick = { showMatchDialog = false }) {
-                    Text("关闭", color = PrimaryTeal, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.tools_close_btn), color = PrimaryTeal, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -1301,14 +1301,14 @@ fun InstallmentsCard(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "分期与债务追踪",
+                            text = stringResource(R.string.tools_inst_title),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate800
                         )
                         Text(
-                            text = if (errorMessage != null) "加载失败：$errorMessage"
-                                   else "剩余待还 RM ${String.format(Locale.getDefault(), "%.2f", totalRemaining)} · ${installments.size} 项进行中",
+                            text = if (errorMessage != null) stringResource(R.string.records_load_error_prefix) + errorMessage
+                                   else stringResource(R.string.tools_inst_summary_fmt, String.format(Locale.getDefault(), "%.2f", totalRemaining), installments.size),
                             fontSize = 12.sp,
                             color = if (errorMessage != null) ExpenseRed else Slate500
                         )
@@ -1319,7 +1319,7 @@ fun InstallmentsCard(
                     IconButton(onClick = onOpenManage) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "添加分期/债务",
+                            contentDescription = stringResource(R.string.tools_add_installment_desc),
                             tint = Color(0xFFD97706)
                         )
                     }
@@ -1360,7 +1360,7 @@ fun InstallmentsCard(
                                     color = Slate800
                                 )
                                 Text(
-                                    text = "已还 ${inst.paidPeriods}/${inst.tenureMonths} 期 · 月供 RM ${String.format(Locale.getDefault(), "%.2f", inst.monthlyAmount)}",
+                                    text = stringResource(R.string.tools_inst_item_progress_fmt, inst.paidPeriods, inst.tenureMonths, String.format(Locale.getDefault(), "%.2f", inst.monthlyAmount)),
                                     fontSize = 11.sp,
                                     color = Slate500
                                 )
@@ -1373,7 +1373,7 @@ fun InstallmentsCard(
                                     color = ExpenseRed
                                 )
                                 Text(
-                                    text = "点击编辑/还款",
+                                    text = stringResource(R.string.tools_click_to_edit_inst),
                                     fontSize = 10.sp,
                                     color = Slate400
                                 )
@@ -1411,13 +1411,13 @@ fun AutomationSettingsCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "自动化记账守护",
+                text = stringResource(R.string.tools_guardian_title),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = Slate800
             )
             Text(
-                text = "毫秒级拦截银行通知，无需手动打开应用",
+                text = stringResource(R.string.tools_guardian_subtitle),
                 fontSize = 12.sp,
                 color = Slate500
             )
@@ -1440,20 +1440,20 @@ fun AutomationSettingsCard(
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "通知监听服务",
+                            text = stringResource(R.string.tools_listener_service),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             color = Slate800
                         )
                         Text(
-                            text = if (isListening) "运行中 (已授权)" else "未启用 (点击前往系统设置授权)",
+                            text = if (isListening) stringResource(R.string.tools_listener_running) else stringResource(R.string.tools_listener_disabled),
                             fontSize = 11.sp,
                             color = if (isListening) IncomeGreen else Color(0xFFEF4444)
                         )
                     }
                 }
                 TextButton(onClick = onManageListener) {
-                    Text("设置", fontSize = 13.sp, color = PrimaryBlue)
+                    Text(stringResource(R.string.tools_setting_btn), fontSize = 13.sp, color = PrimaryBlue)
                 }
             }
 
@@ -1467,19 +1467,19 @@ fun AutomationSettingsCard(
             ) {
                 Column {
                     Text(
-                        text = "后台省电白名单",
+                        text = stringResource(R.string.tools_battery_whitelist),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = Slate800
                     )
                     Text(
-                        text = if (isBatteryOptimized) "已豁免 (允许后台常驻)" else "未豁免 (可能被系统杀进程)",
+                        text = if (isBatteryOptimized) stringResource(R.string.tools_battery_exempted) else stringResource(R.string.tools_battery_not_exempted),
                         fontSize = 11.sp,
                         color = if (isBatteryOptimized) IncomeGreen else Color(0xFFD97706)
                     )
                 }
                 TextButton(onClick = onManageBattery) {
-                    Text("优化", fontSize = 13.sp, color = PrimaryBlue)
+                    Text(stringResource(R.string.tools_optimize_btn), fontSize = 13.sp, color = PrimaryBlue)
                 }
             }
 
@@ -1493,19 +1493,19 @@ fun AutomationSettingsCard(
             ) {
                 Column {
                     Text(
-                        text = "悬浮窗即时记账弹窗",
+                        text = stringResource(R.string.tools_overlay_popup),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = Slate800
                     )
                     Text(
-                        text = if (canDrawOverlays) "已开启 (捕获账单后弹出气泡)" else "未开启",
+                        text = if (canDrawOverlays) stringResource(R.string.tools_overlay_enabled) else stringResource(R.string.tools_overlay_disabled),
                         fontSize = 11.sp,
                         color = if (canDrawOverlays) IncomeGreen else Slate500
                     )
                 }
                 TextButton(onClick = onManageOverlay) {
-                    Text("权限", fontSize = 13.sp, color = PrimaryBlue)
+                    Text(stringResource(R.string.tools_permission_btn), fontSize = 13.sp, color = PrimaryBlue)
                 }
             }
 
@@ -1524,7 +1524,7 @@ fun AutomationSettingsCard(
                 ) {
                     Icon(imageVector = Icons.Default.Apps, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("监控的应用", fontSize = 12.sp)
+                    Text(stringResource(R.string.tools_monitored_apps), fontSize = 12.sp)
                 }
 
                 OutlinedButton(
@@ -1535,7 +1535,7 @@ fun AutomationSettingsCard(
                 ) {
                     Icon(imageVector = Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("抓取日志", fontSize = 12.sp)
+                    Text(stringResource(R.string.tools_capture_logs), fontSize = 12.sp)
                 }
             }
         }
@@ -1565,13 +1565,13 @@ fun ServerSettingsCard(
             ) {
                 Column {
                     Text(
-                        text = "账本服务器连接",
+                        text = stringResource(R.string.tools_server_conn),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate800
                     )
                     Text(
-                        text = serverUrl.ifBlank { "未配置" },
+                        text = serverUrl.ifBlank { stringResource(R.string.tools_not_configured) },
                         fontSize = 12.sp,
                         color = PrimaryBlue,
                         maxLines = 1,
@@ -1585,13 +1585,13 @@ fun ServerSettingsCard(
                     colors = ButtonDefaults.buttonColors(containerColor = Slate100),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Text("修改", fontSize = 12.sp, color = Slate700)
+                    Text(stringResource(R.string.tools_edit_btn), fontSize = 12.sp, color = Slate700)
                 }
             }
 
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "API Key: " + if (apiKey.isNotEmpty()) "${apiKey.take(4)}••••••••" else "未设置",
+                text = "API Key: " + if (apiKey.isNotEmpty()) "${apiKey.take(4)}••••••••" else stringResource(R.string.tools_not_set),
                 fontSize = 11.sp,
                 color = Slate400
             )
@@ -1639,13 +1639,13 @@ fun FullLedgerFeaturesCard(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "全功能账务大厅 (高级管理)",
+                            text = stringResource(R.string.tools_grand_hall_title),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate900
                         )
                         Text(
-                            text = "全景维护订阅大厅、负债车房贷、固定收支与分类报表",
+                            text = stringResource(R.string.tools_grand_hall_desc),
                             fontSize = 12.sp,
                             color = Slate600
                         )
@@ -1665,12 +1665,12 @@ fun FullLedgerFeaturesCard(
             ) {
                 Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("进入全功能账务管理大厅", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(stringResource(R.string.tools_enter_grand_hall), fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            Text("快捷功能直达：", fontSize = 11.sp, color = Slate500, fontWeight = FontWeight.Medium)
+            Text(stringResource(R.string.tools_quick_shortcuts), fontSize = 11.sp, color = Slate500, fontWeight = FontWeight.Medium)
             Spacer(modifier = Modifier.height(6.dp))
 
             val quickLinks = listOf(
@@ -1880,6 +1880,7 @@ fun QuickCategorizeDialog(
     onDismiss: () -> Unit,
     onConfirmCategory: (String) -> Unit
 ) {
+    val context = LocalContext.current
     var customCategory by remember { mutableStateOf("") }
     val displayCategories = remember(userCategories) {
         val cleanList = userCategories.map { CategoryUiHelper.cleanCategoryName(it) }.filter { it.isNotBlank() }
@@ -1902,7 +1903,7 @@ fun QuickCategorizeDialog(
         containerColor = Color.White,
         titleContentColor = Slate900,
         textContentColor = Slate800,
-        title = { Text("为交易选择分类", fontWeight = FontWeight.Bold, fontSize = 17.sp) },
+        title = { Text(stringResource(R.string.tools_pick_category_title), fontWeight = FontWeight.Bold, fontSize = 17.sp) },
         text = {
             Column(
                 modifier = Modifier
@@ -1920,7 +1921,7 @@ fun QuickCategorizeDialog(
                 OutlinedTextField(
                     value = customCategory,
                     onValueChange = { customCategory = it },
-                    placeholder = { Text("自定义分类...", fontSize = 12.sp, color = Slate400) },
+                    placeholder = { Text(stringResource(R.string.tools_custom_category_placeholder), fontSize = 12.sp, color = Slate400) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
                     textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -1928,7 +1929,7 @@ fun QuickCategorizeDialog(
                     trailingIcon = {
                         if (customCategory.isNotBlank()) {
                             IconButton(onClick = { onConfirmCategory(CategoryUiHelper.cleanCategoryName(customCategory)) }) {
-                                Icon(Icons.Default.Check, contentDescription = "确认", tint = PrimaryTeal)
+                                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_confirm), tint = PrimaryTeal)
                             }
                         }
                     },
@@ -1958,7 +1959,7 @@ fun QuickCategorizeDialog(
                                     Text(emoji, fontSize = 14.sp)
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = catName,
+                                        text = CategoryUiHelper.getLocalizedCategoryName(context, catName),
                                         fontSize = 12.sp,
                                         color = Slate800,
                                         fontWeight = FontWeight.Medium,
@@ -1982,13 +1983,13 @@ fun QuickCategorizeDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal, contentColor = Color.White),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("使用「${customCategory.trim()}」")
+                    Text(stringResource(R.string.tools_use_custom_category_fmt, customCategory.trim()))
                 }
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消", color = Slate600)
+                Text(stringResource(R.string.common_cancel), color = Slate600)
             }
         }
     )
@@ -2022,8 +2023,8 @@ fun ServerConfigDialog(
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("后端服务器地址 (URL)", color = Slate600) },
-                    placeholder = { Text("https://example.com 或 http://192.168.x.x:5000", color = Slate400) },
+                    label = { Text(stringResource(R.string.tools_server_url_label), color = Slate600) },
+                    placeholder = { Text(stringResource(R.string.tools_server_url_hint), color = Slate400) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -2032,7 +2033,7 @@ fun ServerConfigDialog(
                 OutlinedTextField(
                     value = key,
                     onValueChange = { key = it },
-                    label = { Text("API 访问秘钥 (X-API-KEY)", color = Slate600) },
+                    label = { Text(stringResource(R.string.tools_api_key_label), color = Slate600) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -2080,7 +2081,7 @@ fun ServerConfigDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消", color = Slate600)
+                Text(stringResource(R.string.common_cancel), color = Slate600)
             }
         }
     )
@@ -2259,7 +2260,7 @@ fun CategoryRulesDialog(
             res.onSuccess {
                 rules = it
             }.onFailure {
-                errorMessage = it.message ?: "加载规则失败"
+                errorMessage = it.message ?: context.getString(R.string.tools_rules_load_failed)
             }
         }
     }
@@ -2316,7 +2317,7 @@ fun CategoryRulesDialog(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("搜索商户或分类...", fontSize = 13.sp, color = Slate400) },
+                    placeholder = { Text(stringResource(R.string.tools_search_rules_placeholder), fontSize = 13.sp, color = Slate400) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     singleLine = true,
@@ -2331,7 +2332,7 @@ fun CategoryRulesDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "共 ${rules.size} 项规则",
+                        text = stringResource(R.string.tools_rules_count_fmt, rules.size),
                         fontSize = 12.sp,
                         color = Slate500,
                         fontWeight = FontWeight.Medium
@@ -2396,9 +2397,9 @@ fun CategoryRulesDialog(
                                             )
                                             Spacer(modifier = Modifier.width(6.dp))
                                             val typeLabel = when (r.matchType) {
-                                                "exact" -> "完全"
-                                                "regex" -> "正则"
-                                                else -> "包含"
+                                                "exact" -> stringResource(R.string.tools_rule_type_exact)
+                                                "regex" -> stringResource(R.string.tools_rule_type_regex)
+                                                else -> stringResource(R.string.tools_rule_type_contains)
                                             }
                                             Box(
                                                 modifier = Modifier
@@ -2418,7 +2419,7 @@ fun CategoryRulesDialog(
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = "已命中 ${r.applyCount} 次",
+                                                text = stringResource(R.string.tools_rule_hit_count_fmt, r.applyCount),
                                                 fontSize = 11.sp,
                                                 color = Slate400
                                             )
@@ -2441,10 +2442,10 @@ fun CategoryRulesDialog(
                                                     isOperating = false
                                                     res.onSuccess { json ->
                                                         val count = json.optInt("count", 0)
-                                                        Toast.makeText(context, "追溯完成，更新了 $count 笔记录", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, context.getString(R.string.tools_rule_retrace_success_fmt, count), Toast.LENGTH_SHORT).show()
                                                         loadRules()
                                                     }.onFailure {
-                                                        Toast.makeText(context, "追溯失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             },
@@ -2452,7 +2453,7 @@ fun CategoryRulesDialog(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.FlashOn,
-                                                contentDescription = "追溯此规则",
+                                                contentDescription = stringResource(R.string.tools_rule_retrace_btn),
                                                 tint = PrimaryTeal,
                                                 modifier = Modifier.size(20.dp)
                                             )
@@ -2465,7 +2466,7 @@ fun CategoryRulesDialog(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.DeleteOutline,
-                                                contentDescription = "删除规则",
+                                                contentDescription = stringResource(R.string.tools_rule_delete_btn),
                                                 tint = Rose500,
                                                 modifier = Modifier.size(20.dp)
                                             )
@@ -2498,14 +2499,14 @@ fun CategoryRulesDialog(
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
             containerColor = Color.White,
-            title = { Text(text = "添加商户分类规则", fontWeight = FontWeight.Bold, color = Slate900) },
+            title = { Text(text = stringResource(R.string.tools_rule_add_title), fontWeight = FontWeight.Bold, color = Slate900) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
                         value = patternInput,
                         onValueChange = { patternInput = it },
-                        label = { Text("商户匹配模式", color = Slate600) },
-                        placeholder = { Text("例如：GrabFood、Starbucks", color = Slate400) },
+                        label = { Text(stringResource(R.string.tools_rule_pattern_label), color = Slate600) },
+                        placeholder = { Text(stringResource(R.string.tools_rule_pattern_hint), color = Slate400) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -2514,8 +2515,8 @@ fun CategoryRulesDialog(
                     OutlinedTextField(
                         value = categoryInput,
                         onValueChange = { categoryInput = it },
-                        label = { Text("目标分类", color = Slate600) },
-                        placeholder = { Text("例如：餐饮、交通", color = Slate400) },
+                        label = { Text(stringResource(R.string.tools_rule_target_cat_label), color = Slate600) },
+                        placeholder = { Text(stringResource(R.string.tools_rule_target_cat_hint), color = Slate400) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -2525,7 +2526,7 @@ fun CategoryRulesDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf("contains" to "包含关键字", "exact" to "完全匹配").forEach { (type, label) ->
+                        listOf("contains" to stringResource(R.string.tools_rule_match_contains), "exact" to stringResource(R.string.tools_rule_match_exact)).forEach { (type, label) ->
                             val selected = matchTypeInput == type
                             Box(
                                 modifier = Modifier
@@ -2563,11 +2564,11 @@ fun CategoryRulesDialog(
                                     isActive = true
                                 )
                                 res.onSuccess {
-                                    Toast.makeText(context, "规则已保存", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.tools_rule_saved), Toast.LENGTH_SHORT).show()
                                     showAddDialog = false
                                     loadRules()
                                 }.onFailure {
-                                    Toast.makeText(context, "保存失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         }
@@ -2575,7 +2576,7 @@ fun CategoryRulesDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                     modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                 ) {
-                    Text("保存", color = Color.White)
+                    Text(stringResource(R.string.common_save), color = Color.White)
                 }
             },
             dismissButton = {
@@ -2594,8 +2595,8 @@ fun CategoryRulesDialog(
         AlertDialog(
             onDismissRequest = { ruleToDelete = null },
             containerColor = Color.White,
-            title = { Text(text = "删除规则", fontWeight = FontWeight.Bold, color = Slate900) },
-            text = { Text("确定删除商户规则「${r.merchantPattern}」吗？", color = Slate700) },
+            title = { Text(text = stringResource(R.string.tools_rule_delete_confirm_title), fontWeight = FontWeight.Bold, color = Slate900) },
+            text = { Text(stringResource(R.string.tools_rule_delete_confirm_msg_fmt, r.merchantPattern), color = Slate700) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -2603,17 +2604,17 @@ fun CategoryRulesDialog(
                             val res = NativeLedgerApi.deleteCategoryRule(context, r.merchantPattern)
                             ruleToDelete = null
                             res.onSuccess {
-                                Toast.makeText(context, "规则已删除", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.tools_rule_deleted), Toast.LENGTH_SHORT).show()
                                 loadRules()
                             }.onFailure {
-                                Toast.makeText(context, "删除失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Rose500),
                     modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                 ) {
-                    Text("删除", color = Color.White)
+                    Text(stringResource(R.string.common_delete), color = Color.White)
                 }
             },
             dismissButton = {
@@ -2632,8 +2633,8 @@ fun CategoryRulesDialog(
         AlertDialog(
             onDismissRequest = { showApplyAllConfirm = false },
             containerColor = Color.White,
-            title = { Text(text = "⚡ 全量重筛历史", fontWeight = FontWeight.Bold, color = Slate900) },
-            text = { Text("将根据所有启用的分类规则，自动将历史“未分类/其他”的交易匹配并更新到对应分类。确认执行？", color = Slate700) },
+            title = { Text(text = stringResource(R.string.tools_rule_rescreen_title), fontWeight = FontWeight.Bold, color = Slate900) },
+            text = { Text(stringResource(R.string.tools_rule_rescreen_msg), color = Slate700) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -2644,17 +2645,17 @@ fun CategoryRulesDialog(
                             isOperating = false
                             res.onSuccess { json ->
                                 val count = json.optInt("count", 0)
-                                Toast.makeText(context, "全量重筛完成，共更新 $count 笔记录", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.tools_rule_rescreen_success_fmt, count), Toast.LENGTH_SHORT).show()
                                 loadRules()
                             }.onFailure {
-                                Toast.makeText(context, "重筛失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                     modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                 ) {
-                    Text("确认执行", color = Color.White)
+                    Text(stringResource(R.string.tools_rule_rescreen_confirm_btn), color = Color.White)
                 }
             },
             dismissButton = {

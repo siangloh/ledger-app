@@ -117,9 +117,9 @@ fun SubscriptionManagementPage(
                     title = {
                         Text(
                             text = when (pagerState.currentPage) {
-                                0 -> "固定支出与订阅"
-                                1 -> "固定储蓄计划"
-                                else -> "固定收入计划"
+                                0 -> stringResource(R.string.sub_tab_expense)
+                                1 -> stringResource(R.string.sub_tab_savings)
+                                else -> stringResource(R.string.sub_tab_income)
                             },
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
@@ -130,7 +130,7 @@ fun SubscriptionManagementPage(
                         IconButton(onClick = onBack) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "返回",
+                                contentDescription = stringResource(R.string.common_back),
                                 tint = Slate800
                             )
                         }
@@ -143,11 +143,11 @@ fun SubscriptionManagementPage(
                                     val syncRes = NativeLedgerApi.syncToolsFromOnline(context)
                                     isSyncing = false
                                     syncRes.onSuccess {
-                                        Toast.makeText(context, "已从在线数据库同步固定收支与储蓄", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.sub_sync_success), Toast.LENGTH_SHORT).show()
                                         LocalLedgerRepository.getAccountsSummary(context).onSuccess { localAccounts = it.accounts }
                                         onRefresh()
                                     }.onFailure {
-                                        Toast.makeText(context, "同步失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
@@ -155,7 +155,7 @@ fun SubscriptionManagementPage(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Sync,
-                                contentDescription = "同步在线数据",
+                                contentDescription = stringResource(R.string.sub_sync_btn_desc),
                                 tint = when (pagerState.currentPage) {
                                     0 -> PrimaryTeal
                                     1 -> SavingsBlue
@@ -172,7 +172,7 @@ fun SubscriptionManagementPage(
                         }) {
                             Icon(
                                 imageVector = Icons.Default.Add,
-                                contentDescription = "添加",
+                                contentDescription = stringResource(R.string.common_add),
                                 tint = when (pagerState.currentPage) {
                                     0 -> PrimaryTeal
                                     1 -> SavingsBlue
@@ -205,7 +205,7 @@ fun SubscriptionManagementPage(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("固定支出 (${subscriptions.size})", fontWeight = if (pagerState.currentPage == 0) FontWeight.Bold else FontWeight.Normal)
+                                Text(stringResource(R.string.sub_tab_expense_count_fmt, subscriptions.size), fontWeight = if (pagerState.currentPage == 0) FontWeight.Bold else FontWeight.Normal)
                             }
                         }
                     )
@@ -220,7 +220,7 @@ fun SubscriptionManagementPage(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Savings, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("固定储蓄 (${fixedSavings.size})", fontWeight = if (pagerState.currentPage == 1) FontWeight.Bold else FontWeight.Normal)
+                                Text(stringResource(R.string.sub_tab_savings_count_fmt, fixedSavings.size), fontWeight = if (pagerState.currentPage == 1) FontWeight.Bold else FontWeight.Normal)
                             }
                         }
                     )
@@ -235,7 +235,7 @@ fun SubscriptionManagementPage(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("固定收入 (${fixedIncomes.size})", fontWeight = if (pagerState.currentPage == 2) FontWeight.Bold else FontWeight.Normal)
+                                Text(stringResource(R.string.sub_tab_income_count_fmt, fixedIncomes.size), fontWeight = if (pagerState.currentPage == 2) FontWeight.Bold else FontWeight.Normal)
                             }
                         }
                     )
@@ -274,15 +274,15 @@ fun SubscriptionManagementPage(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text(text = "月度固定支出概览", fontSize = 13.sp, color = Slate600)
+                                Text(text = stringResource(R.string.sub_expense_overview), fontSize = 13.sp, color = Slate600)
                                 Text(
-                                    text = "共 ${subscriptions.size} 项周期性订阅",
+                                    text = stringResource(R.string.sub_expense_count_fmt, subscriptions.size),
                                     fontSize = 11.sp,
                                     color = Slate400
                                 )
                             }
                             Text(
-                                text = String.format(Locale.getDefault(), "RM %.2f / 月", totalCost),
+                                text = stringResource(R.string.sub_amount_monthly_fmt, String.format(Locale.getDefault(), "%.2f", totalCost)),
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = PrimaryTeal
@@ -316,14 +316,14 @@ fun SubscriptionManagementPage(
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "暂无活跃订阅项目",
+                                text = stringResource(R.string.sub_empty_expense_title),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Slate800
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "添加 Netflix、Spotify、iCloud、宽带或房租等每月固定支出",
+                                text = stringResource(R.string.sub_empty_expense_desc),
                                 fontSize = 12.sp,
                                 color = Slate500,
                                 textAlign = TextAlign.Center
@@ -337,7 +337,7 @@ fun SubscriptionManagementPage(
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("添加首个订阅")
+                                Text(stringResource(R.string.sub_add_first_expense))
                             }
                         }
                     }
@@ -365,7 +365,7 @@ fun SubscriptionManagementPage(
                                         Text(text = sub.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = "分类: ${sub.category} · 扣款: ${sub.nextBillingDate}",
+                                            text = stringResource(R.string.sub_item_cat_date_fmt, CategoryUiHelper.getLocalizedCategoryName(context, sub.category), sub.nextBillingDate),
                                             fontSize = 11.sp,
                                             color = Slate500
                                         )
@@ -391,15 +391,15 @@ fun SubscriptionManagementPage(
                                         shape = RoundedCornerShape(6.dp),
                                         color = if (!sub.accountName.isNullOrBlank()) Teal50 else Slate100
                                     ) {
-                                        val accText = sub.accountName ?: "未绑定账户"
+                                        val accText = sub.accountName ?: stringResource(R.string.sub_unbound_account)
                                         val icon = when {
                                             accText.contains("Touch") || accText.contains("TNG") -> "📱 "
-                                            accText.contains("卡") || accText.contains("Credit") -> "💳 "
-                                            accText.contains("现金") -> "💵 "
+                                            accText.contains("卡") || accText.contains("Credit", ignoreCase = true) || accText.contains("Debit", ignoreCase = true) || accText.contains("Card", ignoreCase = true) || accText.contains("Kad", ignoreCase = true) -> "💳 "
+                                            accText.contains("现金") || accText.contains("Cash", ignoreCase = true) || accText.contains("Tunai", ignoreCase = true) -> "💵 "
                                             else -> "🏦 "
                                         }
                                         Text(
-                                            text = if (!sub.accountName.isNullOrBlank()) "$icon$accText" else "未绑定账户",
+                                            text = if (!sub.accountName.isNullOrBlank()) "$icon$accText" else stringResource(R.string.sub_unbound_account),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = if (!sub.accountName.isNullOrBlank()) PrimaryTeal else Slate500,
@@ -413,10 +413,10 @@ fun SubscriptionManagementPage(
                                                 scope.launch {
                                                     val res = NativeLedgerApi.recordSubscriptionAsTransaction(context, sub)
                                                     res.onSuccess {
-                                                        Toast.makeText(context, "已成功将「${sub.name}」记入本月支出", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, context.getString(R.string.sub_quick_record_success_fmt, sub.name), Toast.LENGTH_SHORT).show()
                                                         onRefresh()
                                                     }.onFailure {
-                                                        Toast.makeText(context, "记账失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             },
@@ -427,12 +427,12 @@ fun SubscriptionManagementPage(
                                         ) {
                                             Icon(Icons.Default.Check, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
                                             Spacer(Modifier.width(4.dp))
-                                            Text("一键记入", fontSize = 11.sp, color = PrimaryTeal, fontWeight = FontWeight.Bold)
+                                            Text(stringResource(R.string.sub_quick_record_btn), fontSize = 11.sp, color = PrimaryTeal, fontWeight = FontWeight.Bold)
                                         }
 
                                         Spacer(modifier = Modifier.width(6.dp))
                                         IconButton(onClick = { editingSub = sub }, modifier = Modifier.size(30.dp)) {
-                                            Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Slate400, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.common_edit), tint = Slate400, modifier = Modifier.size(16.dp))
                                         }
                                     }
                                 }
@@ -465,15 +465,15 @@ fun SubscriptionManagementPage(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text(text = "月度固定储蓄计划", fontSize = 13.sp, color = Slate600)
+                                Text(text = stringResource(R.string.sub_savings_overview), fontSize = 13.sp, color = Slate600)
                                 Text(
-                                    text = "共 ${fixedSavings.size} 项计划存钱",
+                                    text = stringResource(R.string.sub_savings_count_fmt, fixedSavings.size),
                                     fontSize = 11.sp,
                                     color = Slate400
                                 )
                             }
                             Text(
-                                text = String.format(Locale.getDefault(), "RM %.2f / 月", totalSavings),
+                                text = stringResource(R.string.sub_amount_monthly_fmt, String.format(Locale.getDefault(), "%.2f", totalSavings)),
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SavingsBlue
@@ -507,13 +507,13 @@ fun SubscriptionManagementPage(
                             }
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "暂无固定储蓄与存钱计划",
+                                text = stringResource(R.string.sub_empty_savings_title),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Slate700
                             )
                             Text(
-                                text = "设定每月定存、基金定投或心愿储备，独立记账不计入日常消费",
+                                text = stringResource(R.string.sub_empty_savings_desc),
                                 fontSize = 12.sp,
                                 color = Slate400,
                                 textAlign = TextAlign.Center,
@@ -527,7 +527,7 @@ fun SubscriptionManagementPage(
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("添加固定储蓄计划", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.sub_add_first_savings), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -572,7 +572,7 @@ fun SubscriptionManagementPage(
                                                 color = Slate900
                                             )
                                             Text(
-                                                text = "周期: ${saving.arrivalDay} · ${saving.category}",
+                                                text = stringResource(R.string.sub_saving_item_fmt, saving.arrivalDay, CategoryUiHelper.getLocalizedCategoryName(context, saving.category)),
                                                 fontSize = 11.sp,
                                                 color = Slate500
                                             )
@@ -596,11 +596,11 @@ fun SubscriptionManagementPage(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    val accText = saving.accountName ?: "未指定账户"
+                                    val accText = saving.accountName ?: stringResource(R.string.sub_unbound_account)
                                     val icon = when {
                                         accText.contains("Touch") || accText.contains("TNG") -> "📱 "
-                                        accText.contains("卡") || accText.contains("Credit") -> "💳 "
-                                        accText.contains("现金") -> "💵 "
+                                        accText.contains("卡") || accText.contains("Credit", ignoreCase = true) || accText.contains("Debit", ignoreCase = true) || accText.contains("Card", ignoreCase = true) || accText.contains("Kad", ignoreCase = true) -> "💳 "
+                                        accText.contains("现金") || accText.contains("Cash", ignoreCase = true) || accText.contains("Tunai", ignoreCase = true) -> "💵 "
                                         else -> "🏦 "
                                     }
                                     Surface(
@@ -608,7 +608,7 @@ fun SubscriptionManagementPage(
                                         color = if (!saving.accountName.isNullOrBlank()) SavingsBg else Slate100
                                     ) {
                                         Text(
-                                            text = if (!saving.accountName.isNullOrBlank()) "$icon$accText" else "未指定账户",
+                                            text = if (!saving.accountName.isNullOrBlank()) "$icon$accText" else stringResource(R.string.sub_unbound_account),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = if (!saving.accountName.isNullOrBlank()) SavingsBlue else Slate500,
@@ -622,7 +622,7 @@ fun SubscriptionManagementPage(
                                             color = if (saving.isActive) SavingsBg else Slate100
                                         ) {
                                             Text(
-                                                text = if (saving.isActive) "✓ 生效中" else "已暂停",
+                                                text = if (saving.isActive) stringResource(R.string.sub_status_active) else stringResource(R.string.sub_status_paused),
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Medium,
                                                 color = if (saving.isActive) SavingsBlue else Slate500,
@@ -637,10 +637,10 @@ fun SubscriptionManagementPage(
                                                 scope.launch {
                                                     val res = NativeLedgerApi.recordFixedSavingsAsTransaction(context, saving)
                                                     res.onSuccess {
-                                                        Toast.makeText(context, "已成功将「${saving.name}」记入本月储蓄流水", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, context.getString(R.string.sub_quick_deposit_success_fmt, saving.name), Toast.LENGTH_SHORT).show()
                                                         onRefresh()
                                                     }.onFailure {
-                                                        Toast.makeText(context, "存入记账失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             },
@@ -651,12 +651,12 @@ fun SubscriptionManagementPage(
                                         ) {
                                             Icon(Icons.Default.Check, contentDescription = null, tint = SavingsBlue, modifier = Modifier.size(14.dp))
                                             Spacer(Modifier.width(4.dp))
-                                            Text("一键存入", fontSize = 11.sp, color = SavingsBlue, fontWeight = FontWeight.Bold)
+                                            Text(stringResource(R.string.sub_quick_deposit_btn), fontSize = 11.sp, color = SavingsBlue, fontWeight = FontWeight.Bold)
                                         }
 
                                         Spacer(modifier = Modifier.width(6.dp))
                                         IconButton(onClick = { editingSavings = saving }, modifier = Modifier.size(30.dp)) {
-                                            Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Slate400, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.common_edit), tint = Slate400, modifier = Modifier.size(16.dp))
                                         }
                                     }
                                 }
@@ -689,15 +689,15 @@ fun SubscriptionManagementPage(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text(text = "月度固定收入计划", fontSize = 13.sp, color = Slate600)
+                                Text(text = stringResource(R.string.sub_income_overview), fontSize = 13.sp, color = Slate600)
                                 Text(
-                                    text = "共 ${fixedIncomes.size} 项计划入账",
+                                    text = stringResource(R.string.sub_income_count_fmt, fixedIncomes.size),
                                     fontSize = 11.sp,
                                     color = Slate400
                                 )
                             }
                             Text(
-                                text = String.format(Locale.getDefault(), "+RM %.2f / 月", totalIncome),
+                                text = stringResource(R.string.sub_income_monthly_fmt, String.format(Locale.getDefault(), "%.2f", totalIncome)),
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = IncomeGreen
@@ -731,14 +731,14 @@ fun SubscriptionManagementPage(
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "暂无固定收入计划",
+                                text = stringResource(R.string.sub_empty_income_title),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Slate800
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "添加每月全职薪资、副业、租金收入或固定理财分红",
+                                text = stringResource(R.string.sub_empty_income_desc),
                                 fontSize = 12.sp,
                                 color = Slate500,
                                 textAlign = TextAlign.Center
@@ -752,7 +752,7 @@ fun SubscriptionManagementPage(
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("添加首个固定收入")
+                                Text(stringResource(R.string.sub_add_first_income))
                             }
                         }
                     }
@@ -803,7 +803,7 @@ fun SubscriptionManagementPage(
                                                 color = Slate900
                                             )
                                             Text(
-                                                text = "周期: ${income.arrivalDay} · ${income.category}",
+                                                text = stringResource(R.string.sub_saving_item_fmt, income.arrivalDay, CategoryUiHelper.getLocalizedCategoryName(context, income.category)),
                                                 fontSize = 11.sp,
                                                 color = Slate500
                                             )
@@ -832,7 +832,7 @@ fun SubscriptionManagementPage(
                                         color = if (income.isActive) Teal50 else Slate100
                                     ) {
                                         Text(
-                                            text = if (income.isActive) "✓ 生效中" else "已暂停",
+                                            text = if (income.isActive) stringResource(R.string.sub_status_active) else stringResource(R.string.sub_status_paused),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = if (income.isActive) PrimaryTeal else Slate500,
@@ -846,10 +846,10 @@ fun SubscriptionManagementPage(
                                                 scope.launch {
                                                     val res = NativeLedgerApi.recordFixedIncomeAsTransaction(context, income)
                                                     res.onSuccess {
-                                                        Toast.makeText(context, "已成功将「${income.name}」记入本月流水", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, context.getString(R.string.sub_quick_income_success_fmt, income.name), Toast.LENGTH_SHORT).show()
                                                         onRefresh()
                                                     }.onFailure {
-                                                        Toast.makeText(context, "入账记账失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             },
@@ -860,12 +860,12 @@ fun SubscriptionManagementPage(
                                         ) {
                                             Icon(Icons.Default.Check, contentDescription = null, tint = IncomeGreen, modifier = Modifier.size(14.dp))
                                             Spacer(Modifier.width(4.dp))
-                                            Text("一键记入", fontSize = 11.sp, color = IncomeGreen, fontWeight = FontWeight.Bold)
+                                            Text(stringResource(R.string.sub_quick_record_btn), fontSize = 11.sp, color = IncomeGreen, fontWeight = FontWeight.Bold)
                                         }
 
                                         Spacer(modifier = Modifier.width(6.dp))
                                         IconButton(onClick = { editingIncome = income }, modifier = Modifier.size(30.dp)) {
-                                            Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Slate400, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.common_edit), tint = Slate400, modifier = Modifier.size(16.dp))
                                         }
                                     }
                                 }
@@ -898,7 +898,7 @@ fun SubscriptionManagementPage(
             tonalElevation = 0.dp,
             title = {
                 Text(
-                    text = if (activeSub != null) "编辑订阅项目" else "添加新的订阅/固定支出",
+                    text = if (activeSub != null) stringResource(R.string.sub_dialog_edit_expense) else stringResource(R.string.sub_dialog_add_expense),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Slate900
@@ -909,7 +909,7 @@ fun SubscriptionManagementPage(
                     OutlinedTextField(
                         value = nameInput,
                         onValueChange = { nameInput = it },
-                        label = { Text("项目名称 (如: Netflix, iCloud, 宽带)", color = Slate600) },
+                        label = { Text(stringResource(R.string.sub_name_expense_hint), color = Slate600) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -918,7 +918,7 @@ fun SubscriptionManagementPage(
                     OutlinedTextField(
                         value = costInput,
                         onValueChange = { costInput = it },
-                        label = { Text("周期扣费金额 (MYR)", color = Slate600) },
+                        label = { Text(stringResource(R.string.sub_amount_expense_label), color = Slate600) },
                         placeholder = { Text("0.00", color = Slate400) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -928,7 +928,7 @@ fun SubscriptionManagementPage(
                     OutlinedTextField(
                         value = categoryInput,
                         onValueChange = { categoryInput = it },
-                        label = { Text("记账分类 (可手填或点击下方快速选择)", color = Slate600) },
+                        label = { Text(stringResource(R.string.sub_cat_label), color = Slate600) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -937,7 +937,7 @@ fun SubscriptionManagementPage(
 
                     // 支出分类快捷点选
                     Column {
-                        Text("点击快速选择支出分类:", fontSize = 12.sp, color = Slate600)
+                        Text(stringResource(R.string.sub_quick_cat_label), fontSize = 12.sp, color = Slate600)
                         Spacer(Modifier.height(4.dp))
                         Row(
                             modifier = Modifier
@@ -954,7 +954,7 @@ fun SubscriptionManagementPage(
                                     modifier = Modifier.clickable { categoryInput = opt }
                                 ) {
                                     Text(
-                                        text = opt,
+                                        text = CategoryUiHelper.getLocalizedCategoryName(context, opt),
                                         fontSize = 11.sp,
                                         fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
                                         color = if (sel) Color.White else Slate700,
@@ -967,7 +967,7 @@ fun SubscriptionManagementPage(
 
                     // 扣款/支付账户选择
                     Column {
-                        Text("扣款支付账户:", fontSize = 12.sp, color = Slate600)
+                        Text(stringResource(R.string.sub_account_label), fontSize = 12.sp, color = Slate600)
                         Spacer(Modifier.height(4.dp))
                         Row(
                             modifier = Modifier
@@ -985,7 +985,7 @@ fun SubscriptionManagementPage(
                                 }
                             ) {
                                 Text(
-                                    text = "未绑定账户",
+                                    text = stringResource(R.string.sub_unbound_account),
                                     fontSize = 11.sp,
                                     fontWeight = if (noneSelected) FontWeight.Bold else FontWeight.Normal,
                                     color = if (noneSelected) Color.White else Slate700,
@@ -996,8 +996,8 @@ fun SubscriptionManagementPage(
                                 val sel = selectedAccountId == acc.id || (selectedAccountId == null && selectedAccountName == acc.name)
                                 val icon = when {
                                     acc.name.contains("Touch") || acc.name.contains("TNG") -> "📱 "
-                                    acc.name.contains("卡") || acc.name.contains("Credit") -> "💳 "
-                                    acc.name.contains("现金") -> "💵 "
+                                    acc.name.contains("卡") || acc.name.contains("Credit", ignoreCase = true) || acc.name.contains("Debit", ignoreCase = true) || acc.name.contains("Card", ignoreCase = true) || acc.name.contains("Kad", ignoreCase = true) -> "💳 "
+                                    acc.name.contains("现金") || acc.name.contains("Cash", ignoreCase = true) || acc.name.contains("Tunai", ignoreCase = true) -> "💵 "
                                     else -> "🏦 "
                                 }
                                 Surface(
@@ -1025,12 +1025,12 @@ fun SubscriptionManagementPage(
                             value = dateInput,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("下次扣款周期 (点击选择日期)", color = Slate600) },
+                            label = { Text(stringResource(R.string.sub_billing_cycle_label), color = Slate600) },
                             trailingIcon = {
                                 IconButton(onClick = { showDayPicker = true }) {
                                     Icon(
                                         imageVector = Icons.Default.CalendarToday,
-                                        contentDescription = "选择扣款日",
+                                        contentDescription = stringResource(R.string.sub_pick_billing_date_desc),
                                         tint = PrimaryTeal,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -1060,13 +1060,13 @@ fun SubscriptionManagementPage(
                                     NativeLedgerApi.deleteSubscription(context, activeSub.id)
                                     isSubmitting = false
                                     editingSub = null
-                                    Toast.makeText(context, "订阅已删除", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.sub_deleted_toast), Toast.LENGTH_SHORT).show()
                                     onRefresh()
                                 }
                             },
                             enabled = !isSubmitting
                         ) {
-                            Text("删除", color = ExpenseRed)
+                            Text(stringResource(R.string.common_delete), color = ExpenseRed)
                         }
                     }
                     Button(
@@ -1074,7 +1074,7 @@ fun SubscriptionManagementPage(
                             val name = nameInput.trim()
                             val cost = costInput.toDoubleOrNull() ?: 0.0
                             if (name.isEmpty() || cost <= 0.0) {
-                                Toast.makeText(context, "请输入有效的名称与大于0的金额", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.sub_input_valid_name_amount), Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
                             isSubmitting = true
@@ -1095,10 +1095,10 @@ fun SubscriptionManagementPage(
                                 res.onSuccess {
                                     showAddSubDialog = false
                                     editingSub = null
-                                    Toast.makeText(context, "订阅已保存", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.sub_saved_toast), Toast.LENGTH_SHORT).show()
                                     onRefresh()
                                 }.onFailure {
-                                    Toast.makeText(context, "保存失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -1106,7 +1106,7 @@ fun SubscriptionManagementPage(
                         shape = RoundedCornerShape(8.dp),
                         enabled = !isSubmitting
                     ) {
-                        Text("保存")
+                        Text(stringResource(R.string.common_save))
                     }
                 }
             },
@@ -1117,14 +1117,14 @@ fun SubscriptionManagementPage(
                         editingSub = null
                     }
                 ) {
-                    Text("取消", color = Slate600)
+                    Text(stringResource(R.string.common_cancel), color = Slate600)
                 }
             }
         )
 
         if (showDayPicker) {
             MonthlyDayPickerDialog(
-                title = "选择每月扣款日",
+                title = stringResource(R.string.sub_pick_monthly_day_title),
                 currentValue = dateInput,
                 accentColor = PrimaryTeal,
                 onDaySelected = { selected ->
@@ -1158,7 +1158,7 @@ fun SubscriptionManagementPage(
             tonalElevation = 0.dp,
             title = {
                 Text(
-                    text = if (activeIncome != null) "编辑固定收入项目" else "添加新的固定收入",
+                    text = if (activeIncome != null) stringResource(R.string.sub_dialog_edit_income) else stringResource(R.string.sub_dialog_add_income),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Slate900
@@ -1169,7 +1169,7 @@ fun SubscriptionManagementPage(
                     OutlinedTextField(
                         value = nameInput,
                         onValueChange = { nameInput = it },
-                        label = { Text("收入来源名称 (如: 全职月薪、副业、租金)", color = Slate600) },
+                        label = { Text(stringResource(R.string.sub_income_name_hint), color = Slate600) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -1178,7 +1178,7 @@ fun SubscriptionManagementPage(
                     OutlinedTextField(
                         value = amountInput,
                         onValueChange = { amountInput = it },
-                        label = { Text("每月预计入账金额 (MYR)", color = Slate600) },
+                        label = { Text(stringResource(R.string.sub_income_amount_label), color = Slate600) },
                         placeholder = { Text("0.00", color = Slate400) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -1189,7 +1189,7 @@ fun SubscriptionManagementPage(
                     OutlinedTextField(
                         value = categoryInput,
                         onValueChange = { categoryInput = it },
-                        label = { Text("收入分类 (可手填或点击下方快速选择)", color = Slate600) },
+                        label = { Text(stringResource(R.string.sub_income_cat_label), color = Slate600) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -1198,7 +1198,7 @@ fun SubscriptionManagementPage(
 
                     // 收入分类快捷点选
                     Column {
-                        Text("点击快速选择收入分类:", fontSize = 12.sp, color = Slate600)
+                        Text(stringResource(R.string.sub_income_quick_cat), fontSize = 12.sp, color = Slate600)
                         Spacer(Modifier.height(4.dp))
                         Row(
                             modifier = Modifier
@@ -1215,7 +1215,7 @@ fun SubscriptionManagementPage(
                                     modifier = Modifier.clickable { categoryInput = opt }
                                 ) {
                                     Text(
-                                        text = opt,
+                                        text = CategoryUiHelper.getLocalizedCategoryName(context, opt),
                                         fontSize = 11.sp,
                                         fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
                                         color = if (sel) Color.White else Slate700,
@@ -1228,7 +1228,7 @@ fun SubscriptionManagementPage(
 
                     // 入账/收款账户选择
                     Column {
-                        Text("入账收款账户:", fontSize = 12.sp, color = Slate600)
+                        Text(stringResource(R.string.sub_income_account_label), fontSize = 12.sp, color = Slate600)
                         Spacer(Modifier.height(4.dp))
                         Row(
                             modifier = Modifier
@@ -1246,7 +1246,7 @@ fun SubscriptionManagementPage(
                                 }
                             ) {
                                 Text(
-                                    text = "未绑定账户",
+                                    text = stringResource(R.string.sub_unbound_account),
                                     fontSize = 11.sp,
                                     fontWeight = if (noneSelected) FontWeight.Bold else FontWeight.Normal,
                                     color = if (noneSelected) Color.White else Slate700,
@@ -1257,8 +1257,8 @@ fun SubscriptionManagementPage(
                                 val sel = selectedAccountId == acc.id || (selectedAccountId == null && selectedAccountName == acc.name)
                                 val icon = when {
                                     acc.name.contains("Touch") || acc.name.contains("TNG") -> "📱 "
-                                    acc.name.contains("卡") || acc.name.contains("Credit") -> "💳 "
-                                    acc.name.contains("现金") -> "💵 "
+                                    acc.name.contains("卡") || acc.name.contains("Credit", ignoreCase = true) || acc.name.contains("Debit", ignoreCase = true) || acc.name.contains("Card", ignoreCase = true) || acc.name.contains("Kad", ignoreCase = true) -> "💳 "
+                                    acc.name.contains("现金") || acc.name.contains("Cash", ignoreCase = true) || acc.name.contains("Tunai", ignoreCase = true) -> "💵 "
                                     else -> "🏦 "
                                 }
                                 Surface(
@@ -1286,12 +1286,12 @@ fun SubscriptionManagementPage(
                             value = dayInput,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("预计入账周期 (点击选择日期)", color = Slate600) },
+                            label = { Text(stringResource(R.string.sub_income_cycle_label), color = Slate600) },
                             trailingIcon = {
                                 IconButton(onClick = { showDayPicker = true }) {
                                     Icon(
                                         imageVector = Icons.Default.CalendarToday,
-                                        contentDescription = "选择入账日",
+                                        contentDescription = stringResource(R.string.sub_income_pick_date_desc),
                                         tint = IncomeGreen,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -1320,7 +1320,7 @@ fun SubscriptionManagementPage(
                             colors = CheckboxDefaults.colors(checkedColor = IncomeGreen)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("计划生效中", fontSize = 13.sp, color = Slate800)
+                        Text(stringResource(R.string.sub_plan_active_switch), fontSize = 13.sp, color = Slate800)
                     }
                 }
             },
@@ -1334,13 +1334,13 @@ fun SubscriptionManagementPage(
                                     NativeLedgerApi.deleteFixedIncome(context, activeIncome.id)
                                     isSubmitting = false
                                     editingIncome = null
-                                    Toast.makeText(context, "固定收入已删除", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.sub_income_deleted_toast), Toast.LENGTH_SHORT).show()
                                     onRefresh()
                                 }
                             },
                             enabled = !isSubmitting
                         ) {
-                            Text("删除", color = ExpenseRed)
+                            Text(stringResource(R.string.common_delete), color = ExpenseRed)
                         }
                     }
                     Button(
@@ -1348,7 +1348,7 @@ fun SubscriptionManagementPage(
                             val name = nameInput.trim()
                             val amount = amountInput.toDoubleOrNull() ?: 0.0
                             if (name.isEmpty() || amount <= 0.0) {
-                                Toast.makeText(context, "请输入有效的收入名称与大于0的金额", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.sub_input_valid_name_amount), Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
                             isSubmitting = true
@@ -1369,10 +1369,10 @@ fun SubscriptionManagementPage(
                                 res.onSuccess {
                                     showAddIncomeDialog = false
                                     editingIncome = null
-                                    Toast.makeText(context, "固定收入已保存", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.sub_income_saved_toast), Toast.LENGTH_SHORT).show()
                                     onRefresh()
                                 }.onFailure {
-                                    Toast.makeText(context, "保存失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -1380,7 +1380,7 @@ fun SubscriptionManagementPage(
                         shape = RoundedCornerShape(8.dp),
                         enabled = !isSubmitting
                     ) {
-                        Text("保存")
+                        Text(stringResource(R.string.common_save))
                     }
                 }
             },
@@ -1391,14 +1391,14 @@ fun SubscriptionManagementPage(
                         editingIncome = null
                     }
                 ) {
-                    Text("取消", color = Slate600)
+                    Text(stringResource(R.string.common_cancel), color = Slate600)
                 }
             }
         )
 
         if (showDayPicker) {
             MonthlyDayPickerDialog(
-                title = "选择每月入账日",
+                title = stringResource(R.string.sub_pick_monthly_day_income_title),
                 currentValue = dayInput,
                 accentColor = IncomeGreen,
                 onDaySelected = { selected ->
@@ -1431,7 +1431,7 @@ fun SubscriptionManagementPage(
             tonalElevation = 0.dp,
             title = {
                 Text(
-                    text = if (activeSaving != null) "编辑固定储蓄计划" else "添加新的固定储蓄计划",
+                    text = if (activeSaving != null) stringResource(R.string.sub_dialog_edit_savings) else stringResource(R.string.sub_dialog_add_savings),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Slate900
@@ -1447,7 +1447,7 @@ fun SubscriptionManagementPage(
                     OutlinedTextField(
                         value = nameInput,
                         onValueChange = { nameInput = it },
-                        label = { Text("储蓄目标名称 (如: 应急基金、定期存钱、基金定投)", color = Slate600) },
+                        label = { Text(stringResource(R.string.sub_savings_name_hint), color = Slate600) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -1456,7 +1456,7 @@ fun SubscriptionManagementPage(
                     OutlinedTextField(
                         value = amountInput,
                         onValueChange = { amountInput = it },
-                        label = { Text("每月计划存入金额 (MYR)", color = Slate600) },
+                        label = { Text(stringResource(R.string.sub_savings_amount_label), color = Slate600) },
                         placeholder = { Text("0.00", color = Slate400) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -1467,7 +1467,7 @@ fun SubscriptionManagementPage(
                     OutlinedTextField(
                         value = categoryInput,
                         onValueChange = { categoryInput = it },
-                        label = { Text("储蓄分类 (可手填或点击下方快速选择)", color = Slate600) },
+                        label = { Text(stringResource(R.string.sub_savings_cat_label), color = Slate600) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = LocalTextStyle.current.copy(color = Slate900),
@@ -1476,7 +1476,7 @@ fun SubscriptionManagementPage(
 
                     // 储蓄分类快捷点选
                     Column {
-                        Text("点击快速选择储蓄分类:", fontSize = 12.sp, color = Slate600)
+                        Text(stringResource(R.string.sub_savings_quick_cat), fontSize = 12.sp, color = Slate600)
                         Spacer(Modifier.height(4.dp))
                         Row(
                             modifier = Modifier
@@ -1493,7 +1493,7 @@ fun SubscriptionManagementPage(
                                     modifier = Modifier.clickable { categoryInput = opt }
                                 ) {
                                     Text(
-                                        text = opt,
+                                        text = CategoryUiHelper.getLocalizedCategoryName(context, opt),
                                         fontSize = 11.sp,
                                         fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
                                         color = if (sel) Color.White else Slate700,
@@ -1506,7 +1506,7 @@ fun SubscriptionManagementPage(
 
                     // 存入账户选择
                     Column {
-                        Text("存入/目标账户 (储蓄账户/投资账户):", fontSize = 12.sp, color = Slate600)
+                        Text(stringResource(R.string.sub_savings_account_label), fontSize = 12.sp, color = Slate600)
                         Spacer(Modifier.height(4.dp))
                         Row(
                             modifier = Modifier
@@ -1524,7 +1524,7 @@ fun SubscriptionManagementPage(
                                 }
                             ) {
                                 Text(
-                                    text = "未指定账户",
+                                    text = stringResource(R.string.sub_unbound_account),
                                     fontSize = 11.sp,
                                     fontWeight = if (noneSelected) FontWeight.Bold else FontWeight.Normal,
                                     color = if (noneSelected) Color.White else Slate700,
@@ -1564,12 +1564,12 @@ fun SubscriptionManagementPage(
                             value = dayInput,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("预计存入周期 (点击选择日期)", color = Slate600) },
+                            label = { Text(stringResource(R.string.sub_savings_cycle_label), color = Slate600) },
                             trailingIcon = {
                                 IconButton(onClick = { showDayPicker = true }) {
                                     Icon(
                                         imageVector = Icons.Default.CalendarToday,
-                                        contentDescription = "选择存入日",
+                                        contentDescription = stringResource(R.string.sub_savings_pick_date_desc),
                                         tint = SavingsBlue,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -1598,7 +1598,7 @@ fun SubscriptionManagementPage(
                             colors = CheckboxDefaults.colors(checkedColor = SavingsBlue)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("计划生效中", fontSize = 13.sp, color = Slate800)
+                        Text(stringResource(R.string.sub_plan_active_switch), fontSize = 13.sp, color = Slate800)
                     }
                 }
             },
@@ -1612,13 +1612,13 @@ fun SubscriptionManagementPage(
                                     NativeLedgerApi.deleteFixedSavings(context, activeSaving.id)
                                     isSubmitting = false
                                     editingSavings = null
-                                    Toast.makeText(context, "固定储蓄计划已删除", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.sub_savings_deleted_toast), Toast.LENGTH_SHORT).show()
                                     onRefresh()
                                 }
                             },
                             enabled = !isSubmitting
                         ) {
-                            Text("删除", color = ExpenseRed)
+                            Text(stringResource(R.string.common_delete), color = ExpenseRed)
                         }
                     }
                     Button(
@@ -1626,7 +1626,7 @@ fun SubscriptionManagementPage(
                             val name = nameInput.trim()
                             val amount = amountInput.toDoubleOrNull() ?: 0.0
                             if (name.isEmpty() || amount <= 0.0) {
-                                Toast.makeText(context, "请输入有效的储蓄名称与大于0的金额", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.sub_input_valid_name_amount), Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
                             isSubmitting = true
@@ -1647,10 +1647,10 @@ fun SubscriptionManagementPage(
                                 res.onSuccess {
                                     showAddSavingsDialog = false
                                     editingSavings = null
-                                    Toast.makeText(context, "固定储蓄计划已保存", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.sub_savings_saved_toast), Toast.LENGTH_SHORT).show()
                                     onRefresh()
                                 }.onFailure {
-                                    Toast.makeText(context, "保存失败: ${it.message}", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -1658,7 +1658,7 @@ fun SubscriptionManagementPage(
                         shape = RoundedCornerShape(8.dp),
                         enabled = !isSubmitting
                     ) {
-                        Text("保存")
+                        Text(stringResource(R.string.common_save))
                     }
                 }
             },
@@ -1669,14 +1669,14 @@ fun SubscriptionManagementPage(
                         editingSavings = null
                     }
                 ) {
-                    Text("取消", color = Slate600)
+                    Text(stringResource(R.string.common_cancel), color = Slate600)
                 }
             }
         )
 
         if (showDayPicker) {
             MonthlyDayPickerDialog(
-                title = "选择每月计划存入日",
+                title = stringResource(R.string.sub_pick_monthly_day_savings_title),
                 currentValue = dayInput,
                 accentColor = SavingsBlue,
                 onDaySelected = { selected ->
@@ -1694,14 +1694,15 @@ fun SubscriptionManagementPage(
  */
 @Composable
 fun MonthlyDayPickerDialog(
-    title: String = "选择每月周期日期",
+    title: String = stringResource(R.string.sub_cycle_dialog_default_title),
     currentValue: String,
     accentColor: Color = PrimaryTeal,
     onDaySelected: (String) -> Unit,
     onDismissRequest: () -> Unit
 ) {
+    val context = LocalContext.current
     val initialDayNum = remember(currentValue) {
-        if (currentValue.contains("底") || currentValue.contains("末")) {
+        if (currentValue.contains("底") || currentValue.contains("末") || currentValue.contains("end", ignoreCase = true) || currentValue.contains("akhir", ignoreCase = true)) {
             -1
         } else {
             Regex("\\d+").find(currentValue)?.value?.toIntOrNull() ?: 1
@@ -1711,13 +1712,13 @@ fun MonthlyDayPickerDialog(
     var selectedDay by remember { mutableStateOf(initialDayNum) }
 
     val quickOptions = listOf(
-        1 to "1号",
-        5 to "5号",
-        10 to "10号",
-        15 to "15号",
-        20 to "20号",
-        25 to "25号",
-        -1 to "月底"
+        1 to stringResource(R.string.sub_day_fmt, 1),
+        5 to stringResource(R.string.sub_day_fmt, 5),
+        10 to stringResource(R.string.sub_day_fmt, 10),
+        15 to stringResource(R.string.sub_day_fmt, 15),
+        20 to stringResource(R.string.sub_day_fmt, 20),
+        25 to stringResource(R.string.sub_day_fmt, 25),
+        -1 to stringResource(R.string.sub_day_end_of_month)
     )
 
     AlertDialog(
@@ -1752,7 +1753,7 @@ fun MonthlyDayPickerDialog(
                         color = Slate900
                     )
                     Text(
-                        text = "点击数字直接选定每月的固定执行日期",
+                        text = stringResource(R.string.sub_cycle_dialog_hint),
                         fontSize = 11.sp,
                         color = Slate500
                     )
@@ -1767,7 +1768,7 @@ fun MonthlyDayPickerDialog(
                 // 快捷推荐标签
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = "快捷推荐",
+                        text = stringResource(R.string.sub_quick_recommendation),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Slate700
@@ -1785,7 +1786,7 @@ fun MonthlyDayPickerDialog(
                                 color = if (isSel) accentColor else Slate100,
                                 modifier = Modifier.clickable {
                                     selectedDay = day
-                                    val formatted = if (day == -1) "每月最后一天(月底)" else "每月${day}号"
+                                    val formatted = if (day == -1) context.getString(R.string.sub_day_end_of_month) else context.getString(R.string.sub_day_fmt, day)
                                     onDaySelected(formatted)
                                 }
                             ) {
@@ -1811,13 +1812,13 @@ fun MonthlyDayPickerDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "全部日期 (1 ~ 31 号)",
+                            text = stringResource(R.string.sub_all_days_label),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Slate700
                         )
                         Text(
-                            text = if (selectedDay == -1) "当前: 月底" else "当前: 每月${selectedDay}号",
+                            text = if (selectedDay == -1) stringResource(R.string.sub_current_day_end_of_month) else stringResource(R.string.sub_current_day_fmt, selectedDay),
                             fontSize = 11.sp,
                             color = accentColor,
                             fontWeight = FontWeight.Bold
@@ -1842,7 +1843,7 @@ fun MonthlyDayPickerDialog(
                                                 .background(if (isSel) accentColor else Slate100)
                                                 .clickable {
                                                     selectedDay = day
-                                                    onDaySelected("每月${day}号")
+                                                    onDaySelected(context.getString(R.string.sub_day_fmt, day))
                                                 },
                                             contentAlignment = Alignment.Center
                                         ) {
@@ -1866,18 +1867,18 @@ fun MonthlyDayPickerDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val formatted = if (selectedDay == -1) "每月最后一天(月底)" else "每月${selectedDay}号"
+                    val formatted = if (selectedDay == -1) context.getString(R.string.sub_day_end_of_month) else context.getString(R.string.sub_day_fmt, selectedDay)
                     onDaySelected(formatted)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = accentColor),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text("确定")
+                Text(stringResource(R.string.common_confirm))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("取消", color = Slate600)
+                Text(stringResource(R.string.common_cancel), color = Slate600)
             }
         }
     )
