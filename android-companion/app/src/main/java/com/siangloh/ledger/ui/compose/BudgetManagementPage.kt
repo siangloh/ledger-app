@@ -193,7 +193,7 @@ fun BudgetManagementPage(
                                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
-                                                    text = "${data.overall.pct}%",
+                                                    text = String.format(Locale.getDefault(), "%.2f%%", data.overall.pct),
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = badgeColor
@@ -402,7 +402,7 @@ fun BudgetManagementPage(
 
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
-                                                text = "${cat.pct}%",
+                                                text = String.format(Locale.getDefault(), "%.2f%%", cat.pct),
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = when (cat.level) {

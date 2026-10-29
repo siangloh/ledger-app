@@ -1828,7 +1828,7 @@ object LocalLedgerRepository {
             }
 
             val remaining = Math.max(0.0, overallLimit - totalSpent)
-            val pct = if (overallLimit > 0) totalSpent / overallLimit * 100.0 else 0.0
+            val pct = if (overallLimit > 0) kotlin.math.round(totalSpent / overallLimit * 10000.0) / 100.0 else 0.0
             val level = when {
                 pct >= 100.0 -> "danger"
                 pct >= 80.0 -> "warning"
@@ -1866,7 +1866,7 @@ object LocalLedgerRepository {
             for (c in categories) {
                 val spent = catSpentMap[c.name] ?: 0.0
                 val catLimit = sp.getFloat("cat_limit_${c.name}", 0f).toDouble()
-                val catPct = if (catLimit > 0) spent / catLimit * 100.0 else 0.0
+                val catPct = if (catLimit > 0) kotlin.math.round(spent / catLimit * 10000.0) / 100.0 else 0.0
                 val catLevel = when {
                     catLimit <= 0.0 -> "ok"
                     catPct >= 100.0 -> { overCount++; "over" }
