@@ -28,11 +28,13 @@ import java.util.*
 object TursoCloudClient {
     private const val TAG = "TursoCloudClient"
 
-    // 默认 Turso 云端配置 (可由用户或环境变量覆盖)
+    // 默认 Turso 云端配置
     const val DEFAULT_TURSO_PIPELINE_URL =
         "https://ledger-app-siangloh.aws-ap-northeast-1.turso.io/v2/pipeline"
     const val DEFAULT_TURSO_TOKEN =
         "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI5OTYwMjksImlkIjoiMDFhMDc5NDctZDAwMS03MjZkLWE0NzQtNmM1MmYzODM5ZDVhIiwia2lkIjoiUFpvelZYb3JTZkVlSWFmNS1ZdGQyNEFGMG5xbTJ4UkxHZ1MyM3cxZTVsbyIsInJpZCI6IjQxN2YwNTVkLWZmMWQtNDhlZC04YmFjLTVhZDExNGY3MGUxNCJ9.ktieEm8f_mp6yh7CnwMA6Py6G8CrkCB9JYLCIj3eLcvc3VJZrmzqVAonJAi3-cb0YEusfZEaNksg7Jhd18bKDg"
+
+    const val ADMIN_TURSO_UUID = "f84e359d-b99e-4ac2-b098-298e9d2661ea"
 
     private const val PREFS_TURSO = "ledger_turso_prefs"
     private const val KEY_CUSTOM_URL = "custom_pipeline_url"
@@ -208,13 +210,12 @@ object TursoCloudClient {
                 val settingsRows = resList.getOrElse(1) { emptyList() }
 
                 val appPassword = settingsRows.firstOrNull()?.get("value")?.toString() ?: "admin123"
-
                 val isUserAdmin = cleanUser.equals("admin", ignoreCase = true)
 
                 // 1. 如果是 admin 且密码匹配 system_settings 中的 app_password
                 if (isUserAdmin && (cleanPass == appPassword || cleanPass == "admin123")) {
                     val userRow = userRows.firstOrNull()
-                    val userId = userRow?.get("id")?.toString() ?: "f84e359d-b99e-4ac2-b098-298e9d2661ea"
+                    val userId = userRow?.get("id")?.toString() ?: ADMIN_TURSO_UUID
                     return@withContext Result.success(AuthResult(
                         username = "admin",
                         userId = userId,
@@ -227,7 +228,7 @@ object TursoCloudClient {
                 if (userRow != null) {
                     val storedHash = userRow["password_hash"]?.toString() ?: ""
                     val sha256 = AuthManager.hashPassword(cleanPass)
-                    val userId = userRow["id"]?.toString() ?: "1"
+                    val userId = userRow["id"]?.toString() ?: ADMIN_TURSO_UUID
                     val actualUsername = userRow["username"]?.toString() ?: cleanUser
 
                     // 匹配 SHA-256 或明文或 admin 特权密码
@@ -256,24 +257,36 @@ object TursoCloudClient {
         context: Context,
         targetUserId: String? = null
     ): Result<Int> = withContext(Dispatchers.IO) {
-        val currentUserId = targetUserId?.takeIf { it.isNotBlank() }
-            ?: AuthManager.getCurrentUserId(context).takeIf { it.isNotBlank() }
-            ?: "f84e359d-b99e-4ac2-b098-298e9d2661ea"
+        val currentUsername = AuthManager.getCurrentUsername(context).ifBlank { "admin" }
+        val isUserAdmin = currentUsername.equals("admin", ignoreCase = true)
 
-        Log.i(TAG, "Syncing all data from Turso Cloud for user $currentUserId...")
+        val currentUserId = if (isUserAdmin || targetUserId == "1" || AuthManager.getCurrentUserId(context) == "1") {
+            ADMIN_TURSO_UUID
+        } else {
+            targetUserId?.takeIf { it.isNotBlank() && it != "1" }
+                ?: AuthManager.getCurrentUserId(context).takeIf { it.isNotBlank() && it != "1" }
+                ?: ADMIN_TURSO_UUID
+        }
 
-        val isUserAdmin = AuthManager.getCurrentUsername(context).equals("admin", ignoreCase = true)
+        // 矫正本地持久化的 user_id 为 Turso 云端真实 UUID
+        if (isUserAdmin) {
+            context.getSharedPreferences("ledger_auth_prefs", Context.MODE_PRIVATE).edit()
+                .putString("current_user_id", ADMIN_TURSO_UUID)
+                .apply()
+        }
+
+        Log.i(TAG, "Syncing all data from Turso Cloud for user $currentUserId (admin=$isUserAdmin)...")
 
         val statements = if (isUserAdmin) {
             listOf(
-                // 拉取分类 (支持当前用户与公共分类)
-                Pair("SELECT id, name, type, group_name, color FROM categories WHERE user_id = ? OR user_id IS NULL ORDER BY id ASC", listOf(currentUserId)),
-                // 拉取流水 (排除已删除)
-                Pair("SELECT id, date, type, category, amount, note, source, channel, tags, user_id, account_id, created_at, updated_at FROM transactions WHERE (user_id = ? OR user_id IS NULL) AND deleted_at IS NULL ORDER BY date DESC, id DESC", listOf(currentUserId))
+                // 管理员全量拉取其分类或公共分类
+                Pair("SELECT id, name, type, group_name, color FROM categories WHERE (user_id = ? OR user_id = '$ADMIN_TURSO_UUID' OR user_id IS NULL) ORDER BY id ASC", listOf(currentUserId)),
+                // 管理员全量拉取其流水或未归属流水
+                Pair("SELECT id, date, type, category, amount, note, source, channel, tags, user_id, account_id, created_at, updated_at FROM transactions WHERE (user_id = ? OR user_id = '$ADMIN_TURSO_UUID' OR user_id IS NULL) AND deleted_at IS NULL ORDER BY date DESC, id DESC", listOf(currentUserId))
             )
         } else {
             listOf(
-                Pair("SELECT id, name, type, group_name, color FROM categories WHERE user_id = ? OR user_id IS NULL ORDER BY id ASC", listOf(currentUserId)),
+                Pair("SELECT id, name, type, group_name, color FROM categories WHERE (user_id = ? OR user_id IS NULL) ORDER BY id ASC", listOf(currentUserId)),
                 Pair("SELECT id, date, type, category, amount, note, source, channel, tags, user_id, account_id, created_at, updated_at FROM transactions WHERE user_id = ? AND deleted_at IS NULL ORDER BY date DESC, id DESC", listOf(currentUserId))
             )
         }
@@ -366,9 +379,11 @@ object TursoCloudClient {
                     Log.i(TAG, "Synced $syncedTxCount transactions from Turso into Room.")
                 }
 
-                // 3. 确保存储预热与缓存刷新
+                // 3. 确保存储预热与所有多级缓存全面失效刷新
                 LocalLedgerRepository.initDefaultsIfNeeded(context)
                 LocalDataStore.clearOverviewCache(context)
+                LocalDataStore.clearRecordsCache(context)
+                NativeLedgerApi.invalidateCache()
 
                 try {
                     val intent = Intent("com.siangloh.ledger.DATA_SYNCED")
@@ -394,7 +409,7 @@ object TursoCloudClient {
         userId: String? = null
     ): Result<Long> = withContext(Dispatchers.IO) {
         try {
-            val uId = userId ?: AuthManager.getCurrentUserId(context).takeIf { it.isNotBlank() } ?: "f84e359d-b99e-4ac2-b098-298e9d2661ea"
+            val uId = userId ?: AuthManager.getCurrentUserId(context).takeIf { it.isNotBlank() } ?: ADMIN_TURSO_UUID
             val nowIso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).format(Date())
 
             val sql = """
@@ -429,4 +444,3 @@ object TursoCloudClient {
         }
     }
 }
-

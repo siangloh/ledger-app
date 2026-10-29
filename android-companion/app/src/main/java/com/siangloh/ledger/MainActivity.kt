@@ -249,10 +249,8 @@ class MainActivity : AppCompatActivity() {
         // 智能节电同步：避免每次切前台都无脑拉起 WorkManager 唤醒网络
         checkAndEnqueueSyncIfNeeded()
         // 切回前台时，若全量数据已过 5 分钟新鲜期，在后台静默全量同步一次
-        if (!com.siangloh.ledger.data.LocalDataStore.isFullSyncFresh(this)) {
-            lifecycleScope.launch(Dispatchers.IO) {
-                com.siangloh.ledger.data.LocalDataStore.syncAllUserData(this@MainActivity)
-            }
+        lifecycleScope.launch(Dispatchers.IO) {
+            com.siangloh.ledger.data.LocalDataStore.syncAllUserData(this@MainActivity)
         }
     }
 

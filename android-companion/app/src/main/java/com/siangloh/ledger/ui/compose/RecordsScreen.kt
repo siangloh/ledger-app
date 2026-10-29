@@ -262,17 +262,7 @@ fun RecordsScreen(
         val receiver = object : android.content.BroadcastReceiver() {
             override fun onReceive(ctx: android.content.Context?, intent: android.content.Intent?) {
                 loadPending()
-                val effMonth = if (filterStartDate.isNullOrBlank() && filterEndDate.isNullOrBlank()) selectedMonth else null
-                val cachedJson = LocalDataStore.getRecords(context, effMonth, selectedType, debouncedSearchQuery, 1)
-                if (!cachedJson.isNullOrBlank()) {
-                    try {
-                        val pageObj = NativeLedgerApi.parseTransactionsPageJson(JSONObject(cachedJson))
-                        transactions = pageObj.items
-                        totalCount = pageObj.totalCount
-                        hasMore = pageObj.hasMore
-                        isLoading = false
-                    } catch (_: Exception) {}
-                }
+                loadData(resetPage = true, forceRefresh = true)
             }
         }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {

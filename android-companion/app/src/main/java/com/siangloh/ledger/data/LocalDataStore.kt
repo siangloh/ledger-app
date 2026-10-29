@@ -129,6 +129,14 @@ object LocalDataStore {
         }
     }
 
+    fun clearRecordsCache(context: Context) {
+        try {
+            context.getSharedPreferences(PREF_RECORDS, Context.MODE_PRIVATE).edit().clear().apply()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to clear records cache: ${e.message}")
+        }
+    }
+
     // -------------------------------------------------------------------------
     // 3. 资产与账户持久化 (Accounts Cache)
     // -------------------------------------------------------------------------
@@ -238,8 +246,10 @@ object LocalDataStore {
             Log.d(TAG, "syncAllUserData already in progress. Skipping redundant concurrent call.")
             return@withContext
         }
-        if (!force && isFullSyncFresh(context)) {
-            Log.d(TAG, "All user data is fresh (within 5 minutes). Skipping online db fetch.")
+        val db = AppDatabase.getInstance(context)
+        val hasLocalTransactions = db.localTransactionDao().countAll() > 0
+        if (!force && hasLocalTransactions && isFullSyncFresh(context)) {
+            Log.d(TAG, "All user data is fresh and populated (within 5 minutes). Skipping online db fetch.")
             return@withContext
         }
         if (!NetworkHelper.isOnline(context)) {

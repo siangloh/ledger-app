@@ -19,12 +19,12 @@ data class AuthResult(
 
 object AuthManager {
     private const val TAG = "AuthManager"
-    private const val PREFS_NAME = "ledger_auth_prefs"
-    private const val KEY_IS_LOGGED_IN = "is_logged_in"
-    private const val KEY_CURRENT_USERNAME = "current_username"
-    private const val KEY_CURRENT_USER_ID = "current_user_id"
-    private const val KEY_USERS_CACHE = "cached_users_json"
-    private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
+    const val PREFS_NAME = "ledger_auth_prefs"
+    const val KEY_IS_LOGGED_IN = "is_logged_in"
+    const val KEY_CURRENT_USERNAME = "current_username"
+    const val KEY_CURRENT_USER_ID = "current_user_id"
+    const val KEY_USERS_CACHE = "cached_users_json"
+    const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
 
     fun isBiometricSupported(context: Context): Boolean {
         return try {
@@ -85,7 +85,7 @@ object AuthManager {
         val userRecord = cacheObj.optJSONObject(userKey)
             ?: return Result.failure(Exception(context.getString(R.string.login_biometric_failed)))
 
-        val userId = userRecord.optString("user_id", "f84e359d-b99e-4ac2-b098-298e9d2661ea")
+        val userId = if (userKey == "admin") TursoCloudClient.ADMIN_TURSO_UUID else userRecord.optString("user_id", TursoCloudClient.ADMIN_TURSO_UUID)
         val origName = userRecord.optString("username", cleanUser)
         val apiKey = userRecord.optString("api_key")
 
@@ -115,7 +115,11 @@ object AuthManager {
 
     fun getCurrentUserId(context: Context): String {
         val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return sp.getString(KEY_CURRENT_USER_ID, "") ?: ""
+        val uid = sp.getString(KEY_CURRENT_USER_ID, "") ?: ""
+        if (uid.isBlank() || uid == "1" || getCurrentUsername(context).equals("admin", ignoreCase = true)) {
+            return TursoCloudClient.ADMIN_TURSO_UUID
+        }
+        return uid
     }
 
     fun hasCachedUser(context: Context, username: String): Boolean {
@@ -168,14 +172,20 @@ object AuthManager {
             if (userRecord != null) {
                 val cachedHash = userRecord.optString("password_hash")
                 if (cachedHash == passHash) {
-                    val userId = userRecord.optString("user_id", "f84e359d-b99e-4ac2-b098-298e9d2661ea")
+                    val userId = if (userKey == "admin") TursoCloudClient.ADMIN_TURSO_UUID else userRecord.optString("user_id", TursoCloudClient.ADMIN_TURSO_UUID)
                     val origName = userRecord.optString("username", cleanUser)
                     val apiKey = userRecord.optString("api_key")
+
+                    if (userKey == "admin") {
+                        userRecord.put("user_id", userId)
+                        cacheObj.put(userKey, userRecord)
+                    }
 
                     sp.edit()
                         .putBoolean(KEY_IS_LOGGED_IN, true)
                         .putString(KEY_CURRENT_USERNAME, origName)
                         .putString(KEY_CURRENT_USER_ID, userId)
+                        .putString(KEY_USERS_CACHE, cacheObj.toString())
                         .putBoolean(KEY_BIOMETRIC_ENABLED, true)
                         .apply()
 
@@ -187,10 +197,12 @@ object AuthManager {
                         NetworkHelper.setServerUrl(context, serverUrl)
                     }
 
-                    // 后台异步刷新 Turso 最新数据
+                    // 登录成功后，立即拉取 Turso 云端流水并刷新 UI
                     try {
                         TursoCloudClient.syncAllFromTurso(context, userId)
-                    } catch (_: Exception) {}
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Cached login Turso sync warning: ${e.message}")
+                    }
 
                     return@withContext Result.success(AuthResult(origName, userId, isLocalCache = true))
                 }
@@ -203,7 +215,7 @@ object AuthManager {
             if (tursoRes.isSuccess) {
                 val authRes = tursoRes.getOrThrow()
                 val retUsername = authRes.username
-                val userId = authRes.userId
+                val userId = if (userKey == "admin") TursoCloudClient.ADMIN_TURSO_UUID else authRes.userId
 
                 val newRecord = JSONObject().apply {
                     put("username", retUsername)
@@ -242,7 +254,7 @@ object AuthManager {
 
         // 3. 默认管理员离线登录兜底 (保证首次安装/完全无网络下直接进入)
         if (userKey == "admin" && cleanPass == "admin123") {
-            val defaultAdminId = "f84e359d-b99e-4ac2-b098-298e9d2661ea"
+            val defaultAdminId = TursoCloudClient.ADMIN_TURSO_UUID
             val defaultRecord = JSONObject().apply {
                 put("username", "admin")
                 put("password_hash", passHash)
@@ -278,7 +290,7 @@ object AuthManager {
         onlineRes.fold(
             onSuccess = { json ->
                 val userObj = json.optJSONObject("user")
-                val userId = userObj?.optString("id") ?: "1"
+                val userId = if (userKey == "admin") TursoCloudClient.ADMIN_TURSO_UUID else (userObj?.optString("id") ?: TursoCloudClient.ADMIN_TURSO_UUID)
                 val retUsername = userObj?.optString("username") ?: cleanUser
                 val apiKey = userObj?.optString("api_key") ?: ""
 
@@ -308,7 +320,7 @@ object AuthManager {
                 }
 
                 try {
-                    LocalDataStore.syncAllUserData(context)
+                    LocalDataStore.syncAllUserData(context, force = true)
                 } catch (_: Exception) {}
 
                 Result.success(AuthResult(retUsername, userId, isLocalCache = false))
