@@ -7,6 +7,7 @@ import com.siangloh.ledger.data.entities.LocalCategory
 import com.siangloh.ledger.data.entities.LocalTransaction
 import com.siangloh.ledger.parser.LocalParsedResult
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -19,6 +20,7 @@ import java.util.*
 object LocalLedgerRepository {
     private const val TAG = "LocalLedgerRepository"
     private val initMutex = Mutex()
+    private val cloudSyncScope = kotlinx.coroutines.CoroutineScope(Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
 
     suspend fun initDefaultsIfNeeded(context: Context) = withContext(Dispatchers.IO) {
         initMutex.withLock {
@@ -264,6 +266,10 @@ object LocalLedgerRepository {
             db.localAccountDao().updateBalance(matchedAccount.id, delta)
         }
 
+        val appCtx = context.applicationContext
+        cloudSyncScope.launch {
+            TursoCloudClient.insertTransaction(appCtx, tx.copy(id = id))
+        }
         notifyDataChanged(context)
         return id
     }
@@ -327,6 +333,10 @@ object LocalLedgerRepository {
                 db.localAccountDao().updateBalance(toAccountId, amount)
             }
 
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.insertTransaction(appCtx, tx.copy(id = id))
+            }
             notifyDataChanged(context)
             Result.success(id)
         } catch (e: Exception) {
@@ -383,6 +393,10 @@ object LocalLedgerRepository {
                 db.localAccountDao().updateBalance(toAccountId, amount)
             }
 
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.updateTransaction(appCtx, updated)
+            }
             notifyDataChanged(context)
             Result.success(Unit)
         } catch (e: Exception) {
@@ -431,6 +445,10 @@ object LocalLedgerRepository {
                 db.pendingTransactionDao().deleteById(id)
             } catch (_: Exception) {}
 
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.deleteTransaction(appCtx, id, permanent = false)
+            }
             notifyDataChanged(context)
             Result.success(Unit)
         } catch (e: Exception) {
@@ -459,6 +477,10 @@ object LocalLedgerRepository {
                 val delta = if (record.type == "income") record.amount else -record.amount
                 db.localAccountDao().updateBalance(record.accountId, delta)
             }
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.restoreTransaction(appCtx, entity)
+            }
             notifyDataChanged(context)
             Result.success(Unit)
         } catch (e: Exception) {
@@ -471,6 +493,10 @@ object LocalLedgerRepository {
             val db = AppDatabase.getInstance(context)
             val cleanCat = com.siangloh.ledger.ui.compose.CategoryUiHelper.cleanCategoryName(category)
             db.localTransactionDao().updateCategory(id, cleanCat)
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.updateTransactionCategory(appCtx, id, cleanCat)
+            }
             notifyDataChanged(context)
             Result.success(Unit)
         } catch (e: Exception) {
@@ -848,13 +874,26 @@ object LocalLedgerRepository {
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val db = AppDatabase.getInstance(context)
+            val savedAcc: LocalAccount?
             if (id != null && id > 0) {
                 val acc = db.localAccountDao().getById(id)
                 if (acc != null) {
-                    db.localAccountDao().update(acc.copy(name = name, type = type, balance = balance, creditLimit = creditLimit, currency = currency))
+                    val updated = acc.copy(name = name, type = type, balance = balance, creditLimit = creditLimit, currency = currency)
+                    db.localAccountDao().update(updated)
+                    savedAcc = updated
+                } else {
+                    savedAcc = null
                 }
             } else {
-                db.localAccountDao().insert(LocalAccount(name = name, type = type, balance = balance, creditLimit = creditLimit, currency = currency))
+                val newAcc = LocalAccount(name = name, type = type, balance = balance, creditLimit = creditLimit, currency = currency)
+                val newId = db.localAccountDao().insert(newAcc).toInt()
+                savedAcc = newAcc.copy(id = newId)
+            }
+            if (savedAcc != null) {
+                val appCtx = context.applicationContext
+                cloudSyncScope.launch {
+                    TursoCloudClient.upsertAccount(appCtx, savedAcc)
+                }
             }
             NativeLedgerApi.invalidateCache()
             Result.success(Unit)
@@ -932,7 +971,11 @@ object LocalLedgerRepository {
                     accountId = accountId,
                     source = "reconciliation"
                 )
-                db.localTransactionDao().insert(adjTx)
+                val newTxId = db.localTransactionDao().insert(adjTx)
+                val appCtx = context.applicationContext
+                cloudSyncScope.launch {
+                    TursoCloudClient.insertTransaction(appCtx, adjTx.copy(id = newTxId))
+                }
             }
 
             // Mark all existing transactions for this account as reconciled
@@ -945,7 +988,12 @@ object LocalLedgerRepository {
             }
 
             // Update account balance to statement balance
-            db.localAccountDao().update(acc.copy(balance = statementBalance))
+            val updatedAcc = acc.copy(balance = statementBalance)
+            db.localAccountDao().update(updatedAcc)
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.upsertAccount(appCtx, updatedAcc)
+            }
             NativeLedgerApi.invalidateCache()
 
             val json = JSONObject().apply {
@@ -1274,6 +1322,11 @@ object LocalLedgerRepository {
             val newArr = JSONArray()
             list.forEach { newArr.put(it) }
             sp.edit().putString("subscriptions_json", newArr.toString()).apply()
+            val dayNum = Regex("""\d+""").find(nextBillingDate)?.value?.toIntOrNull()?.coerceIn(1, 31) ?: 1
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.saveRecurringRule(appCtx, id, "expense", category, amount = cost, dayOfMonth = dayNum, note = name, isActive = autoRenew, accountId = accountId)
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "saveSubscription error: ${e.message}", e)
@@ -1294,6 +1347,10 @@ object LocalLedgerRepository {
                 }
             }
             sp.edit().putString("subscriptions_json", newArr.toString()).apply()
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.deleteRecurringRule(appCtx, id)
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "deleteSubscription error: ${e.message}", e)
@@ -1359,6 +1416,11 @@ object LocalLedgerRepository {
             val newArr = JSONArray()
             list.forEach { newArr.put(it) }
             sp.edit().putString("fixed_incomes_json", newArr.toString()).apply()
+            val dayNum = Regex("""\d+""").find(arrivalDay)?.value?.toIntOrNull()?.coerceIn(1, 31) ?: 25
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.saveRecurringRule(appCtx, id, "income", category, amount = amount, dayOfMonth = dayNum, note = name, isActive = isActive, accountId = accountId)
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "saveFixedIncome error: ${e.message}", e)
@@ -1370,7 +1432,8 @@ object LocalLedgerRepository {
         try {
             val serverUrl = NetworkHelper.getServerUrl(context)
             if (serverUrl.isBlank()) {
-                return@withContext Result.failure(Exception("未配置服务器地址"))
+                TursoCloudClient.syncAllFromTurso(context)
+                return@withContext getToolsSummary(context)
             }
             val apiKey = NetworkHelper.getApiKey(context)
             val url = java.net.URL(serverUrl.trimEnd('/') + "/api/native/tools-summary")
@@ -1381,12 +1444,14 @@ object LocalLedgerRepository {
             if (apiKey.isNotBlank()) conn.setRequestProperty("X-API-KEY", apiKey)
             val code = conn.responseCode
             if (code !in 200..299) {
-                return@withContext Result.failure(Exception("云端接口返回 HTTP $code"))
+                TursoCloudClient.syncAllFromTurso(context)
+                return@withContext getToolsSummary(context)
             }
             val body = conn.inputStream.bufferedReader().use { it.readText() }
             val json = JSONObject(body)
             if (!json.optBoolean("ok", false)) {
-                return@withContext Result.failure(Exception(json.optString("message", "解析失败")))
+                TursoCloudClient.syncAllFromTurso(context)
+                return@withContext getToolsSummary(context)
             }
 
             val db = AppDatabase.getInstance(context)
@@ -1483,8 +1548,9 @@ object LocalLedgerRepository {
 
             getToolsSummary(context)
         } catch (e: Exception) {
-            Log.e(TAG, "syncToolsFromOnline error: ${e.message}", e)
-            Result.failure(e)
+            Log.e(TAG, "syncToolsFromOnline error, falling back to Turso: ${e.message}", e)
+            TursoCloudClient.syncAllFromTurso(context)
+            getToolsSummary(context)
         }
     }
 
@@ -1501,6 +1567,10 @@ object LocalLedgerRepository {
                 }
             }
             sp.edit().putString("fixed_incomes_json", newArr.toString()).apply()
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.deleteRecurringRule(appCtx, id)
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "deleteFixedIncome error: ${e.message}", e)
@@ -1566,6 +1636,11 @@ object LocalLedgerRepository {
             val newArr = JSONArray()
             list.forEach { newArr.put(it) }
             sp.edit().putString("fixed_savings_json", newArr.toString()).apply()
+            val dayNum = Regex("""\d+""").find(arrivalDay)?.value?.toIntOrNull()?.coerceIn(1, 31) ?: 1
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.saveRecurringRule(appCtx, id, "savings", category, amount = amount, dayOfMonth = dayNum, note = name, isActive = isActive, accountId = accountId)
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "saveFixedSavings error: ${e.message}", e)
@@ -1586,6 +1661,10 @@ object LocalLedgerRepository {
                 }
             }
             sp.edit().putString("fixed_savings_json", newArr.toString()).apply()
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.deleteRecurringRule(appCtx, id)
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "deleteFixedSavings error: ${e.message}", e)
@@ -1835,6 +1914,10 @@ object LocalLedgerRepository {
                 .putBoolean("overall_set", true)
                 .putBoolean("overall_explicit", true)
                 .apply()
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.saveBudget(appCtx, "__OVERALL__", limit, billingCycleStartDay)
+            }
             Result.success(JSONObject().put("ok", true).put("message", "总预算保存成功"))
         } catch (e: Exception) {
             Result.failure(e)
@@ -1847,6 +1930,10 @@ object LocalLedgerRepository {
                 .edit()
                 .putFloat("cat_limit_$category", limit.toFloat())
                 .apply()
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.saveBudget(appCtx, category, limit)
+            }
             Result.success(JSONObject().put("ok", true).put("message", "分类预算保存成功"))
         } catch (e: Exception) {
             Result.failure(e)
@@ -1859,6 +1946,10 @@ object LocalLedgerRepository {
                 .edit()
                 .remove("cat_limit_$category")
                 .apply()
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.saveBudget(appCtx, category, 0.0)
+            }
             Result.success(JSONObject().put("ok", true).put("message", "分类预算已删除"))
         } catch (e: Exception) {
             Result.failure(e)
@@ -1955,6 +2046,10 @@ object LocalLedgerRepository {
                 rules.add(CategoryRuleRecord(pattern, category, matchType, 0, isActive, now, now))
             }
             saveCategoryRulesList(context, rules)
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.saveCategoryRule(appCtx, pattern, category, matchType, isActive)
+            }
             Result.success(JSONObject().put("ok", true).put("message", "规则已保存"))
         } catch (e: Exception) {
             Result.failure(e)
@@ -1966,6 +2061,10 @@ object LocalLedgerRepository {
             val rules = getCategoryRules(context).getOrNull()?.toMutableList() ?: mutableListOf()
             rules.removeAll { it.merchantPattern.equals(pattern, ignoreCase = true) }
             saveCategoryRulesList(context, rules)
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.deleteCategoryRule(appCtx, pattern)
+            }
             Result.success(JSONObject().put("ok", true).put("message", "规则已删除"))
         } catch (e: Exception) {
             Result.failure(e)
@@ -1978,8 +2077,13 @@ object LocalLedgerRepository {
             val idx = rules.indexOfFirst { it.merchantPattern.equals(pattern, ignoreCase = true) }
             if (idx >= 0) {
                 val old = rules[idx]
-                rules[idx] = old.copy(isActive = !old.isActive)
+                val updated = old.copy(isActive = !old.isActive)
+                rules[idx] = updated
                 saveCategoryRulesList(context, rules)
+                val appCtx = context.applicationContext
+                cloudSyncScope.launch {
+                    TursoCloudClient.saveCategoryRule(appCtx, updated.merchantPattern, updated.category, updated.matchType, updated.isActive)
+                }
             }
             Result.success(JSONObject().put("ok", true).put("message", "状态已切换"))
         } catch (e: Exception) {
@@ -1996,6 +2100,7 @@ object LocalLedgerRepository {
     ): Result<JSONObject> = withContext(Dispatchers.IO) {
         try {
             var updatedCount = 0
+            val updatedTxIds = mutableListOf<Long>()
             val db = AppDatabase.getInstance(context)
             val txs = db.localTransactionDao().getAll()
             for (tx in txs) {
@@ -2003,7 +2108,14 @@ object LocalLedgerRepository {
                               else tx.note.contains(pattern, ignoreCase = true)
                 if (matches && (!onlyUncategorized || tx.category == "其他" || tx.category == "未分类" || tx.category.isBlank())) {
                     db.localTransactionDao().update(tx.copy(category = category, updatedAt = System.currentTimeMillis()))
+                    updatedTxIds.add(tx.id)
                     updatedCount++
+                }
+            }
+            if (updatedTxIds.isNotEmpty()) {
+                val appCtx = context.applicationContext
+                cloudSyncScope.launch {
+                    updatedTxIds.forEach { id -> TursoCloudClient.updateTransactionCategory(appCtx, id, category) }
                 }
             }
             NativeLedgerApi.invalidateCache()
@@ -2020,6 +2132,7 @@ object LocalLedgerRepository {
         try {
             val rules = getCategoryRules(context).getOrNull()?.filter { it.isActive } ?: emptyList()
             var totalUpdated = 0
+            val updatedPairs = mutableListOf<Pair<Long, String>>()
             val db = AppDatabase.getInstance(context)
             val txs = db.localTransactionDao().getAll()
             for (rule in rules) {
@@ -2028,8 +2141,15 @@ object LocalLedgerRepository {
                                   else tx.note.contains(rule.merchantPattern, ignoreCase = true)
                     if (matches && (!onlyUncategorized || tx.category == "其他" || tx.category == "未分类" || tx.category.isBlank())) {
                         db.localTransactionDao().update(tx.copy(category = rule.category, updatedAt = System.currentTimeMillis()))
+                        updatedPairs.add(tx.id to rule.category)
                         totalUpdated++
                     }
+                }
+            }
+            if (updatedPairs.isNotEmpty()) {
+                val appCtx = context.applicationContext
+                cloudSyncScope.launch {
+                    updatedPairs.forEach { (id, cat) -> TursoCloudClient.updateTransactionCategory(appCtx, id, cat) }
                 }
             }
             NativeLedgerApi.invalidateCache()
@@ -2090,6 +2210,10 @@ object LocalLedgerRepository {
                     val delta = if (tx.type == "income") tx.amount else -tx.amount
                     db.localAccountDao().updateBalance(tx.accountId, delta)
                 }
+                val appCtx = context.applicationContext
+                cloudSyncScope.launch {
+                    TursoCloudClient.restoreTransaction(appCtx, tx)
+                }
                 NativeLedgerApi.invalidateCache()
             }
             Result.success(Unit)
@@ -2111,6 +2235,10 @@ object LocalLedgerRepository {
                 }
             }
             sp.edit().putString("trash_items", newArr.toString()).apply()
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.deleteTransaction(appCtx, id, permanent = true)
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -2121,6 +2249,10 @@ object LocalLedgerRepository {
         try {
             context.getSharedPreferences("local_recycle_bin_prefs", Context.MODE_PRIVATE)
                 .edit().clear().apply()
+            val appCtx = context.applicationContext
+            cloudSyncScope.launch {
+                TursoCloudClient.emptyRecycleBin(appCtx)
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

@@ -133,6 +133,7 @@ class MainActivity : AppCompatActivity() {
         // 核心：单机离线模式，初始化本地账户、分类以及迁移以往积攒的通知
         lifecycleScope.launch(Dispatchers.IO) {
             com.siangloh.ledger.data.LocalLedgerRepository.initDefaultsIfNeeded(this@MainActivity)
+            com.siangloh.ledger.data.LocalDataStore.syncAllUserData(this@MainActivity, force = true)
         }
     }
 
