@@ -48,6 +48,9 @@ class SyncWorker(
         }
 
         Log.i(TAG, "Starting background sync...")
+        try {
+            com.siangloh.ledger.data.TursoCloudClient.syncAllFromTurso(applicationContext)
+        } catch (_: Exception) {}
         val db = AppDatabase.getInstance(applicationContext)
 
         try {

@@ -1,6 +1,7 @@
 package com.siangloh.ledger.data
 
 import android.content.Context
+import android.util.Log
 import androidx.biometric.BiometricManager
 import com.siangloh.ledger.NetworkHelper
 import com.siangloh.ledger.R
@@ -17,6 +18,7 @@ data class AuthResult(
 )
 
 object AuthManager {
+    private const val TAG = "AuthManager"
     private const val PREFS_NAME = "ledger_auth_prefs"
     private const val KEY_IS_LOGGED_IN = "is_logged_in"
     private const val KEY_CURRENT_USERNAME = "current_username"
@@ -83,7 +85,7 @@ object AuthManager {
         val userRecord = cacheObj.optJSONObject(userKey)
             ?: return Result.failure(Exception(context.getString(R.string.login_biometric_failed)))
 
-        val userId = userRecord.optString("user_id")
+        val userId = userRecord.optString("user_id", "f84e359d-b99e-4ac2-b098-298e9d2661ea")
         val origName = userRecord.optString("username", cleanUser)
         val apiKey = userRecord.optString("api_key")
 
@@ -136,8 +138,8 @@ object AuthManager {
     /**
      * 执行用户登录：
      * 1. 优先比对本地已缓存的用户名与密码哈希；若本地匹配成功，直接离线极速登入。
-     * 2. 若本地无该用户记录或比对未命中，则发起网络请求向在线后端 (Online DB) 验证。
-     * 3. 在线验证成功后，将用户名和密码哈希缓存至本地，下次登入即可免联网离线进入。
+     * 2. 若本地无匹配，直连 Turso 云端数据库进行在线凭据校验与拉取。
+     * 3. 校验成功后自动全量预载/同步 Turso 云端流水与分类到本地 Room 数据库。
      */
     suspend fun login(
         context: Context,
@@ -160,13 +162,13 @@ object AuthManager {
         val cacheObj = try { JSONObject(cacheStr) } catch (_: Exception) { JSONObject() }
         val userKey = cleanUser.lowercase(Locale.ROOT)
 
-        // 1. 检查本地缓存中是否存在匹配的凭据
+        // 1. 检查本地缓存中是否存在匹配的凭据 (极速秒进)
         if (cacheObj.has(userKey)) {
             val userRecord = cacheObj.optJSONObject(userKey)
             if (userRecord != null) {
                 val cachedHash = userRecord.optString("password_hash")
                 if (cachedHash == passHash) {
-                    val userId = userRecord.optString("user_id", "1")
+                    val userId = userRecord.optString("user_id", "f84e359d-b99e-4ac2-b098-298e9d2661ea")
                     val origName = userRecord.optString("username", cleanUser)
                     val apiKey = userRecord.optString("api_key")
 
@@ -185,17 +187,66 @@ object AuthManager {
                         NetworkHelper.setServerUrl(context, serverUrl)
                     }
 
+                    // 后台异步刷新 Turso 最新数据
+                    try {
+                        TursoCloudClient.syncAllFromTurso(context, userId)
+                    } catch (_: Exception) {}
+
                     return@withContext Result.success(AuthResult(origName, userId, isLocalCache = true))
                 }
             }
         }
 
-        // 1.5 默认管理员离线登录兜底 (保证首次安装/无服务器状态下直接登录使用)
+        // 2. 优先通过 Turso Cloud 直接验证与同步 (无需 PC / 本地后端)
+        try {
+            val tursoRes = TursoCloudClient.verifyLogin(context, cleanUser, cleanPass)
+            if (tursoRes.isSuccess) {
+                val authRes = tursoRes.getOrThrow()
+                val retUsername = authRes.username
+                val userId = authRes.userId
+
+                val newRecord = JSONObject().apply {
+                    put("username", retUsername)
+                    put("password_hash", passHash)
+                    put("user_id", userId)
+                    put("api_key", "")
+                    put("saved_at", System.currentTimeMillis())
+                }
+                cacheObj.put(userKey, newRecord)
+
+                sp.edit()
+                    .putBoolean(KEY_IS_LOGGED_IN, true)
+                    .putString(KEY_CURRENT_USERNAME, retUsername)
+                    .putString(KEY_CURRENT_USER_ID, userId)
+                    .putString(KEY_USERS_CACHE, cacheObj.toString())
+                    .putBoolean(KEY_BIOMETRIC_ENABLED, true)
+                    .apply()
+
+                NetworkHelper.setUsername(context, retUsername)
+                if (!serverUrl.isNullOrBlank()) {
+                    NetworkHelper.setServerUrl(context, serverUrl)
+                }
+
+                // 首次拉取成功后，全量同步 Turso 云端流水与分类数据
+                try {
+                    TursoCloudClient.syncAllFromTurso(context, userId)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Post-login Turso sync warning: ${e.message}")
+                }
+
+                return@withContext Result.success(authRes)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Turso cloud login failed: ${e.message}")
+        }
+
+        // 3. 默认管理员离线登录兜底 (保证首次安装/完全无网络下直接进入)
         if (userKey == "admin" && cleanPass == "admin123") {
+            val defaultAdminId = "f84e359d-b99e-4ac2-b098-298e9d2661ea"
             val defaultRecord = JSONObject().apply {
                 put("username", "admin")
                 put("password_hash", passHash)
-                put("user_id", "1")
+                put("user_id", defaultAdminId)
                 put("api_key", "")
                 put("saved_at", System.currentTimeMillis())
             }
@@ -204,7 +255,7 @@ object AuthManager {
             sp.edit()
                 .putBoolean(KEY_IS_LOGGED_IN, true)
                 .putString(KEY_CURRENT_USERNAME, "admin")
-                .putString(KEY_CURRENT_USER_ID, "1")
+                .putString(KEY_CURRENT_USER_ID, defaultAdminId)
                 .putString(KEY_USERS_CACHE, cacheObj.toString())
                 .putBoolean(KEY_BIOMETRIC_ENABLED, true)
                 .apply()
@@ -214,10 +265,15 @@ object AuthManager {
                 NetworkHelper.setServerUrl(context, serverUrl)
             }
 
-            return@withContext Result.success(AuthResult("admin", "1", isLocalCache = true))
+            // 离线兜底登入后也尝试异步同步 Turso
+            try {
+                TursoCloudClient.syncAllFromTurso(context, defaultAdminId)
+            } catch (_: Exception) {}
+
+            return@withContext Result.success(AuthResult("admin", defaultAdminId, isLocalCache = true))
         }
 
-        // 2. 本地不存在或本地验证未过，联网请求在线后端验证 (Online DB)
+        // 4. 本地与 Turso 直连均未命中时，尝试向局域网/自定义服务器接口验证兜底
         val onlineRes = NativeLedgerApi.login(context, cleanUser, cleanPass, serverUrl)
         onlineRes.fold(
             onSuccess = { json ->
@@ -226,7 +282,6 @@ object AuthManager {
                 val retUsername = userObj?.optString("username") ?: cleanUser
                 val apiKey = userObj?.optString("api_key") ?: ""
 
-                // 记录凭证到本地缓存
                 val newRecord = JSONObject().apply {
                     put("username", retUsername)
                     put("password_hash", passHash)
@@ -252,7 +307,6 @@ object AuthManager {
                     NetworkHelper.setServerUrl(context, serverUrl)
                 }
 
-                // 首次拉取成功后，后台全量同步账户与分类数据
                 try {
                     LocalDataStore.syncAllUserData(context)
                 } catch (_: Exception) {}
@@ -260,7 +314,6 @@ object AuthManager {
                 Result.success(AuthResult(retUsername, userId, isLocalCache = false))
             },
             onFailure = { _ ->
-                // 统一返回专业、优雅的凭据无效提示，黑盒化处理，严禁暴露底层网络错误
                 Result.failure(Exception(context.getString(R.string.login_invalid_credentials)))
             }
         )

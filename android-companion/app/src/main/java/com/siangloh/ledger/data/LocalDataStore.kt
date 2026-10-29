@@ -249,7 +249,12 @@ object LocalDataStore {
 
         isSyncing = true
         try {
-            Log.i(TAG, "Preloading all local data from Room database...")
+            Log.i(TAG, "Syncing data from Turso Cloud & preloading local database...")
+            try {
+                TursoCloudClient.syncAllFromTurso(context)
+            } catch (e: Exception) {
+                Log.w(TAG, "Turso cloud sync skipped: ${e.message}")
+            }
             val username = NetworkHelper.getUsername(context)
             val today = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
             val prevMonth = shiftMonth(today, -1)

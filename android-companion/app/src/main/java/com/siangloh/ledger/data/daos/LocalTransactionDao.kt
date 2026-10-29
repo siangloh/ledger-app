@@ -11,7 +11,6 @@ interface LocalTransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(transactions: List<LocalTransaction>)
 
-
     @Update
     suspend fun update(transaction: LocalTransaction)
 
@@ -41,4 +40,7 @@ interface LocalTransactionDao {
 
     @Query("SELECT COUNT(*) FROM local_transactions")
     suspend fun countAll(): Int
+
+    @Query("DELETE FROM local_transactions")
+    suspend fun deleteAll()
 }
