@@ -513,6 +513,13 @@ fun OverviewScreen(
 
         coroutineScope.launch {
             try {
+                if (forceRefresh) {
+                    withContext(Dispatchers.IO) {
+                        try {
+                            com.siangloh.ledger.data.LocalLedgerRepository.checkAndGenerateDueRecurring(context)
+                        } catch (_: Exception) {}
+                    }
+                }
                 val yr = calendar.get(Calendar.YEAR)
                 val (result, bRecord) = withContext(Dispatchers.IO) {
                     val ov = com.siangloh.ledger.data.LocalLedgerRepository.getOverviewJson(

@@ -340,6 +340,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkAndEnqueueSyncIfNeeded() {
         SyncWorker.enqueuePeriodicSync(this)
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                com.siangloh.ledger.data.LocalLedgerRepository.checkAndGenerateDueRecurring(this@MainActivity)
+            } catch (_: Exception) {}
+        }
         if (!NetworkHelper.isOnline(this)) return
         val sp = getSharedPreferences("ledger_sync_prefs", Context.MODE_PRIVATE)
         val lastSync = sp.getLong("last_auto_sync_time", 0L)

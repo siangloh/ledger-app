@@ -1802,6 +1802,183 @@ object LocalLedgerRepository {
         }
     }
 
+    /**
+     * 周期性固定收支与固定储蓄到期自动入账守护引擎
+     * 智能判定到期日期、防止当月重复入账，自动生成本地流水并同步至云端。
+     */
+    suspend fun checkAndGenerateDueRecurring(context: Context): Int = withContext(Dispatchers.IO) {
+        var count = 0
+        try {
+            val db = AppDatabase.getInstance(context)
+            val cal = Calendar.getInstance()
+            val todayDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cal.time)
+            val currentMonth = todayDate.substring(0, 7)
+            val currentDay = cal.get(Calendar.DAY_OF_MONTH)
+            val maxDayOfMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+
+            val spTools = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
+            val spStatus = context.getSharedPreferences("local_recurring_status", Context.MODE_PRIVATE)
+
+            val thisMonthTxs = db.localTransactionDao().getByMonth("$currentMonth%")
+
+            // 1. 固定支出 (Subscriptions / 周期账单)
+            val subJson = spTools.getString("subscriptions_json", null)
+            if (!subJson.isNullOrBlank()) {
+                val subsArr = JSONArray(subJson)
+                for (i in 0 until subsArr.length()) {
+                    val sub = subsArr.optJSONObject(i) ?: continue
+                    val id = sub.optInt("id", 0)
+                    val autoRenew = sub.optBoolean("auto_renew", true)
+                    if (!autoRenew || id <= 0) continue
+
+                    val nextDate = sub.optString("next_billing_date", "1")
+                    val scheduledDay = (Regex("""\d+""").find(nextDate)?.value?.toIntOrNull() ?: 1).coerceIn(1, maxDayOfMonth)
+
+                    if (currentDay >= scheduledDay) {
+                        val key = "sub_${id}_$currentMonth"
+                        if (!spStatus.contains(key)) {
+                            val name = sub.optString("name", "周期支出")
+                            val cat = sub.optString("category", "账单")
+                            val cost = sub.optDouble("cost", 0.0)
+                            val accId = sub.optInt("account_id").takeIf { it > 0 }
+
+                            // 检查当月是否已有该笔支出（避免重复记账）
+                            val alreadyExists = thisMonthTxs.any { tx ->
+                                tx.type == "expense" && (
+                                    (tx.tags.contains("#subscription") && tx.note.contains(name)) ||
+                                    (kotlin.math.abs(tx.amount - cost) < 0.01 && tx.category.equals(cat, ignoreCase = true) && tx.note.contains(name))
+                                )
+                            }
+                            if (alreadyExists) {
+                                spStatus.edit().putString(key, "existing_found").apply()
+                            } else if (cost > 0.0) {
+                                val txDate = String.format(Locale.US, "%s-%02d", currentMonth, scheduledDay)
+                                createTransaction(
+                                    context = context,
+                                    date = txDate,
+                                    type = "expense",
+                                    category = cat,
+                                    amount = cost,
+                                    note = "$name (自动入账)",
+                                    tags = "#subscription",
+                                    accountId = accId
+                                )
+                                spStatus.edit().putString(key, "generated_${System.currentTimeMillis()}").apply()
+                                count++
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. 固定收入 (Salary / 薪资工资)
+            val incomeJson = spTools.getString("fixed_incomes_json", null)
+            if (!incomeJson.isNullOrBlank()) {
+                val incArr = JSONArray(incomeJson)
+                for (i in 0 until incArr.length()) {
+                    val inc = incArr.optJSONObject(i) ?: continue
+                    val id = inc.optInt("id", 0)
+                    val isActive = inc.optBoolean("is_active", true)
+                    if (!isActive || id <= 0) continue
+
+                    val arrDayStr = inc.optString("arrival_day", "25")
+                    val scheduledDay = (Regex("""\d+""").find(arrDayStr)?.value?.toIntOrNull() ?: 25).coerceIn(1, maxDayOfMonth)
+
+                    if (currentDay >= scheduledDay) {
+                        val key = "inc_${id}_$currentMonth"
+                        if (!spStatus.contains(key)) {
+                            val name = inc.optString("name", "固定收入")
+                            val cat = inc.optString("category", "薪资")
+                            val amt = inc.optDouble("amount", 0.0)
+                            val accId = inc.optInt("account_id").takeIf { it > 0 }
+
+                            val alreadyExists = thisMonthTxs.any { tx ->
+                                tx.type == "income" && (
+                                    (tx.tags.contains("#fixed_income") && tx.note.contains(name)) ||
+                                    (kotlin.math.abs(tx.amount - amt) < 0.01 && tx.category.equals(cat, ignoreCase = true) && tx.note.contains(name))
+                                )
+                            }
+                            if (alreadyExists) {
+                                spStatus.edit().putString(key, "existing_found").apply()
+                            } else if (amt > 0.0) {
+                                val txDate = String.format(Locale.US, "%s-%02d", currentMonth, scheduledDay)
+                                createTransaction(
+                                    context = context,
+                                    date = txDate,
+                                    type = "income",
+                                    category = cat,
+                                    amount = amt,
+                                    note = "$name (自动入账)",
+                                    tags = "#fixed_income",
+                                    accountId = accId
+                                )
+                                spStatus.edit().putString(key, "generated_${System.currentTimeMillis()}").apply()
+                                count++
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. 固定储蓄 (Fixed Savings Plan)
+            val savingsJson = spTools.getString("fixed_savings_json", null)
+            if (!savingsJson.isNullOrBlank()) {
+                val savArr = JSONArray(savingsJson)
+                for (i in 0 until savArr.length()) {
+                    val sav = savArr.optJSONObject(i) ?: continue
+                    val id = sav.optInt("id", 0)
+                    val isActive = sav.optBoolean("is_active", true)
+                    if (!isActive || id <= 0) continue
+
+                    val arrDayStr = sav.optString("arrival_day", "1")
+                    val scheduledDay = (Regex("""\d+""").find(arrDayStr)?.value?.toIntOrNull() ?: 1).coerceIn(1, maxDayOfMonth)
+
+                    if (currentDay >= scheduledDay) {
+                        val key = "sav_${id}_$currentMonth"
+                        if (!spStatus.contains(key)) {
+                            val name = sav.optString("name", "固定储蓄")
+                            val cat = sav.optString("category", "常规储蓄")
+                            val amt = sav.optDouble("amount", 0.0)
+                            val accId = sav.optInt("account_id").takeIf { it > 0 }
+
+                            val alreadyExists = thisMonthTxs.any { tx ->
+                                tx.type == "savings" && (
+                                    (tx.tags.contains("#fixed_savings") && tx.note.contains(name)) ||
+                                    (kotlin.math.abs(tx.amount - amt) < 0.01 && tx.note.contains(name))
+                                )
+                            }
+                            if (alreadyExists) {
+                                spStatus.edit().putString(key, "existing_found").apply()
+                            } else if (amt > 0.0) {
+                                val txDate = String.format(Locale.US, "%s-%02d", currentMonth, scheduledDay)
+                                createTransaction(
+                                    context = context,
+                                    date = txDate,
+                                    type = "savings",
+                                    category = cat,
+                                    amount = amt,
+                                    note = "$name (自动存入)",
+                                    tags = "#fixed_savings",
+                                    accountId = accId
+                                )
+                                spStatus.edit().putString(key, "generated_${System.currentTimeMillis()}").apply()
+                                count++
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "checkAndGenerateDueRecurring error: ${e.message}", e)
+        }
+        if (count > 0) {
+            try {
+                NativeLedgerApi.invalidateCache()
+            } catch (_: Exception) {}
+        }
+        count
+    }
+
     suspend fun getBudgetOverview(context: Context, month: String? = null): Result<BudgetOverviewRecord> = withContext(Dispatchers.IO) {
         try {
             initDefaultsIfNeeded(context)

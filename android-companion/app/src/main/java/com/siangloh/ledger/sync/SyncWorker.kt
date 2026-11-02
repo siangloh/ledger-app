@@ -70,6 +70,9 @@ class SyncWorker(
         try {
             com.siangloh.ledger.data.TursoCloudClient.syncAllFromTurso(applicationContext)
         } catch (_: Exception) {}
+        try {
+            com.siangloh.ledger.data.LocalLedgerRepository.checkAndGenerateDueRecurring(applicationContext)
+        } catch (_: Exception) {}
         val db = AppDatabase.getInstance(applicationContext)
 
         try {

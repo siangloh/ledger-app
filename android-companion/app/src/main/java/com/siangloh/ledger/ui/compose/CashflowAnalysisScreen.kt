@@ -843,32 +843,40 @@ private fun MonthlyDailyCalendarCard(
     todayDay: Int?,
     selectedDay: Int?,
     onSelectDay: (Int?) -> Unit,
-    onItemClick: ((TxSelection) -> Unit)? = null
+    onItemClick: ((TxSelection) -> Unit)? = null,
+    rangeStartDate: String? = null,
+    rangeEndDate: String? = null
 ) {
     val context = LocalContext.current
+    val cleanMonth = remember(month) {
+        if (month.length >= 7) month.substring(0, 7) else SimpleDateFormat("yyyy-MM", Locale.US).format(java.util.Date())
+    }
     val ymFormat = remember { SimpleDateFormat("yyyy-MM", Locale.US) }
-    val cal = remember(month) {
+    val cal = remember(cleanMonth) {
         Calendar.getInstance().apply {
-            time = try { ymFormat.parse(month)!! } catch (_: Exception) { java.util.Date() }
+            time = try { ymFormat.parse(cleanMonth)!! } catch (_: Exception) { java.util.Date() }
             set(Calendar.DAY_OF_MONTH, 1)
         }
     }
-    val daysInMonth = remember(month) { cal.getActualMaximum(Calendar.DAY_OF_MONTH) }
-    val firstDayOfWeek = remember(month) { cal.get(Calendar.DAY_OF_WEEK) }
-    val leadingOffset = remember(month) { (firstDayOfWeek - Calendar.MONDAY + 7) % 7 }
+    val daysInMonth = remember(cleanMonth) { cal.getActualMaximum(Calendar.DAY_OF_MONTH) }
+    val firstDayOfWeek = remember(cleanMonth) { cal.get(Calendar.DAY_OF_WEEK) }
+    val leadingOffset = remember(cleanMonth) { (firstDayOfWeek - Calendar.MONDAY + 7) % 7 }
 
-    val dayExpenses = remember(data, month, daysInMonth) {
+    val dayExpenses = remember(data, cleanMonth, daysInMonth, rangeStartDate, rangeEndDate) {
         val sum = DoubleArray(daysInMonth + 1)
         val txs = mutableMapOf<Int, MutableList<JSONObject>>()
         data.rows("transactions").forEach { tx ->
             if (tx.optString("type") == "expense" && tx.optString("category") != TRANSFER_LABEL) {
                 val date = tx.optString("date")
-                if (date.startsWith(month) && date.length >= 10) {
+                if (date.startsWith(cleanMonth) && date.length >= 10) {
                     val d = date.substring(8, 10).toIntOrNull()
                     if (d != null && d in 1..daysInMonth) {
-                        val amt = tx.optDouble("amount", 0.0)
-                        sum[d] += amt
-                        txs.getOrPut(d) { mutableListOf() }.add(tx)
+                        val isOutOfRange = (rangeStartDate != null && date < rangeStartDate) || (rangeEndDate != null && date > rangeEndDate)
+                        if (!isOutOfRange) {
+                            val amt = tx.optDouble("amount", 0.0)
+                            sum[d] += amt
+                            txs.getOrPut(d) { mutableListOf() }.add(tx)
+                        }
                     }
                 }
             }
@@ -883,8 +891,21 @@ private fun MonthlyDailyCalendarCard(
     val maxExpenseDay = remember(dailySum, maxExpenseAmt) {
         if (maxExpenseAmt > 0) (1..daysInMonth).maxByOrNull { dailySum[it] } else null
     }
-    val zeroDays = remember(dailySum, daysInMonth) { (1..daysInMonth).count { dailySum[it] == 0.0 } }
-    val elapsedDays = todayDay ?: daysInMonth
+    val zeroDays = remember(dailySum, daysInMonth, cleanMonth, rangeStartDate, rangeEndDate) {
+        (1..daysInMonth).count { d ->
+            val curDate = String.format(Locale.US, "%s-%02d", cleanMonth, d)
+            val inRange = (rangeStartDate == null || curDate >= rangeStartDate) && (rangeEndDate == null || curDate <= rangeEndDate)
+            inRange && dailySum[d] == 0.0
+        }
+    }
+    val elapsedDays = remember(daysInMonth, cleanMonth, rangeStartDate, rangeEndDate, todayDay) {
+        (1..daysInMonth).count { d ->
+            val curDate = String.format(Locale.US, "%s-%02d", cleanMonth, d)
+            val inRange = (rangeStartDate == null || curDate >= rangeStartDate) && (rangeEndDate == null || curDate <= rangeEndDate)
+            val notFuture = (todayDay == null || d <= todayDay)
+            inRange && notFuture
+        }.coerceAtLeast(1)
+    }
     val dailyAvg = if (elapsedDays > 0) totalExpense / elapsedDays else 0.0
 
     val weekdays = listOf(
@@ -898,7 +919,7 @@ private fun MonthlyDailyCalendarCard(
     )
 
     SectionCard(
-        title = stringResource(R.string.cf_calendar_title),
+        title = stringResource(R.string.cf_calendar_title) + " (${formatDisplayMonth(cleanMonth, context)})",
         trailing = formatMoney(currency, totalExpense)
     ) {
         Text(
@@ -943,18 +964,22 @@ private fun MonthlyDailyCalendarCard(
                         if (dayNum !in 1..daysInMonth) {
                             Spacer(Modifier.weight(1f))
                         } else {
+                            val curDateStr = String.format(Locale.US, "%s-%02d", cleanMonth, dayNum)
+                            val isOutOfRange = (rangeStartDate != null && curDateStr < rangeStartDate) || (rangeEndDate != null && curDateStr > rangeEndDate)
                             val amt = dailySum[dayNum]
                             val isToday = (todayDay == dayNum)
                             val isSelected = (selectedDay == dayNum)
                             val isMax = (maxExpenseDay == dayNum && amt > 0)
 
                             val cellBg = when {
+                                isOutOfRange -> Slate100.copy(alpha = 0.5f)
                                 isSelected -> PrimaryTeal
                                 isToday -> Teal50
                                 amt > 0 -> if (isMax && amt >= 30.0) Color(0xFFFEE2E2) else Color(0xFFFFF1F2)
                                 else -> Color.White
                             }
                             val cellBorder = when {
+                                isOutOfRange -> BorderStroke(0.5.dp, Slate200.copy(alpha = 0.5f))
                                 isSelected -> BorderStroke(1.5.dp, PrimaryTeal)
                                 isToday -> BorderStroke(1.5.dp, PrimaryTeal)
                                 amt > 0 -> BorderStroke(1.dp, Color(0xFFFECDD3))
@@ -966,7 +991,7 @@ private fun MonthlyDailyCalendarCard(
                                     .weight(1f)
                                     .height(48.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .clickable { onSelectDay(if (isSelected) null else dayNum) },
+                                    .clickable(enabled = !isOutOfRange) { onSelectDay(if (isSelected) null else dayNum) },
                                 shape = RoundedCornerShape(8.dp),
                                 color = cellBg,
                                 border = cellBorder
@@ -980,9 +1005,11 @@ private fun MonthlyDailyCalendarCard(
                                         text = "$dayNum",
                                         fontSize = 11.sp,
                                         fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.White else if (isToday) PrimaryTeal else Slate800
+                                        color = if (isOutOfRange) Slate300 else if (isSelected) Color.White else if (isToday) PrimaryTeal else Slate800
                                     )
-                                    if (amt > 0) {
+                                    if (isOutOfRange) {
+                                        Text("-", fontSize = 9.sp, color = Slate300)
+                                    } else if (amt > 0) {
                                         val amtStr = if (amt >= 1000) {
                                             "${(amt / 1000).toInt()}k"
                                         } else if (amt >= 100) {
@@ -1042,7 +1069,7 @@ private fun MonthlyDailyCalendarCard(
 
         // 选中某天展开当日明细卡片
         if (selectedDay != null) {
-            val dateStr = String.format(Locale.US, "%s-%02d", month, selectedDay)
+            val dateStr = String.format(Locale.US, "%s-%02d", cleanMonth, selectedDay)
             val txs = dayTxsMap[selectedDay] ?: emptyList()
             val dayTotal = dailySum[selectedDay]
 
@@ -1318,9 +1345,35 @@ fun CashflowAnalysisScreen(
     var isCustomRange by rememberSaveable { mutableStateOf(!initialStartDate.isNullOrBlank() && !initialEndDate.isNullOrBlank()) }
     val todayCal = remember { Calendar.getInstance() }
     val todayStr = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(todayCal.time) }
+    val todayCalMonth = remember { SimpleDateFormat("yyyy-MM", Locale.US).format(todayCal.time) }
     var startDate by rememberSaveable { mutableStateOf(initialStartDate ?: "$initialMonth-01") }
     var endDate by rememberSaveable { mutableStateOf(initialEndDate ?: todayStr) }
     var currency by rememberSaveable { mutableStateOf("") }
+
+    val rangeMonths = remember(startDate, endDate, isCustomRange, month) {
+        if (isCustomRange) {
+            try {
+                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                val ymSdf = SimpleDateFormat("yyyy-MM", Locale.US)
+                val startCal = Calendar.getInstance().apply { time = sdf.parse(startDate)!!; set(Calendar.DAY_OF_MONTH, 1) }
+                val endCal = Calendar.getInstance().apply { time = sdf.parse(endDate)!!; set(Calendar.DAY_OF_MONTH, 1) }
+                val list = mutableListOf<String>()
+                val cur = startCal.clone() as Calendar
+                while (!cur.after(endCal) && list.size < 36) {
+                    list.add(ymSdf.format(cur.time))
+                    cur.add(Calendar.MONTH, 1)
+                }
+                if (list.isEmpty()) listOf(month.take(7)) else list
+            } catch (_: Exception) {
+                listOf(month.take(7))
+            }
+        } else {
+            listOf(month.take(7))
+        }
+    }
+    var selectedCalendarMonth by rememberSaveable(isCustomRange, startDate, endDate, month) {
+        mutableStateOf(rangeMonths.lastOrNull() ?: month.take(7))
+    }
     var refresh by remember { mutableIntStateOf(0) }
     var result by remember { mutableStateOf(CashflowRepository.getCached(context, initialMonth, currency)) }
     var prevData by remember { mutableStateOf(CashflowRepository.getCached(context, shiftMonth(initialMonth, -1), currency)?.data) }
@@ -2102,15 +2155,89 @@ fun CashflowAnalysisScreen(
 
                             // ================= 日历 (CALENDAR) =================
                             CashflowDashboardTab.CALENDAR -> {
+                                if (rangeMonths.size > 1) {
+                                    item {
+                                        Surface(
+                                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = Color.White,
+                                            border = BorderStroke(1.dp, Slate200)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                val curIdx = rangeMonths.indexOf(selectedCalendarMonth)
+                                                IconButton(
+                                                    onClick = {
+                                                        if (curIdx > 0) {
+                                                            selectedCalendarMonth = rangeMonths[curIdx - 1]
+                                                            selectedDay = null
+                                                        }
+                                                    },
+                                                    enabled = curIdx > 0,
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(Icons.Default.ChevronLeft, contentDescription = null, tint = if (curIdx > 0) Slate700 else Slate300)
+                                                }
+
+                                                LazyRow(
+                                                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    items(rangeMonths) { m ->
+                                                        val isSel = (m == selectedCalendarMonth)
+                                                        Surface(
+                                                            shape = RoundedCornerShape(16.dp),
+                                                            color = if (isSel) PrimaryTeal else Slate100,
+                                                            border = if (isSel) null else BorderStroke(1.dp, Slate200),
+                                                            modifier = Modifier.clickable {
+                                                                selectedCalendarMonth = m
+                                                                selectedDay = null
+                                                            }
+                                                        ) {
+                                                            Text(
+                                                                text = formatDisplayMonth(m, context),
+                                                                fontSize = 12.sp,
+                                                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                                                color = if (isSel) Color.White else Slate700,
+                                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                IconButton(
+                                                    onClick = {
+                                                        if (curIdx >= 0 && curIdx < rangeMonths.size - 1) {
+                                                            selectedCalendarMonth = rangeMonths[curIdx + 1]
+                                                            selectedDay = null
+                                                        }
+                                                    },
+                                                    enabled = curIdx >= 0 && curIdx < rangeMonths.size - 1,
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = if (curIdx < rangeMonths.size - 1) Slate700 else Slate300)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
                                 item {
+                                    val isCurrentMonth = selectedCalendarMonth == todayCalMonth
+                                    val passTodayDay = if (isCurrentMonth) todayCal.get(Calendar.DAY_OF_MONTH) else null
                                     MonthlyDailyCalendarCard(
-                                        month = month,
+                                        month = selectedCalendarMonth,
                                         data = data,
                                         currency = cur,
-                                        todayDay = todayDay,
+                                        todayDay = passTodayDay,
                                         selectedDay = selectedDay,
                                         onSelectDay = { selectedDay = it },
-                                        onItemClick = { selection = it }
+                                        onItemClick = { selection = it },
+                                        rangeStartDate = if (isCustomRange) startDate else null,
+                                        rangeEndDate = if (isCustomRange) endDate else null
                                     )
                                 }
                             }
