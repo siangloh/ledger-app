@@ -52,6 +52,8 @@ fun MainAppScreen(
     var cashflowEndDate by rememberSaveable { mutableStateOf<String?>(null) }
     var cashflowVisible by rememberSaveable { mutableStateOf(false) }
     var cashflowRevision by remember { mutableIntStateOf(0) }
+    var overviewRevision by remember { mutableIntStateOf(0) }
+    var showBudgetDialog by rememberSaveable { mutableStateOf(false) }
     val saveableStateHolder = rememberSaveableStateHolder()
     val detailParallax by animateFloatAsState(
         targetValue = if (cashflowVisible && selectedTab == 0) -0.08f else 0f,
@@ -85,7 +87,16 @@ fun MainAppScreen(
 
                         NavigationBarItem(
                             selected = isSelected,
-                            onClick = { if (cashflowVisible) { cashflowVisible = false; cashflowRevision++ }; selectedTab = index },
+                            onClick = {
+                                if (cashflowVisible) {
+                                    cashflowVisible = false
+                                    cashflowRevision++
+                                }
+                                if (index == 0 && selectedTab != 0) {
+                                    overviewRevision++
+                                }
+                                selectedTab = index
+                            },
                             icon = {
                                 Icon(
                                     imageVector = item.icon,
@@ -140,10 +151,13 @@ fun MainAppScreen(
                         0 -> {
                             OverviewScreen(
                                 showBottomBar = false,
+                                isActive = (selectedTab == 0 && !cashflowVisible),
+                                overviewRevision = overviewRevision,
                                 onNavigateToRecords = { selectedTab = 1 },
                                 onNavigateToAdd = { selectedTab = 2 },
                                 onNavigateToAccounts = { selectedTab = 3 },
                                 onNavigateToTools = { selectedTab = 4 },
+                                onNavigateToBudget = { showBudgetDialog = true },
                                 onScanReceipt = onScanReceipt,
                                 onOpenSettings = onOpenSettings,
                                 onNavigateToCashflow = { m, sDate, eDate ->
@@ -194,6 +208,14 @@ fun MainAppScreen(
                         initialEndDate = cashflowEndDate
                     ) { cashflowVisible = false; cashflowRevision++ }
                 }
+            }
+            if (showBudgetDialog) {
+                BudgetManagementDialog(
+                    onDismiss = {
+                        showBudgetDialog = false
+                        overviewRevision++
+                    }
+                )
             }
         }
     }

@@ -743,6 +743,7 @@ object LocalLedgerRepository {
             var totalExp = 0.0
             var totalInc = 0.0
             var totalSavings = 0.0
+            var totalTransfer = 0.0
             val catExpMap = mutableMapOf<String, Double>()
             val trendExpMap = mutableMapOf<String, Double>()
 
@@ -767,6 +768,8 @@ object LocalLedgerRepository {
                     totalInc += tx.amount
                 } else if (tx.type == "savings") {
                     totalSavings += tx.amount
+                } else if (tx.type == "transfer") {
+                    totalTransfer += tx.amount
                 }
             }
 
@@ -841,7 +844,7 @@ object LocalLedgerRepository {
                 put("savings", totalSavings)
                 put("total_savings", totalSavings)
                 put("savings_amount", totalSavings)
-                put("transfer_amount", 0.0)
+                put("transfer_amount", totalTransfer)
                 put("uncategorized_count", 0)
                 put("uncategorized_amount", 0.0)
                 put("net", net)

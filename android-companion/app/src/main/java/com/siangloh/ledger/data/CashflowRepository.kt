@@ -107,6 +107,7 @@ object CashflowRepository {
         var inc = 0.0
         var exp = 0.0
         var savings = 0.0
+        var transfer = 0.0
 
         val expCategoriesMap = mutableMapOf<String, Pair<Double, MutableList<Int>>>()
         val expPlatformMap = mutableMapOf<String, Pair<Double, MutableList<Int>>>()
@@ -142,6 +143,8 @@ object CashflowRepository {
 
                 val spEntry = savingsPlatformMap.getOrPut(platformName) { Pair(0.0, mutableListOf()) }
                 savingsPlatformMap[platformName] = Pair(spEntry.first + amt, spEntry.second.apply { add(tx.id.toInt()) })
+            } else if (tx.type == "transfer") {
+                transfer += amt
             }
 
             txArray.put(JSONObject().apply {
@@ -315,6 +318,8 @@ object CashflowRepository {
             put("expense", exp)
             put("savings", savings)
             put("total_savings", savings)
+            put("transfer", transfer)
+            put("total_transfer", transfer)
             put("reserved", totalPending)
             put("planned", totalPlanned)
             put("paid", totalPaid)

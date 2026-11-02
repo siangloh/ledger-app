@@ -398,6 +398,35 @@ fun BudgetManagementPage(
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = Slate800
                                             )
+                                            if (cat.level == "over") {
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = Color(0xFFFEE2E2)
+                                                ) {
+                                                    Text(
+                                                        text = stringResource(R.string.budget_status_over),
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFDC2626),
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            } else if (cat.level == "warn" || cat.level == "reached") {
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = Color(0xFFFEF3C7)
+                                                ) {
+                                                    Text(
+                                                        text = stringResource(R.string.budget_status_warn),
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFD97706),
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            }
                                         }
 
                                         Row(verticalAlignment = Alignment.CenterVertically) {

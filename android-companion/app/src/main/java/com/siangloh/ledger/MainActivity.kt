@@ -173,7 +173,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             val localizedContext = androidx.compose.runtime.remember(hostContext, localizedConfig) {
-                hostContext.createConfigurationContext(localizedConfig)
+                val configCtx = hostContext.createConfigurationContext(localizedConfig)
+                object : android.content.ContextWrapper(hostContext) {
+                    override fun getResources(): android.content.res.Resources = configCtx.resources
+                }
             }
 
             androidx.compose.runtime.CompositionLocalProvider(
@@ -336,6 +339,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAndEnqueueSyncIfNeeded() {
+        SyncWorker.enqueuePeriodicSync(this)
         if (!NetworkHelper.isOnline(this)) return
         val sp = getSharedPreferences("ledger_sync_prefs", Context.MODE_PRIVATE)
         val lastSync = sp.getLong("last_auto_sync_time", 0L)

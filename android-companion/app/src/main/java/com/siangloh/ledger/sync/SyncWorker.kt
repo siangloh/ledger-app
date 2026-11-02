@@ -19,8 +19,27 @@ class SyncWorker(
     companion object {
         private const val TAG = "LedgerSyncWorker"
         private const val WORK_NAME = "ledger_background_sync"
+        private const val PERIODIC_WORK_NAME = "ledger_periodic_sync"
 
         private val notifRetryMap = java.util.concurrent.ConcurrentHashMap<Long, Int>()
+
+        fun enqueuePeriodicSync(context: Context) {
+            val wifiOnly = NetworkHelper.isWifiOnlySync(context)
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
+                .build()
+
+            val periodicRequest = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
+                .setConstraints(constraints)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+                .build()
+
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                PERIODIC_WORK_NAME,
+                ExistingPeriodicWorkPolicy.KEEP,
+                periodicRequest
+            )
+        }
 
         fun enqueueSync(context: Context) {
             val wifiOnly = NetworkHelper.isWifiOnlySync(context)

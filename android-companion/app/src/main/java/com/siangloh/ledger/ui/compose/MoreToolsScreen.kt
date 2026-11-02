@@ -389,25 +389,37 @@ fun MoreToolsScreen(
                     isBatteryOptimized = isIgnoringBatteryOptimizations,
                     canDrawOverlays = canDrawOverlays,
                     onManageListener = {
-                        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                        context.startActivity(intent)
+                        startActivitySafely(
+                            context,
+                            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS),
+                            Intent(Settings.ACTION_SETTINGS)
+                        )
                     },
                     onManageBattery = {
-                        val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                        context.startActivity(intent)
+                        startActivitySafely(
+                            context,
+                            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+                            Intent(
+                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                Uri.parse("package:${context.packageName}")
+                            )
+                        )
                     },
                     onManageOverlay = {
-                        val intent = Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:${context.packageName}")
+                        startActivitySafely(
+                            context,
+                            Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:${context.packageName}")
+                            ),
+                            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
                         )
-                        context.startActivity(intent)
                     },
                     onOpenAppSelection = {
-                        context.startActivity(Intent(context, AppSelectionActivity::class.java))
+                        startActivitySafely(context, Intent(context, AppSelectionActivity::class.java))
                     },
                     onOpenLogs = {
-                        context.startActivity(Intent(context, NotificationLogActivity::class.java))
+                        startActivitySafely(context, Intent(context, NotificationLogActivity::class.java))
                     }
                 )
             }
@@ -434,7 +446,7 @@ fun MoreToolsScreen(
                     currentLang = currentLang,
                     onSelectLanguage = { newLang ->
                         com.siangloh.ledger.util.AppLanguageManager.setLanguage(context, newLang)
-                        (context as? android.app.Activity)?.recreate()
+                        findActivity(context)?.recreate()
                     }
                 )
             }
@@ -2774,4 +2786,40 @@ fun InstallmentManagementDialog(
         installments = installments,
         onBack = onDismiss
     )
+}
+
+private tailrec fun findActivity(context: Context?): android.app.Activity? {
+    return when (context) {
+        null -> null
+        is android.app.Activity -> context
+        is android.content.ContextWrapper -> findActivity(context.baseContext)
+        else -> null
+    }
+}
+
+private fun startActivitySafely(
+    context: Context,
+    primaryIntent: Intent,
+    fallbackIntent: Intent? = null
+) {
+    val activity = findActivity(context)
+    try {
+        if (activity != null) {
+            activity.startActivity(primaryIntent)
+        } else {
+            primaryIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(primaryIntent)
+        }
+    } catch (_: Exception) {
+        if (fallbackIntent != null) {
+            try {
+                if (activity != null) {
+                    activity.startActivity(fallbackIntent)
+                } else {
+                    fallbackIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(fallbackIntent)
+                }
+            } catch (_: Exception) {}
+        }
+    }
 }
