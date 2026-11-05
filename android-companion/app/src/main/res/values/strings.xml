@@ -590,6 +590,7 @@
     <string name="cal_sun">日</string>
     <string name="cal_today">今天</string>
     <string name="cf_calendar_zero_days_count">%1$d天</string>
+    <string name="cal_range_month_progress">第 %1$d / %2$d 个月</string>
     <string name="records_empty_title">本期暂无符合条件的流水</string>
     <string name="records_empty_desc">可尝试切换月份，或点击下方【记一笔】快速记账</string>
     <string name="records_add_tx_btn">记一笔支出/收入</string>

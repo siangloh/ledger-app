@@ -1819,6 +1819,48 @@ object LocalLedgerRepository {
             val spTools = context.getSharedPreferences("local_tools_prefs", Context.MODE_PRIVATE)
             val spStatus = context.getSharedPreferences("local_recurring_status", Context.MODE_PRIVATE)
 
+            val lang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
+            val autoExpenseTag = when (lang) {
+                com.siangloh.ledger.util.AppLanguageManager.LANG_EN -> "(Auto)"
+                com.siangloh.ledger.util.AppLanguageManager.LANG_MS -> "(Automatik)"
+                else -> "(自动入账)"
+            }
+            val autoSavingsTag = when (lang) {
+                com.siangloh.ledger.util.AppLanguageManager.LANG_EN -> "(Auto-saved)"
+                com.siangloh.ledger.util.AppLanguageManager.LANG_MS -> "(Simpanan Automatik)"
+                else -> "(自动存入)"
+            }
+            val defaultSubName = when (lang) {
+                com.siangloh.ledger.util.AppLanguageManager.LANG_EN -> "Recurring Expense"
+                com.siangloh.ledger.util.AppLanguageManager.LANG_MS -> "Perbelanjaan Berkala"
+                else -> "周期支出"
+            }
+            val defaultSubCat = when (lang) {
+                com.siangloh.ledger.util.AppLanguageManager.LANG_EN -> "Bills"
+                com.siangloh.ledger.util.AppLanguageManager.LANG_MS -> "Bil"
+                else -> "账单"
+            }
+            val defaultIncName = when (lang) {
+                com.siangloh.ledger.util.AppLanguageManager.LANG_EN -> "Fixed Income"
+                com.siangloh.ledger.util.AppLanguageManager.LANG_MS -> "Pendapatan Tetap"
+                else -> "固定收入"
+            }
+            val defaultIncCat = when (lang) {
+                com.siangloh.ledger.util.AppLanguageManager.LANG_EN -> "Salary"
+                com.siangloh.ledger.util.AppLanguageManager.LANG_MS -> "Gaji"
+                else -> "薪资"
+            }
+            val defaultSavName = when (lang) {
+                com.siangloh.ledger.util.AppLanguageManager.LANG_EN -> "Fixed Savings"
+                com.siangloh.ledger.util.AppLanguageManager.LANG_MS -> "Simpanan Tetap"
+                else -> "固定储蓄"
+            }
+            val defaultSavCat = when (lang) {
+                com.siangloh.ledger.util.AppLanguageManager.LANG_EN -> "Savings"
+                com.siangloh.ledger.util.AppLanguageManager.LANG_MS -> "Simpanan"
+                else -> "常规储蓄"
+            }
+
             val thisMonthTxs = db.localTransactionDao().getByMonth("$currentMonth%")
 
             // 1. 固定支出 (Subscriptions / 周期账单)
@@ -1837,8 +1879,8 @@ object LocalLedgerRepository {
                     if (currentDay >= scheduledDay) {
                         val key = "sub_${id}_$currentMonth"
                         if (!spStatus.contains(key)) {
-                            val name = sub.optString("name", "周期支出")
-                            val cat = sub.optString("category", "账单")
+                            val name = sub.optString("name", defaultSubName)
+                            val cat = sub.optString("category", defaultSubCat)
                             val cost = sub.optDouble("cost", 0.0)
                             val accId = sub.optInt("account_id").takeIf { it > 0 }
 
@@ -1859,7 +1901,7 @@ object LocalLedgerRepository {
                                     type = "expense",
                                     category = cat,
                                     amount = cost,
-                                    note = "$name (自动入账)",
+                                    note = "$name $autoExpenseTag",
                                     tags = "#subscription",
                                     accountId = accId
                                 )
@@ -1887,8 +1929,8 @@ object LocalLedgerRepository {
                     if (currentDay >= scheduledDay) {
                         val key = "inc_${id}_$currentMonth"
                         if (!spStatus.contains(key)) {
-                            val name = inc.optString("name", "固定收入")
-                            val cat = inc.optString("category", "薪资")
+                            val name = inc.optString("name", defaultIncName)
+                            val cat = inc.optString("category", defaultIncCat)
                             val amt = inc.optDouble("amount", 0.0)
                             val accId = inc.optInt("account_id").takeIf { it > 0 }
 
@@ -1908,7 +1950,7 @@ object LocalLedgerRepository {
                                     type = "income",
                                     category = cat,
                                     amount = amt,
-                                    note = "$name (自动入账)",
+                                    note = "$name $autoExpenseTag",
                                     tags = "#fixed_income",
                                     accountId = accId
                                 )
@@ -1936,8 +1978,8 @@ object LocalLedgerRepository {
                     if (currentDay >= scheduledDay) {
                         val key = "sav_${id}_$currentMonth"
                         if (!spStatus.contains(key)) {
-                            val name = sav.optString("name", "固定储蓄")
-                            val cat = sav.optString("category", "常规储蓄")
+                            val name = sav.optString("name", defaultSavName)
+                            val cat = sav.optString("category", defaultSavCat)
                             val amt = sav.optDouble("amount", 0.0)
                             val accId = sav.optInt("account_id").takeIf { it > 0 }
 
@@ -1957,7 +1999,7 @@ object LocalLedgerRepository {
                                     type = "savings",
                                     category = cat,
                                     amount = amt,
-                                    note = "$name (自动存入)",
+                                    note = "$name $autoSavingsTag",
                                     tags = "#fixed_savings",
                                     accountId = accId
                                 )

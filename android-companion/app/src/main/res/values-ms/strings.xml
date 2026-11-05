@@ -590,6 +590,7 @@
     <string name="cal_sun">Ahd</string>
     <string name="cal_today">Hari Ini</string>
     <string name="cf_calendar_zero_days_count">%1$d hari</string>
+    <string name="cal_range_month_progress">Bulan %1$d drpd %2$d</string>
     <string name="records_empty_title">Tiada rekod transaksi</string>
     <string name="records_empty_desc">Cuba tukar bulan atau ketik di bawah untuk merekod transaksi baru</string>
     <string name="records_add_tx_btn">Rekod Perbelanjaan / Pendapatan</string>

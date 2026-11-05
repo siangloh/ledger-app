@@ -590,6 +590,7 @@
     <string name="cal_sun">Sun</string>
     <string name="cal_today">Today</string>
     <string name="cf_calendar_zero_days_count">%1$d days</string>
+    <string name="cal_range_month_progress">Month %1$d of %2$d</string>
     <string name="records_empty_title">No transactions found</string>
     <string name="records_empty_desc">Try switching months or tap below to record a new transaction</string>
     <string name="records_add_tx_btn">Record Expense / Income</string>

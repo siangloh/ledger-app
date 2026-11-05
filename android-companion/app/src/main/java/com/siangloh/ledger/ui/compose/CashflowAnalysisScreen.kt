@@ -1498,12 +1498,10 @@ fun CashflowAnalysisScreen(
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cf_back), tint = Slate900) }
-                    Text(stringResource(R.string.cfd_details_title), modifier = Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                    IconButton(onClick = { refresh++ }, enabled = !loading) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cf_refresh), tint = Slate600) }
+                    Text(stringResource(R.string.cfd_details_title), modifier = Modifier.weight(1f).padding(start = 4.dp), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
                 }
 
                 val expenseListState = rememberLazyListState()
@@ -2201,7 +2199,7 @@ fun CashflowAnalysisScreen(
                                                     )
                                                     if (isCustomRange && rangeMonths.size > 1 && curIdx >= 0) {
                                                         Text(
-                                                            text = "${curIdx + 1} / ${rangeMonths.size}",
+                                                            text = stringResource(R.string.cal_range_month_progress, curIdx + 1, rangeMonths.size),
                                                             fontSize = 11.sp,
                                                             fontWeight = FontWeight.Medium,
                                                             color = Slate500
