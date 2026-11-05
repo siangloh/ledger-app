@@ -919,7 +919,7 @@ private fun MonthlyDailyCalendarCard(
     )
 
     SectionCard(
-        title = stringResource(R.string.cf_calendar_title) + " (${formatDisplayMonth(cleanMonth, context)})",
+        title = stringResource(R.string.cf_calendar_title) + " · " + formatDisplayMonth(cleanMonth, context),
         trailing = formatMoney(currency, totalExpense)
     ) {
         Text(
@@ -1010,16 +1010,10 @@ private fun MonthlyDailyCalendarCard(
                                     if (isOutOfRange) {
                                         Text("-", fontSize = 9.sp, color = Slate300)
                                     } else if (amt > 0) {
-                                        val amtStr = if (amt >= 1000) {
-                                            "${(amt / 1000).toInt()}k"
-                                        } else if (amt >= 100) {
-                                            String.format(Locale.US, "%.0f", amt)
-                                        } else {
-                                            String.format(Locale.US, "%.1f", amt)
-                                        }
+                                        val amtStr = String.format(Locale.US, "%.2f", amt)
                                         Text(
                                             text = amtStr,
-                                            fontSize = 9.sp,
+                                            fontSize = 8.sp,
                                             fontWeight = FontWeight.Bold,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
@@ -2155,34 +2149,100 @@ fun CashflowAnalysisScreen(
 
                             // ================= 日历 (CALENDAR) =================
                             CashflowDashboardTab.CALENDAR -> {
-                                if (rangeMonths.size > 1) {
-                                    item {
-                                        Surface(
-                                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                                            shape = RoundedCornerShape(12.dp),
-                                            color = Color.White,
-                                            border = BorderStroke(1.dp, Slate200)
+                                val activeCalMonth = if (isCustomRange) selectedCalendarMonth else month.take(7)
+                                val curIdx = if (isCustomRange) rangeMonths.indexOf(selectedCalendarMonth) else -1
+                                val hasPrev = if (isCustomRange) curIdx > 0 else true
+                                val hasNext = if (isCustomRange) (curIdx in 0 until rangeMonths.size - 1) else true
+
+                                item {
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = Color.White,
+                                        border = BorderStroke(1.dp, Slate200)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
                                             Row(
-                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp),
+                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                val curIdx = rangeMonths.indexOf(selectedCalendarMonth)
                                                 IconButton(
                                                     onClick = {
-                                                        if (curIdx > 0) {
-                                                            selectedCalendarMonth = rangeMonths[curIdx - 1]
+                                                        if (isCustomRange) {
+                                                            if (curIdx > 0) {
+                                                                selectedCalendarMonth = rangeMonths[curIdx - 1]
+                                                                selectedDay = null
+                                                            }
+                                                        } else {
+                                                            changeMonth(-1)
                                                             selectedDay = null
                                                         }
                                                     },
-                                                    enabled = curIdx > 0,
-                                                    modifier = Modifier.size(32.dp)
+                                                    enabled = hasPrev,
+                                                    modifier = Modifier.size(36.dp)
                                                 ) {
-                                                    Icon(Icons.Default.ChevronLeft, contentDescription = null, tint = if (curIdx > 0) Slate700 else Slate300)
+                                                    Icon(
+                                                        Icons.Default.ChevronLeft,
+                                                        contentDescription = stringResource(R.string.prev_month),
+                                                        tint = if (hasPrev) PrimaryTeal else Slate300
+                                                    )
                                                 }
 
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text(
+                                                        text = formatDisplayMonth(activeCalMonth, context),
+                                                        fontSize = 17.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = Slate900
+                                                    )
+                                                    if (isCustomRange && rangeMonths.size > 1 && curIdx >= 0) {
+                                                        Text(
+                                                            text = "${curIdx + 1} / ${rangeMonths.size}",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Medium,
+                                                            color = Slate500
+                                                        )
+                                                    }
+                                                }
+
+                                                IconButton(
+                                                    onClick = {
+                                                        if (isCustomRange) {
+                                                            if (curIdx >= 0 && curIdx < rangeMonths.size - 1) {
+                                                                selectedCalendarMonth = rangeMonths[curIdx + 1]
+                                                                selectedDay = null
+                                                            }
+                                                        } else {
+                                                            changeMonth(1)
+                                                            selectedDay = null
+                                                        }
+                                                    },
+                                                    enabled = hasNext,
+                                                    modifier = Modifier.size(36.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.ChevronRight,
+                                                        contentDescription = stringResource(R.string.next_month),
+                                                        tint = if (hasNext) PrimaryTeal else Slate300
+                                                    )
+                                                }
+                                            }
+
+                                            if (isCustomRange && rangeMonths.size > 1) {
+                                                val monthPillsListState = rememberLazyListState()
+                                                LaunchedEffect(selectedCalendarMonth) {
+                                                    val idx = rangeMonths.indexOf(selectedCalendarMonth)
+                                                    if (idx >= 0) {
+                                                        monthPillsListState.animateScrollToItem(idx)
+                                                    }
+                                                }
                                                 LazyRow(
-                                                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                                                    state = monthPillsListState,
+                                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
@@ -2207,29 +2267,16 @@ fun CashflowAnalysisScreen(
                                                         }
                                                     }
                                                 }
-
-                                                IconButton(
-                                                    onClick = {
-                                                        if (curIdx >= 0 && curIdx < rangeMonths.size - 1) {
-                                                            selectedCalendarMonth = rangeMonths[curIdx + 1]
-                                                            selectedDay = null
-                                                        }
-                                                    },
-                                                    enabled = curIdx >= 0 && curIdx < rangeMonths.size - 1,
-                                                    modifier = Modifier.size(32.dp)
-                                                ) {
-                                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = if (curIdx < rangeMonths.size - 1) Slate700 else Slate300)
-                                                }
                                             }
                                         }
                                     }
                                 }
 
                                 item {
-                                    val isCurrentMonth = selectedCalendarMonth == todayCalMonth
+                                    val isCurrentMonth = activeCalMonth == todayCalMonth
                                     val passTodayDay = if (isCurrentMonth) todayCal.get(Calendar.DAY_OF_MONTH) else null
                                     MonthlyDailyCalendarCard(
-                                        month = selectedCalendarMonth,
+                                        month = activeCalMonth,
                                         data = data,
                                         currency = cur,
                                         todayDay = passTodayDay,
