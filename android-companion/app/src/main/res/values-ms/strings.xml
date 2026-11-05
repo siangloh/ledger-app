@@ -935,5 +935,49 @@
     <string name="records_tx_update_failed_fmt">Gagal mengemas kini: %1$s</string>
     <string name="records_load_failed_fmt">Gagal memuatkan transaksi: %1$s</string>
     <string name="records_edit_amount_invalid">Sila masukkan jumlah yang sah</string>
+
+    <!-- Local AI Financial Advisor -->
+    <string name="ai_advisor_card_title">✨ Wawasan Kewangan Pintar</string>
+    <string name="ai_advisor_score_label">Indeks Kesihatan</string>
+    <string name="ai_advisor_reanalyze_btn">Nilai Semula</string>
+    <string name="ai_advisor_score_excellent">Cemerlang</string>
+    <string name="ai_advisor_score_healthy">Sihat</string>
+    <string name="ai_advisor_score_moderate">Sederhana</string>
+    <string name="ai_advisor_score_warning">Perhatian</string>
+    <string name="ai_advisor_summary_excellent">Aliran tunai kukuh, matlamat simpanan tercapai dengan baik, dan taburan perbelanjaan seimbang.</string>
+    <string name="ai_advisor_summary_healthy">Kewangan keseluruhan berada di landasan yang sihat. Teruskan kadar ini untuk mencapai sasaran simpanan.</string>
+    <string name="ai_advisor_summary_moderate">Beberapa kategori mempunyai tumpuan perbelanjaan yang tinggi. Pertimbangkan untuk mengurangkan perbelanjaan budi bicara.</string>
+    <string name="ai_advisor_summary_warning">Perbelanjaan melebihi pendapatan atau belanjawan mengalami tekanan. Tangguhkan perbelanjaan bukan keperluan.</string>
+
+    <string name="ai_advisor_tag_warning">Lebih Had</string>
+    <string name="ai_advisor_tag_full">Had Penuh</string>
+    <string name="ai_advisor_tag_optimize">Optimumkan</string>
+    <string name="ai_advisor_tag_healthy">Seimbang</string>
+    <string name="ai_advisor_tag_savings">Simpanan</string>
+    <string name="ai_advisor_tag_deficit">Defisit</string>
+    <string name="ai_advisor_tag_balanced">Imbang</string>
+    <string name="ai_advisor_tag_pacing">Kadar</string>
+    <string name="ai_advisor_tag_planning">Perancangan</string>
+
+    <string name="ai_advisor_title_overspent">"%1$s" melebihi had sebanyak %2$s</string>
+    <string name="ai_advisor_desc_overspent">Perbelanjaan dalam kategori ini melebihi had belanjawan. Hentikan perbelanjaan bukan keperluan di sini.</string>
+    <string name="ai_advisor_title_reached">Belanjawan "%1$s" sudah penuh</string>
+    <string name="ai_advisor_desc_reached">Kategori ini telah mencapai 100%% hadnya. Perbelanjaan seterusnya akan menjadi terlebih had.</string>
+    <string name="ai_advisor_title_concentrated">"%1$s" mengambil %2$.1f%% perbelanjaan</string>
+    <string name="ai_advisor_desc_concentrated">Menyumbang hampir 40%% perbelanjaan. Mengurangkan perbelanjaan budi bicara sebanyak 15%% dapat menjimatkan %1$s.</string>
+    <string name="ai_advisor_title_balanced_cats">Taburan Kategori Seimbang</string>
+    <string name="ai_advisor_desc_balanced_cats">Tiada satu kategori yang terlalu besar. Perbelanjaan harian tertabur dengan baik.</string>
+
+    <string name="ai_advisor_title_savings_good">Aliran Tunai Bersih Kukuh</string>
+    <string name="ai_advisor_desc_savings_good">Lebihan bersih adalah %1$s dengan kadar simpanan %2$.1f%%, memberikan daya tahan kewangan yang kukuh.</string>
+    <string name="ai_advisor_title_deficit">Defisit Aliran Tunai</string>
+    <string name="ai_advisor_desc_deficit">Perbelanjaan kini melebihi pendapatan sebanyak %1$s. Tangguhkan perbelanjaan budi bicara untuk pulihkan baki.</string>
+    <string name="ai_advisor_title_breakeven">Hampir Seimbang</string>
+    <string name="ai_advisor_desc_breakeven">Aliran tunai seimbang. Pertimbangkan untuk menetapkan simpanan automatik 10%% ~ 20%% untuk dana kecemasan.</string>
+
+    <string name="ai_advisor_title_daily_safe">Elaun Harian Selamat: %1$s</string>
+    <string name="ai_advisor_desc_daily_safe">%1$d hari lagi dalam kitaran ini. Kekalkan perbelanjaan harian dalam had ini untuk capai sasaran.</string>
+    <string name="ai_advisor_title_cycle_wrapup">Rancang Kitaran Seterusnya</string>
+    <string name="ai_advisor_desc_cycle_wrapup">Kitaran ini hampir tamat. Semak perbelanjaan bulan ini dan sediakan had belanjawan bulan depan.</string>
 </resources>
 

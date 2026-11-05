@@ -935,5 +935,49 @@
     <string name="records_tx_update_failed_fmt">更新失败：%1$s</string>
     <string name="records_load_failed_fmt">加载流水失败：%1$s</string>
     <string name="records_edit_amount_invalid">请输入有效金额</string>
+
+    <!-- AI 智能财务诊断与建议 (Local AI Financial Advisor) -->
+    <string name="ai_advisor_card_title">✨ 智能财务诊断与建议</string>
+    <string name="ai_advisor_score_label">健康指数</string>
+    <string name="ai_advisor_reanalyze_btn">重新诊断</string>
+    <string name="ai_advisor_score_excellent">优良</string>
+    <string name="ai_advisor_score_healthy">稳健</string>
+    <string name="ai_advisor_score_moderate">需关注</string>
+    <string name="ai_advisor_score_warning">预警</string>
+    <string name="ai_advisor_summary_excellent">本月现金流充裕，储蓄达成良好，开销结构稳健。</string>
+    <string name="ai_advisor_summary_healthy">整体收支处于良性轨道，保持当前节奏可平稳达成储蓄目标。</string>
+    <string name="ai_advisor_summary_moderate">部分分类支出集中度偏高，建议适当精简非刚需弹性开销。</string>
+    <string name="ai_advisor_summary_warning">本月支出超过收入或预算承压，建议暂缓大额非刚需开支，优先恢复收支平衡。</string>
+
+    <string name="ai_advisor_tag_warning">预算超支</string>
+    <string name="ai_advisor_tag_full">限额已满</string>
+    <string name="ai_advisor_tag_optimize">支出优化</string>
+    <string name="ai_advisor_tag_healthy">结构健康</string>
+    <string name="ai_advisor_tag_savings">储蓄成效</string>
+    <string name="ai_advisor_tag_deficit">收支赤字</string>
+    <string name="ai_advisor_tag_balanced">收支平衡</string>
+    <string name="ai_advisor_tag_pacing">节奏把控</string>
+    <string name="ai_advisor_tag_planning">下期规划</string>
+
+    <string name="ai_advisor_title_overspent">「%1$s」分类已超支 %2$s</string>
+    <string name="ai_advisor_desc_overspent">该分类支出已超出预算限额，建议暂时冻结该类别非必要支出，避免赤字扩大。</string>
+    <string name="ai_advisor_title_reached">「%1$s」预算已满</string>
+    <string name="ai_advisor_desc_reached">该分类已达 100%% 设定限额，后续开支将转为超支状态，请谨慎控制。</string>
+    <string name="ai_advisor_title_concentrated">「%1$s」开销集中度达 %2$.1f%%</string>
+    <string name="ai_advisor_desc_concentrated">占本月总支出近四成。若适当精简 15%% 弹性开销，预计可多结余 %1$s。</string>
+    <string name="ai_advisor_title_balanced_cats">各分类支出结构均衡</string>
+    <string name="ai_advisor_desc_balanced_cats">没有单项分类过度膨胀，各项生活与弹性开销分布合理。</string>
+
+    <string name="ai_advisor_title_savings_good">现金流净结余表现良好</string>
+    <string name="ai_advisor_desc_savings_good">本月实现净结余 %1$s，储蓄率达 %2$.1f%%，现金流抗风险韧性充裕。</string>
+    <string name="ai_advisor_title_deficit">现金流出现负结余</string>
+    <string name="ai_advisor_desc_deficit">当前支出超出收入 %1$s，建议暂缓大额非刚需开支，优先恢复收支平衡。</string>
+    <string name="ai_advisor_title_breakeven">收支基本处于平衡线</string>
+    <string name="ai_advisor_desc_breakeven">当前收支处于微弱平衡，建议制定每月 10%% ~ 20%% 强制储蓄计划，积累安全备用金。</string>
+
+    <string name="ai_advisor_title_daily_safe">周期建议每日安全花费：%1$s</string>
+    <string name="ai_advisor_desc_daily_safe">距离本周期结束还有 %1$d 天，将每日弹性花费控制在此金额内，即可平稳达成目标。</string>
+    <string name="ai_advisor_title_cycle_wrapup">合理规划下一账单周期</string>
+    <string name="ai_advisor_desc_cycle_wrapup">本周期即将结束，建议复盘本月实际开销并提前微调下月总预算与分类额度。</string>
 </resources>
 

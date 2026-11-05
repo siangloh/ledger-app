@@ -67,6 +67,10 @@ import kotlin.math.roundToInt
 import com.siangloh.ledger.R
 import com.siangloh.ledger.util.AppLanguageManager
 import com.siangloh.ledger.data.CashflowRepository
+import com.siangloh.ledger.data.LocalFinancialAdvisor
+import com.siangloh.ledger.data.BudgetOverviewRecord
+import com.siangloh.ledger.data.LocalLedgerRepository
+import com.siangloh.ledger.ui.compose.components.AiFinancialAdvisorCard
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -1373,6 +1377,12 @@ fun CashflowAnalysisScreen(
     var prevData by remember { mutableStateOf(CashflowRepository.getCached(context, shiftMonth(initialMonth, -1), currency)?.data) }
     var failed by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(result == null) }
+    var budgetOverview by remember { mutableStateOf<BudgetOverviewRecord?>(null) }
+    val advisorReport = remember(result?.data, budgetOverview, refresh) {
+        result?.data?.let { data ->
+            LocalFinancialAdvisor.analyze(context, data, budgetOverview)
+        }
+    }
 
     var selection by remember { mutableStateOf<TxSelection?>(null) }
     var selectedBill by remember { mutableStateOf<JSONObject?>(null) }
@@ -1464,6 +1474,9 @@ fun CashflowAnalysisScreen(
                 android.util.Log.w("Cashflow", "Previous month unavailable", error)
             }
         }
+        try {
+            budgetOverview = LocalLedgerRepository.getBudgetOverview(context, month).getOrNull()
+        } catch (_: Exception) {}
     }
 
     fun changeMonth(delta: Int) {
@@ -2050,6 +2063,14 @@ fun CashflowAnalysisScreen(
                                         when (detailPages[page]) {
                             // ================= 支出 =================
                             CashflowDashboardTab.EXPENSE -> {
+                                if (advisorReport != null) {
+                                    item {
+                                        AiFinancialAdvisorCard(
+                                            report = advisorReport,
+                                            onRefresh = { refresh++ }
+                                        )
+                                    }
+                                }
                                 item {
                                     val transfer = transferAmount(data)
                                     val isPlatformMode = expenseViewMode == 1

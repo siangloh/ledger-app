@@ -935,5 +935,49 @@
     <string name="records_tx_update_failed_fmt">Update failed: %1$s</string>
     <string name="records_load_failed_fmt">Failed to load transactions: %1$s</string>
     <string name="records_edit_amount_invalid">Please enter a valid amount</string>
+
+    <!-- Local AI Financial Advisor -->
+    <string name="ai_advisor_card_title">✨ Smart Financial Insights</string>
+    <string name="ai_advisor_score_label">Health Index</string>
+    <string name="ai_advisor_reanalyze_btn">Re-evaluate</string>
+    <string name="ai_advisor_score_excellent">Excellent</string>
+    <string name="ai_advisor_score_healthy">Healthy</string>
+    <string name="ai_advisor_score_moderate">Moderate</string>
+    <string name="ai_advisor_score_warning">Attention</string>
+    <string name="ai_advisor_summary_excellent">Cashflow is robust, savings goals are well met, and spending distribution is balanced.</string>
+    <string name="ai_advisor_summary_healthy">Overall finances are on a healthy track. Maintaining this pace will meet your savings target.</string>
+    <string name="ai_advisor_summary_moderate">Some categories have high spending concentration. Consider trimming discretionary purchases.</string>
+    <string name="ai_advisor_summary_warning">Expenses exceed income or budget is under pressure. Postpone non-essential purchases.</string>
+
+    <string name="ai_advisor_tag_warning">Over Budget</string>
+    <string name="ai_advisor_tag_full">Budget Full</string>
+    <string name="ai_advisor_tag_optimize">Optimization</string>
+    <string name="ai_advisor_tag_healthy">Balanced</string>
+    <string name="ai_advisor_tag_savings">Savings</string>
+    <string name="ai_advisor_tag_deficit">Deficit</string>
+    <string name="ai_advisor_tag_balanced">Breakeven</string>
+    <string name="ai_advisor_tag_pacing">Pacing</string>
+    <string name="ai_advisor_tag_planning">Planning</string>
+
+    <string name="ai_advisor_title_overspent">"%1$s" exceeded by %2$s</string>
+    <string name="ai_advisor_desc_overspent">Spending in this category has exceeded the budget limit. Pause discretionary expenses here.</string>
+    <string name="ai_advisor_title_reached">"%1$s" budget is full</string>
+    <string name="ai_advisor_desc_reached">This category has reached 100%% of its limit. Any further expenses will become overspent.</string>
+    <string name="ai_advisor_title_concentrated">"%1$s" takes %2$.1f%% of expenses</string>
+    <string name="ai_advisor_desc_concentrated">Accounts for nearly 40%% of expenses. Reducing discretionary spend by 15%% can save %1$s.</string>
+    <string name="ai_advisor_title_balanced_cats">Balanced Category Distribution</string>
+    <string name="ai_advisor_desc_balanced_cats">No single category is disproportionately large. Daily living expenses are well-distributed.</string>
+
+    <string name="ai_advisor_title_savings_good">Strong Net Cashflow</string>
+    <string name="ai_advisor_desc_savings_good">Net surplus is %1$s with a %2$.1f%% savings rate, giving you ample financial resilience.</string>
+    <string name="ai_advisor_title_deficit">Cashflow Deficit</string>
+    <string name="ai_advisor_desc_deficit">Expenses currently exceed income by %1$s. Delay discretionary spending to regain balance.</string>
+    <string name="ai_advisor_title_breakeven">Near Breakeven</string>
+    <string name="ai_advisor_desc_breakeven">Cashflow is balanced. Consider setting a 10%% ~ 20%% automatic savings plan for emergency funds.</string>
+
+    <string name="ai_advisor_title_daily_safe">Safe Daily Allowance: %1$s</string>
+    <string name="ai_advisor_desc_daily_safe">%1$d days remaining in this cycle. Keeping daily discretionary spending within this limit achieves your goals.</string>
+    <string name="ai_advisor_title_cycle_wrapup">Plan Next Billing Cycle</string>
+    <string name="ai_advisor_desc_cycle_wrapup">This cycle is coming to an end. Review this month\'s spending and prepare next month\'s category limits.</string>
 </resources>
 
