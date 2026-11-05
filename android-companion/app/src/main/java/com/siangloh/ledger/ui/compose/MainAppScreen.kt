@@ -157,7 +157,6 @@ fun MainAppScreen(
                                 onNavigateToAdd = { selectedTab = 2 },
                                 onNavigateToAccounts = { selectedTab = 3 },
                                 onNavigateToTools = { selectedTab = 4 },
-                                onNavigateToBudget = { showBudgetDialog = true },
                                 onScanReceipt = onScanReceipt,
                                 onOpenSettings = onOpenSettings,
                                 onNavigateToCashflow = { m, sDate, eDate ->

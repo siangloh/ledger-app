@@ -40,7 +40,6 @@ import com.siangloh.ledger.R
 import com.siangloh.ledger.NetworkHelper
 import com.siangloh.ledger.data.AppDatabase
 import com.siangloh.ledger.data.LocalLedgerRepository
-import com.siangloh.ledger.data.BudgetOverviewRecord
 import com.siangloh.ledger.data.NativeLedgerApi
 import com.siangloh.ledger.ui.compose.components.OverviewSkeletonScreen
 import com.siangloh.ledger.ui.compose.components.SpendingHeroCardSkeleton
@@ -337,7 +336,6 @@ fun OverviewScreen(
     onNavigateToAdd: () -> Unit = {},
     onNavigateToAccounts: () -> Unit = {},
     onNavigateToTools: () -> Unit = {},
-    onNavigateToBudget: () -> Unit = {},
     onScanReceipt: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onNavigateToWeb: () -> Unit = onNavigateToRecords,
@@ -354,7 +352,6 @@ fun OverviewScreen(
     var currentMonthStr by remember {
         mutableStateOf(SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time))
     }
-    var budgetOverview by remember { mutableStateOf<BudgetOverviewRecord?>(null) }
     val currentLang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
     val displayRangeLabel = remember(period, currentMonthStr, currentLang) {
         when (period) {
@@ -521,17 +518,14 @@ fun OverviewScreen(
                     }
                 }
                 val yr = calendar.get(Calendar.YEAR)
-                val (result, bRecord) = withContext(Dispatchers.IO) {
-                    val ov = com.siangloh.ledger.data.LocalLedgerRepository.getOverviewJson(
+                val result = withContext(Dispatchers.IO) {
+                    com.siangloh.ledger.data.LocalLedgerRepository.getOverviewJson(
                         context = context,
                         month = currentMonthStr,
                         period = period,
                         year = yr
                     ).getOrNull()?.toString()
-                    val bo = NativeLedgerApi.getBudgetOverview(context, currentMonthStr).getOrNull()
-                    Pair(ov, bo)
                 }
-                budgetOverview = bRecord
 
                 if (result != null) {
                     try {
@@ -814,13 +808,6 @@ fun OverviewScreen(
                                 }
                             }
                         }
-                    )
-                }
-
-                item {
-                    BudgetHealthCard(
-                        budget = budgetOverview,
-                        onClick = onNavigateToBudget
                     )
                 }
 
@@ -2426,218 +2413,6 @@ fun UncategorizedReviewBottomSheet(
             }
 
             Spacer(modifier = Modifier.height(20.dp))
-        }
-    }
-}
-
-@Composable
-fun BudgetHealthCard(
-    budget: BudgetOverviewRecord?,
-    onClick: () -> Unit
-) {
-    val overall = budget?.overall
-    val hasBudget = overall != null && overall.isSet && overall.limit > 0
-
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, Slate200),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // Header Row: Title + Icon + Level Badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(PrimaryTealSubtle, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Savings,
-                            contentDescription = stringResource(R.string.budget_title),
-                            tint = PrimaryTeal,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = stringResource(R.string.budget_title),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Slate900
-                        )
-                        if (hasBudget && budget != null) {
-                            Text(
-                                text = stringResource(R.string.budget_cycle_days_format, budget.billingCycle.remainingDays),
-                                fontSize = 11.sp,
-                                color = Slate500
-                            )
-                        }
-                    }
-                }
-
-                if (hasBudget && overall != null) {
-                    val (badgeText, badgeBg, badgeTextColor) = when (overall.level) {
-                        "danger", "over" -> Triple(stringResource(R.string.budget_status_over), Color(0xFFFEE2E2), Color(0xFFDC2626))
-                        "warning", "warn", "reached" -> Triple(stringResource(R.string.budget_status_warn), Color(0xFFFEF3C7), Color(0xFFD97706))
-                        else -> Triple(stringResource(R.string.budget_status_ok), Color(0xFFDCFCE7), Color(0xFF16A34A))
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = badgeBg
-                    ) {
-                        Text(
-                            text = badgeText,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = badgeTextColor,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = stringResource(R.string.budget_set_overall_btn),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = PrimaryTeal
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            tint = PrimaryTeal,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-            }
-
-            if (hasBudget && overall != null) {
-                // Daily Allowance Spotlight
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Slate50, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.budget_daily_allowance_format, "").trimEnd(':', '：'),
-                        fontSize = 12.sp,
-                        color = Slate600
-                    )
-                    Text(
-                        text = String.format(Locale.US, "MYR %,.2f / 天", overall.dailyAllowance),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (overall.dailyAllowance > 0) Slate900 else Color(0xFFDC2626)
-                    )
-                }
-
-                // Progress Bar
-                val progress = (overall.pct / 100.0).toFloat().coerceIn(0f, 1f)
-                val barColor = when (overall.level) {
-                    "danger", "over" -> Color(0xFFEF4444)
-                    "warning", "warn", "reached" -> Color(0xFFF59E0B)
-                    else -> PrimaryTeal
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = stringResource(
-                                R.string.budget_spent_format,
-                                String.format(Locale.US, "RM %,.0f", overall.spent),
-                                String.format(Locale.US, "RM %,.0f", overall.limit)
-                            ),
-                            fontSize = 12.sp,
-                            color = Slate600
-                        )
-                        Text(
-                            text = String.format(Locale.getDefault(), "%.1f%%", overall.pct),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = barColor
-                        )
-                    }
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp)),
-                        color = barColor,
-                        trackColor = Slate200
-                    )
-                }
-
-                // Alert tag if categories overspent
-                val overCats = budget.overCount
-                val warnCats = budget.warnCount
-                if (overCats > 0 || warnCats > 0) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (overCats > 0) {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFFFEE2E2),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = "⚠️ $overCats 个分类已超支",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFFDC2626),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                        if (warnCats > 0) {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFFFEF3C7),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = "⚡ $warnCats 个分类接近上限",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFFD97706),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-                }
-            } else {
-                Text(
-                    text = "尚未配置月度总预算。点击即可规划预算并启用超支守护。",
-                    fontSize = 12.sp,
-                    color = Slate500,
-                    lineHeight = 18.sp
-                )
-            }
         }
     }
 }
