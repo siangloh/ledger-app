@@ -178,13 +178,13 @@ fun BudgetManagementPage(
                                         if (data != null && data.overall.isSet) {
                                             Spacer(modifier = Modifier.width(6.dp))
                                             val badgeBg = when (data.overall.level) {
-                                                "over" -> Color(0xFFFEE2E2)
-                                                "warn", "reached" -> Color(0xFFFEF3C7)
+                                                "over", "danger" -> Color(0xFFFEE2E2)
+                                                "warn", "warning", "reached" -> Color(0xFFFEF3C7)
                                                 else -> PrimaryTealSubtle
                                             }
                                             val badgeColor = when (data.overall.level) {
-                                                "over" -> Color(0xFFDC2626)
-                                                "warn", "reached" -> Color(0xFFD97706)
+                                                "over", "danger" -> Color(0xFFDC2626)
+                                                "warn", "warning", "reached" -> Color(0xFFD97706)
                                                 else -> PrimaryTeal
                                             }
                                             Box(
@@ -198,6 +198,49 @@ fun BudgetManagementPage(
                                                     fontWeight = FontWeight.Bold,
                                                     color = badgeColor
                                                 )
+                                            }
+                                            if (data.overall.level == "over" || data.overall.level == "danger") {
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = Color(0xFFFEE2E2)
+                                                ) {
+                                                    Text(
+                                                        text = stringResource(R.string.budget_status_over),
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFDC2626),
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            } else if (data.overall.level == "reached") {
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = Color(0xFFFEF3C7)
+                                                ) {
+                                                    Text(
+                                                        text = stringResource(R.string.budget_status_reached),
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFD97706),
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            } else if (data.overall.level == "warn" || data.overall.level == "warning") {
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = Color(0xFFFEF3C7)
+                                                ) {
+                                                    Text(
+                                                        text = stringResource(R.string.budget_status_warn),
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFD97706),
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -412,7 +455,21 @@ fun BudgetManagementPage(
                                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                                                     )
                                                 }
-                                            } else if (cat.level == "warn" || cat.level == "reached") {
+                                            } else if (cat.level == "reached") {
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = Color(0xFFFEF3C7)
+                                                ) {
+                                                    Text(
+                                                        text = stringResource(R.string.budget_status_reached),
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFFD97706),
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            } else if (cat.level == "warn") {
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Surface(
                                                     shape = RoundedCornerShape(4.dp),
@@ -461,20 +518,20 @@ fun BudgetManagementPage(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            text = stringResource(R.string.budget_spent_limit_fmt, String.format(Locale.getDefault(), "%.0f", cat.spent), String.format(Locale.getDefault(), "%.0f", cat.limit)),
+                                            text = stringResource(R.string.budget_spent_limit_fmt, String.format(Locale.getDefault(), "%.2f", cat.spent), String.format(Locale.getDefault(), "%.2f", cat.limit)),
                                             fontSize = 11.sp,
                                             color = Slate500
                                         )
                                         if (cat.remaining < 0) {
                                             Text(
-                                                text = stringResource(R.string.budget_overspent_format, String.format(Locale.getDefault(), "%.0f", -cat.remaining)),
+                                                text = stringResource(R.string.budget_overspent_format, String.format(Locale.getDefault(), "RM %.2f", -cat.remaining)),
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color(0xFFDC2626)
                                             )
                                         } else {
                                             Text(
-                                                text = stringResource(R.string.budget_remaining_format, String.format(Locale.getDefault(), "%.0f", cat.remaining)),
+                                                text = stringResource(R.string.budget_remaining_format, String.format(Locale.getDefault(), "RM %.2f", cat.remaining)),
                                                 fontSize = 11.sp,
                                                 color = Slate500
                                             )

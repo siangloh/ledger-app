@@ -277,7 +277,7 @@
     <string name="budget_amount_hint">Masukkan had (0 untuk batal)</string>
     <string name="budget_status_ok">Mencukupi</string>
     <string name="budget_status_warn">Amaran</string>
-    <string name="budget_status_reached">Mencapai Had</string>
+    <string name="budget_status_reached">Penuh</string>
     <string name="budget_status_over">Terlebih</string>
     <string name="budget_no_budget">Tiada belanjawan ditetapkan</string>
     <string name="budget_set_cat_dialog_title">Tetapkan Belanjawan "%1$s"</string>

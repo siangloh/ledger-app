@@ -277,7 +277,7 @@
     <string name="budget_amount_hint">Enter limit (0 to remove)</string>
     <string name="budget_status_ok">Adequate</string>
     <string name="budget_status_warn">Warning</string>
-    <string name="budget_status_reached">Reached</string>
+    <string name="budget_status_reached">Full</string>
     <string name="budget_status_over">Over</string>
     <string name="budget_no_budget">No budget set</string>
     <string name="budget_set_cat_dialog_title">Set "%1$s" Budget</string>

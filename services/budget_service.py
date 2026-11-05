@@ -205,9 +205,10 @@ def get_budget_overview(user_id: Any, month: Optional[str] = None, db: Any = Non
     if effective_limit > 0.0:
         remaining_overall = round(effective_limit - total_spent, 2)
         overall_pct = round((total_spent / effective_limit) * 100.0, 1)
-        if overall_pct > 100.0:
+        diff = round(total_spent - effective_limit, 2)
+        if diff > 0 or overall_pct > 100.0:
             overall_level = 'over'
-        elif overall_pct == 100.0:
+        elif diff == 0 or overall_pct == 100.0:
             overall_level = 'reached'
         elif overall_pct >= 70.0:
             overall_level = 'warn'

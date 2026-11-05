@@ -2049,14 +2049,17 @@ object LocalLedgerRepository {
                 }
             }
 
-            val remaining = Math.max(0.0, overallLimit - totalSpent)
+            val remaining = kotlin.math.round((overallLimit - totalSpent) * 100.0) / 100.0
             val pct = if (overallLimit > 0) kotlin.math.round(totalSpent / overallLimit * 10000.0) / 100.0 else 0.0
+            val diff = kotlin.math.round((totalSpent - overallLimit) * 100.0) / 100.0
             val level = when {
-                pct >= 100.0 -> "danger"
-                pct >= 80.0 -> "warning"
+                overallLimit <= 0.0 -> "safe"
+                diff > 0.0 || pct > 100.0 -> "over"
+                diff == 0.0 || pct == 100.0 -> "reached"
+                pct >= 80.0 -> "warn"
                 else -> "safe"
             }
-            val allowance = if (remainingDays > 0) remaining / remainingDays else 0.0
+            val allowance = if (remainingDays > 0 && remaining > 0) remaining / remainingDays else 0.0
 
             val cycle = BillingCycleRecord(
                 startDate = "$targetMonth-01",
@@ -2089,9 +2092,11 @@ object LocalLedgerRepository {
                 val spent = catSpentMap[c.name] ?: 0.0
                 val catLimit = sp.getFloat("cat_limit_${c.name}", 0f).toDouble()
                 val catPct = if (catLimit > 0) kotlin.math.round(spent / catLimit * 10000.0) / 100.0 else 0.0
+                val catDiff = kotlin.math.round((spent - catLimit) * 100.0) / 100.0
                 val catLevel = when {
                     catLimit <= 0.0 -> "ok"
-                    catPct >= 100.0 -> { overCount++; "over" }
+                    catDiff > 0.0 || catPct > 100.0 -> { overCount++; "over" }
+                    catDiff == 0.0 || catPct == 100.0 -> { "reached" }
                     catPct >= 80.0 -> { warnCount++; "warn" }
                     else -> { okCount++; "ok" }
                 }
@@ -2101,7 +2106,7 @@ object LocalLedgerRepository {
                         category = c.name,
                         limit = catLimit,
                         spent = spent,
-                        remaining = Math.max(0.0, catLimit - spent),
+                        remaining = if (catLimit > 0.0) kotlin.math.round((catLimit - spent) * 100.0) / 100.0 else 0.0,
                         pct = catPct,
                         level = catLevel,
                         color = c.color ?: "#0F766E"

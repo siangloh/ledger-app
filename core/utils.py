@@ -241,9 +241,10 @@ def get_category_budget_status(db, user_id=None, month=None, start_day=None):
         limit = float(b['monthly_limit'])
         spent = spent_by_category.get(cat, 0.0)
         pct = (spent / limit * 100.0) if limit > 0 else 0.0
-        if pct > 100.0:
+        diff = round(spent - limit, 2)
+        if diff > 0 or pct > 100.0:
             level = 'over'
-        elif pct == 100.0:
+        elif (diff == 0 or pct == 100.0) and limit > 0:
             level = 'reached'
         elif pct >= 70.0:
             level = 'warn'

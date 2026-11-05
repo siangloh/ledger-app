@@ -237,3 +237,56 @@ def test_native_budget_endpoints(logged_in_client, flask_app, admin_user_id):
     )
     assert res4.status_code == 200
     assert res4.get_json()["ok"] is True
+
+
+def test_budget_exact_boundary_reached_vs_over(flask_app, admin_user_id):
+    """测试预算 100% 精确边界：正好 100% 标记为 reached (已满)，超出 0.01 则标记为 over (超支)"""
+    today_str = date.today().strftime("%Y-%m-%d")
+    current_month = date.today().strftime("%Y-%m")
+
+    with _test_db(flask_app) as db:
+        db.execute("DELETE FROM transactions WHERE user_id = ?", (str(admin_user_id),))
+        db.execute("DELETE FROM category_budgets WHERE user_id = ?", (str(admin_user_id),))
+
+        # 餐饮限额 100，支出正好 100.00
+        set_category_budget(admin_user_id, "餐饮", 100.0, db)
+        db.execute(
+            "INSERT INTO transactions (user_id, date, type, category, amount, note, source, created_at) "
+            "VALUES (?, ?, 'expense', '餐饮', 100.0, '刚好满额', 'manual', datetime('now'))",
+            (str(admin_user_id), today_str)
+        )
+        # 交通限额 100，支出 100.01
+        set_category_budget(admin_user_id, "交通", 100.0, db)
+        db.execute(
+            "INSERT INTO transactions (user_id, date, type, category, amount, note, source, created_at) "
+            "VALUES (?, ?, 'expense', '交通', 100.01, '超支一分钱', 'manual', datetime('now'))",
+            (str(admin_user_id), today_str)
+        )
+        db.commit()
+
+        # 1. 验证分类预算
+        cats_overview = get_budget_overview(admin_user_id, month=current_month, db=db)
+        cat_map = {c["category"]: c for c in cats_overview["categories"]}
+        assert cat_map["餐饮"]["spent"] == 100.0
+        assert cat_map["餐饮"]["remaining"] == 0.0
+        assert cat_map["餐饮"]["level"] == "reached"
+
+        assert cat_map["交通"]["spent"] == 100.01
+        assert cat_map["交通"]["remaining"] == -0.01
+        assert cat_map["交通"]["level"] == "over"
+
+        # 2. 验证总预算正好 100% 与超过 100%
+        # 总限额设为 200.01 (总支出为 200.01，正好 100%)
+        set_overall_budget(admin_user_id, 200.01, db)
+        ov1 = get_budget_overview(admin_user_id, month=current_month, db=db)
+        assert ov1["overall"]["spent"] == 200.01
+        assert ov1["overall"]["limit"] == 200.01
+        assert ov1["overall"]["level"] == "reached"
+
+        # 总限额设为 200.00 (总支出 200.01，超出 0.01)
+        set_overall_budget(admin_user_id, 200.00, db)
+        ov2 = get_budget_overview(admin_user_id, month=current_month, db=db)
+        assert ov2["overall"]["spent"] == 200.01
+        assert ov2["overall"]["limit"] == 200.00
+        assert ov2["overall"]["level"] == "over"
+
