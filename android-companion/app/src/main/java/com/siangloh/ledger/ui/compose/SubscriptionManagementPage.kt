@@ -881,13 +881,13 @@ fun SubscriptionManagementPage(
     // 新增/编辑订阅子弹窗
     val activeSub = editingSub
     if (showAddSubDialog || activeSub != null) {
-        var nameInput by remember { mutableStateOf(activeSub?.name ?: "") }
-        var costInput by remember { mutableStateOf(if (activeSub != null) String.format(Locale.getDefault(), "%.2f", activeSub.cost) else "") }
-        var categoryInput by remember { mutableStateOf(activeSub?.category ?: if (userCategories.isNotEmpty()) userCategories.first() else "日常") }
-        var dateInput by remember { mutableStateOf(activeSub?.nextBillingDate ?: "每月1号") }
-        var selectedAccountId by remember { mutableStateOf(activeSub?.accountId) }
-        var selectedAccountName by remember { mutableStateOf(activeSub?.accountName) }
-        var showDayPicker by remember { mutableStateOf(false) }
+        var nameInput by remember(activeSub) { mutableStateOf(activeSub?.name ?: "") }
+        var costInput by remember(activeSub) { mutableStateOf(if (activeSub != null) String.format(Locale.getDefault(), "%.2f", activeSub.cost) else "") }
+        var categoryInput by remember(activeSub) { mutableStateOf(activeSub?.category ?: if (userCategories.isNotEmpty()) userCategories.first() else "日常") }
+        var dateInput by remember(activeSub) { mutableStateOf(activeSub?.nextBillingDate ?: "每月1号") }
+        var selectedAccountId by remember(activeSub) { mutableStateOf(activeSub?.accountId) }
+        var selectedAccountName by remember(activeSub) { mutableStateOf(activeSub?.accountName) }
+        var showDayPicker by remember(activeSub) { mutableStateOf(false) }
 
         AlertDialog(
             onDismissRequest = {
@@ -1139,14 +1139,14 @@ fun SubscriptionManagementPage(
     // 新增/编辑固定收入子弹窗
     val activeIncome = editingIncome
     if (showAddIncomeDialog || activeIncome != null) {
-        var nameInput by remember { mutableStateOf(activeIncome?.name ?: "") }
-        var amountInput by remember { mutableStateOf(if (activeIncome != null) String.format(Locale.getDefault(), "%.2f", activeIncome.amount) else "") }
-        var categoryInput by remember { mutableStateOf(activeIncome?.category ?: "工资") }
-        var dayInput by remember { mutableStateOf(activeIncome?.arrivalDay ?: "每月25号") }
-        var isActiveInput by remember { mutableStateOf(activeIncome?.isActive ?: true) }
-        var selectedAccountId by remember { mutableStateOf(activeIncome?.accountId) }
-        var selectedAccountName by remember { mutableStateOf(activeIncome?.accountName) }
-        var showDayPicker by remember { mutableStateOf(false) }
+        var nameInput by remember(activeIncome) { mutableStateOf(activeIncome?.name ?: "") }
+        var amountInput by remember(activeIncome) { mutableStateOf(if (activeIncome != null) String.format(Locale.getDefault(), "%.2f", activeIncome.amount) else "") }
+        var categoryInput by remember(activeIncome) { mutableStateOf(activeIncome?.category ?: "工资") }
+        var dayInput by remember(activeIncome) { mutableStateOf(activeIncome?.arrivalDay ?: "每月25号") }
+        var isActiveInput by remember(activeIncome) { mutableStateOf(activeIncome?.isActive ?: true) }
+        var selectedAccountId by remember(activeIncome) { mutableStateOf(activeIncome?.accountId) }
+        var selectedAccountName by remember(activeIncome) { mutableStateOf(activeIncome?.accountName) }
+        var showDayPicker by remember(activeIncome) { mutableStateOf(false) }
 
 
         AlertDialog(
@@ -1413,14 +1413,14 @@ fun SubscriptionManagementPage(
     // 新增/编辑固定储蓄子弹窗
     val activeSaving = editingSavings
     if (showAddSavingsDialog || activeSaving != null) {
-        var nameInput by remember { mutableStateOf(activeSaving?.name ?: "") }
-        var amountInput by remember { mutableStateOf(if (activeSaving != null) String.format(Locale.getDefault(), "%.2f", activeSaving.amount) else "") }
-        var categoryInput by remember { mutableStateOf(activeSaving?.category ?: "定期存款") }
-        var dayInput by remember { mutableStateOf(activeSaving?.arrivalDay ?: "每月1号") }
-        var selectedAccountId by remember { mutableStateOf(activeSaving?.accountId) }
-        var selectedAccountName by remember { mutableStateOf(activeSaving?.accountName) }
-        var isActiveInput by remember { mutableStateOf(activeSaving?.isActive ?: true) }
-        var showDayPicker by remember { mutableStateOf(false) }
+        var nameInput by remember(activeSaving) { mutableStateOf(activeSaving?.name ?: "") }
+        var amountInput by remember(activeSaving) { mutableStateOf(if (activeSaving != null) String.format(Locale.getDefault(), "%.2f", activeSaving.amount) else "") }
+        var categoryInput by remember(activeSaving) { mutableStateOf(activeSaving?.category ?: "定期存款") }
+        var dayInput by remember(activeSaving) { mutableStateOf(activeSaving?.arrivalDay ?: "每月1号") }
+        var selectedAccountId by remember(activeSaving) { mutableStateOf(activeSaving?.accountId) }
+        var selectedAccountName by remember(activeSaving) { mutableStateOf(activeSaving?.accountName) }
+        var isActiveInput by remember(activeSaving) { mutableStateOf(activeSaving?.isActive ?: true) }
+        var showDayPicker by remember(activeSaving) { mutableStateOf(false) }
 
         AlertDialog(
             onDismissRequest = {

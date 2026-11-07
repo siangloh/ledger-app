@@ -271,23 +271,59 @@ object CashflowRepository {
         var paidBills = 0.0
         var pendingBills = 0.0
 
+        val linksArr = getPaymentLinks(context)
+        val linksList = mutableListOf<JSONObject>()
+        for (i in 0 until linksArr.length()) {
+            linksList.add(linksArr.getJSONObject(i))
+        }
+
         for (sub in subs) {
             plannedBills += sub.cost
-            // 检查当月是否有对应类别的支出或包含该订阅名称的交易
-            val matchedTx = txList.find { tx ->
-                tx.type == "expense" && (
-                    tx.category.equals(sub.category, ignoreCase = true) ||
-                    tx.note.contains(sub.name, ignoreCase = true) ||
-                    tx.tags.contains(sub.name, ignoreCase = true)
-                )
+            val billKey = "sub_${sub.id}"
+            val directLinks = linksList.filter { it.optString("bill_key") == billKey }
+
+            val paidAmt: Double
+            val pendingAmt: Double
+            val isPaid: Boolean
+
+            if (directLinks.isNotEmpty()) {
+                var sum = 0.0
+                for (link in directLinks) {
+                    val txId = link.optLong("transaction_id")
+                    val isRefund = link.optBoolean("is_refund", false)
+                    val tx = txList.find { it.id == txId }
+                    if (tx != null) {
+                        if (isRefund) sum -= tx.amount else sum += tx.amount
+                    }
+                }
+                paidAmt = sum.coerceAtLeast(0.0)
+                pendingAmt = (sub.cost - paidAmt).coerceAtLeast(0.0)
+                isPaid = pendingAmt <= 0.0
+            } else {
+                // 检查当月是否有对应类别的支出或包含该订阅名称的交易 (优先匹配同账户)
+                val matchedTx = txList.find { tx ->
+                    if (tx.type != "expense") return@find false
+                    val accMatch = sub.accountId == null || tx.accountId == sub.accountId || (sub.accountName != null && sub.accountName.equals(tx.channel, ignoreCase = true))
+                    val nameOrCatMatch = tx.category.equals(sub.category, ignoreCase = true) ||
+                        tx.note.contains(sub.name, ignoreCase = true) ||
+                        tx.tags.contains(sub.name, ignoreCase = true)
+                    accMatch && nameOrCatMatch
+                } ?: txList.find { tx ->
+                    tx.type == "expense" && (
+                        tx.category.equals(sub.category, ignoreCase = true) ||
+                        tx.note.contains(sub.name, ignoreCase = true) ||
+                        tx.tags.contains(sub.name, ignoreCase = true)
+                    )
+                }
+                isPaid = matchedTx != null
+                paidAmt = if (isPaid) sub.cost else 0.0
+                pendingAmt = if (isPaid) 0.0 else sub.cost
             }
-            val isPaid = matchedTx != null
-            val paidAmt = if (isPaid) sub.cost else 0.0
-            val pendingAmt = if (isPaid) 0.0 else sub.cost
+
             if (isPaid) paidBills += paidAmt else pendingBills += pendingAmt
 
             billsArray.put(JSONObject().apply {
-                put("bill_key", "sub_${sub.id}")
+                put("bill_key", billKey)
                 put("title", sub.name)
                 put("amount", sub.cost)
                 put("due_date", sub.nextBillingDate.ifBlank { "$month-15" })
@@ -295,6 +331,8 @@ object CashflowRepository {
                 put("pending", pendingAmt)
                 put("is_paid", isPaid)
                 put("category", sub.category)
+                if (sub.accountId != null) put("account_id", sub.accountId)
+                if (!sub.accountName.isNullOrBlank()) put("account_name", sub.accountName)
             })
         }
 
@@ -337,6 +375,7 @@ object CashflowRepository {
             put("savings_categories", savingsCategories)
             put("savings_platforms", savingsPlatforms)
             put("bills", billsArray)
+            put("payment_links", linksArr)
             put("prior_overdue", org.json.JSONArray())
             put("scheduled_transactions", org.json.JSONArray())
             put("confirmed_transactions", org.json.JSONArray())
@@ -347,8 +386,135 @@ object CashflowRepository {
         Result(data, false)
     }
 
+    private fun getLinksPrefs(context: Context) =
+        context.getSharedPreferences("cashflow_links_prefs", Context.MODE_PRIVATE)
+
+    fun getPaymentLinks(context: Context): org.json.JSONArray {
+        val raw = getLinksPrefs(context).getString("payment_links", null)
+        return if (!raw.isNullOrBlank()) {
+            try { org.json.JSONArray(raw) } catch (_: Exception) { org.json.JSONArray() }
+        } else org.json.JSONArray()
+    }
+
+    private fun savePaymentLinks(context: Context, arr: org.json.JSONArray) {
+        getLinksPrefs(context).edit().putString("payment_links", arr.toString()).apply()
+    }
+
+    fun addPaymentLink(context: Context, billKey: String, txId: Long, isRefund: Boolean, month: String = "") {
+        val arr = getPaymentLinks(context)
+        val list = mutableListOf<JSONObject>()
+        for (i in 0 until arr.length()) {
+            val obj = arr.getJSONObject(i)
+            if (obj.optString("bill_key") == billKey && obj.optLong("transaction_id") == txId) {
+                return
+            }
+            list.add(obj)
+        }
+        list.add(JSONObject().apply {
+            put("bill_key", billKey)
+            put("transaction_id", txId)
+            put("is_refund", isRefund)
+            put("month", month)
+        })
+        val newArr = org.json.JSONArray()
+        list.forEach { newArr.put(it) }
+        savePaymentLinks(context, newArr)
+    }
+
+    fun removePaymentLink(context: Context, billKey: String, txId: Long) {
+        val arr = getPaymentLinks(context)
+        val newArr = org.json.JSONArray()
+        for (i in 0 until arr.length()) {
+            val obj = arr.getJSONObject(i)
+            if (!(obj.optString("bill_key") == billKey && obj.optLong("transaction_id") == txId)) {
+                newArr.put(obj)
+            }
+        }
+        savePaymentLinks(context, newArr)
+    }
+
+    suspend fun updateBillAccount(context: Context, billKey: String, accountId: Int?, accountName: String?) {
+        if (billKey.startsWith("sub_")) {
+            val subId = billKey.removePrefix("sub_").toIntOrNull() ?: return
+            val tools = LocalLedgerRepository.getToolsSummary(context).getOrNull()
+            val sub = tools?.subscriptions?.find { it.id == subId } ?: return
+            LocalLedgerRepository.saveSubscription(
+                context = context,
+                id = sub.id,
+                name = sub.name,
+                category = sub.category,
+                cost = sub.cost,
+                currency = sub.currency,
+                nextBillingDate = sub.nextBillingDate,
+                autoRenew = sub.autoRenew,
+                accountId = accountId,
+                accountName = accountName
+            )
+        }
+    }
+
+    suspend fun updateBillAmount(context: Context, billKey: String, amount: Double) {
+        if (billKey.startsWith("sub_")) {
+            val subId = billKey.removePrefix("sub_").toIntOrNull() ?: return
+            val tools = LocalLedgerRepository.getToolsSummary(context).getOrNull()
+            val sub = tools?.subscriptions?.find { it.id == subId } ?: return
+            LocalLedgerRepository.saveSubscription(
+                context = context,
+                id = sub.id,
+                name = sub.name,
+                category = sub.category,
+                cost = amount,
+                currency = sub.currency,
+                nextBillingDate = sub.nextBillingDate,
+                autoRenew = sub.autoRenew,
+                accountId = sub.accountId,
+                accountName = sub.accountName
+            )
+        }
+    }
+
     suspend fun update(context: Context, payload: JSONObject) = withContext(Dispatchers.IO) {
-        // 本地单机模式：清除现金流缓存以触发本地重新计算
+        val action = payload.optString("action")
+        val billKey = payload.optString("bill_key")
+        val month = payload.optString("month")
+
+        if (action == "link_account" || payload.has("account_id") || payload.has("account_name")) {
+            val accId = if (payload.has("account_id") && !payload.isNull("account_id")) payload.optInt("account_id") else null
+            val accName = if (payload.has("account_name") && !payload.isNull("account_name")) payload.optString("account_name").takeIf { it != "null" && it.isNotBlank() } else null
+            if (billKey.isNotBlank()) {
+                updateBillAccount(context, billKey, accId, accName)
+            }
+        }
+
+        if (payload.has("transaction_id") && billKey.isNotBlank()) {
+            val txId = payload.optLong("transaction_id")
+            val unlink = payload.optBoolean("unlink", false)
+            val refund = payload.optBoolean("refund", false)
+            if (unlink) {
+                removePaymentLink(context, billKey, txId)
+            } else {
+                addPaymentLink(context, billKey, txId, refund, month)
+            }
+        }
+
+        if (action == "bill") {
+            if (payload.has("amount")) {
+                val amtStr = payload.optString("amount")
+                val amt = amtStr.toDoubleOrNull() ?: payload.optDouble("amount", -1.0)
+                if (amt >= 0.0 && billKey.isNotBlank()) {
+                    updateBillAmount(context, billKey, amt)
+                }
+            }
+            if (payload.optBoolean("cancelled", false) && billKey.isNotBlank()) {
+                if (billKey.startsWith("sub_")) {
+                    billKey.removePrefix("sub_").toIntOrNull()?.let { subId ->
+                        LocalLedgerRepository.deleteSubscription(context, subId)
+                    }
+                }
+            }
+        }
+
+        // 清除现金流报告缓存以触发本地重新计算并即时生效
         context.getSharedPreferences("cashflow_reports", Context.MODE_PRIVATE).edit().clear().apply()
     }
 }

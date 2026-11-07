@@ -73,6 +73,7 @@ fun MoreToolsScreen(
         )
     }
     var toolsError by remember { mutableStateOf<String?>(null) }
+    var localAccounts by remember { mutableStateOf<List<AccountRecord>>(emptyList()) }
     var pendingItems by remember { mutableStateOf<List<UncategorizedItem>>(emptyList()) }
     var pendingError by remember { mutableStateOf<String?>(null) }
     var categorizingItem by remember { mutableStateOf<UncategorizedItem?>(null) }
@@ -125,6 +126,10 @@ fun MoreToolsScreen(
                 toolsError = null
             }.onFailure {
                 toolsError = it.message ?: context.getString(R.string.tools_error_load_subs_inst)
+            }
+
+            LocalLedgerRepository.getAccountsSummary(context).onSuccess {
+                localAccounts = it.accounts
             }
 
             // 2. Load Pending Transactions from Overview API
@@ -231,6 +236,7 @@ fun MoreToolsScreen(
                     fixedIncomes = toolsSummary?.fixedIncomes ?: emptyList(),
                     userCategories = userCategories,
                     userIncomeCategories = userIncomeCategories,
+                    accounts = localAccounts,
                     onBack = {
                         activeSubPage = null
                         refreshAll()

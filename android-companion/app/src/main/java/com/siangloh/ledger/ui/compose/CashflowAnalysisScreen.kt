@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -72,6 +73,7 @@ import com.siangloh.ledger.R
 import com.siangloh.ledger.util.AppLanguageManager
 import com.siangloh.ledger.data.CashflowRepository
 import com.siangloh.ledger.data.LocalFinancialAdvisor
+import com.siangloh.ledger.data.AccountRecord
 import com.siangloh.ledger.data.BudgetOverviewRecord
 import com.siangloh.ledger.data.LocalLedgerRepository
 import androidx.compose.ui.unit.IntOffset
@@ -1432,7 +1434,13 @@ private fun BillRow(bill: JSONObject, currency: String, overdue: Boolean, enable
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(bill.optString("title"), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate900, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(stringResource(R.string.cfu_due) + bill.optString("due_date"), fontSize = 11.sp, color = if (overdue) DangerColor else Slate500)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(stringResource(R.string.cfu_due) + bill.optString("due_date"), fontSize = 11.sp, color = if (overdue) DangerColor else Slate500)
+                        val accName = bill.optString("account_name")
+                        if (accName.isNotBlank() && accName != "null") {
+                            Text("· $accName", fontSize = 11.sp, color = PrimaryTeal, fontWeight = FontWeight.Medium)
+                        }
+                    }
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(formatMoney(currency, amount), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
@@ -1516,6 +1524,12 @@ fun CashflowAnalysisScreen(
     var prevData by remember { mutableStateOf(CashflowRepository.getCached(context, shiftMonth(initialMonth, -1), currency)?.data) }
     var failed by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(result == null) }
+    var availableAccounts by remember { mutableStateOf<List<AccountRecord>>(emptyList()) }
+    LaunchedEffect(refresh) {
+        LocalLedgerRepository.getAccountsSummary(context).onSuccess {
+            availableAccounts = it.accounts
+        }
+    }
     var budgetOverview by remember { mutableStateOf<BudgetOverviewRecord?>(null) }
     val advisorReport = remember(result?.data, budgetOverview, refresh) {
         result?.data?.let { data ->
@@ -2627,9 +2641,9 @@ fun CashflowAnalysisScreen(
                                     correctedAmount = bill.optString("amount")
                                 }
 
-                                item { BillGroup(stringResource(R.string.cf_prior), overdue, cur, true, isOnline && !busy, pick) }
-                                item { BillGroup(stringResource(R.string.cf_pending), unpaid, cur, false, isOnline && !busy, pick) }
-                                item { BillGroup(stringResource(R.string.cf_paid), settled, cur, false, isOnline && !busy, pick) }
+                                item { BillGroup(stringResource(R.string.cf_prior), overdue, cur, true, !busy, pick) }
+                                item { BillGroup(stringResource(R.string.cf_pending), unpaid, cur, false, !busy, pick) }
+                                item { BillGroup(stringResource(R.string.cf_paid), settled, cur, false, !busy, pick) }
 
                                 if (bills.isEmpty() && overdue.isEmpty()) {
                                     item {
@@ -2822,7 +2836,6 @@ fun CashflowAnalysisScreen(
     // ---------------- 账单详情 Bottom Sheet ----------------
     selectedBill?.let { bill ->
         val billKey = bill.optString("bill_key")
-        val isOnline = !(result?.cached ?: false)
         val cur = result?.data?.optString("currency") ?: ""
         val amount = bill.optDouble("amount", 0.0)
         val paid = bill.optDouble("paid", 0.0)
@@ -2837,7 +2850,13 @@ fun CashflowAnalysisScreen(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(bill.optString("title"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                            Text(stringResource(R.string.cfu_due) + bill.optString("due_date"), fontSize = 12.sp, color = Slate500)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(stringResource(R.string.cfu_due) + bill.optString("due_date"), fontSize = 12.sp, color = Slate500)
+                                val accName = bill.optString("account_name")
+                                if (accName.isNotBlank() && accName != "null") {
+                                    Text("· $accName", fontSize = 12.sp, color = PrimaryTeal, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
                         }
                         Text(formatMoney(cur, amount), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Slate900)
                     }
@@ -2848,13 +2867,80 @@ fun CashflowAnalysisScreen(
                     }
                 }
 
+                // 扣款/支付账户选择 (Link to Account)
+                val currentAccountId = if (bill.has("account_id") && !bill.isNull("account_id")) bill.optInt("account_id").takeIf { it > 0 } else null
+                val currentAccountName = if (bill.has("account_name") && !bill.isNull("account_name")) bill.optString("account_name").takeIf { it != "null" && it.isNotBlank() } else null
+
+                SheetSection(stringResource(R.string.sub_account_label)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val noneSelected = currentAccountId == null && currentAccountName == null
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (noneSelected) PrimaryTeal else Slate100,
+                            modifier = Modifier.clickable(!busy) {
+                                update(
+                                    JSONObject()
+                                        .put("action", "link_account")
+                                        .put("bill_key", billKey)
+                                        .put("account_id", JSONObject.NULL)
+                                        .put("account_name", JSONObject.NULL)
+                                )
+                            }
+                        ) {
+                            Text(
+                                text = stringResource(R.string.sub_unbound_account),
+                                fontSize = 11.sp,
+                                fontWeight = if (noneSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (noneSelected) Color.White else Slate700,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        availableAccounts.forEach { acc ->
+                            val sel = (currentAccountId != null && currentAccountId == acc.id) ||
+                                (currentAccountId == null && currentAccountName == acc.name)
+                            val icon = when {
+                                acc.name.contains("Touch") || acc.name.contains("TNG") -> "📱 "
+                                acc.name.contains("卡") || acc.name.contains("Credit", ignoreCase = true) || acc.name.contains("Debit", ignoreCase = true) || acc.name.contains("Card", ignoreCase = true) || acc.name.contains("Kad", ignoreCase = true) -> "💳 "
+                                acc.name.contains("现金") || acc.name.contains("Cash", ignoreCase = true) || acc.name.contains("Tunai", ignoreCase = true) -> "💵 "
+                                else -> "🏦 "
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (sel) PrimaryTeal else Slate100,
+                                modifier = Modifier.clickable(!busy) {
+                                    update(
+                                        JSONObject()
+                                            .put("action", "link_account")
+                                            .put("bill_key", billKey)
+                                            .put("account_id", acc.id)
+                                            .put("account_name", acc.name)
+                                    )
+                                }
+                            ) {
+                                Text(
+                                    text = "$icon${acc.name}",
+                                    fontSize = 11.sp,
+                                    fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (sel) Color.White else Slate700,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 if (failed) Text(stringResource(R.string.cf_error), color = ExpenseRed, fontSize = 13.sp)
 
                 val linked = result?.data?.rows("payment_links")?.filter { it.optString("bill_key") == billKey } ?: emptyList()
                 if (linked.isNotEmpty()) {
                     SheetSection(stringResource(R.string.cfu_linked)) {
                         linked.forEach { link ->
-                            SheetActionRow(text = "#" + link.optInt("transaction_id"), action = stringResource(R.string.cf_unlink), enabled = isOnline && !busy) {
+                            SheetActionRow(text = "#" + link.optInt("transaction_id"), action = stringResource(R.string.cf_unlink), enabled = !busy) {
                                 update(JSONObject().put("bill_key", billKey).put("transaction_id", link.optInt("transaction_id")).put("unlink", true))
                             }
                         }
@@ -2870,7 +2956,7 @@ fun CashflowAnalysisScreen(
                             SheetActionRow(
                                 text = tx.optString("date") + " · " + tx.optString("note").ifEmpty { "#" + tx.optInt("id") },
                                 sub = formatMoney(cur, tx.optDouble("amount", 0.0)),
-                                action = stringResource(R.string.cf_link), enabled = isOnline && !busy
+                                action = stringResource(R.string.cf_link), enabled = !busy
                             ) { update(JSONObject().put("bill_key", billKey).put("transaction_id", tx.optInt("id"))) }
                         }
                     }
@@ -2885,7 +2971,7 @@ fun CashflowAnalysisScreen(
                             SheetActionRow(
                                 text = tx.optString("date") + " · " + tx.optString("note").ifEmpty { "#" + tx.optInt("id") },
                                 sub = formatMoney(cur, tx.optDouble("amount", 0.0)),
-                                action = stringResource(R.string.cf_link), enabled = isOnline && !busy
+                                action = stringResource(R.string.cf_link), enabled = !busy
                             ) { update(JSONObject().put("bill_key", billKey).put("transaction_id", tx.optInt("id")).put("refund", true)) }
                         }
                     }
@@ -2906,7 +2992,7 @@ fun CashflowAnalysisScreen(
                             )
                         )
                         Button(
-                            enabled = isOnline && !busy && correctedAmount.toDoubleOrNull()?.let { it >= 0 && it.isFinite() } == true,
+                            enabled = !busy && correctedAmount.toDoubleOrNull()?.let { it >= 0 && it.isFinite() } == true,
                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                             onClick = { update(JSONObject().put("action", "bill").put("bill_key", billKey).put("amount", correctedAmount)) }
                         ) { Text(stringResource(R.string.cfu_save)) }
@@ -2917,7 +3003,7 @@ fun CashflowAnalysisScreen(
                 if (others.isNotEmpty()) {
                     SheetSection(stringResource(R.string.cf_duplicate)) {
                         others.forEach { other ->
-                            SheetActionRow(text = other.optString("title") + " · " + other.optString("due_date"), action = stringResource(R.string.cfu_mark), enabled = isOnline && !busy) {
+                            SheetActionRow(text = other.optString("title") + " · " + other.optString("due_date"), action = stringResource(R.string.cfu_mark), enabled = !busy) {
                                 update(JSONObject().put("action", "bill").put("bill_key", billKey).put("duplicate_of", other.optString("bill_key")))
                             }
                         }
@@ -2925,7 +3011,7 @@ fun CashflowAnalysisScreen(
                 }
 
                 OutlinedButton(
-                    enabled = isOnline && !busy,
+                    enabled = !busy,
                     onClick = { update(JSONObject().put("action", "bill").put("bill_key", billKey).put("cancelled", true)) },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = ExpenseRed),
                     border = BorderStroke(1.dp, Color(0xFFFECDD3)),
