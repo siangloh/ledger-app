@@ -1,7 +1,6 @@
 package com.siangloh.ledger.ui.compose.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -11,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.siangloh.ledger.ui.compose.theme.Slate900
 import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
 import java.util.Locale
 
 /**
@@ -37,11 +38,16 @@ fun AnimatedAmountText(
     modifier: Modifier = Modifier,
     maxLines: Int = 1
 ) {
-    val formatter = remember { DecimalFormat("#,##0.00") }
+    val symbols = remember { DecimalFormatSymbols(Locale.US) }
+    val formatter = remember { DecimalFormat("#,##0.00", symbols) }
     val formattedStr = remember(amount, currency, prefix) {
-        val sign = if (amount < 0) "-" else prefix
-        val absAmt = Math.abs(amount)
-        "$sign$currency ${formatter.format(absAmt)}"
+        val safeAmt = if (amount.isNaN() || amount.isInfinite()) 0.0 else amount
+        val absAmt = Math.abs(safeAmt)
+        val formattedNumber = formatter.format(absAmt)
+        // 彻底消除 "-RM 0.00" 负零缺陷
+        val sign = if (formattedNumber == "0.00") "" else if (safeAmt < 0) "-" else prefix
+        val currPart = if (currency.isNotBlank()) "$currency " else ""
+        "$sign$currPart$formattedNumber"
     }
 
     AnimatedContent(
@@ -52,7 +58,7 @@ fun AnimatedAmountText(
             enterAnim togetherWith exitAnim
         },
         label = "AnimatedAmountText",
-        modifier = modifier
+        modifier = modifier.clipToBounds()
     ) { text ->
         Text(
             text = text,

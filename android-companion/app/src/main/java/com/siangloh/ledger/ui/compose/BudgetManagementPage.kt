@@ -388,7 +388,7 @@ fun BudgetManagementPage(
                         }
                     }
 
-                    val catList = data?.categories ?: emptyList()
+                    val catList = (data?.categories ?: emptyList()).distinctBy { it.category }
                     if (catList.isEmpty()) {
                         item {
                             Box(

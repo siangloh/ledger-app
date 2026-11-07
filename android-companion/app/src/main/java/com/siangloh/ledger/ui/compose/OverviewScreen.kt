@@ -12,6 +12,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -936,7 +937,9 @@ fun OverviewScreen(
                         }
                     }
                 } else {
-                    items(displayList, key = { it.id }) { tx ->
+                    itemsIndexed(displayList, key = { idx, tx ->
+                        if (tx.id > 0) "${tx.isOfflineLocal}_${tx.id}" else "local_${idx}_${tx.date}_${tx.amount}"
+                    }) { _, tx ->
                         TransactionCardItem(
                             tx = tx,
                             onClick = {
@@ -2250,7 +2253,7 @@ fun UncategorizedReviewBottomSheet(
                         .heightIn(max = 440.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(items, key = { it.id }) { item ->
+                    items(items, key = { "${it.sourceType}_${it.id}" }) { item ->
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = Slate50,

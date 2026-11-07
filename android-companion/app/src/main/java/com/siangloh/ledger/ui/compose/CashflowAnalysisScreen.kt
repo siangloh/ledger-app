@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -1806,7 +1807,7 @@ fun CashflowAnalysisScreen(
 
                             result?.data?.optJSONArray("currencies")?.let { codes ->
                                 if (codes.length() > 1) {
-                                    val currencyCodeList = remember(codes) { (0 until codes.length()).map { codes.getString(it) } }
+                                    val currencyCodeList = remember(codes) { (0 until codes.length()).map { codes.getString(it) }.distinct() }
                                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         items(currencyCodeList, key = { it }) { code ->
                                             val isSelected = code == currency.ifEmpty { result?.data?.optString("currency") ?: "" }
@@ -1996,14 +1997,16 @@ fun CashflowAnalysisScreen(
                                             .background(Slate100)
                                     ) {
                                         val width = maxWidth / detailPages.size
+                                        val pageOffset = (pagerState.currentPage + pagerState.currentPageOffsetFraction)
+                                            .let { if (it.isNaN()) 0f else it }
+                                            .coerceIn(0f, (detailPages.size - 1).toFloat())
                                         Box(Modifier.matchParentSize()) {
                                             Box(
                                                 Modifier
                                                     .width(width)
                                                     .fillMaxHeight()
                                                     .offset {
-                                                        val pos = (pagerState.currentPage + pagerState.currentPageOffsetFraction).coerceIn(0f, (detailPages.size - 1).toFloat())
-                                                        IntOffset((width.toPx() * pos).roundToInt(), 0)
+                                                        IntOffset((width.toPx() * pageOffset).roundToInt(), 0)
                                                     }
                                                     .padding(3.dp)
                                                     .background(Color.White, RoundedCornerShape(9.dp))
@@ -2019,7 +2022,7 @@ fun CashflowAnalysisScreen(
                                             )
                                             detailPages.forEachIndexed { index, tab ->
                                                 val selected = pagerState.currentPage == index
-                                                val emphasis = (1f - kotlin.math.abs(position - index)).coerceIn(0f, 1f)
+                                                val emphasis = (1f - kotlin.math.abs(pageOffset - index)).coerceIn(0f, 1f)
                                                 Box(
                                                     Modifier
                                                         .weight(1f)
@@ -2032,7 +2035,7 @@ fun CashflowAnalysisScreen(
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Text(
-                                                        stringResource(labels[index]),
+                                                        stringResource(labels.getOrElse(index) { R.string.cf_tab_expense }),
                                                         fontSize = 12.sp,
                                                         color = androidx.compose.ui.graphics.lerp(Slate600, PrimaryTeal, emphasis),
                                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
@@ -2651,7 +2654,10 @@ fun CashflowAnalysisScreen(
                     val sortedTxs = remember(txs) { txs.sortedByDescending { it.optDouble("amount", 0.0) } }
                     val maxTx = remember(sortedTxs) { sortedTxs.firstOrNull()?.optDouble("amount", 0.0) ?: 0.0 }
                     LazyColumn(Modifier.heightIn(max = 460.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(sortedTxs, key = { it.optLong("id") }) { tx ->
+                        itemsIndexed(sortedTxs, key = { idx, tx ->
+                        val id = tx.optLong("id")
+                        if (id > 0) "tx_$id" else "idx_${idx}_${tx.optString("date")}_${tx.optDouble("amount")}"
+                    }) { _, tx ->
                             val isIncome = tx.optString("type") == "income"
                             Surface(shape = RoundedCornerShape(12.dp), color = Slate50, border = BorderStroke(1.dp, Slate200)) {
                                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
