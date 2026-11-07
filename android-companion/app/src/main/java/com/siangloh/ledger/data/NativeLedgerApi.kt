@@ -2,6 +2,7 @@ package com.siangloh.ledger.data
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.runtime.Immutable
 import com.siangloh.ledger.NetworkHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,6 +15,7 @@ import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.*
 
+@Immutable
 data class TransactionRecord(
     val id: Long,
     val date: String,
@@ -203,6 +205,7 @@ data class TransactionMatchRecord(
     val matchedInstTenure: Int? = null
 )
 
+@Immutable
 data class BudgetItemRecord(
     val category: String,
     val limit: Double,
@@ -213,6 +216,7 @@ data class BudgetItemRecord(
     val color: String
 )
 
+@Immutable
 data class BillingCycleRecord(
     val startDate: String,
     val endDate: String,
@@ -223,6 +227,7 @@ data class BillingCycleRecord(
     val remainingDays: Int
 )
 
+@Immutable
 data class OverallBudgetRecord(
     val limit: Double,
     val spent: Double,
@@ -234,6 +239,7 @@ data class OverallBudgetRecord(
     val isSet: Boolean
 )
 
+@Immutable
 data class BudgetOverviewRecord(
     val month: String,
     val billingCycle: BillingCycleRecord,

@@ -32,7 +32,7 @@ import com.siangloh.ledger.data.entities.LocalTransaction
         LocalAccount::class,
         LocalCategory::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -112,13 +112,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_local_transactions_date ON local_transactions(date)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_local_transactions_type ON local_transactions(type)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_local_transactions_category ON local_transactions(category)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_local_transactions_accountId ON local_transactions(accountId)")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "ledger_local.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance

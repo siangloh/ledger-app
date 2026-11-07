@@ -406,7 +406,7 @@ fun BudgetManagementPage(
                             }
                         }
                     } else {
-                        items(catList) { cat ->
+                        items(catList, key = { it.category }) { cat ->
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()

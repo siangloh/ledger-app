@@ -47,6 +47,7 @@ import com.siangloh.ledger.ui.compose.components.SpendingTrendSkeleton
 import com.siangloh.ledger.ui.compose.components.RecentTransactionsSkeleton
 import com.siangloh.ledger.ui.compose.theme.*
 import com.siangloh.ledger.ui.overlay.InstantReviewManager
+import androidx.compose.runtime.Immutable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -56,7 +57,9 @@ import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.*
 import com.siangloh.ledger.ui.compose.components.SourceBrandBadge
+import com.siangloh.ledger.ui.compose.components.AnimatedAmountText
 
+@Immutable
 data class TransactionItem(
     val id: Long,
     val date: String,
@@ -73,11 +76,13 @@ data class TransactionItem(
     val isOfflineLocal: Boolean = false
 )
 
+@Immutable
 data class SparklinePoint(
     val date: String,
     val amount: Double
 )
 
+@Immutable
 data class UncategorizedItem(
     val id: Long,
     val date: String,
@@ -95,6 +100,7 @@ data class UncategorizedItem(
     val suspectedDuplicateDate: String? = null
 )
 
+@Immutable
 data class OverviewData(
     val totalSpending: Double = 0.0,
     val expenseAmount: Double = 0.0,
@@ -930,7 +936,7 @@ fun OverviewScreen(
                         }
                     }
                 } else {
-                    items(displayList) { tx ->
+                    items(displayList, key = { it.id }) { tx ->
                         TransactionCardItem(
                             tx = tx,
                             onClick = {
@@ -1279,8 +1285,9 @@ fun UnifiedOverviewHeroCard(
                 color = Slate500
             )
 
-            Text(
-                text = (if (net < 0) "-RM " else "RM ") + String.format(Locale.getDefault(), "%,.2f", Math.abs(net)),
+            AnimatedAmountText(
+                amount = net,
+                currency = "RM",
                 fontSize = 26.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = if (isPositive) PrimaryTeal else ExpenseRed
@@ -1292,16 +1299,22 @@ fun UnifiedOverviewHeroCard(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.total_actual_income), fontSize = 12.sp, color = Slate500)
-                    Text(
-                        text = "+RM " + String.format(Locale.getDefault(), "%,.2f", income),
+                    AnimatedAmountText(
+                        amount = income,
+                        currency = "RM",
+                        prefix = "+",
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Slate900
                     )
                 }
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.total_actual_expense), fontSize = 12.sp, color = Slate500)
-                    Text(
-                        text = "-RM " + String.format(Locale.getDefault(), "%,.2f", expense),
+                    AnimatedAmountText(
+                        amount = expense,
+                        currency = "RM",
+                        prefix = "-",
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Slate900
                     )
@@ -1309,8 +1322,11 @@ fun UnifiedOverviewHeroCard(
                 if (savings > 0) {
                     Column(Modifier.weight(1f)) {
                         Text(stringResource(R.string.savings_deposited), fontSize = 12.sp, color = Slate500)
-                        Text(
-                            text = "-RM " + String.format(Locale.getDefault(), "%,.2f", savings),
+                        AnimatedAmountText(
+                            amount = savings,
+                            currency = "RM",
+                            prefix = "-",
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFFD97706)
                         )
@@ -2234,7 +2250,7 @@ fun UncategorizedReviewBottomSheet(
                         .heightIn(max = 440.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(items) { item ->
+                    items(items, key = { it.id }) { item ->
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = Slate50,

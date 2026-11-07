@@ -1,9 +1,18 @@
 package com.siangloh.ledger.data.entities
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "local_transactions")
+@Entity(
+    tableName = "local_transactions",
+    indices = [
+        Index(value = ["date"]),
+        Index(value = ["type"]),
+        Index(value = ["category"]),
+        Index(value = ["accountId"])
+    ]
+)
 data class LocalTransaction(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

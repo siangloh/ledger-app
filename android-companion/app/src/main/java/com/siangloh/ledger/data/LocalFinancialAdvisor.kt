@@ -1,6 +1,7 @@
 package com.siangloh.ledger.data
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import com.siangloh.ledger.R
 import com.siangloh.ledger.ui.compose.CategoryUiHelper
 import org.json.JSONObject
@@ -24,6 +25,7 @@ object LocalFinancialAdvisor {
         TIP       // 节奏把控 / 每日安全额度建议
     }
 
+    @Immutable
     data class FinancialInsightItem(
         val type: InsightType,
         val title: String,
@@ -31,6 +33,7 @@ object LocalFinancialAdvisor {
         val tag: String
     )
 
+    @Immutable
     data class FinancialHealthReport(
         val score: Int,            // 0..100
         val scoreGrade: String,    // 优良 / 稳健 / 需关注 / 预警

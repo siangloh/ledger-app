@@ -70,6 +70,8 @@ import com.siangloh.ledger.data.CashflowRepository
 import com.siangloh.ledger.data.LocalFinancialAdvisor
 import com.siangloh.ledger.data.BudgetOverviewRecord
 import com.siangloh.ledger.data.LocalLedgerRepository
+import androidx.compose.ui.unit.IntOffset
+import com.siangloh.ledger.ui.compose.components.AnimatedAmountText
 import com.siangloh.ledger.ui.compose.components.AiFinancialAdvisorCard
 import com.siangloh.ledger.ui.compose.theme.*
 import kotlinx.coroutines.CancellationException
@@ -1804,8 +1806,9 @@ fun CashflowAnalysisScreen(
 
                             result?.data?.optJSONArray("currencies")?.let { codes ->
                                 if (codes.length() > 1) {
+                                    val currencyCodeList = remember(codes) { (0 until codes.length()).map { codes.getString(it) } }
                                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        items((0 until codes.length()).map { codes.getString(it) }) { code ->
+                                        items(currencyCodeList, key = { it }) { code ->
                                             val isSelected = code == currency.ifEmpty { result?.data?.optString("currency") ?: "" }
                                             FilterChip(
                                                 selected = isSelected,
@@ -1899,8 +1902,9 @@ fun CashflowAnalysisScreen(
                                                     fontSize = 11.sp,
                                                     color = Slate500
                                                 )
-                                                Text(
-                                                    text = (if (availAmt < 0) "-$cur " else "$cur ") + String.format(Locale.getDefault(), "%,.2f", Math.abs(availAmt)),
+                                                AnimatedAmountText(
+                                                    amount = availAmt,
+                                                    currency = cur,
                                                     fontSize = 24.sp,
                                                     fontWeight = FontWeight.ExtraBold,
                                                     color = if (isPositive) PrimaryTeal else ExpenseRed
@@ -1921,8 +1925,10 @@ fun CashflowAnalysisScreen(
                                             ) {
                                                 Text(stringResource(R.string.cf_total_expense), fontSize = 11.sp, color = Slate500)
                                                 Spacer(Modifier.height(2.dp))
-                                                Text(
-                                                    "-$cur " + String.format(Locale.getDefault(), "%,.2f", expAmt),
+                                                AnimatedAmountText(
+                                                    amount = expAmt,
+                                                    currency = cur,
+                                                    prefix = "-",
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = ExpenseRed
@@ -1935,8 +1941,9 @@ fun CashflowAnalysisScreen(
                                             ) {
                                                 Text(stringResource(R.string.cf_total_savings), fontSize = 11.sp, color = Slate500)
                                                 Spacer(Modifier.height(2.dp))
-                                                Text(
-                                                    "$cur " + String.format(Locale.getDefault(), "%,.2f", savAmt),
+                                                AnimatedAmountText(
+                                                    amount = savAmt,
+                                                    currency = cur,
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = Color(0xFFD97706)
@@ -1949,8 +1956,10 @@ fun CashflowAnalysisScreen(
                                             ) {
                                                 Text(stringResource(R.string.cf_total_income), fontSize = 11.sp, color = Slate500)
                                                 Spacer(Modifier.height(2.dp))
-                                                Text(
-                                                    "+$cur " + String.format(Locale.getDefault(), "%,.2f", incAmt),
+                                                AnimatedAmountText(
+                                                    amount = incAmt,
+                                                    currency = cur,
+                                                    prefix = "+",
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = PrimaryTeal
@@ -1987,13 +1996,15 @@ fun CashflowAnalysisScreen(
                                             .background(Slate100)
                                     ) {
                                         val width = maxWidth / detailPages.size
-                                        val position = (pagerState.currentPage + pagerState.currentPageOffsetFraction).coerceIn(0f, (detailPages.size - 1).toFloat())
                                         Box(Modifier.matchParentSize()) {
                                             Box(
                                                 Modifier
-                                                    .offset(x = width * position)
                                                     .width(width)
                                                     .fillMaxHeight()
+                                                    .offset {
+                                                        val pos = (pagerState.currentPage + pagerState.currentPageOffsetFraction).coerceIn(0f, (detailPages.size - 1).toFloat())
+                                                        IntOffset((width.toPx() * pos).roundToInt(), 0)
+                                                    }
                                                     .padding(3.dp)
                                                     .background(Color.White, RoundedCornerShape(9.dp))
                                             )
@@ -2265,7 +2276,7 @@ fun CashflowAnalysisScreen(
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    items(rangeMonths) { m ->
+                                                    items(rangeMonths, key = { it }) { m ->
                                                         val isSel = (m == selectedCalendarMonth)
                                                         Surface(
                                                             shape = RoundedCornerShape(16.dp),
@@ -2637,9 +2648,10 @@ fun CashflowAnalysisScreen(
                 if (txs.isEmpty()) {
                     Text(stringResource(R.string.cf_empty), fontSize = 13.sp, color = Slate500)
                 } else {
-                    val maxTx = txs.maxOf { it.optDouble("amount", 0.0) }
+                    val sortedTxs = remember(txs) { txs.sortedByDescending { it.optDouble("amount", 0.0) } }
+                    val maxTx = remember(sortedTxs) { sortedTxs.firstOrNull()?.optDouble("amount", 0.0) ?: 0.0 }
                     LazyColumn(Modifier.heightIn(max = 460.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(txs.sortedByDescending { it.optDouble("amount", 0.0) }) { tx ->
+                        items(sortedTxs, key = { it.optLong("id") }) { tx ->
                             val isIncome = tx.optString("type") == "income"
                             Surface(shape = RoundedCornerShape(12.dp), color = Slate50, border = BorderStroke(1.dp, Slate200)) {
                                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
