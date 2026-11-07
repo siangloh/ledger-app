@@ -1327,9 +1327,23 @@ private fun BreakdownCard(
     showIncomeShare: Boolean = false,
     prevMap: Map<String, Double> = emptyMap(),
     headerExtra: (@Composable ColumnScope.() -> Unit)? = null,
+    activeSelectionTitle: String? = null,
     onItemClick: (TxSelection) -> Unit
 ) {
-    var selectedIndex by remember(slices.size) { mutableStateOf<Int?>(null) }
+    var selectedIndex by remember(title, slices) { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(activeSelectionTitle) {
+        if (activeSelectionTitle == null) {
+            if (selectedIndex != null) {
+                selectedIndex = null
+            }
+        } else {
+            val matchingIdx = slices.indexOfFirst { it.label == activeSelectionTitle }
+            if (matchingIdx >= 0 && selectedIndex != matchingIdx) {
+                selectedIndex = matchingIdx
+            }
+        }
+    }
     val total = slices.sumOf { it.amount.coerceAtLeast(0.0) }
     SectionCard(title = title, trailing = totalLabel + " " + formatMoney(currency, total)) {
         headerExtra?.invoke(this)
@@ -1368,8 +1382,12 @@ private fun BreakdownCard(
                 selected = selectedIndex == idx,
                 showIncomeShare = showIncomeShare,
                 onClick = {
-                    selectedIndex = if (selectedIndex == idx) null else idx
-                    if (s.transactionIds.isNotEmpty()) onItemClick(TxSelection(s.label, s.transactionIds))
+                    if (s.transactionIds.isNotEmpty()) {
+                        selectedIndex = idx
+                        onItemClick(TxSelection(s.label, s.transactionIds))
+                    } else {
+                        selectedIndex = if (selectedIndex == idx) null else idx
+                    }
                 }
             )
         }
@@ -2300,6 +2318,7 @@ fun CashflowAnalysisScreen(
                                                 }
                                             }
                                         },
+                                        activeSelectionTitle = selection?.title,
                                         onItemClick = { selection = it }
                                     )
                                 }
@@ -2472,6 +2491,7 @@ fun CashflowAnalysisScreen(
                                                 Text(stringResource(R.string.cfd_assign_accounts), fontSize = 12.sp, color = Slate600)
                                             }
                                         },
+                                        activeSelectionTitle = selection?.title,
                                         onItemClick = { selection = it }
                                     )
                                 }
@@ -2559,6 +2579,7 @@ fun CashflowAnalysisScreen(
                                                     )
                                                 }
                                             },
+                                            activeSelectionTitle = selection?.title,
                                             onItemClick = { selection = it }
                                         )
                                     }
