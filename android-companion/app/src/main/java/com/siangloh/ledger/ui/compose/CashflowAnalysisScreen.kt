@@ -1530,6 +1530,27 @@ fun CashflowAnalysisScreen(
             availableAccounts = it.accounts
         }
     }
+
+    // 实时监听流水与数据变动广播 (DATA_SYNCED)，静默重新核算金额与账单进度，无需手动刷新且杜绝全屏重载闪烁
+    DisposableEffect(month, currency, isCustomRange, startDate, endDate) {
+        val filter = android.content.IntentFilter().apply {
+            addAction("com.siangloh.ledger.DATA_SYNCED")
+            addAction("com.siangloh.ledger.SYNC_COMPLETED")
+        }
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: android.content.Context?, intent: android.content.Intent?) {
+                refresh++
+            }
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(receiver, filter)
+        }
+        onDispose {
+            try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
+        }
+    }
     var budgetOverview by remember { mutableStateOf<BudgetOverviewRecord?>(null) }
     val advisorReport = remember(result?.data, budgetOverview, refresh) {
         result?.data?.let { data ->

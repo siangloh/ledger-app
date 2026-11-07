@@ -75,6 +75,27 @@ fun AccountsScreen() {
         loadAccounts()
     }
 
+    // 实时监听流水与数据变动广播 (DATA_SYNCED)，静默更新账户余额与总资产，数字就地平滑滚动动画
+    DisposableEffect(Unit) {
+        val filter = android.content.IntentFilter().apply {
+            addAction("com.siangloh.ledger.DATA_SYNCED")
+            addAction("com.siangloh.ledger.SYNC_COMPLETED")
+        }
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: android.content.Context?, intent: android.content.Intent?) {
+                loadAccounts()
+            }
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(receiver, filter)
+        }
+        onDispose {
+            try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
+        }
+    }
+
     Scaffold(
         topBar = {
             Column(
