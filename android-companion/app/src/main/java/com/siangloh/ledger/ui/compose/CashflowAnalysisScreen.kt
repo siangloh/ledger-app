@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -61,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -680,20 +682,6 @@ private fun CashflowDonutChart(
                         onSelectSlice?.invoke(if (hit == selectedSliceIndex) null else hit)
                     }
                 )
-            }
-            .pointerInput(slices, totalAmount) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        val hit = findSliceAt(offset, Size(size.width.toFloat(), size.height.toFloat()))
-                        if (hit != null) onSelectSlice?.invoke(hit)
-                    },
-                    onDrag = { change, _ ->
-                        val hit = findSliceAt(change.position, Size(size.width.toFloat(), size.height.toFloat()))
-                        if (hit != null && hit != selectedSliceIndex) {
-                            onSelectSlice?.invoke(hit)
-                        }
-                    }
-                )
             },
         contentAlignment = Alignment.Center
     ) {
@@ -903,12 +891,6 @@ private fun DailySpendingCard(daily: DoubleArray, currency: String, todayDay: In
                         val idx = (off.x / (size.width / n)).toInt().coerceIn(0, n - 1)
                         sel = if (sel == idx) null else idx
                     }
-                }
-                .pointerInput(daily) {
-                    detectDragGestures(
-                        onDragStart = { off -> sel = (off.x / (size.width / n)).toInt().coerceIn(0, n - 1) },
-                        onDrag = { change, _ -> sel = (change.position.x / (size.width / n)).toInt().coerceIn(0, n - 1) }
-                    )
                 }
         ) {
             val slot = size.width / n
@@ -1731,6 +1713,23 @@ fun CashflowAnalysisScreen(
                             }
                             return Offset.Zero
                         }
+
+                        override suspend fun onPostFling(
+                            consumed: Velocity,
+                            available: Velocity
+                        ): Velocity {
+                            if (available.y > 0f && headerHeightPx > 0f && headerOffsetPx < 0f) {
+                                val start = headerOffsetPx
+                                Animatable(start).animateTo(
+                                    0f,
+                                    animationSpec = tween(250, easing = FastOutSlowInEasing)
+                                ) {
+                                    headerOffsetPx = value
+                                }
+                                return Velocity(0f, available.y)
+                            }
+                            return Velocity.Zero
+                        }
                     }
                 }
 
@@ -1754,7 +1753,14 @@ fun CashflowAnalysisScreen(
                         val newOffset = (oldOffset + delta).coerceIn(-hHeight, 0f)
                         val consumedByHeader = newOffset - oldOffset
                         headerOffsetPx = newOffset
-                        consumedByHeader
+                        val remaining = delta - consumedByHeader
+                        if (remaining > 0f && result != null) {
+                            val activeList = pageListStates[pagerState.currentPage]
+                            val consumedByList = -activeList.dispatchRawDelta(-remaining)
+                            consumedByHeader + consumedByList
+                        } else {
+                            consumedByHeader
+                        }
                     } else {
                         0f
                     }
@@ -1779,34 +1785,7 @@ fun CashflowAnalysisScreen(
                                 .scrollable(
                                     state = headerScrollState,
                                     orientation = Orientation.Vertical
-                                )
-                                .pointerInput(detailPages) {
-                                    var totalDragX = 0f
-                                    val swipeThreshold = 40.dp.toPx()
-                                    detectHorizontalDragGestures(
-                                        onDragStart = { totalDragX = 0f },
-                                        onDragEnd = {
-                                            val currentIndex = pagerState.currentPage
-                                            if (totalDragX < -swipeThreshold && currentIndex < detailPages.size - 1) {
-                                                scope.launch {
-                                                    pagerState.animateScrollToPage(currentIndex + 1, animationSpec = tween(300, easing = FastOutSlowInEasing))
-                                                }
-                                            } else if (totalDragX > swipeThreshold && currentIndex > 0) {
-                                                scope.launch {
-                                                    pagerState.animateScrollToPage(currentIndex - 1, animationSpec = tween(300, easing = FastOutSlowInEasing))
-                                                }
-                                            }
-                                            totalDragX = 0f
-                                        },
-                                        onDragCancel = { totalDragX = 0f },
-                                        onHorizontalDrag = { change, dragAmount ->
-                                            totalDragX += dragAmount
-                                            if (kotlin.math.abs(totalDragX) > 15f) {
-                                                change.consume()
-                                            }
-                                        }
-                                    )
-                                },
+                                ),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             // 模式切换（按月查看 / 自定义区间）
