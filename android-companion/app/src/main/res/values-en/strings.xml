@@ -502,7 +502,7 @@
     <string name="overview_3m_net_sub_savings">Last 3 Months Balance (Savings Deducted)</string>
     <string name="overview_3m_net_sub">Last 3 Months Cumulative Balance</string>
     <string name="overview_month_net_sub_savings">Net Balance (Savings Deducted)</string>
-    <string name="overview_month_net_sub">Estimated Available After Reserves</string>
+    <string name="overview_month_net_sub">Actual Net Balance</string>
     <string name="total_actual_income">Total Income</string>
     <string name="total_actual_expense">Total Expenses</string>
     <string name="savings_deposited">Savings Deposited</string>

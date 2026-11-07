@@ -502,7 +502,7 @@
     <string name="overview_3m_net_sub_savings">近3个月累计结余 (已扣除储蓄)</string>
     <string name="overview_3m_net_sub">近3个月累计结余</string>
     <string name="overview_month_net_sub_savings">实际收支结余 (已扣除储蓄)</string>
-    <string name="overview_month_net_sub">扣除预留后预计可用</string>
+    <string name="overview_month_net_sub">实际收支结余</string>
     <string name="total_actual_income">实际总收入</string>
     <string name="total_actual_expense">实际总支出</string>
     <string name="savings_deposited">储蓄存入</string>

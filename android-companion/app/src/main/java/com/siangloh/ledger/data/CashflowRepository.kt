@@ -358,6 +358,7 @@ object CashflowRepository {
             put("total_savings", savings)
             put("transfer", transfer)
             put("total_transfer", transfer)
+            put("net", avail)
             put("reserved", totalPending)
             put("planned", totalPlanned)
             put("paid", totalPaid)

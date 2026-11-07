@@ -502,7 +502,7 @@
     <string name="overview_3m_net_sub_savings">Baki 3 Bulan Terkini (Ditolak Simpanan)</string>
     <string name="overview_3m_net_sub">Baki Terkumpul 3 Bulan Terkini</string>
     <string name="overview_month_net_sub_savings">Baki Bersih (Ditolak Simpanan)</string>
-    <string name="overview_month_net_sub">Anggaran Tersedia Selepas Rizab</string>
+    <string name="overview_month_net_sub">Baki Bersih Sebenar</string>
     <string name="total_actual_income">Jumlah Pendapatan</string>
     <string name="total_actual_expense">Jumlah Perbelanjaan</string>
     <string name="savings_deposited">Simpanan Dimasukkan</string>

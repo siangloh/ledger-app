@@ -2008,8 +2008,10 @@ fun CashflowAnalysisScreen(
                                 val incAmt = data.optDouble("income", 0.0)
                                 val expAmt = data.optDouble("expense", 0.0)
                                 val savAmt = data.optDouble("savings", 0.0)
-                                val availAmt = data.optDouble("available", incAmt - expAmt - savAmt)
-                                val isPositive = availAmt >= 0
+                                val netAmt = if (data.has("net")) data.optDouble("net") else (incAmt - expAmt - savAmt)
+                                val reservedAmt = data.optDouble("reserved", 0.0)
+                                val availAmt = data.optDouble("available", netAmt - reservedAmt)
+                                val isPositive = netAmt >= 0
 
                                 // 突出呈现的总览卡片：总支出、储蓄总额、总收入与净结余
                                 Surface(
@@ -2051,12 +2053,33 @@ fun CashflowAnalysisScreen(
                                                     color = Slate500
                                                 )
                                                 AnimatedAmountText(
-                                                    amount = availAmt,
+                                                    amount = netAmt,
                                                     currency = cur,
                                                     fontSize = 24.sp,
                                                     fontWeight = FontWeight.ExtraBold,
                                                     color = if (isPositive) PrimaryTeal else ExpenseRed
                                                 )
+                                            }
+                                            if (reservedAmt > 0) {
+                                                Column(horizontalAlignment = Alignment.End) {
+                                                    Text(
+                                                        text = stringResource(R.string.cf_available),
+                                                        fontSize = 11.sp,
+                                                        color = Slate500
+                                                    )
+                                                    AnimatedAmountText(
+                                                        amount = availAmt,
+                                                        currency = cur,
+                                                        fontSize = 15.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (availAmt >= 0) PrimaryTeal else ExpenseRed
+                                                    )
+                                                    Text(
+                                                        text = stringResource(R.string.cf_pending) + " " + formatMoney(cur, reservedAmt),
+                                                        fontSize = 10.sp,
+                                                        color = WarningAmber
+                                                    )
+                                                }
                                             }
                                         }
 
