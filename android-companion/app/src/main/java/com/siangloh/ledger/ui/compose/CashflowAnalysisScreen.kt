@@ -732,25 +732,41 @@ private fun CashflowDonutChart(
                         val isSel = selectedSliceIndex == index
                         val dim = selectedSliceIndex != null && !isSel
 
+                        val midAngleDeg = currentAngle + gap / 2f + (sweep - gap) / 2f
+                        val midAngleRad = Math.toRadians(midAngleDeg.toDouble())
+                        val popOffset = if (isSel) {
+                            val popDist = 5.dp.toPx()
+                            Offset(
+                                (kotlin.math.cos(midAngleRad) * popDist).toFloat(),
+                                (kotlin.math.sin(midAngleRad) * popDist).toFloat()
+                            )
+                        } else Offset.Zero
+
+                        val sliceTopLeft = topLeft + popOffset
+
                         if (isSel) {
-                            // Outer glowing halo behind selected slice
+                            // Clean radial halo behind popped-out slice (strictly Butt cap to maintain crisp sector boundaries)
                             drawArc(
-                                color = slice.color.copy(alpha = 0.32f),
+                                color = slice.color.copy(alpha = 0.22f),
                                 startAngle = currentAngle + gap / 2f,
                                 sweepAngle = (sweep - gap).coerceAtLeast(0.5f),
-                                useCenter = false, topLeft = topLeft, size = arcSize,
-                                style = Stroke(width = strokePx * 1.55f, cap = StrokeCap.Round)
+                                useCenter = false,
+                                topLeft = sliceTopLeft,
+                                size = arcSize,
+                                style = Stroke(width = strokePx + 6.dp.toPx(), cap = StrokeCap.Butt)
                             )
                         }
 
                         drawArc(
-                            color = slice.color.copy(alpha = if (dim) 0.35f else 1f),
+                            color = slice.color.copy(alpha = if (dim) 0.40f else 1f),
                             startAngle = currentAngle + gap / 2f,
                             sweepAngle = (sweep - gap).coerceAtLeast(0.5f),
-                            useCenter = false, topLeft = topLeft, size = arcSize,
+                            useCenter = false,
+                            topLeft = sliceTopLeft,
+                            size = arcSize,
                             style = Stroke(
-                                width = if (isSel) strokePx * 1.25f else strokePx,
-                                cap = if (isSel) StrokeCap.Round else StrokeCap.Butt
+                                width = if (isSel) strokePx * 1.06f else strokePx,
+                                cap = StrokeCap.Butt
                             )
                         )
                         currentAngle += sweep
