@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
@@ -1668,7 +1669,7 @@ fun SpendingTrendSection(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp)
+                .padding(16.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1677,19 +1678,25 @@ fun SpendingTrendSection(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (activePoint != null) "${stringResource(R.string.trend_title)} · ${activePoint.date}" else stringResource(R.string.trend_title),
+                        text = stringResource(R.string.trend_title),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
                     )
                     if (activePoint != null) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = stringResource(R.string.trend_drag_hint),
-                            fontSize = 10.sp,
-                            color = PrimaryTeal,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = PrimaryTealSubtle
+                        ) {
+                            Text(
+                                text = activePoint.date,
+                                fontSize = 11.sp,
+                                color = PrimaryTeal,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
                 Text(
@@ -1807,30 +1814,64 @@ fun SpendingTrendSection(
                 selectedIndex?.let { idx ->
                     if (idx in points.indices) {
                         val pt = points[idx]
-                        // Vertical guideline
+
+                        // 1. Vertical Gradient Glow Beam (微光光柱)
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(Color.Transparent, PrimaryTeal.copy(alpha = 0.16f), Color.Transparent),
+                                startX = pt.x - 14.dp.toPx(),
+                                endX = pt.x + 14.dp.toPx()
+                            ),
+                            topLeft = Offset(pt.x - 14.dp.toPx(), 0f),
+                            size = Size(28.dp.toPx(), h)
+                        )
+
+                        // 2. Vertical needle guideline
                         drawLine(
-                            color = PrimaryTeal.copy(alpha = 0.6f),
+                            brush = Brush.verticalGradient(
+                                colors = listOf(PrimaryTeal.copy(alpha = 0.85f), PrimaryTeal.copy(alpha = 0.25f)),
+                                startY = 0f,
+                                endY = h
+                            ),
                             start = Offset(pt.x, 0f),
                             end = Offset(pt.x, h),
                             strokeWidth = 1.5.dp.toPx(),
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
                         )
-                        // Outer halo
+
+                        // 3. Multi-layer Radial Gradient Halo (径向微光光晕)
                         drawCircle(
-                            color = PrimaryTeal.copy(alpha = 0.22f),
-                            radius = 9.dp.toPx(),
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    PrimaryTeal.copy(alpha = 0.45f),
+                                    PrimaryTeal.copy(alpha = 0.12f),
+                                    Color.Transparent
+                                ),
+                                center = pt,
+                                radius = 20.dp.toPx()
+                            ),
+                            radius = 20.dp.toPx(),
                             center = pt
                         )
-                        // Middle solid point
+
+                        // Outer white ring
+                        drawCircle(
+                            color = Color.White,
+                            radius = 6.5.dp.toPx(),
+                            center = pt
+                        )
+
+                        // Solid PrimaryTeal core
                         drawCircle(
                             color = PrimaryTeal,
                             radius = 4.5.dp.toPx(),
                             center = pt
                         )
-                        // Inner core
+
+                        // Inner white pinpoint
                         drawCircle(
                             color = Color.White,
-                            radius = 2.dp.toPx(),
+                            radius = 1.8.dp.toPx(),
                             center = pt
                         )
                     }

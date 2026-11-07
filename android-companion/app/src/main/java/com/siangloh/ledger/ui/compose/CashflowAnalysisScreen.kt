@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -636,15 +637,90 @@ private fun CashflowDonutChart(
     modifier: Modifier = Modifier,
     chartSize: Dp = 190.dp,
     strokeWidth: Dp = 26.dp,
-    selectedSliceIndex: Int? = null
+    selectedSliceIndex: Int? = null,
+    onSelectSlice: ((Int?) -> Unit)? = null
 ) {
     val totalAmount = slices.sumOf { it.amount.coerceAtLeast(0.0) }
-    Box(modifier.size(chartSize), contentAlignment = Alignment.Center) {
+    val selSlice = selectedSliceIndex?.let { slices.getOrNull(it) }
+
+    fun findSliceAt(pos: Offset, sizePx: Size): Int? {
+        if (totalAmount <= 0.0 || slices.isEmpty()) return null
+        val cx = sizePx.width / 2f
+        val cy = sizePx.height / 2f
+        val dx = pos.x - cx
+        val dy = pos.y - cy
+        val r = kotlin.math.sqrt(dx * dx + dy * dy)
+        val outerR = sizePx.minDimension / 2f
+        val strokePx = (strokeWidth.value * (sizePx.minDimension / chartSize.value)).coerceAtLeast(10f)
+        val innerR = outerR - strokePx * 1.6f
+        // Tapping inside center resets selection
+        if (r < innerR * 0.45f) return null
+
+        val angleDeg = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 90f + 360f) % 360f
+        var currentAngle = 0f
+        slices.forEachIndexed { idx, s ->
+            val sweep = ((s.amount.coerceAtLeast(0.0) / totalAmount) * 360.0).toFloat()
+            if (sweep > 0f) {
+                if (angleDeg >= currentAngle && angleDeg < currentAngle + sweep) {
+                    return idx
+                }
+                currentAngle += sweep
+            }
+        }
+        return null
+    }
+
+    Box(
+        modifier
+            .size(chartSize)
+            .pointerInput(slices, totalAmount) {
+                detectTapGestures(
+                    onTap = { offset ->
+                        val hit = findSliceAt(offset, Size(size.width.toFloat(), size.height.toFloat()))
+                        onSelectSlice?.invoke(if (hit == selectedSliceIndex) null else hit)
+                    }
+                )
+            }
+            .pointerInput(slices, totalAmount) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        val hit = findSliceAt(offset, Size(size.width.toFloat(), size.height.toFloat()))
+                        if (hit != null) onSelectSlice?.invoke(hit)
+                    },
+                    onDrag = { change, _ ->
+                        val hit = findSliceAt(change.position, Size(size.width.toFloat(), size.height.toFloat()))
+                        if (hit != null && hit != selectedSliceIndex) {
+                            onSelectSlice?.invoke(hit)
+                        }
+                    }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
         Canvas(Modifier.fillMaxSize().padding(strokeWidth / 2 + 4.dp)) {
             val strokePx = strokeWidth.toPx()
             val canvasSize = size.minDimension
             val arcSize = Size(canvasSize, canvasSize)
             val topLeft = Offset((size.width - canvasSize) / 2f, (size.height - canvasSize) / 2f)
+            val center = Offset(size.width / 2f, size.height / 2f)
+
+            // Dynamic radial glow bloom in center when probed
+            selSlice?.let { sel ->
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            sel.color.copy(alpha = 0.18f),
+                            sel.color.copy(alpha = 0.04f),
+                            Color.Transparent
+                        ),
+                        center = center,
+                        radius = canvasSize * 0.46f
+                    ),
+                    radius = canvasSize * 0.46f,
+                    center = center
+                )
+            }
+
             if (totalAmount <= 0.0 || slices.isEmpty()) {
                 drawArc(TrackColor, 0f, 360f, false, topLeft, arcSize, style = Stroke(width = strokePx))
             } else {
@@ -655,12 +731,27 @@ private fun CashflowDonutChart(
                     if (sweep > 0f) {
                         val isSel = selectedSliceIndex == index
                         val dim = selectedSliceIndex != null && !isSel
+
+                        if (isSel) {
+                            // Outer glowing halo behind selected slice
+                            drawArc(
+                                color = slice.color.copy(alpha = 0.32f),
+                                startAngle = currentAngle + gap / 2f,
+                                sweepAngle = (sweep - gap).coerceAtLeast(0.5f),
+                                useCenter = false, topLeft = topLeft, size = arcSize,
+                                style = Stroke(width = strokePx * 1.55f, cap = StrokeCap.Round)
+                            )
+                        }
+
                         drawArc(
                             color = slice.color.copy(alpha = if (dim) 0.35f else 1f),
                             startAngle = currentAngle + gap / 2f,
                             sweepAngle = (sweep - gap).coerceAtLeast(0.5f),
                             useCenter = false, topLeft = topLeft, size = arcSize,
-                            style = Stroke(width = if (isSel) strokePx * 1.25f else strokePx, cap = StrokeCap.Butt)
+                            style = Stroke(
+                                width = if (isSel) strokePx * 1.25f else strokePx,
+                                cap = if (isSel) StrokeCap.Round else StrokeCap.Butt
+                            )
                         )
                         currentAngle += sweep
                     }
@@ -675,7 +766,13 @@ private fun CashflowDonutChart(
             Text(centerTitle, fontSize = 11.sp, color = Slate500, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(centerValue, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Slate900, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (!centerSubtitle.isNullOrBlank()) {
-                Text(centerSubtitle, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = PrimaryTeal, maxLines = 1)
+                Text(
+                    centerSubtitle,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = selSlice?.color ?: PrimaryTeal,
+                    maxLines = 1
+                )
             }
         }
     }
@@ -805,17 +902,39 @@ private fun DailySpendingCard(daily: DoubleArray, currency: String, todayDay: In
                 val v = daily[i]
                 val h = if (maxV > 0) (v / maxV * usable).toFloat() else 0f
                 val isFuture = todayDay != null && i + 1 > todayDay
+                val isSel = sel == i
                 val color = when {
-                    sel == i -> primary
+                    isSel -> primary
                     v > 0 && v == maxV -> peak
                     isFuture -> future
                     v > 0 -> primary.copy(alpha = 0.55f)
                     else -> future
                 }
                 val barH = if (v > 0) h.coerceAtLeast(3.dp.toPx()) else 2.dp.toPx()
+                val barTop = size.height - barH
+                val barLeft = i * slot + (slot - barW) / 2f
+
+                if (isSel) {
+                    // Vertical soft glow beam behind selected bar
+                    drawRoundRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(primary.copy(alpha = 0.20f), primary.copy(alpha = 0.04f), Color.Transparent)
+                        ),
+                        topLeft = Offset(i * slot, 0f),
+                        size = Size(slot, size.height),
+                        cornerRadius = CornerRadius(4.dp.toPx())
+                    )
+                    // Halo glow around the bar head
+                    drawCircle(
+                        color = primary.copy(alpha = 0.35f),
+                        radius = barW * 0.75f,
+                        center = Offset(barLeft + barW / 2f, barTop)
+                    )
+                }
+
                 drawRoundRect(
                     color = color,
-                    topLeft = Offset(i * slot + (slot - barW) / 2f, size.height - barH),
+                    topLeft = Offset(barLeft, barTop),
                     size = Size(barW, barH),
                     cornerRadius = CornerRadius(3.dp.toPx())
                 )
@@ -1218,7 +1337,8 @@ private fun BreakdownCard(
                 centerSubtitle = active?.let { formatPct(it.percent) } ?: "${slices.size} $unitLabel",
                 chartSize = 210.dp,
                 strokeWidth = 26.dp,
-                selectedSliceIndex = selectedIndex
+                selectedSliceIndex = selectedIndex,
+                onSelectSlice = { newIdx -> selectedIndex = newIdx }
             )
         }
 
@@ -1872,7 +1992,7 @@ fun CashflowAnalysisScreen(
                                     border = BorderStroke(1.dp, Slate200),
                                     shadowElevation = 0.5.dp
                                 ) {
-                                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
