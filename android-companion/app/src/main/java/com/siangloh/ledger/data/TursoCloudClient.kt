@@ -535,6 +535,11 @@ object TursoCloudClient {
             Pair(
                 "SELECT budget_start_day, currency_symbol, default_currency, language FROM user_settings WHERE user_id = ? LIMIT 1",
                 listOf<Any?>(currentUserId)
+            ),
+            // 10: 现金流对账与支付关联表 (cashflow_payment_links)
+            Pair(
+                "SELECT transaction_id, bill_key, is_refund FROM cashflow_payment_links WHERE user_id = ?",
+                listOf<Any?>(currentUserId)
             )
         )
 
@@ -922,6 +927,23 @@ object TursoCloudClient {
                     .putString("installments_json", instArr.toString())
                     .apply()
                 Log.i(TAG, "Synced tools from Turso: subs=${subsArr.length()}, incomes=${fixedIncomesArr.length()}, savings=${fixedSavingsArr.length()}, installments=${instArr.length()}.")
+
+                val linkRows = resList.getOrElse(10) { emptyList() }
+                if (linkRows.isNotEmpty()) {
+                    val linksArr = JSONArray()
+                    for (lRow in linkRows) {
+                        val txId = asLong(lRow["transaction_id"]) ?: continue
+                        val bKey = lRow["bill_key"]?.toString() ?: continue
+                        val refund = (asLong(lRow["is_refund"]) ?: 0L) != 0L
+                        linksArr.put(JSONObject().apply {
+                            put("bill_key", bKey)
+                            put("transaction_id", txId)
+                            put("is_refund", refund)
+                        })
+                    }
+                    context.getSharedPreferences("cashflow_links_prefs", Context.MODE_PRIVATE)
+                        .edit().putString("payment_links", linksArr.toString()).apply()
+                }
 
                 // -----------------------------------------------------------------
                 // 8. 全面清理各级内存与快照缓存，广播通知所有界面立即刷新

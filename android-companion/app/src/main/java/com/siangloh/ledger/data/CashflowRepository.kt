@@ -3,7 +3,9 @@ package com.siangloh.ledger.data
 import android.content.Context
 import android.util.Log
 import com.siangloh.ledger.NetworkHelper
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.security.MessageDigest
@@ -291,7 +293,7 @@ object CashflowRepository {
                 for (link in directLinks) {
                     val txId = link.optLong("transaction_id")
                     val isRefund = link.optBoolean("is_refund", false)
-                    val tx = txList.find { it.id == txId }
+                    val tx = txList.find { it.id == txId } ?: db.localTransactionDao().getById(txId)
                     if (tx != null) {
                         if (isRefund) sum -= tx.amount else sum += tx.amount
                     }
@@ -300,20 +302,18 @@ object CashflowRepository {
                 pendingAmt = (sub.cost - paidAmt).coerceAtLeast(0.0)
                 isPaid = pendingAmt <= 0.0
             } else {
-                // 检查当月是否有对应类别的支出或包含该订阅名称的交易 (优先匹配同账户)
-                val matchedTx = txList.find { tx ->
-                    if (tx.type != "expense") return@find false
-                    val accMatch = sub.accountId == null || tx.accountId == sub.accountId || (sub.accountName != null && sub.accountName.equals(tx.channel, ignoreCase = true))
-                    val nameOrCatMatch = tx.category.equals(sub.category, ignoreCase = true) ||
-                        tx.note.contains(sub.name, ignoreCase = true) ||
-                        tx.tags.contains(sub.name, ignoreCase = true)
-                    accMatch && nameOrCatMatch
-                } ?: txList.find { tx ->
-                    tx.type == "expense" && (
-                        tx.category.equals(sub.category, ignoreCase = true) ||
-                        tx.note.contains(sub.name, ignoreCase = true) ||
-                        tx.tags.contains(sub.name, ignoreCase = true)
-                    )
+                // 检查当月是否有对应类别的支出或包含该订阅名称的交易 (绑定账户时严格限定该账户)
+                val matchedTx = if (sub.accountId != null) {
+                    txList.find { tx ->
+                        tx.type == "expense" &&
+                            (tx.accountId == sub.accountId || (sub.accountName != null && sub.accountName.equals(tx.channel, ignoreCase = true))) &&
+                            (tx.category.equals(sub.category, ignoreCase = true) || tx.note.contains(sub.name, ignoreCase = true) || tx.tags.contains(sub.name, ignoreCase = true))
+                    }
+                } else {
+                    txList.find { tx ->
+                        tx.type == "expense" &&
+                            (tx.category.equals(sub.category, ignoreCase = true) || tx.note.contains(sub.name, ignoreCase = true) || tx.tags.contains(sub.name, ignoreCase = true))
+                    }
                 }
                 isPaid = matchedTx != null
                 paidAmt = if (isPaid) sub.cost else 0.0
@@ -375,6 +375,20 @@ object CashflowRepository {
             put("expense_platforms", expPlatforms)
             put("savings_categories", savingsCategories)
             put("savings_platforms", savingsPlatforms)
+            val allRecentExpenses = db.localTransactionDao().getAll().filter { it.type == "expense" }.take(60)
+            val candidateExpensesArr = org.json.JSONArray()
+            for (tx in allRecentExpenses) {
+                candidateExpensesArr.put(JSONObject().apply {
+                    put("id", tx.id)
+                    put("date", tx.date)
+                    put("type", tx.type)
+                    put("amount", tx.amount)
+                    put("note", tx.note)
+                    put("category", tx.category)
+                    put("channel", tx.channel ?: "")
+                })
+            }
+            put("candidate_expenses", candidateExpensesArr)
             put("bills", billsArray)
             put("payment_links", linksArr)
             put("prior_overdue", org.json.JSONArray())
@@ -420,6 +434,23 @@ object CashflowRepository {
         val newArr = org.json.JSONArray()
         list.forEach { newArr.put(it) }
         savePaymentLinks(context, newArr)
+
+        val appCtx = context.applicationContext
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val uId = TursoCloudClient.resolveTursoUserId(appCtx)
+                val sql = """
+                    INSERT INTO cashflow_payment_links (user_id, transaction_id, bill_key, is_refund)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(user_id, transaction_id) DO UPDATE SET
+                        bill_key = excluded.bill_key,
+                        is_refund = excluded.is_refund
+                """.trimIndent()
+                TursoCloudClient.executeBatch(appCtx, listOf(Pair(sql, listOf(uId, txId, billKey, if (isRefund) 1 else 0))))
+            } catch (e: Exception) {
+                Log.w("Cashflow", "Turso addPaymentLink sync failed", e)
+            }
+        }
     }
 
     fun removePaymentLink(context: Context, billKey: String, txId: Long) {
@@ -432,6 +463,17 @@ object CashflowRepository {
             }
         }
         savePaymentLinks(context, newArr)
+
+        val appCtx = context.applicationContext
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val uId = TursoCloudClient.resolveTursoUserId(appCtx)
+                val sql = "DELETE FROM cashflow_payment_links WHERE user_id = ? AND transaction_id = ? AND bill_key = ?"
+                TursoCloudClient.executeBatch(appCtx, listOf(Pair(sql, listOf(uId, txId, billKey))))
+            } catch (e: Exception) {
+                Log.w("Cashflow", "Turso removePaymentLink sync failed", e)
+            }
+        }
     }
 
     suspend fun updateBillAccount(context: Context, billKey: String, accountId: Int?, accountName: String?) {
@@ -451,6 +493,14 @@ object CashflowRepository {
                 accountId = accountId,
                 accountName = accountName
             )
+            val appCtx = context.applicationContext
+            try {
+                val uId = TursoCloudClient.resolveTursoUserId(appCtx)
+                val sql = "UPDATE recurring_rules SET account_id = ? WHERE id = ? AND user_id = ?"
+                TursoCloudClient.executeBatch(appCtx, listOf(Pair(sql, listOf(accountId, subId, uId))))
+            } catch (e: Exception) {
+                Log.w("Cashflow", "Turso rule account update failed", e)
+            }
         }
     }
 

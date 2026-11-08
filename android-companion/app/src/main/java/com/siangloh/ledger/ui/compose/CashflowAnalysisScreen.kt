@@ -1628,9 +1628,15 @@ fun CashflowAnalysisScreen(
         loading = true
         failed = false
         selection = null
-        selectedBill = null
         try {
             result = CashflowRepository.load(context, month, currency, forceRefresh = true, startDate = sDate, endDate = eDate)
+            selectedBill?.let { cur ->
+                val bKey = cur.optString("bill_key")
+                val refreshed = result?.data?.rows("bills")?.find { it.optString("bill_key") == bKey }
+                if (refreshed != null) {
+                    selectedBill = refreshed
+                }
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -1667,7 +1673,22 @@ fun CashflowAnalysisScreen(
             busy = true
             try {
                 CashflowRepository.update(context, payload.put("month", month))
-                selectedBill = null
+                selectedBill?.let { curBill ->
+                    val billKey = payload.optString("bill_key")
+                    if (billKey == curBill.optString("bill_key")) {
+                        val newBill = JSONObject(curBill.toString())
+                        if (payload.optString("action") == "link_account") {
+                            if (payload.has("account_id") && !payload.isNull("account_id")) {
+                                newBill.put("account_id", payload.optInt("account_id"))
+                                newBill.put("account_name", payload.optString("account_name"))
+                            } else {
+                                newBill.remove("account_id")
+                                newBill.remove("account_name")
+                            }
+                        }
+                        selectedBill = newBill
+                    }
+                }
                 refresh++
             } catch (error: CancellationException) {
                 throw error
@@ -2981,42 +3002,70 @@ fun CashflowAnalysisScreen(
                 if (failed) Text(stringResource(R.string.cf_error), color = ExpenseRed, fontSize = 13.sp)
 
                 val linked = result?.data?.rows("payment_links")?.filter { it.optString("bill_key") == billKey } ?: emptyList()
+                val linkedTxIds = linked.map { it.optLong("transaction_id") }.toSet()
+
+                val allExpenses = (result?.data?.rows("candidate_expenses") ?: emptyList()) +
+                    (result?.data?.rows("transactions") ?: emptyList()) +
+                    (result?.data?.rows("scheduled_transactions") ?: emptyList())
+
                 if (linked.isNotEmpty()) {
                     SheetSection(stringResource(R.string.cfu_linked)) {
                         linked.forEach { link ->
-                            SheetActionRow(text = "#" + link.optInt("transaction_id"), action = stringResource(R.string.cf_unlink), enabled = !busy) {
-                                update(JSONObject().put("bill_key", billKey).put("transaction_id", link.optInt("transaction_id")).put("unlink", true))
+                            val txId = link.optLong("transaction_id")
+                            val tx = allExpenses.find { it.optLong("id") == txId }
+                            val labelText = if (tx != null) {
+                                "${tx.optString("date")} · ${tx.optString("note").ifEmpty { CategoryUiHelper.getLocalizedCategoryName(context, tx.optString("category")) }}"
+                            } else {
+                                "#$txId"
+                            }
+                            val subText = if (tx != null) formatMoney(cur, tx.optDouble("amount", 0.0)) else null
+                            SheetActionRow(
+                                text = labelText,
+                                sub = subText,
+                                action = stringResource(R.string.cf_unlink),
+                                enabled = !busy
+                            ) {
+                                update(JSONObject().put("bill_key", billKey).put("transaction_id", txId).put("unlink", true))
                             }
                         }
                     }
                 }
 
-                val candidateExpenses = ((result?.data?.rows("transactions") ?: emptyList()) +
-                    (result?.data?.rows("scheduled_transactions") ?: emptyList()))
-                    .filter { it.optString("type") == "expense" }
+                val candidateExpenses = allExpenses
+                    .filter { it.optString("type") == "expense" && !linkedTxIds.contains(it.optLong("id")) }
+                    .distinctBy { it.optLong("id") }
+
                 if (candidateExpenses.isNotEmpty()) {
                     SheetSection(stringResource(R.string.cf_link)) {
                         candidateExpenses.take(20).forEach { tx ->
+                            val txId = tx.optLong("id")
                             SheetActionRow(
-                                text = tx.optString("date") + " · " + tx.optString("note").ifEmpty { "#" + tx.optInt("id") },
+                                text = tx.optString("date") + " · " + tx.optString("note").ifEmpty { CategoryUiHelper.getLocalizedCategoryName(context, tx.optString("category")) },
                                 sub = formatMoney(cur, tx.optDouble("amount", 0.0)),
-                                action = stringResource(R.string.cf_link), enabled = !busy
-                            ) { update(JSONObject().put("bill_key", billKey).put("transaction_id", tx.optInt("id"))) }
+                                action = stringResource(R.string.cf_link),
+                                enabled = !busy
+                            ) {
+                                update(JSONObject().put("bill_key", billKey).put("transaction_id", txId))
+                            }
                         }
                     }
                 }
 
-                val candidateRefunds = result?.data?.rows("transactions")?.filter {
-                    it.optString("type") == "income" && it.optDouble("amount") > 0
-                } ?: emptyList()
+                val candidateRefunds = (result?.data?.rows("transactions") ?: emptyList()).filter {
+                    it.optString("type") == "income" && it.optDouble("amount") > 0 && !linkedTxIds.contains(it.optLong("id"))
+                }
                 if (candidateRefunds.isNotEmpty()) {
                     SheetSection(stringResource(R.string.cf_refund)) {
                         candidateRefunds.take(20).forEach { tx ->
+                            val txId = tx.optLong("id")
                             SheetActionRow(
-                                text = tx.optString("date") + " · " + tx.optString("note").ifEmpty { "#" + tx.optInt("id") },
+                                text = tx.optString("date") + " · " + tx.optString("note").ifEmpty { "#$txId" },
                                 sub = formatMoney(cur, tx.optDouble("amount", 0.0)),
-                                action = stringResource(R.string.cf_link), enabled = !busy
-                            ) { update(JSONObject().put("bill_key", billKey).put("transaction_id", tx.optInt("id")).put("refund", true)) }
+                                action = stringResource(R.string.cf_link),
+                                enabled = !busy
+                            ) {
+                                update(JSONObject().put("bill_key", billKey).put("transaction_id", txId).put("refund", true))
+                            }
                         }
                     }
                 }
