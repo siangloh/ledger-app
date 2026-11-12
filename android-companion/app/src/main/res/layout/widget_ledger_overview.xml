@@ -56,6 +56,20 @@
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
+            <!-- 模式切换：走势 / 7日 / 简洁 -->
+            <TextView
+                android:id="@+id/btn_widget_pattern_toggle"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:gravity="center"
+                android:paddingHorizontal="6dp"
+                android:text="@string/widget_pattern_trend"
+                android:textColor="#334155"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:background="@drawable/bg_widget_pill"
+                android:layout_marginEnd="5dp" />
+
             <TextView
                 android:id="@+id/btn_widget_refresh"
                 android:layout_width="26dp"
@@ -64,7 +78,7 @@
                 android:text="🔄"
                 android:textSize="13sp"
                 android:background="@drawable/bg_widget_pill"
-                android:layout_marginEnd="6dp" />
+                android:layout_marginEnd="5dp" />
 
             <TextView
                 android:id="@+id/btn_widget_quick_add"
@@ -145,6 +159,16 @@
                 android:maxLines="1" />
         </LinearLayout>
     </LinearLayout>
+
+    <!-- 动态微图表区域 (支持现金流走势图 / 7日支出柱状图 / 简洁隐藏) -->
+    <ImageView
+        android:id="@+id/iv_widget_chart"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:layout_marginTop="1dp"
+        android:layout_marginBottom="4dp"
+        android:scaleType="fitXY"
+        android:contentDescription="Chart" />
 
     <!-- 底部双指标行：今日支出 & 待付账单 -->
     <LinearLayout

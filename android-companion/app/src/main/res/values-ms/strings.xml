@@ -1003,4 +1003,7 @@
     <string name="widget_bills_count_fmt">%1$d tertunggak</string>
     <string name="widget_bills_pending_fmt">"%1$d bil · %2$s"</string>
     <string name="widget_bills_all_clear">"Selesai dibayar ✓"</string>
+    <string name="widget_pattern_trend">"📈 Trend"</string>
+    <string name="widget_pattern_bars">"📊 7-Hari"</string>
+    <string name="widget_pattern_compact">"🔢 Ringkas"</string>
 </resources>

@@ -111,6 +111,7 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.siangloh.ledger.ACTION_WIDGET_REFRESH" />
+                <action android:name="com.siangloh.ledger.ACTION_WIDGET_TOGGLE_PATTERN" />
                 <action android:name="com.siangloh.ledger.DATA_SYNCED" />
             </intent-filter>
             <meta-data
