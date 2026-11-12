@@ -34,6 +34,8 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
         private const val TAG = "LedgerAppWidget"
         const val ACTION_WIDGET_REFRESH = "com.siangloh.ledger.ACTION_WIDGET_REFRESH"
         const val ACTION_WIDGET_TOGGLE_PATTERN = "com.siangloh.ledger.ACTION_WIDGET_TOGGLE_PATTERN"
+        const val ACTION_WIDGET_SELECT_DAY = "com.siangloh.ledger.ACTION_WIDGET_SELECT_DAY"
+        const val EXTRA_DAY_INDEX = "extra_day_index"
         const val ACTION_DATA_SYNCED = "com.siangloh.ledger.DATA_SYNCED"
 
         /**
@@ -74,7 +76,25 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
             return
         }
 
+        if (action == ACTION_WIDGET_SELECT_DAY) {
+            val dayIndex = intent.getIntExtra(EXTRA_DAY_INDEX, 6)
+            val prefs = context.getSharedPreferences("ledger_widget_prefs", Context.MODE_PRIVATE)
+            prefs.edit().putInt("selected_day_index", dayIndex).apply()
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            val thisWidget = ComponentName(context, LedgerAppWidgetProvider::class.java)
+            val appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
+            for (id in appWidgetIds) {
+                updateWidget(context, appWidgetManager, id)
+            }
+            return
+        }
+
         if (action == ACTION_WIDGET_REFRESH || action == ACTION_DATA_SYNCED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            if (action == ACTION_WIDGET_REFRESH) {
+                // 刷新时重置选中的日期回今天 (index = 6)
+                val prefs = context.getSharedPreferences("ledger_widget_prefs", Context.MODE_PRIVATE)
+                prefs.edit().putInt("selected_day_index", 6).apply()
+            }
             val appWidgetManager = AppWidgetManager.getInstance(context)
             val thisWidget = ComponentName(context, LedgerAppWidgetProvider::class.java)
             val appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
@@ -160,9 +180,37 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                 val currency = "RM"
                 val views = RemoteViews(appCtx.packageName, R.layout.widget_ledger_overview)
 
-                // 读取当前用户偏好的图表模式
+                // 读取当前用户偏好的图表模式与选中的探索天数 (默认 6 即今天)
                 val prefs = appCtx.getSharedPreferences("ledger_widget_prefs", Context.MODE_PRIVATE)
                 val chartPattern = prefs.getInt("chart_pattern", WidgetChartRenderer.PATTERN_TREND)
+                val selectedDayIndex = prefs.getInt("selected_day_index", 6).coerceIn(0, 6)
+
+                // 统计近 7 天支出数据 (从 6 天前到今天)
+                val dailyExpenses = mutableListOf<Pair<String, Double>>()
+                val dailyDates = mutableListOf<Calendar>()
+                val barCal = Calendar.getInstance()
+                barCal.add(Calendar.DAY_OF_MONTH, -6)
+                val sdfDay = SimpleDateFormat("dd", Locale.US)
+                val sdfFull = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                for (i in 0..6) {
+                    val fullDate = sdfFull.format(barCal.time)
+                    val label = sdfDay.format(barCal.time)
+                    val dayTxs = db.localTransactionDao().getByDateRange(fullDate, fullDate)
+                    val dayExp = dayTxs.filter { it.type == "expense" }.sumOf { it.amount }
+                    dailyExpenses.add(Pair(label, dayExp))
+                    dailyDates.add(barCal.clone() as Calendar)
+                    barCal.add(Calendar.DAY_OF_MONTH, 1)
+                }
+
+                // 计算选中日期的支出与标题
+                val selectedCal = dailyDates[selectedDayIndex]
+                val selectedExp = dailyExpenses[selectedDayIndex].second
+                val isSelectedToday = (selectedDayIndex == 6)
+                val dayExpenseTitle = com.siangloh.ledger.util.AppLanguageManager.formatWidgetDayExpenseTitle(
+                    selectedCal,
+                    isSelectedToday,
+                    lang
+                )
 
                 when (chartPattern) {
                     WidgetChartRenderer.PATTERN_TREND -> {
@@ -181,31 +229,50 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                         if (trendPoints.size <= 1) {
                             trendPoints.add(0, 0.0)
                         }
-                        val chartBitmap = WidgetChartRenderer.drawCashflowTrend(480, 110, trendPoints)
+                        // 现金流走势图：若在近7天内，折算到走势图对应的后7个数据点
+                        val trendSelectedIdx = if (trendPoints.size >= 7) {
+                            (trendPoints.size - 7 + selectedDayIndex).coerceIn(0, trendPoints.size - 1)
+                        } else {
+                            selectedDayIndex.coerceIn(0, trendPoints.size - 1)
+                        }
+                        val chartBitmap = WidgetChartRenderer.drawCashflowTrend(480, 110, trendPoints, trendSelectedIdx)
                         views.setImageViewBitmap(R.id.iv_widget_chart, chartBitmap)
                         views.setViewVisibility(R.id.iv_widget_chart, android.view.View.VISIBLE)
+                        views.setViewVisibility(R.id.layout_chart_container, android.view.View.VISIBLE)
                     }
                     WidgetChartRenderer.PATTERN_BARS -> {
-                        val dailyExpenses = mutableListOf<Pair<String, Double>>()
-                        val barCal = Calendar.getInstance()
-                        barCal.add(Calendar.DAY_OF_MONTH, -6)
-                        val sdfDay = SimpleDateFormat("dd", Locale.US)
-                        val sdfFull = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-                        for (i in 0..6) {
-                            val fullDate = sdfFull.format(barCal.time)
-                            val label = sdfDay.format(barCal.time)
-                            val dayTxs = db.localTransactionDao().getByDateRange(fullDate, fullDate)
-                            val dayExp = dayTxs.filter { it.type == "expense" }.sumOf { it.amount }
-                            dailyExpenses.add(Pair(label, dayExp))
-                            barCal.add(Calendar.DAY_OF_MONTH, 1)
-                        }
-                        val chartBitmap = WidgetChartRenderer.draw7DaySpendingBars(480, 110, dailyExpenses)
+                        val chartBitmap = WidgetChartRenderer.draw7DaySpendingBars(480, 110, dailyExpenses, selectedDayIndex)
                         views.setImageViewBitmap(R.id.iv_widget_chart, chartBitmap)
                         views.setViewVisibility(R.id.iv_widget_chart, android.view.View.VISIBLE)
+                        views.setViewVisibility(R.id.layout_chart_container, android.view.View.VISIBLE)
                     }
                     else -> {
-                        views.setViewVisibility(R.id.iv_widget_chart, android.view.View.GONE)
+                        views.setViewVisibility(R.id.layout_chart_container, android.view.View.GONE)
                     }
+                }
+
+                // 绑定 7 个独立点击热区 (btn_bar_day_0 ~ btn_bar_day_6)
+                val barSlotIds = intArrayOf(
+                    R.id.btn_bar_day_0,
+                    R.id.btn_bar_day_1,
+                    R.id.btn_bar_day_2,
+                    R.id.btn_bar_day_3,
+                    R.id.btn_bar_day_4,
+                    R.id.btn_bar_day_5,
+                    R.id.btn_bar_day_6
+                )
+                for (i in 0..6) {
+                    val selectIntent = Intent(appCtx, LedgerAppWidgetProvider::class.java).apply {
+                        action = ACTION_WIDGET_SELECT_DAY
+                        putExtra(EXTRA_DAY_INDEX, i)
+                    }
+                    val selectPendingIntent = PendingIntent.getBroadcast(
+                        appCtx,
+                        100 + i,
+                        selectIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    views.setOnClickPendingIntent(barSlotIds[i], selectPendingIntent)
                 }
 
                 // 月份标签 (根据多语言自适应)
@@ -226,9 +293,10 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                 views.setTextViewText(R.id.tv_widget_projected_cashflow, safeStr)
                 views.setTextColor(R.id.tv_widget_projected_cashflow, if (safeCashflow >= 0) Color.parseColor("#0F766E") else Color.parseColor("#B91C1C"))
 
-                // 今日支出
-                val todayStrDisplay = "$currency ${String.format(Locale.getDefault(), "%,.2f", todayExpense)}"
-                views.setTextViewText(R.id.tv_widget_today_expense, todayStrDisplay)
+                // 展示选中日期的支出与标题 (如 "今日支出" 或 "11月10日 支出")
+                views.setTextViewText(R.id.tv_widget_today_label, dayExpenseTitle)
+                val dayStrDisplay = "$currency ${String.format(Locale.getDefault(), "%,.2f", selectedExp)}"
+                views.setTextViewText(R.id.tv_widget_today_expense, dayStrDisplay)
 
                 // 待付账单与金额
                 if (pendingCount == 0) {
@@ -241,7 +309,7 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                     views.setTextColor(R.id.tv_widget_pending_bills, Color.parseColor("#B45309"))
                 }
 
-                // 点击主卡片 -> 打开主 App
+                // 点击主卡片与顶部余额 -> 打开主 App
                 val mainIntent = Intent(appCtx, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 }
@@ -253,7 +321,23 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                 )
                 views.setOnClickPendingIntent(R.id.widget_root, mainPendingIntent)
                 views.setOnClickPendingIntent(R.id.layout_hero_balance, mainPendingIntent)
-                views.setOnClickPendingIntent(R.id.layout_widget_today, mainPendingIntent)
+
+                // 点击支出卡片：如果当前查看的是历史某天，点击直接还原重置回今天；如果已经是今天，点击打开主 App
+                if (!isSelectedToday) {
+                    val resetTodayIntent = Intent(appCtx, LedgerAppWidgetProvider::class.java).apply {
+                        action = ACTION_WIDGET_SELECT_DAY
+                        putExtra(EXTRA_DAY_INDEX, 6)
+                    }
+                    val resetTodayPendingIntent = PendingIntent.getBroadcast(
+                        appCtx,
+                        200,
+                        resetTodayIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    views.setOnClickPendingIntent(R.id.layout_widget_today, resetTodayPendingIntent)
+                } else {
+                    views.setOnClickPendingIntent(R.id.layout_widget_today, mainPendingIntent)
+                }
 
                 // 点击现金流与待付账单卡片 -> 打开主 App 并直接定位到现金流分析
                 val billsIntent = Intent(appCtx, MainActivity::class.java).apply {

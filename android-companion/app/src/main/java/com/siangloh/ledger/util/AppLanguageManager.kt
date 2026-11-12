@@ -89,6 +89,21 @@ object AppLanguageManager {
         }
     }
 
+    fun formatWidgetDayExpenseTitle(calendar: Calendar, isToday: Boolean, lang: String): String {
+        if (isToday) {
+            return when (lang) {
+                LANG_EN -> "Today Spend"
+                LANG_MS -> "Belanja Hari Ini"
+                else -> "今日支出"
+            }
+        }
+        return when (lang) {
+            LANG_EN -> SimpleDateFormat("MMM d Spend", Locale.ENGLISH).format(calendar.time)
+            LANG_MS -> SimpleDateFormat("d MMM Belanja", Locale("ms", "MY")).format(calendar.time)
+            else -> SimpleDateFormat("M月d日 支出", Locale.CHINESE).format(calendar.time)
+        }
+    }
+
     fun format3mRange(calendar: Calendar, lang: String): String {
         val startCal = (calendar.clone() as Calendar).apply { add(Calendar.MONTH, -2) }
         return when (lang) {

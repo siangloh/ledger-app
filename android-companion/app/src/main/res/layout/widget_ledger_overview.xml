@@ -146,15 +146,85 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- 动态微图表区域 (支持现金流走势图 / 7日支出柱状图 / 简洁隐藏) -->
-    <ImageView
-        android:id="@+id/iv_widget_chart"
+    <!-- 动态微图表与7日热区交互区域 -->
+    <FrameLayout
+        android:id="@+id/layout_chart_container"
         android:layout_width="match_parent"
-        android:layout_height="46dp"
+        android:layout_height="48dp"
         android:layout_marginTop="1dp"
-        android:layout_marginBottom="4dp"
-        android:scaleType="fitXY"
-        android:contentDescription="Chart" />
+        android:layout_marginBottom="4dp">
+
+        <ImageView
+            android:id="@+id/iv_widget_chart"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:contentDescription="Chart" />
+
+        <!-- 7日独立点击交互热区 (覆盖柱状图与走势图，点击直接查看前几天消费) -->
+        <LinearLayout
+            android:id="@+id/layout_bar_click_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <View
+                android:id="@+id/btn_bar_day_0"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/btn_bar_day_1"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/btn_bar_day_2"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/btn_bar_day_3"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/btn_bar_day_4"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/btn_bar_day_5"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:id="@+id/btn_bar_day_6"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true" />
+        </LinearLayout>
+    </FrameLayout>
 
     <!-- 底部双指标行：今日支出 & 待付账单 -->
     <LinearLayout
@@ -175,6 +245,7 @@
             android:layout_marginEnd="4dp">
 
             <TextView
+                android:id="@+id/tv_widget_today_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/widget_today_expense"

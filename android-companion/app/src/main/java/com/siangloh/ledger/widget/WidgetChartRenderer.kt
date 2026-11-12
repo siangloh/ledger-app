@@ -23,11 +23,13 @@ object WidgetChartRenderer {
 
     /**
      * 绘制现金流累积走势平滑曲线图 (Smooth Cashflow Trend Area Chart)
+     * 支持选中特定索引以高亮显示该点
      */
     fun drawCashflowTrend(
         widthPx: Int,
         heightPx: Int,
-        dataPoints: List<Double>
+        dataPoints: List<Double>,
+        selectedIndex: Int = -1
     ): Bitmap {
         val width = max(widthPx, 240)
         val height = max(heightPx, 60)
@@ -104,36 +106,40 @@ object WidgetChartRenderer {
         }
         canvas.drawPath(path, linePaint)
 
-        // 最新数据点外圈光晕与实心圆点
-        val lastPoint = points.last()
+        // 目标高亮点（若指定 selectedIndex 有效则标出选中点，否则默认高亮最后点）
+        val targetIdx = if (selectedIndex in points.indices) selectedIndex else points.indices.last
+        val targetPoint = points[targetIdx]
+
         val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = if (isPositive) Color.parseColor("#660F766E") else Color.parseColor("#66E11D48")
             style = Paint.Style.FILL
         }
-        canvas.drawCircle(lastPoint.first, lastPoint.second, 7f, glowPaint)
+        canvas.drawCircle(targetPoint.first, targetPoint.second, 7.5f, glowPaint)
 
         val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = lineColor
             style = Paint.Style.FILL
         }
-        canvas.drawCircle(lastPoint.first, lastPoint.second, 4.5f, dotPaint)
+        canvas.drawCircle(targetPoint.first, targetPoint.second, 4.5f, dotPaint)
 
         val innerDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             style = Paint.Style.FILL
         }
-        canvas.drawCircle(lastPoint.first, lastPoint.second, 2f, innerDotPaint)
+        canvas.drawCircle(targetPoint.first, targetPoint.second, 2f, innerDotPaint)
 
         return bitmap
     }
 
     /**
      * 绘制近 7 天支出柱状图 (7-Day Daily Spending Bar Chart)
+     * 支持选中某一天 (selectedIndex, 默认 6 即今天) 进行重点突出高亮
      */
     fun draw7DaySpendingBars(
         widthPx: Int,
         heightPx: Int,
-        dailyExpenses: List<Pair<String, Double>> // Pair(dateLabel e.g. "12", amount)
+        dailyExpenses: List<Pair<String, Double>>, // Pair(dateLabel e.g. "12", amount)
+        selectedIndex: Int = 6
     ): Bitmap {
         val width = max(widthPx, 240)
         val height = max(heightPx, 60)
@@ -162,7 +168,7 @@ object WidgetChartRenderer {
             color = Color.parseColor("#CBD5E1")
             style = Paint.Style.FILL
         }
-        val todayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val selectedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#0F766E")
             style = Paint.Style.FILL
         }
@@ -171,7 +177,7 @@ object WidgetChartRenderer {
             textSize = 20f
             textAlign = Paint.Align.CENTER
         }
-        val textTodayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val textSelectedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#0F766E")
             textSize = 20f
             textAlign = Paint.Align.CENTER
@@ -180,7 +186,7 @@ object WidgetChartRenderer {
 
         for (i in dailyExpenses.indices) {
             val item = dailyExpenses[i]
-            val isToday = (i == count - 1)
+            val isSelected = (i == selectedIndex)
 
             val slotCenter = paddingH + i * totalSlotWidth + totalSlotWidth / 2f
             val ratio = (item.second / maxVal).toFloat().coerceIn(0f, 1f)
@@ -192,11 +198,11 @@ object WidgetChartRenderer {
             val bottom = paddingTop + effectiveHeight
 
             val rect = RectF(left, top, right, bottom)
-            val paint = if (isToday) todayPaint else normalPaint
+            val paint = if (isSelected) selectedPaint else normalPaint
             canvas.drawRoundRect(rect, barWidth / 2f, barWidth / 2f, paint)
 
             // 日期文本 (如 08, 09, 10...)
-            val tPaint = if (isToday) textTodayPaint else textPaint
+            val tPaint = if (isSelected) textSelectedPaint else textPaint
             canvas.drawText(item.first, slotCenter, height - 2f, tPaint)
         }
 

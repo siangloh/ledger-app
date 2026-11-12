@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -98,9 +99,49 @@ fun WidgetCustomizationPage(
     var monthDisplayStr by remember { mutableStateOf("") }
     val currency = "RM"
 
-    // 渲染生成的图表 Bitmaps
-    var trendBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var barsBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    // 渲染生成的图表 Bitmaps 与数据缓存
+    var trendDataPoints by remember { mutableStateOf<List<Double>>(emptyList()) }
+    var dailyExpenseList by remember { mutableStateOf<List<Pair<String, Double>>>(emptyList()) }
+    var dailyDateList by remember { mutableStateOf<List<Calendar>>(emptyList()) }
+    var selectedDayIndex by remember { mutableIntStateOf(6) }
+
+    val trendBitmap = remember(trendDataPoints, selectedDayIndex) {
+        if (trendDataPoints.isEmpty()) null
+        else {
+            val trendSelectedIdx = if (trendDataPoints.size >= 7) {
+                (trendDataPoints.size - 7 + selectedDayIndex).coerceIn(0, trendDataPoints.size - 1)
+            } else {
+                selectedDayIndex.coerceIn(0, trendDataPoints.size - 1)
+            }
+            WidgetChartRenderer.drawCashflowTrend(480, 110, trendDataPoints, trendSelectedIdx)
+        }
+    }
+
+    val barsBitmap = remember(dailyExpenseList, selectedDayIndex) {
+        if (dailyExpenseList.isEmpty()) null
+        else WidgetChartRenderer.draw7DaySpendingBars(480, 110, dailyExpenseList, selectedDayIndex)
+    }
+
+    // 计算当前选中的支出数值与标题
+    val currentSelectedExp = remember(dailyExpenseList, selectedDayIndex, todayExpense) {
+        if (dailyExpenseList.isNotEmpty() && selectedDayIndex in dailyExpenseList.indices) {
+            dailyExpenseList[selectedDayIndex].second
+        } else {
+            todayExpense
+        }
+    }
+
+    val currentSelectedTitle = remember(dailyDateList, selectedDayIndex, currentLang) {
+        if (dailyDateList.isNotEmpty() && selectedDayIndex in dailyDateList.indices) {
+            AppLanguageManager.formatWidgetDayExpenseTitle(
+                dailyDateList[selectedDayIndex],
+                selectedDayIndex == 6,
+                currentLang
+            )
+        } else {
+            AppLanguageManager.formatWidgetDayExpenseTitle(Calendar.getInstance(), true, currentLang)
+        }
+    }
 
     // 加载本地真实记账数据并预绘制图表
     LaunchedEffect(Unit) {
@@ -179,10 +220,11 @@ fun WidgetCustomizationPage(
                 if (trendPoints.size <= 1) {
                     trendPoints.add(0, 0.0)
                 }
-                trendBitmap = WidgetChartRenderer.drawCashflowTrend(480, 110, trendPoints)
+                trendDataPoints = trendPoints
 
                 // 预渲染 7 日柱状图
                 val dailyExpenses = mutableListOf<Pair<String, Double>>()
+                val dailyDates = mutableListOf<Calendar>()
                 val barCal = Calendar.getInstance()
                 barCal.add(Calendar.DAY_OF_MONTH, -6)
                 val sdfDay = SimpleDateFormat("dd", Locale.US)
@@ -193,9 +235,11 @@ fun WidgetCustomizationPage(
                     val dayTxs = db.localTransactionDao().getByDateRange(fullDate, fullDate)
                     val dayExpAmt = dayTxs.filter { it.type == "expense" }.sumOf { it.amount }
                     dailyExpenses.add(Pair(label, dayExpAmt))
+                    dailyDates.add(barCal.clone() as Calendar)
                     barCal.add(Calendar.DAY_OF_MONTH, 1)
                 }
-                barsBitmap = WidgetChartRenderer.draw7DaySpendingBars(480, 110, dailyExpenses)
+                dailyExpenseList = dailyExpenses
+                dailyDateList = dailyDates
             } catch (_: Exception) {}
         }
     }
@@ -266,13 +310,17 @@ fun WidgetCustomizationPage(
                 pattern = selectedPattern,
                 monthNetBalance = monthNetBalance,
                 safeCashflow = safeCashflow,
-                todayExpense = todayExpense,
+                displayExpense = currentSelectedExp,
+                expenseTitle = currentSelectedTitle,
+                isTodaySelected = selectedDayIndex == 6,
                 pendingCount = pendingCount,
                 pendingAmount = pendingAmount,
                 monthDisplayStr = monthDisplayStr,
                 currency = currency,
                 trendBitmap = trendBitmap,
-                barsBitmap = barsBitmap
+                barsBitmap = barsBitmap,
+                onSelectDay = { dayIdx -> selectedDayIndex = dayIdx },
+                onResetToday = { selectedDayIndex = 6 }
             )
 
             Spacer(Modifier.height(24.dp))
@@ -354,13 +402,17 @@ private fun WidgetPreviewCard(
     pattern: Int,
     monthNetBalance: Double,
     safeCashflow: Double,
-    todayExpense: Double,
+    displayExpense: Double,
+    expenseTitle: String,
+    isTodaySelected: Boolean,
     pendingCount: Int,
     pendingAmount: Double,
     monthDisplayStr: String,
     currency: String,
     trendBitmap: Bitmap?,
-    barsBitmap: Bitmap?
+    barsBitmap: Bitmap?,
+    onSelectDay: (Int) -> Unit,
+    onResetToday: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -412,7 +464,9 @@ private fun WidgetPreviewCard(
                         shape = RoundedCornerShape(12.dp),
                         color = Color(0xFFF1F5F9),
                         border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable { onResetToday() }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text("🔄", fontSize = 11.sp)
@@ -492,46 +546,76 @@ private fun WidgetPreviewCard(
                 }
             }
 
-            // 动态图表显示
+            // 动态图表显示 (支持点击 7 个热区交互探索)
             when (pattern) {
                 WidgetChartRenderer.PATTERN_TREND -> {
                     Spacer(Modifier.height(4.dp))
-                    if (trendBitmap != null) {
-                        Image(
-                            bitmap = trendBitmap.asImageBitmap(),
-                            contentDescription = "Trend Chart",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .background(Color(0xFFF1F5F9), RoundedCornerShape(8.dp))
-                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                    ) {
+                        if (trendBitmap != null) {
+                            Image(
+                                bitmap = trendBitmap.asImageBitmap(),
+                                contentDescription = "Trend Chart",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color(0xFFF1F5F9), RoundedCornerShape(8.dp))
+                            )
+                        }
+                        // 7个探索点击热区
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            for (i in 0..6) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clickable { onSelectDay(i) }
+                                )
+                            }
+                        }
                     }
                 }
                 WidgetChartRenderer.PATTERN_BARS -> {
                     Spacer(Modifier.height(4.dp))
-                    if (barsBitmap != null) {
-                        Image(
-                            bitmap = barsBitmap.asImageBitmap(),
-                            contentDescription = "Bars Chart",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .background(Color(0xFFF1F5F9), RoundedCornerShape(8.dp))
-                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                    ) {
+                        if (barsBitmap != null) {
+                            Image(
+                                bitmap = barsBitmap.asImageBitmap(),
+                                contentDescription = "Bars Chart",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color(0xFFF1F5F9), RoundedCornerShape(8.dp))
+                            )
+                        }
+                        // 7个探索点击热区
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            for (i in 0..6) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clickable { onSelectDay(i) }
+                                )
+                            }
+                        }
                     }
                 }
                 else -> {
@@ -541,29 +625,42 @@ private fun WidgetPreviewCard(
 
             Spacer(Modifier.height(8.dp))
 
-            // 底部双指标胶囊：今日支出 & 待付账单
+            // 底部双指标胶囊：展示选中日期的支出 & 待付账单
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // 今日支出
+                // 支出卡片 (若非今天，点击直接还原回今天)
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFFF8FAFC),
-                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                    modifier = Modifier.weight(1f)
+                    color = if (!isTodaySelected) Color(0xFFF0FDF4) else Color(0xFFF8FAFC),
+                    border = BorderStroke(1.dp, if (!isTodaySelected) Color(0xFF86EFAC) else Color(0xFFE2E8F0)),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onResetToday() }
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = expenseTitle,
+                                fontSize = 10.sp,
+                                color = if (!isTodaySelected) Color(0xFF166534) else Color(0xFF64748B),
+                                fontWeight = if (!isTodaySelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                            if (!isTodaySelected) {
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = "↩",
+                                    fontSize = 10.sp,
+                                    color = Color(0xFF166534)
+                                )
+                            }
+                        }
                         Text(
-                            text = stringResource(R.string.widget_today_expense),
-                            fontSize = 10.sp,
-                            color = Color(0xFF64748B)
-                        )
-                        Text(
-                            text = "$currency ${String.format(Locale.getDefault(), "%,.2f", todayExpense)}",
+                            text = "$currency ${String.format(Locale.getDefault(), "%,.2f", displayExpense)}",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F172A)
+                            color = if (!isTodaySelected) Color(0xFF166534) else Color(0xFF0F172A)
                         )
                     }
                 }
