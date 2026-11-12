@@ -302,6 +302,7 @@ object LocalDataStore {
                 val intent = Intent("com.siangloh.ledger.DATA_SYNCED")
                 intent.setPackage(context.packageName)
                 context.sendBroadcast(intent)
+                com.siangloh.ledger.widget.LedgerAppWidgetProvider.notifyDataChanged(context)
             } catch (_: Exception) {}
         } catch (e: Exception) {
             Log.e(TAG, "syncAllUserData failed: ${e.message}", e)

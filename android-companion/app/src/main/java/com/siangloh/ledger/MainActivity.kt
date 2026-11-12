@@ -130,6 +130,9 @@ class MainActivity : AppCompatActivity() {
         handleIncomingIntent(intent)
         registerNetworkCallback()
 
+        // 注册账单离线到期定期检查与预警提醒 (WorkManager 每天静默检查)
+        com.siangloh.ledger.worker.BillDueReminderWorker.scheduleDaily(this)
+
         // 核心：单机离线模式，初始化本地账户、分类以及迁移以往积攒的通知
         lifecycleScope.launch(Dispatchers.IO) {
             com.siangloh.ledger.data.LocalLedgerRepository.initDefaultsIfNeeded(this@MainActivity)

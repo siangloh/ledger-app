@@ -979,5 +979,25 @@
     <string name="ai_advisor_desc_daily_safe">%1$d days remaining in this cycle. Keeping daily discretionary spending within this limit achieves your goals.</string>
     <string name="ai_advisor_title_cycle_wrapup">Plan Next Billing Cycle</string>
     <string name="ai_advisor_desc_cycle_wrapup">This cycle is coming to an end. Review this month\'s spending and prepare next month\'s category limits.</string>
-</resources>
+<!-- Bill Reminders & Calendar Integration -->
+    <string name="cf_add_to_calendar">Add to Calendar</string>
+    <string name="cf_calendar_added">Added to calendar</string>
+    <string name="cf_calendar_event_title">Bill Due: %1$s</string>
+    <string name="cf_calendar_event_desc">"Bill: %1$s\nAmount Due: %2$s\nPayment Account: %3$s\nDue Date: %4$s\nFrom Ledger Reminders"</string>
+    <string name="notif_bill_due_channel_name">Bill Due Reminders</string>
+    <string name="notif_bill_due_channel_desc">Alerts for upcoming bill payments</string>
+    <string name="notif_bill_due_title">Bill Due Reminder: %1$s</string>
+    <string name="notif_bill_due_today">Due today for %1$s. Please check your account balance.</string>
+    <string name="notif_bill_due_tomorrow">Due tomorrow for %1$s. Please prepare funds.</string>
+    <string name="notif_bill_due_days">Due in %1$d days (%2$s) for %3$s.</string>
 
+    <!-- AppWidget -->
+    <string name="widget_name">Ledger Overview</string>
+    <string name="widget_description">"View monthly balance, today's spending and upcoming bills on home screen"</string>
+    <string name="widget_title">Ledger Balance</string>
+    <string name="widget_net_balance">Net Balance</string>
+    <string name="widget_today_expense">"Today's Spend"</string>
+    <string name="widget_pending_bills">Pending Bills</string>
+    <string name="widget_quick_add">+ Add</string>
+    <string name="widget_bills_count_fmt">%1$d pending</string>
+</resources>

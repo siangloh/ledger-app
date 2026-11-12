@@ -2926,9 +2926,39 @@ fun CashflowAnalysisScreen(
                         Text(formatMoney(cur, amount), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Slate900)
                     }
                     BillSegmentBar(paid, pending, amount)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.cf_paid) + " " + formatMoney(cur, paid), fontSize = 12.sp, color = IncomeGreen, fontWeight = FontWeight.SemiBold)
                         Text(stringResource(R.string.cf_pending) + " " + formatMoney(cur, pending), fontSize = 12.sp, color = WarningAmber, fontWeight = FontWeight.SemiBold)
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Slate100,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                com.siangloh.ledger.util.CalendarHelper.addBillToCalendar(
+                                    context = context,
+                                    title = bill.optString("title"),
+                                    amount = amount,
+                                    currency = cur,
+                                    dueDateStr = bill.optString("due_date"),
+                                    accountName = bill.optString("account_name").takeIf { it != "null" && it.isNotBlank() }
+                                )
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text("📅 ", fontSize = 13.sp)
+                            Text(
+                                text = stringResource(R.string.cf_add_to_calendar),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Slate700
+                            )
+                        }
                     }
                 }
 

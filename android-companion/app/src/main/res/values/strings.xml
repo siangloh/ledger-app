@@ -979,5 +979,25 @@
     <string name="ai_advisor_desc_daily_safe">距离本周期结束还有 %1$d 天，将每日弹性花费控制在此金额内，即可平稳达成目标。</string>
     <string name="ai_advisor_title_cycle_wrapup">合理规划下一账单周期</string>
     <string name="ai_advisor_desc_cycle_wrapup">本周期即将结束，建议复盘本月实际开销并提前微调下月总预算与分类额度。</string>
-</resources>
+<!-- 账单到期提醒与系统日历联动 -->
+    <string name="cf_add_to_calendar">添加至系统日历</string>
+    <string name="cf_calendar_added">已添加到系统日历</string>
+    <string name="cf_calendar_event_title">账单待缴: %1$s</string>
+    <string name="cf_calendar_event_desc">"待缴账单: %1$s\n应付金额: %2$s\n付款账户: %3$s\n到期日期: %4$s\n来自账本自动提醒"</string>
+    <string name="notif_bill_due_channel_name">账单到期提醒</string>
+    <string name="notif_bill_due_channel_desc">在账单扣款前提醒您准备资金与按时缴费</string>
+    <string name="notif_bill_due_title">账单待缴提醒: %1$s</string>
+    <string name="notif_bill_due_today">将于今天扣缴 %1$s，请核对付款账户余额。</string>
+    <string name="notif_bill_due_tomorrow">将于明天扣缴 %1$s，请注意准备资金。</string>
+    <string name="notif_bill_due_days">将于 %1$d 天后 (%2$s) 扣缴 %3$s，请按时缴费。</string>
 
+    <!-- 桌面微部件 (AppWidget) -->
+    <string name="widget_name">账本概览与记账</string>
+    <string name="widget_description">在主屏幕查看本月结余、今日支出及待付账单</string>
+    <string name="widget_title">账本结余</string>
+    <string name="widget_net_balance">本月净结余</string>
+    <string name="widget_today_expense">今日支出</string>
+    <string name="widget_pending_bills">待付账单</string>
+    <string name="widget_quick_add">+ 记一笔</string>
+    <string name="widget_bills_count_fmt">%1$d 笔待付</string>
+</resources>

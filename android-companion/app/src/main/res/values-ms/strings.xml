@@ -979,5 +979,25 @@
     <string name="ai_advisor_desc_daily_safe">%1$d hari lagi dalam kitaran ini. Kekalkan perbelanjaan harian dalam had ini untuk capai sasaran.</string>
     <string name="ai_advisor_title_cycle_wrapup">Rancang Kitaran Seterusnya</string>
     <string name="ai_advisor_desc_cycle_wrapup">Kitaran ini hampir tamat. Semak perbelanjaan bulan ini dan sediakan had belanjawan bulan depan.</string>
-</resources>
+<!-- Peringatan Bil & Kalendar -->
+    <string name="cf_add_to_calendar">Tambah ke Kalendar</string>
+    <string name="cf_calendar_added">Ditambah ke kalendar</string>
+    <string name="cf_calendar_event_title">Bil Perlu Dibayar: %1$s</string>
+    <string name="cf_calendar_event_desc">"Bil: %1$s\nJumlah Perlu Dibayar: %2$s\nAkaun Pembayaran: %3$s\nTarikh Tamat: %4$s\nDaripada Peringatan Buku Lejar"</string>
+    <string name="notif_bill_due_channel_name">Peringatan Tamat Tempoh Bil</string>
+    <string name="notif_bill_due_channel_desc">Makluman untuk pembayaran bil yang akan datang</string>
+    <string name="notif_bill_due_title">Peringatan Bil: %1$s</string>
+    <string name="notif_bill_due_today">Perlu dibayar hari ini (%1$s). Sila semak baki akaun anda.</string>
+    <string name="notif_bill_due_tomorrow">Perlu dibayar esok (%1$s). Sila sediakan dana.</string>
+    <string name="notif_bill_due_days">Perlu dibayar dalam %1$d hari (%2$s) untuk %3$s.</string>
 
+    <!-- Widget -->
+    <string name="widget_name">Gambaran Keseluruhan Lejar</string>
+    <string name="widget_description">Lihat baki bulanan, perbelanjaan hari ini dan bil belum selesai di skrin utama</string>
+    <string name="widget_title">Baki Lejar</string>
+    <string name="widget_net_balance">Baki Bersih</string>
+    <string name="widget_today_expense">Belanja Hari Ini</string>
+    <string name="widget_pending_bills">Bil Tertunggak</string>
+    <string name="widget_quick_add">+ Rekod</string>
+    <string name="widget_bills_count_fmt">%1$d tertunggak</string>
+</resources>

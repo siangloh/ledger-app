@@ -281,6 +281,7 @@ object LocalLedgerRepository {
             NativeLedgerApi.invalidateCache()
             val intent = android.content.Intent("com.siangloh.ledger.DATA_SYNCED").setPackage(context.packageName)
             context.sendBroadcast(intent)
+            com.siangloh.ledger.widget.LedgerAppWidgetProvider.notifyDataChanged(context)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to notify data changed: ${e.message}")
         }

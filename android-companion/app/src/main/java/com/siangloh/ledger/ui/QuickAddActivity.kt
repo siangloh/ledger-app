@@ -170,6 +170,9 @@ class QuickAddActivity : AppCompatActivity() {
             // 触发 WorkManager 在有网络时同步
             SyncWorker.enqueueSync(this@QuickAddActivity)
 
+            // 触发桌面小部件立即刷新最新结余与今日支出
+            com.siangloh.ledger.widget.LedgerAppWidgetProvider.notifyDataChanged(this@QuickAddActivity)
+
             Toast.makeText(this@QuickAddActivity, "✓ 已保存到本地，联网后将自动同步到账本！", Toast.LENGTH_LONG).show()
             finish()
         }
