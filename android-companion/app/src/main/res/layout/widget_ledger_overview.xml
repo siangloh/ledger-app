@@ -168,59 +168,66 @@
             android:layout_height="match_parent"
             android:orientation="horizontal">
 
-            <View
+            <TextView
                 android:id="@+id/btn_bar_day_0"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:text=""
                 android:clickable="true"
                 android:focusable="true" />
 
-            <View
+            <TextView
                 android:id="@+id/btn_bar_day_1"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:text=""
                 android:clickable="true"
                 android:focusable="true" />
 
-            <View
+            <TextView
                 android:id="@+id/btn_bar_day_2"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:text=""
                 android:clickable="true"
                 android:focusable="true" />
 
-            <View
+            <TextView
                 android:id="@+id/btn_bar_day_3"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:text=""
                 android:clickable="true"
                 android:focusable="true" />
 
-            <View
+            <TextView
                 android:id="@+id/btn_bar_day_4"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:text=""
                 android:clickable="true"
                 android:focusable="true" />
 
-            <View
+            <TextView
                 android:id="@+id/btn_bar_day_5"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:text=""
                 android:clickable="true"
                 android:focusable="true" />
 
-            <View
+            <TextView
                 android:id="@+id/btn_bar_day_6"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:text=""
                 android:clickable="true"
                 android:focusable="true" />
         </LinearLayout>

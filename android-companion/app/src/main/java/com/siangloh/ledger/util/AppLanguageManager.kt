@@ -97,10 +97,11 @@ object AppLanguageManager {
                 else -> "今日支出"
             }
         }
+        val day = calendar.get(Calendar.DAY_OF_MONTH)
         return when (lang) {
-            LANG_EN -> SimpleDateFormat("MMM d Spend", Locale.ENGLISH).format(calendar.time)
-            LANG_MS -> SimpleDateFormat("d MMM Belanja", Locale("ms", "MY")).format(calendar.time)
-            else -> SimpleDateFormat("M月d日 支出", Locale.CHINESE).format(calendar.time)
+            LANG_EN -> "${SimpleDateFormat("MMM", Locale.ENGLISH).format(calendar.time)} $day Spend"
+            LANG_MS -> "$day ${SimpleDateFormat("MMM", Locale("ms", "MY")).format(calendar.time)} Belanja"
+            else -> "${calendar.get(Calendar.MONTH) + 1}月${day}日 支出"
         }
     }
 
