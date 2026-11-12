@@ -3,15 +3,11 @@ package com.siangloh.ledger.ui.compose
 import android.content.Context
 import android.graphics.Bitmap
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,13 +26,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DashboardCustomize
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,7 +44,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,10 +60,10 @@ import com.siangloh.ledger.R
 import com.siangloh.ledger.data.AppDatabase
 import com.siangloh.ledger.data.CashflowRepository
 import com.siangloh.ledger.data.LocalLedgerRepository
+import com.siangloh.ledger.util.AppLanguageManager
 import com.siangloh.ledger.widget.LedgerAppWidgetProvider
 import com.siangloh.ledger.widget.WidgetChartRenderer
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -82,7 +72,8 @@ import kotlin.math.abs
 
 /**
  * 桌面微组件样式定制与实时交互预览页面
- * (Widget Customization & Live Interactive Preview)
+ * (Widget Customization & Live 1:1 Preview)
+ * 严格遵循用户自定义多语言 (AppLanguageManager)，完全消除硬编码
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,7 +81,7 @@ fun WidgetCustomizationPage(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val currentLang = remember { AppLanguageManager.getLanguage(context) }
     val prefs = remember { context.getSharedPreferences("ledger_widget_prefs", Context.MODE_PRIVATE) }
 
     // 当前选中的图表模式
@@ -104,7 +95,8 @@ fun WidgetCustomizationPage(
     var safeCashflow by remember { mutableStateOf(0.0) }
     var pendingCount by remember { mutableIntStateOf(0) }
     var pendingAmount by remember { mutableStateOf(0.0) }
-    var currentMonthStr by remember { mutableStateOf("11月") }
+    var monthDisplayStr by remember { mutableStateOf("") }
+    val currency = "RM"
 
     // 渲染生成的图表 Bitmaps
     var trendBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -118,7 +110,7 @@ fun WidgetCustomizationPage(
                 val year = cal.get(Calendar.YEAR)
                 val month = cal.get(Calendar.MONTH) + 1
                 val day = cal.get(Calendar.DAY_OF_MONTH)
-                currentMonthStr = "${month}月"
+                monthDisplayStr = AppLanguageManager.formatWidgetMonth(cal, currentLang)
 
                 val monthQuery = String.format(Locale.US, "%04d-%02d", year, month)
                 val todayQuery = String.format(Locale.US, "%04d-%02d-%02d", year, month, day)
@@ -269,7 +261,7 @@ fun WidgetCustomizationPage(
 
             Spacer(Modifier.height(10.dp))
 
-            // 桌面小部件 1:1 动态仿真卡片
+            // 桌面小部件 1:1 动态仿真卡片 (纯净预览，完美对应桌面小部件)
             WidgetPreviewCard(
                 pattern = selectedPattern,
                 monthNetBalance = monthNetBalance,
@@ -277,13 +269,10 @@ fun WidgetCustomizationPage(
                 todayExpense = todayExpense,
                 pendingCount = pendingCount,
                 pendingAmount = pendingAmount,
-                monthStr = currentMonthStr,
+                monthDisplayStr = monthDisplayStr,
+                currency = currency,
                 trendBitmap = trendBitmap,
-                barsBitmap = barsBitmap,
-                onPatternToggle = {
-                    val next = (selectedPattern + 1) % 3
-                    applyPattern(next)
-                }
+                barsBitmap = barsBitmap
             )
 
             Spacer(Modifier.height(24.dp))
@@ -300,10 +289,10 @@ fun WidgetCustomizationPage(
 
             // 选项 1：现金流累积走势图
             StyleSelectionItem(
-                title = stringResource(R.string.widget_pattern_trend) + " · 现金流走势面积图",
+                title = stringResource(R.string.widget_pattern_trend) + " · " + stringResource(R.string.widget_style_trend_title),
                 description = stringResource(R.string.widget_style_trend_desc),
                 isSelected = selectedPattern == WidgetChartRenderer.PATTERN_TREND,
-                tagText = "最推荐",
+                tagText = stringResource(R.string.widget_tag_recommended),
                 tagColor = Color(0xFF0F766E),
                 onClick = { applyPattern(WidgetChartRenderer.PATTERN_TREND) }
             )
@@ -312,10 +301,10 @@ fun WidgetCustomizationPage(
 
             // 选项 2：近 7 天支出柱状图
             StyleSelectionItem(
-                title = stringResource(R.string.widget_pattern_bars) + " · 近7天支出柱状图",
+                title = stringResource(R.string.widget_pattern_bars) + " · " + stringResource(R.string.widget_style_bars_title),
                 description = stringResource(R.string.widget_style_bars_desc),
                 isSelected = selectedPattern == WidgetChartRenderer.PATTERN_BARS,
-                tagText = "对比清晰",
+                tagText = stringResource(R.string.widget_tag_contrast),
                 tagColor = Color(0xFF0284C7),
                 onClick = { applyPattern(WidgetChartRenderer.PATTERN_BARS) }
             )
@@ -324,17 +313,17 @@ fun WidgetCustomizationPage(
 
             // 选项 3：极简紧凑数字模式
             StyleSelectionItem(
-                title = stringResource(R.string.widget_pattern_compact) + " · 纯数字紧凑模式",
+                title = stringResource(R.string.widget_pattern_compact) + " · " + stringResource(R.string.widget_style_compact_title),
                 description = stringResource(R.string.widget_style_compact_desc),
                 isSelected = selectedPattern == WidgetChartRenderer.PATTERN_COMPACT,
-                tagText = "极简省心",
+                tagText = stringResource(R.string.widget_tag_minimal),
                 tagColor = Color(0xFF64748B),
                 onClick = { applyPattern(WidgetChartRenderer.PATTERN_COMPACT) }
             )
 
             Spacer(Modifier.height(24.dp))
 
-            // 底部应用提示
+            // 底部提示信息 (全面多语言自适应)
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = Color(0xFFF1F5F9),
@@ -346,7 +335,7 @@ fun WidgetCustomizationPage(
                 ) {
                     Text(text = "💡 ", fontSize = 16.sp)
                     Text(
-                        text = "选择样式后已自动生效！您也可以随时直接在手机桌面上点击小部件右上角的切换胶囊进行无缝轮播切换。",
+                        text = stringResource(R.string.widget_customization_tip),
                         fontSize = 12.sp,
                         color = Color(0xFF475569),
                         lineHeight = 18.sp
@@ -358,7 +347,7 @@ fun WidgetCustomizationPage(
 }
 
 /**
- * 桌面微组件 1:1 动态仿真卡片 (与 RemoteViews 布局完全对应)
+ * 桌面微组件 1:1 动态仿真卡片 (与 RemoteViews 布局完全 100% 对应)
  */
 @Composable
 private fun WidgetPreviewCard(
@@ -368,10 +357,10 @@ private fun WidgetPreviewCard(
     todayExpense: Double,
     pendingCount: Int,
     pendingAmount: Double,
-    monthStr: String,
+    monthDisplayStr: String,
+    currency: String,
     trendBitmap: Bitmap?,
-    barsBitmap: Bitmap?,
-    onPatternToggle: () -> Unit
+    barsBitmap: Bitmap?
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -387,7 +376,7 @@ private fun WidgetPreviewCard(
                 .fillMaxWidth()
                 .padding(14.dp)
         ) {
-            // 顶栏：标题、月份与操作按钮
+            // 顶栏：标题、月份与操作按钮 (完全对应桌面小部件的纯净顶栏)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -401,7 +390,7 @@ private fun WidgetPreviewCard(
                             .background(Color(0xFF0F766E)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("¥", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(currency.take(1), fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     }
                     Spacer(Modifier.width(6.dp))
                     Text(
@@ -411,7 +400,7 @@ private fun WidgetPreviewCard(
                         color = Color(0xFF334155)
                     )
                     Text(
-                        text = " · $monthStr",
+                        text = monthDisplayStr,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0F766E)
@@ -419,30 +408,6 @@ private fun WidgetPreviewCard(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // 样式切换胶囊 (点击切换)
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFFF1F5F9),
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        modifier = Modifier
-                            .clickable(onClick = onPatternToggle)
-                    ) {
-                        val patternLabel = when (pattern) {
-                            WidgetChartRenderer.PATTERN_TREND -> stringResource(R.string.widget_pattern_trend)
-                            WidgetChartRenderer.PATTERN_BARS -> stringResource(R.string.widget_pattern_bars)
-                            else -> stringResource(R.string.widget_pattern_compact)
-                        }
-                        Text(
-                            text = patternLabel,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF334155),
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                        )
-                    }
-
-                    Spacer(Modifier.width(5.dp))
-
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = Color(0xFFF1F5F9),
@@ -454,7 +419,7 @@ private fun WidgetPreviewCard(
                         }
                     }
 
-                    Spacer(Modifier.width(5.dp))
+                    Spacer(Modifier.width(6.dp))
 
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -491,7 +456,7 @@ private fun WidgetPreviewCard(
                         color = Color(0xFF64748B)
                     )
                     val sign = if (monthNetBalance >= 0) "+" else "-"
-                    val netStr = "$sign RM ${String.format(Locale.getDefault(), "%,.2f", abs(monthNetBalance))}"
+                    val netStr = "$sign $currency ${String.format(Locale.getDefault(), "%,.2f", abs(monthNetBalance))}"
                     Text(
                         text = netStr,
                         fontSize = 19.sp,
@@ -516,7 +481,7 @@ private fun WidgetPreviewCard(
                             color = Color(0xFF64748B)
                         )
                         val safeSign = if (safeCashflow >= 0) "+" else "-"
-                        val safeStr = "$safeSign RM ${String.format(Locale.getDefault(), "%,.2f", abs(safeCashflow))}"
+                        val safeStr = "$safeSign $currency ${String.format(Locale.getDefault(), "%,.2f", abs(safeCashflow))}"
                         Text(
                             text = safeStr,
                             fontSize = 13.sp,
@@ -539,7 +504,6 @@ private fun WidgetPreviewCard(
                                 .fillMaxWidth()
                                 .height(50.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable(onClick = onPatternToggle)
                         )
                     } else {
                         Box(
@@ -560,7 +524,6 @@ private fun WidgetPreviewCard(
                                 .fillMaxWidth()
                                 .height(50.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable(onClick = onPatternToggle)
                         )
                     } else {
                         Box(
@@ -597,7 +560,7 @@ private fun WidgetPreviewCard(
                             color = Color(0xFF64748B)
                         )
                         Text(
-                            text = "RM ${String.format(Locale.getDefault(), "%,.2f", todayExpense)}",
+                            text = "$currency ${String.format(Locale.getDefault(), "%,.2f", todayExpense)}",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF0F172A)
@@ -626,7 +589,7 @@ private fun WidgetPreviewCard(
                                 color = Color(0xFF0F766E)
                             )
                         } else {
-                            val amtStr = "RM ${String.format(Locale.getDefault(), "%,.2f", pendingAmount)}"
+                            val amtStr = "$currency ${String.format(Locale.getDefault(), "%,.2f", pendingAmount)}"
                             Text(
                                 text = stringResource(R.string.widget_bills_pending_fmt, pendingCount, amtStr),
                                 fontSize = 12.sp,
@@ -722,4 +685,3 @@ private fun StyleSelectionItem(
         }
     }
 }
-

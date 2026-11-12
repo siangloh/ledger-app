@@ -81,6 +81,14 @@ object AppLanguageManager {
         }
     }
 
+    fun formatWidgetMonth(calendar: Calendar, lang: String): String {
+        return when (lang) {
+            LANG_EN -> " · " + SimpleDateFormat("MMM", Locale.ENGLISH).format(calendar.time)
+            LANG_MS -> " · " + SimpleDateFormat("MMM", Locale("ms", "MY")).format(calendar.time)
+            else -> " · ${calendar.get(Calendar.MONTH) + 1}月"
+        }
+    }
+
     fun format3mRange(calendar: Calendar, lang: String): String {
         val startCal = (calendar.clone() as Calendar).apply { add(Calendar.MONTH, -2) }
         return when (lang) {

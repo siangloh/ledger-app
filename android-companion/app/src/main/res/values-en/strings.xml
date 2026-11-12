@@ -1009,8 +1009,15 @@
     <string name="tools_widget_customization">"Widget Customization"</string>
     <string name="tools_widget_customization_desc">"Live preview, trend charts &amp; display styles"</string>
     <string name="widget_preview_title">"Live Preview"</string>
-    <string name="widget_preview_tip">"Tap widget to toggle style"</string>
+    <string name="widget_preview_tip">"Selected style immediately syncs to your home screen"</string>
     <string name="widget_style_select_title">"Select Chart Style"</string>
+    <string name="widget_style_trend_title">"Cashflow Trend Area"</string>
+    <string name="widget_style_bars_title">"7-Day Spending Bars"</string>
+    <string name="widget_style_compact_title">"Compact Metrics Only"</string>
+    <string name="widget_tag_recommended">"Recommended"</string>
+    <string name="widget_tag_contrast">"Clear Trend"</string>
+    <string name="widget_tag_minimal">"Minimal"</string>
+    <string name="widget_customization_tip">"Selected style is automatically saved and synced to your home screen widget!"</string>
     <string name="widget_style_trend_desc">"Smooth bezier curve &amp; gradient glow showing month-to-date cashflow"</string>
     <string name="widget_style_bars_desc">"7 rounded mini bars highlighting today to track weekly spending spikes"</string>
     <string name="widget_style_compact_desc">"Hides chart to focus cleanly on net balance and upcoming bills"</string>

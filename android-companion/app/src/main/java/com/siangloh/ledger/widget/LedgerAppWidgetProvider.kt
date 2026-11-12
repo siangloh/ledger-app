@@ -92,7 +92,8 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
     }
 
     private fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
-        val appCtx = context.applicationContext
+        val lang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
+        val appCtx = com.siangloh.ledger.util.AppLanguageManager.wrapContext(context.applicationContext, lang)
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val cal = Calendar.getInstance()
@@ -165,7 +166,6 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
 
                 when (chartPattern) {
                     WidgetChartRenderer.PATTERN_TREND -> {
-                        views.setTextViewText(R.id.btn_widget_pattern_toggle, appCtx.getString(R.string.widget_pattern_trend))
                         val trendPoints = mutableListOf<Double>()
                         var cumulative = 0.0
                         val txByDate = monthTransactions.groupBy { it.date }
@@ -186,7 +186,6 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                         views.setViewVisibility(R.id.iv_widget_chart, android.view.View.VISIBLE)
                     }
                     WidgetChartRenderer.PATTERN_BARS -> {
-                        views.setTextViewText(R.id.btn_widget_pattern_toggle, appCtx.getString(R.string.widget_pattern_bars))
                         val dailyExpenses = mutableListOf<Pair<String, Double>>()
                         val barCal = Calendar.getInstance()
                         barCal.add(Calendar.DAY_OF_MONTH, -6)
@@ -205,26 +204,13 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                         views.setViewVisibility(R.id.iv_widget_chart, android.view.View.VISIBLE)
                     }
                     else -> {
-                        views.setTextViewText(R.id.btn_widget_pattern_toggle, appCtx.getString(R.string.widget_pattern_compact))
                         views.setViewVisibility(R.id.iv_widget_chart, android.view.View.GONE)
                     }
                 }
 
-                // 模式切换按钮交互绑定 (点按钮或点图表即可直接轮播切换)
-                val toggleIntent = Intent(appCtx, LedgerAppWidgetProvider::class.java).apply {
-                    action = ACTION_WIDGET_TOGGLE_PATTERN
-                }
-                val togglePendingIntent = PendingIntent.getBroadcast(
-                    appCtx,
-                    4,
-                    toggleIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.btn_widget_pattern_toggle, togglePendingIntent)
-                views.setOnClickPendingIntent(R.id.iv_widget_chart, togglePendingIntent)
-
-                // 月份标签
-                views.setTextViewText(R.id.tv_widget_month, "· ${month}月")
+                // 月份标签 (根据多语言自适应)
+                val monthDisplay = com.siangloh.ledger.util.AppLanguageManager.formatWidgetMonth(cal, lang)
+                views.setTextViewText(R.id.tv_widget_month, monthDisplay)
 
                 // 当月净结余数值与颜色
                 val sign = if (netBalance >= 0) "+" else "-"
@@ -283,6 +269,7 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                 )
                 views.setOnClickPendingIntent(R.id.layout_widget_bills, billsPendingIntent)
                 views.setOnClickPendingIntent(R.id.layout_widget_cashflow_badge, billsPendingIntent)
+                views.setOnClickPendingIntent(R.id.iv_widget_chart, billsPendingIntent)
 
                 // 点击「+ 记一笔」按钮 -> 直接弹出原生离线快速记账界面
                 val quickAddIntent = Intent(appCtx, QuickAddActivity::class.java).apply {
