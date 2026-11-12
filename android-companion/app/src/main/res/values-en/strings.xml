@@ -992,12 +992,15 @@
     <string name="notif_bill_due_days">Due in %1$d days (%2$s) for %3$s.</string>
 
     <!-- AppWidget -->
-    <string name="widget_name">Ledger Overview</string>
-    <string name="widget_description">"View monthly balance, today's spending and upcoming bills on home screen"</string>
+    <string name="widget_name">Ledger &amp; Cashflow</string>
+    <string name="widget_description">"View monthly balance, cashflow forecast, today's spending and bills on home screen"</string>
     <string name="widget_title">Ledger Balance</string>
     <string name="widget_net_balance">Net Balance</string>
+    <string name="widget_safe_cashflow">Projected Safe</string>
     <string name="widget_today_expense">"Today's Spend"</string>
     <string name="widget_pending_bills">Pending Bills</string>
     <string name="widget_quick_add">+ Add</string>
     <string name="widget_bills_count_fmt">%1$d pending</string>
+    <string name="widget_bills_pending_fmt">"%1$d bills · %2$s"</string>
+    <string name="widget_bills_all_clear">"All paid ✓"</string>
 </resources>

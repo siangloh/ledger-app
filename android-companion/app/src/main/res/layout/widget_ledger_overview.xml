@@ -80,33 +80,70 @@
         </LinearLayout>
     </RelativeLayout>
 
-    <!-- 中部主指标：净结余 -->
+    <!-- 中部主指标：净结余与现金流安全预估 -->
     <LinearLayout
         android:id="@+id/layout_hero_balance"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="vertical"
+        android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginTop="2dp"
-        android:layout_marginBottom="2dp">
+        android:layout_marginTop="3dp"
+        android:layout_marginBottom="3dp">
 
-        <TextView
+        <!-- 当月净结余 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_net_balance"
+                android:textColor="#64748B"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/tv_widget_net_balance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+RM 0.00"
+                android:textColor="#0F766E"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:maxLines="1" />
+        </LinearLayout>
+
+        <!-- 预估安全现金流 (扣除待付后) -->
+        <LinearLayout
+            android:id="@+id/layout_widget_cashflow_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/widget_net_balance"
-            android:textColor="#64748B"
-            android:textSize="11sp" />
+            android:orientation="vertical"
+            android:gravity="end"
+            android:background="@drawable/bg_widget_pill"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp">
 
-        <TextView
-            android:id="@+id/tv_widget_net_balance"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="+RM 0.00"
-            android:textColor="#0F766E"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:maxLines="1" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_safe_cashflow"
+                android:textColor="#64748B"
+                android:textSize="9sp" />
+
+            <TextView
+                android:id="@+id/tv_widget_projected_cashflow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+RM 0.00"
+                android:textColor="#0F766E"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:maxLines="1" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- 底部双指标行：今日支出 & 待付账单 -->

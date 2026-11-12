@@ -119,6 +119,7 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                 }
 
                 var pendingCount = 0
+                var pendingAmount = 0.0
                 for (sub in subs) {
                     if (sub.cost <= 0) continue
                     val billKey = "sub_${sub.id}"
@@ -134,8 +135,11 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                     }
                     if (!isPaid) {
                         pendingCount++
+                        pendingAmount += sub.cost
                     }
                 }
+
+                val safeCashflow = netBalance - pendingAmount
 
                 val currency = "RM"
                 val views = RemoteViews(appCtx.packageName, R.layout.widget_ledger_overview)
@@ -143,20 +147,34 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                 // 月份标签
                 views.setTextViewText(R.id.tv_widget_month, "· ${month}月")
 
-                // 净结余数值与颜色
+                // 当月净结余数值与颜色
                 val sign = if (netBalance >= 0) "+" else "-"
                 val absVal = abs(netBalance)
                 val netStr = "$sign$currency ${String.format(Locale.getDefault(), "%,.2f", absVal)}"
                 views.setTextViewText(R.id.tv_widget_net_balance, netStr)
                 views.setTextColor(R.id.tv_widget_net_balance, if (netBalance >= 0) Color.parseColor("#0F766E") else Color.parseColor("#B91C1C"))
 
+                // 预估安全现金流 (扣除待付账单后的安全结余)
+                val safeSign = if (safeCashflow >= 0) "+" else "-"
+                val safeAbsVal = abs(safeCashflow)
+                val safeStr = "$safeSign$currency ${String.format(Locale.getDefault(), "%,.2f", safeAbsVal)}"
+                views.setTextViewText(R.id.tv_widget_projected_cashflow, safeStr)
+                views.setTextColor(R.id.tv_widget_projected_cashflow, if (safeCashflow >= 0) Color.parseColor("#0F766E") else Color.parseColor("#B91C1C"))
+
                 // 今日支出
                 val todayStrDisplay = "$currency ${String.format(Locale.getDefault(), "%,.2f", todayExpense)}"
                 views.setTextViewText(R.id.tv_widget_today_expense, todayStrDisplay)
 
-                // 待付账单
-                val pendingDisplay = appCtx.getString(R.string.widget_bills_count_fmt, pendingCount)
-                views.setTextViewText(R.id.tv_widget_pending_bills, pendingDisplay)
+                // 待付账单与金额
+                if (pendingCount == 0) {
+                    views.setTextViewText(R.id.tv_widget_pending_bills, appCtx.getString(R.string.widget_bills_all_clear))
+                    views.setTextColor(R.id.tv_widget_pending_bills, Color.parseColor("#0F766E"))
+                } else {
+                    val pendingAmtStr = "$currency ${String.format(Locale.getDefault(), "%,.2f", pendingAmount)}"
+                    val pendingDisplay = appCtx.getString(R.string.widget_bills_pending_fmt, pendingCount, pendingAmtStr)
+                    views.setTextViewText(R.id.tv_widget_pending_bills, pendingDisplay)
+                    views.setTextColor(R.id.tv_widget_pending_bills, Color.parseColor("#B45309"))
+                }
 
                 // 点击主卡片 -> 打开主 App
                 val mainIntent = Intent(appCtx, MainActivity::class.java).apply {
@@ -172,10 +190,11 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                 views.setOnClickPendingIntent(R.id.layout_hero_balance, mainPendingIntent)
                 views.setOnClickPendingIntent(R.id.layout_widget_today, mainPendingIntent)
 
-                // 点击待付账单卡片 -> 打开主 App 并直接定位到账单分析
+                // 点击现金流与待付账单卡片 -> 打开主 App 并直接定位到现金流分析
                 val billsIntent = Intent(appCtx, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     putExtra("navigate_tab", "bills")
+                    putExtra("open_cashflow", true)
                 }
                 val billsPendingIntent = PendingIntent.getActivity(
                     appCtx,
@@ -184,6 +203,7 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
                 views.setOnClickPendingIntent(R.id.layout_widget_bills, billsPendingIntent)
+                views.setOnClickPendingIntent(R.id.layout_widget_cashflow_badge, billsPendingIntent)
 
                 // 点击「+ 记一笔」按钮 -> 直接弹出原生离线快速记账界面
                 val quickAddIntent = Intent(appCtx, QuickAddActivity::class.java).apply {

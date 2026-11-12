@@ -147,6 +147,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val openCashflowState = androidx.compose.runtime.mutableStateOf(false)
+
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -156,6 +158,9 @@ class MainActivity : AppCompatActivity() {
     private fun handleIncomingIntent(intent: Intent?) {
         if (intent?.getStringExtra("action") == "open_web_add") {
             startActivity(Intent(this, QuickAddActivity::class.java))
+        }
+        if (intent?.getBooleanExtra("open_cashflow", false) == true || intent?.getStringExtra("navigate_tab") == "bills") {
+            openCashflowState.value = true
         }
     }
 
@@ -203,6 +208,7 @@ class MainActivity : AppCompatActivity() {
 
                     if (isLoggedIn) {
                         com.siangloh.ledger.ui.compose.MainAppScreen(
+                            openCashflowOnStart = openCashflowState.value,
                             onScanReceipt = { showReceiptScanChooser() },
                             onOpenSettings = { showAppSettingsDialog() },
                             onLogout = {

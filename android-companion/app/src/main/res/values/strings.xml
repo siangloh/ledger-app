@@ -992,12 +992,15 @@
     <string name="notif_bill_due_days">将于 %1$d 天后 (%2$s) 扣缴 %3$s，请按时缴费。</string>
 
     <!-- 桌面微部件 (AppWidget) -->
-    <string name="widget_name">账本概览与记账</string>
-    <string name="widget_description">在主屏幕查看本月结余、今日支出及待付账单</string>
+    <string name="widget_name">账本概览与现金流</string>
+    <string name="widget_description">在主屏幕查看本月结余、现金流预估、今日支出及待付账单</string>
     <string name="widget_title">账本结余</string>
-    <string name="widget_net_balance">本月净结余</string>
+    <string name="widget_net_balance">当月净结余</string>
+    <string name="widget_safe_cashflow">预估安全结余</string>
     <string name="widget_today_expense">今日支出</string>
     <string name="widget_pending_bills">待付账单</string>
     <string name="widget_quick_add">+ 记一笔</string>
     <string name="widget_bills_count_fmt">%1$d 笔待付</string>
+    <string name="widget_bills_pending_fmt">%1$d 笔 · %2$s</string>
+    <string name="widget_bills_all_clear">已全部付清 ✓</string>
 </resources>

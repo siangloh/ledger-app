@@ -41,16 +41,26 @@ data class NavItem(
 @Composable
 fun MainAppScreen(
     initialTab: Int = 0,
+    openCashflowOnStart: Boolean = false,
     onScanReceipt: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onLogout: () -> Unit = {},
     onOpenWebUrl: (String) -> Unit = {}
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(initialTab) }
-    var cashflowMonth by rememberSaveable { mutableStateOf<String?>(null) }
+    val currentMonthStr = remember { java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US).format(java.util.Date()) }
+    var cashflowMonth by rememberSaveable { mutableStateOf<String?>(if (openCashflowOnStart) currentMonthStr else null) }
     var cashflowStartDate by rememberSaveable { mutableStateOf<String?>(null) }
     var cashflowEndDate by rememberSaveable { mutableStateOf<String?>(null) }
-    var cashflowVisible by rememberSaveable { mutableStateOf(false) }
+    var cashflowVisible by rememberSaveable { mutableStateOf(openCashflowOnStart) }
+
+    LaunchedEffect(openCashflowOnStart) {
+        if (openCashflowOnStart) {
+            selectedTab = 0
+            cashflowMonth = currentMonthStr
+            cashflowVisible = true
+        }
+    }
     var cashflowRevision by remember { mutableIntStateOf(0) }
     var overviewRevision by remember { mutableIntStateOf(0) }
     var showBudgetDialog by rememberSaveable { mutableStateOf(false) }
