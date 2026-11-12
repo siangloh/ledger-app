@@ -1006,4 +1006,13 @@
     <string name="widget_pattern_trend">📈 走势</string>
     <string name="widget_pattern_bars">📊 7日</string>
     <string name="widget_pattern_compact">🔢 简洁</string>
+    <string name="tools_widget_customization">桌面微组件定制</string>
+    <string name="tools_widget_customization_desc">实时预览、走势图与显示样式切换</string>
+    <string name="widget_preview_title">实时效果预览</string>
+    <string name="widget_preview_tip">点击部件可直接切换</string>
+    <string name="widget_style_select_title">选择图表样式</string>
+    <string name="widget_style_trend_desc">平滑贝塞尔曲线与渐变光晕，直观呈现当月资金水位起伏与健康度</string>
+    <string name="widget_style_bars_desc">7根圆角微型柱状图，高亮凸显今日，一眼对比一周花销波动</string>
+    <string name="widget_style_compact_desc">隐藏图表区域，以大字号聚焦呈现核心净结余与待付账单</string>
+    <string name="widget_applied_toast">✓ 样式已保存，桌面小部件已同步更新！</string>
 </resources>

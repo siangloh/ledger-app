@@ -1006,4 +1006,13 @@
     <string name="widget_pattern_trend">"📈 Trend"</string>
     <string name="widget_pattern_bars">"📊 7-Hari"</string>
     <string name="widget_pattern_compact">"🔢 Ringkas"</string>
+    <string name="tools_widget_customization">"Penyesuaian Widget"</string>
+    <string name="tools_widget_customization_desc">"Pratonton langsung, carta trend &amp; gaya paparan"</string>
+    <string name="widget_preview_title">"Pratonton Langsung"</string>
+    <string name="widget_preview_tip">"Ketik widget untuk tukar gaya"</string>
+    <string name="widget_style_select_title">"Pilih Gaya Carta"</string>
+    <string name="widget_style_trend_desc">"Keluk bezier licin &amp; kecerunan menunjukkan aliran tunai terkini"</string>
+    <string name="widget_style_bars_desc">"7 bar bulat menyerlahkan hari ini untuk bandingkan belanja mingguan"</string>
+    <string name="widget_style_compact_desc">"Sembunyikan carta untuk fokus pada baki bersih dan bil tertunggak"</string>
+    <string name="widget_applied_toast">"✓ Gaya disimpan, widget skrin utama dikemas kini!"</string>
 </resources>

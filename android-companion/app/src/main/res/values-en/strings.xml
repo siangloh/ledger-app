@@ -1006,4 +1006,13 @@
     <string name="widget_pattern_trend">"📈 Trend"</string>
     <string name="widget_pattern_bars">"📊 7-Day"</string>
     <string name="widget_pattern_compact">"🔢 Compact"</string>
+    <string name="tools_widget_customization">"Widget Customization"</string>
+    <string name="tools_widget_customization_desc">"Live preview, trend charts &amp; display styles"</string>
+    <string name="widget_preview_title">"Live Preview"</string>
+    <string name="widget_preview_tip">"Tap widget to toggle style"</string>
+    <string name="widget_style_select_title">"Select Chart Style"</string>
+    <string name="widget_style_trend_desc">"Smooth bezier curve &amp; gradient glow showing month-to-date cashflow"</string>
+    <string name="widget_style_bars_desc">"7 rounded mini bars highlighting today to track weekly spending spikes"</string>
+    <string name="widget_style_compact_desc">"Hides chart to focus cleanly on net balance and upcoming bills"</string>
+    <string name="widget_applied_toast">"✓ Style saved, home screen widget updated!"</string>
 </resources>

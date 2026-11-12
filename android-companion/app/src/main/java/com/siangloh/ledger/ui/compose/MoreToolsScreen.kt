@@ -262,6 +262,14 @@ fun MoreToolsScreen(
                     }
                 )
             }
+            "widget_customization" -> {
+                WidgetCustomizationPage(
+                    onBack = {
+                        activeSubPage = null
+                        refreshAll()
+                    }
+                )
+            }
             "recycle_bin" -> {
                 RecycleBinPage(
                     onBack = {
@@ -441,6 +449,13 @@ fun MoreToolsScreen(
             item {
                 BudgetManagementCard(
                     onOpenBudget = { activeSubPage = "budget" }
+                )
+            }
+
+            // 6.8 桌面微组件定制与实时预览 (Widget Customization & Live Preview)
+            item {
+                WidgetCustomizationCard(
+                    onOpenWidgetCustomization = { activeSubPage = "widget_customization" }
                 )
             }
 
@@ -2736,6 +2751,68 @@ fun BudgetManagementCard(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = stringResource(R.string.budget_subtitle),
+                    fontSize = 12.sp,
+                    color = Slate500
+                )
+            }
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = Slate400,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Component: 桌面微组件定制与实时预览 (Widget Customization Card)
+// -----------------------------------------------------------------------------
+@Composable
+fun WidgetCustomizationCard(
+    onOpenWidgetCustomization: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenWidgetCustomization),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(PrimaryTealSubtle, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DashboardCustomize,
+                    contentDescription = null,
+                    tint = PrimaryTeal,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.tools_widget_customization),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.tools_widget_customization_desc),
                     fontSize = 12.sp,
                     color = Slate500
                 )
