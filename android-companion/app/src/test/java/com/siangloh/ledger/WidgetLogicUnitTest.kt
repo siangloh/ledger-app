@@ -63,3 +63,4 @@ class WidgetLogicUnitTest {
         assertTrue(AppLanguageManager.formatWidgetMonth(cal, AppLanguageManager.LANG_MS).contains("Nov"))
     }
 }
+

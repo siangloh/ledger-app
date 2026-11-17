@@ -65,7 +65,7 @@ object LocalNotificationParser {
     )
 
     private val MAYBANK_TRANSFER_OUT_PATTERN = Pattern.compile(
-        """(?:transfer of|transferred|transfer|duitnow transfer to|duitnow transfer)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:to)?\s*([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})?""",
+        """(?:transfer of|transferred|transfer|duitnow transfer to|duitnow transfer)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:to|kepada)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})""",
         Pattern.CASE_INSENSITIVE
     )
 
@@ -100,21 +100,55 @@ object LocalNotificationParser {
     )
 
     private val GENERIC_MERCHANT_PATTERN = Pattern.compile(
-        """(?:to|at|@|paid to|transfer to|transferred to|transfer of|payment to|转账给|付款给)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,35})""",
+        """(?:\b(?:paid to|transfer to|transferred to|transfer of|payment to|payment at|spent at|purchase at|bayaran di|transaksi di|kepada|to|at|di|for)|@|转账给|付款给)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,35})""",
         Pattern.CASE_INSENSITIVE
     )
 
+    private val KNOWN_MERCHANT_LABELS = listOf(
+        "petronas" to "PETRONAS",
+        "setel" to "Setel",
+        "shell" to "Shell",
+        "caltex" to "Caltex",
+        "bhpetrol" to "BHPetrol",
+        "bhp" to "BHPetrol",
+        "petron" to "Petron",
+        "ron95" to "Petrol (RON95)",
+        "ron97" to "Petrol (RON97)",
+        "petrol" to "Petrol",
+        "diesel" to "Diesel",
+        "fuel" to "Fuel",
+        "minyak" to "Fuel",
+        "mcdonald" to "McDonald's",
+        "kfc" to "KFC",
+        "starbucks" to "Starbucks",
+        "zus" to "ZUS Coffee",
+        "tealive" to "Tealive",
+        "chagee" to "CHAGEE",
+        "99 speedmart" to "99 Speedmart",
+        "jaya grocer" to "Jaya Grocer",
+        "lotus" to "Lotus's",
+        "aeon" to "AEON",
+        "shopee" to "Shopee",
+        "lazada" to "Lazada",
+        "tnb" to "TNB",
+        "unifi" to "Unifi"
+    )
+
     private val CATEGORY_RULES = listOf(
+        "交通" to listOf(
+            "shell", "petronas", "caltex", "petron", "bhp", "bhpetrol", "setel",
+            "fuel", "petrol", "diesel", "ron95", "ron97", "ron 95", "ron 97",
+            "v-power", "vpower", "primax", "techron", "minyak", "isi minyak",
+            "stesen minyak", "refuel", "engine oil", "lubricant", "oil",
+            "parking", "toll", "plus", "rfid", "smarttag",
+            "touch n go - toll", "rapid", "mrt", "lrt", "monorail", "ktm", "erl",
+            "grab ride", "grabcar", "airasia", "mycar", "indrive", "maxim"
+        ),
         "餐饮" to listOf(
             "mcdonald", "kfc", "starbucks", "zus", "mixue", "subway", "tea", "boba", "coffee",
             "cafe", "kopitiam", "restaurant", "food", "bakery", "hawker", "mamak", "nasi lemak",
             "burger", "pizza", "sushi", "ramen", "hotpot", "tealive", "chagee", "llaollao",
             "dunkin", "secret recipe", "oldtown", "oriental kopi", "marrybrown", "liho"
-        ),
-        "交通" to listOf(
-            "shell", "petronas", "caltex", "petron", "bhp", "parking", "toll", "plus",
-            "touch n go - toll", "rapid", "mrt", "lrt", "monorail", "ktm", "grab ride",
-            "grabcar", "airasia", "mycar", "indrive", "maxim", "petrol"
         ),
         "杂货" to listOf(
             "jaya grocer", "99 speedmart", "speedmart", "lotus", "village grocer", "aeon",
@@ -163,6 +197,10 @@ object LocalNotificationParser {
         val isGrab = pkg.contains("grab") || lower.contains("grab")
         val isMaybank = pkg.contains("maybank") || pkg.contains("m2u") || pkg.contains("mae") || lower.contains("maybank") || lower.contains("mae")
         val isPublicBank = pkg.contains("pbb") || pkg.contains("publicbank") || pkg.contains("mypb") || lower.contains("public bank") || lower.contains("pbb") || lower.contains("mypb")
+        val isSetel = pkg.contains("setel") || lower.contains("setel")
+        val isCimb = pkg.contains("cimb") || lower.contains("cimb")
+        val isRhb = pkg.contains("rhb") || lower.contains("rhb")
+        val isHlb = pkg.contains("hongleong") || pkg.contains("hlb") || lower.contains("hong leong") || lower.contains("hlb")
 
         val today = getToday()
 
@@ -290,9 +328,14 @@ object LocalNotificationParser {
             }
         }
 
-        // 7. 通用兜底解析 (DuitNow QR, CIMB, Public Bank, 银行短信等)
+        // 7. 通用兜底解析 (Setel, DuitNow QR, CIMB, Public Bank, 银行短信等)
         val isTransfer = listOf("transfer", "transferred", "duitnow transfer", "转账", "duitnow to").any { lower.contains(it) }
-        val isExpense = isTransfer || listOf("paid", "spent", "payment to", "payment of", "deducted", "debited", "transfer to", "transferred to", "transfer of", "duitnow qr", "扣款", "支付", "支出", "转账给", "using your cd", "using your card", "card transaction").any { lower.contains(it) }
+        val isExpense = isTransfer || listOf(
+            "paid", "spent", "payment to", "payment of", "deducted", "debited",
+            "transfer to", "transferred to", "transfer of", "duitnow qr",
+            "扣款", "支付", "支出", "转账给", "using your cd", "using your card", "card transaction",
+            "fuel", "refuel", "petrol", "bayar", "bayaran", "transaksi", "berjaya"
+        ).any { lower.contains(it) }
         val isIncome = listOf("received from", "received", "credited", "duitnow transfer from", "transfer from", "收款", "转入", "到账").any { lower.contains(it) }
 
         if (isExpense || isIncome) {
@@ -305,19 +348,44 @@ object LocalNotificationParser {
                         isIncome && !isExpense -> "income"
                         else -> "expense"
                     }
+                    val channel = when {
+                        isSetel -> "Setel"
+                        isTng -> "Touch 'n Go"
+                        isGrab -> "Grab"
+                        isMaybank -> "Maybank"
+                        isPublicBank -> "Public Bank"
+                        isCimb -> "CIMB"
+                        isRhb -> "RHB"
+                        isHlb -> "Hong Leong"
+                        else -> "银行/卡"
+                    }
                     val mMcht = GENERIC_MERCHANT_PATTERN.matcher(trimmed)
-                    val rawMerchant = if (mMcht.find()) cleanMerchant(mMcht.group(1) ?: "") else if (isTransfer) "转账" else if (type == "expense") "本地消费" else "本地入账"
+                    val regexMerchant = if (mMcht.find()) cleanMerchant(mMcht.group(1) ?: "", "") else ""
+                    val rawMerchant = when {
+                        regexMerchant.isNotBlank() -> regexMerchant
+                        isTransfer -> "转账"
+                        type == "income" -> "$channel 入账"
+                        else -> inferBrandFromText(lower) ?: if (channel != "银行/卡") "$channel 消费" else "日常消费"
+                    }
                     val cat = when {
                         isTransfer -> "转账"
                         type == "income" -> "其他收入"
                         else -> predictCategory(rawMerchant, lower)
                     }
-                    val channel = if (isTng) "Touch 'n Go" else if (isGrab) "Grab" else if (isMaybank) "Maybank" else if (isPublicBank) "Public Bank" else "银行/卡"
                     return LocalParsedResult(amt, type, cat, rawMerchant, rawMerchant, channel, today)
                 }
             }
         }
 
+        return null
+    }
+
+    private fun inferBrandFromText(lower: String): String? {
+        for ((kw, label) in KNOWN_MERCHANT_LABELS) {
+            if (matchesKeyword(lower, kw)) {
+                return label
+            }
+        }
         return null
     }
 
@@ -330,8 +398,8 @@ object LocalNotificationParser {
         }
     }
 
-    private fun cleanMerchant(raw: String): String {
-        var cleaned = raw.split(Regex("""[\.\r\n]|\s+(?:on|via|ref|using|with|at|date|txid|claim|get|earn)\b""", RegexOption.IGNORE_CASE))[0].trim()
+    private fun cleanMerchant(raw: String, fallback: String = "日常消费"): String {
+        var cleaned = raw.split(Regex("""[\.\r\n]|\s+(?:on|via|ref|using|with|at|date|txid|claim|get|earn|for)\b""", RegexOption.IGNORE_CASE))[0].trim()
         cleaned = cleaned.trim(' ', '.', '-', ':', ',', '@')
         cleaned = cleaned.replace(Regex("""\s+#?\d{3,10}$"""), "").trim()
         val words = cleaned.split(" ").filter { it.isNotBlank() }
@@ -343,17 +411,24 @@ object LocalNotificationParser {
                 cleaned = words.subList(0, half).joinToString(" ")
             }
         }
-        return if (cleaned.isBlank()) "本地商户" else cleaned
+        return if (cleaned.isBlank()) fallback else cleaned
+    }
+
+    private fun matchesKeyword(textLower: String, keyword: String): Boolean {
+        if (keyword.length <= 4 && keyword.all { it.isLetterOrDigit() }) {
+            return Regex("""\b${Regex.escape(keyword)}\b""").containsMatchIn(textLower)
+        }
+        return textLower.contains(keyword)
     }
 
     fun predictCategory(merchant: String, fullTextLower: String): String {
         val mLower = merchant.lowercase(Locale.ROOT)
         for ((cat, keywords) in CATEGORY_RULES) {
-            if (keywords.any { mLower.contains(it) || fullTextLower.contains(it) }) {
+            if (keywords.any { kw -> matchesKeyword(mLower, kw) || matchesKeyword(fullTextLower, kw) }) {
                 return cat
             }
         }
-        return "餐饮" // 马来西亚小额动账最常见兜底
+        return "其他"
     }
 
     private fun getToday(): String {
