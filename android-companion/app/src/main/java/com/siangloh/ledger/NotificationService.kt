@@ -47,14 +47,17 @@ class NotificationService : NotificationListenerService() {
             "transfer from", "transferred from", "refund from", "payment from", "successful",
             "completed", "you have paid", "you've paid", "sent", "reload", "top up",
             "using your cd", "using your card", "card transaction alert", "card transaction",
-            "bayar", "bayaran", "transaksi", "berjaya", "fuel", "refuel", "petrol"
+            "bayar", "bayaran", "transaksi", "berjaya", "fuel", "refuel", "petrol",
+            "refund", "refunded", "rebate", "cashback credited", "cashback of",
+            "退款", "退回", "回扣", "返现"
         )
 
         // 明确的已完成交易动词特征
         val COMPLETED_TXN_VERBS = listOf(
             "paid", "you have paid", "you've paid", "spent", "deducted", "debited", "charged",
             "transferred", "successful", "completed", "has been deducted", "payment to", "payment of",
-            "已支付", "成功支付", "成功转账", "成功扣款", "扣款", "支出",
+            "credited", "received", "refunded", "refund of", "rebate of", "cashback credited", "cashback of",
+            "已支付", "成功支付", "成功转账", "成功扣款", "扣款", "支出", "退款", "退回", "回扣", "返现",
             "using your cd", "using your card", "card transaction alert", "card transaction",
             "bayaran", "transaksi", "berjaya"
         )

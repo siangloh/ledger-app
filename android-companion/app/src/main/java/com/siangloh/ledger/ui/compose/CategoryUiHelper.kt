@@ -61,7 +61,8 @@ object CategoryUiHelper {
                 clean.contains("奖金") || clean.contains("分红") || clean.contains("bonus") -> "🧧"
                 clean.contains("投资") || clean.contains("利息") || clean.contains("invest") || clean.contains("pelaburan") -> "📈"
                 clean.contains("兼职") || clean.contains("副业") || clean.contains("part-time") || clean.contains("sampingan") -> "💼"
-                clean.contains("退款") || clean.contains("报销") || clean.contains("refund") || clean.contains("reimburse") -> "🧾"
+                clean.contains("退款") || clean.contains("报销") || clean.contains("返现") || clean.contains("回扣") ||
+                    clean.contains("refund") || clean.contains("rebate") || clean.contains("cashback") || clean.contains("reimburse") -> "🧾"
                 else -> "💵"
             }
         }

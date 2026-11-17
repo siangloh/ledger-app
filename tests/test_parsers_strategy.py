@@ -541,3 +541,24 @@ def test_public_bank_parser_card_transaction_alert():
     assert top_result["type"] == "expense"
     assert top_result["category"] == "餐饮"
     assert top_result["merchant"] == "McDonalds"
+
+
+def test_tng_parser_refund_and_rebate():
+    """验证 Touch'n Go 预授权/加油退款与返现回扣通知均能准确识别为收入退款或返现"""
+    parser = TouchNGoParser()
+
+    refund_text = "Touch 'n Go eWallet: Payment of RM150.00 from PETRONAS has been refunded to your eWallet."
+    res_refund = parser.parse(refund_text)
+    assert res_refund is not None
+    assert res_refund.type == "income"
+    assert res_refund.category == "退款"
+    assert res_refund.amount == 150.0
+    assert res_refund.is_refund is True
+
+    rebate_text = "Touch 'n Go eWallet: Cashback of RM 2.50 from PETRONAS credited to your eWallet."
+    res_rebate = parser.parse(rebate_text)
+    assert res_rebate is not None
+    assert res_rebate.type == "income"
+    assert res_rebate.category == "返现"
+    assert res_rebate.amount == 2.5
+    assert res_rebate.is_refund is True

@@ -18,7 +18,7 @@ class TouchNGoParser(NotificationParserStrategy):
         re.IGNORECASE
     )
     REFUND_PATTERN = re.compile(
-        r'(?:refund of|refunded|payment refunded)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:from|for)?\s*([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{0,40})',
+        r'(?:refund of|refunded|payment refunded|rebate of|cashback of|rebate|cashback)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s*(?:from|for)?\s*([A-Za-z0-9\u4e00-\u9fa5\s&\'\.\-_]{0,40})',
         re.IGNORECASE
     )
     TRANSFER_IN_PATTERN = re.compile(
@@ -50,9 +50,11 @@ class TouchNGoParser(NotificationParserStrategy):
         lower_text = text.lower()
         today_str = date.today().isoformat()
 
-        # 1. 检查加油或预授权退款
+        # 1. 检查加油预授权退款或返现回扣
         m_ref = self.REFUND_PATTERN.search(text)
-        if m_ref or any(k in lower_text for k in ['refund', '退款', '退回']):
+        is_rebate = any(k in lower_text for k in ['rebate', 'cashback', '回扣', '返现'])
+        is_refund = any(k in lower_text for k in ['refund', '退款', '退回'])
+        if m_ref or is_refund or is_rebate:
             amt = None
             if m_ref:
                 try:
@@ -65,11 +67,13 @@ class TouchNGoParser(NotificationParserStrategy):
                     amt = float(m_amt.group(1))
 
             if amt and amt > 0:
-                merchant = (m_ref.group(2).strip() if m_ref and m_ref.group(2) else '') or 'TnG预授权/加油退款'
+                default_label = 'TnG消费返现' if (is_rebate and not is_refund) else 'TnG预授权/加油退款'
+                merchant = (self._clean_merchant(m_ref.group(2)) if m_ref and m_ref.group(2) else '') or default_label
+                cat = '返现' if (is_rebate and not is_refund) else '退款'
                 return ParsedNotification(
                     amount=amt,
                     type='income',
-                    category='退款',
+                    category=cat,
                     merchant=merchant,
                     note=merchant,
                     date=today_str,

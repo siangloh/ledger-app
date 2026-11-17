@@ -59,6 +59,11 @@ object LocalNotificationParser {
         Pattern.CASE_INSENSITIVE
     )
 
+    private val REFUND_REBATE_PATTERN = Pattern.compile(
+        """(?:refund of|refunded|payment refunded|rebate of|cashback of|rebate|cashback)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)(?:\s+(?:from|for)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40}))?""",
+        Pattern.CASE_INSENSITIVE
+    )
+
     private val MAYBANK_PAYMENT_PATTERN = Pattern.compile(
         """(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:paid to|transferred to|transfer to)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})""",
         Pattern.CASE_INSENSITIVE
@@ -203,6 +208,24 @@ object LocalNotificationParser {
         val isHlb = pkg.contains("hongleong") || pkg.contains("hlb") || lower.contains("hong leong") || lower.contains("hlb")
 
         val today = getToday()
+
+        // 2.5 优先识别退款 / 返现回扣 (如 Touch 'n Go 预授权退款、加油退差额、消费返现)
+        parseRefundOrRebate(
+            trimmed = trimmed,
+            lower = lower,
+            channel = when {
+                isTng -> "Touch 'n Go"
+                isSetel -> "Setel"
+                isGrab -> "Grab"
+                isMaybank -> "Maybank"
+                isPublicBank -> "Public Bank"
+                isCimb -> "CIMB"
+                isRhb -> "RHB"
+                isHlb -> "Hong Leong"
+                else -> "银行/卡"
+            },
+            today = today
+        )?.let { return it }
 
         // 3. Touch 'n Go 解析
         if (isTng) {
@@ -378,6 +401,47 @@ object LocalNotificationParser {
         }
 
         return null
+    }
+
+    private fun parseRefundOrRebate(
+        trimmed: String,
+        lower: String,
+        channel: String,
+        today: String
+    ): LocalParsedResult? {
+        val isRebate = listOf("rebate", "cashback", "回扣", "返现").any { lower.contains(it) }
+        val isRefund = listOf("refund", "refunded", "退款", "退回", "pulangan").any { lower.contains(it) }
+        if (!isRebate && !isRefund) return null
+
+        val mRef = REFUND_REBATE_PATTERN.matcher(trimmed)
+        var amt = 0.0
+        var rawMerchant = ""
+        if (mRef.find()) {
+            amt = parseAmount(mRef.group(1))
+            rawMerchant = cleanMerchant(mRef.group(2) ?: "", "")
+        }
+        if (amt <= 0.0) {
+            val mRm = GENERIC_RM_PATTERN.matcher(trimmed)
+            if (mRm.find()) {
+                amt = parseAmount(mRm.group(1))
+            }
+        }
+        if (amt <= 0.0) return null
+
+        if (rawMerchant.isBlank()) {
+            val mMcht = GENERIC_MERCHANT_PATTERN.matcher(trimmed)
+            if (mMcht.find()) {
+                val candidate = cleanMerchant(mMcht.group(1) ?: "", "")
+                if (candidate.isNotBlank() && !candidate.lowercase(Locale.ROOT).startsWith("your ")) {
+                    rawMerchant = candidate
+                }
+            }
+        }
+
+        val brand = rawMerchant.ifBlank { inferBrandFromText(lower) ?: channel }
+        val category = if (isRebate && !isRefund) "返现" else "退款"
+        val note = if (isRebate && !isRefund) "$brand 返现" else "$brand 退款"
+        return LocalParsedResult(amt, "income", category, note, note, channel, today)
     }
 
     private fun inferBrandFromText(lower: String): String? {
