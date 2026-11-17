@@ -185,18 +185,22 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                 val chartPattern = prefs.getInt("chart_pattern", WidgetChartRenderer.PATTERN_TREND)
                 val selectedDayIndex = prefs.getInt("selected_day_index", 6).coerceIn(0, 6)
 
-                // 统计近 7 天支出数据 (从 6 天前到今天)
+                // 统计近 7 天支出数据 (从 6 天前到今天，单次批量查询避免多次 DB I/O)
                 val dailyExpenses = mutableListOf<Pair<String, Double>>()
                 val dailyDates = mutableListOf<Calendar>()
                 val barCal = Calendar.getInstance()
                 barCal.add(Calendar.DAY_OF_MONTH, -6)
                 val sdfDay = SimpleDateFormat("dd", Locale.US)
                 val sdfFull = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                val startDateStr = sdfFull.format(barCal.time)
+                val sevenDayTxs = db.localTransactionDao().getByDateRange(startDateStr, todayStr)
+                val sevenDayExpByDate = sevenDayTxs
+                    .filter { it.type == "expense" }
+                    .groupBy { it.date }
                 for (i in 0..6) {
                     val fullDate = sdfFull.format(barCal.time)
                     val label = sdfDay.format(barCal.time)
-                    val dayTxs = db.localTransactionDao().getByDateRange(fullDate, fullDate)
-                    val dayExp = dayTxs.filter { it.type == "expense" }.sumOf { it.amount }
+                    val dayExp = (sevenDayExpByDate[fullDate] ?: emptyList()).sumOf { it.amount }
                     dailyExpenses.add(Pair(label, dayExp))
                     dailyDates.add(barCal.clone() as Calendar)
                     barCal.add(Calendar.DAY_OF_MONTH, 1)
@@ -229,12 +233,8 @@ class LedgerAppWidgetProvider : AppWidgetProvider() {
                         if (trendPoints.size <= 1) {
                             trendPoints.add(0, 0.0)
                         }
-                        // 现金流走势图：若在近7天内，折算到走势图对应的后7个数据点
-                        val trendSelectedIdx = if (trendPoints.size >= 7) {
-                            (trendPoints.size - 7 + selectedDayIndex).coerceIn(0, trendPoints.size - 1)
-                        } else {
-                            selectedDayIndex.coerceIn(0, trendPoints.size - 1)
-                        }
+                        // 现金流走势图：折算到走势图对应的后7个数据点 (兼容月初天数不足7天的情况)
+                        val trendSelectedIdx = (trendPoints.size - 7 + selectedDayIndex).coerceIn(0, trendPoints.size - 1)
                         val chartBitmap = WidgetChartRenderer.drawCashflowTrend(480, 110, trendPoints, trendSelectedIdx)
                         views.setImageViewBitmap(R.id.iv_widget_chart, chartBitmap)
                         views.setViewVisibility(R.id.iv_widget_chart, android.view.View.VISIBLE)

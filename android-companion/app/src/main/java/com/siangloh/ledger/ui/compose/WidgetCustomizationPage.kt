@@ -108,11 +108,7 @@ fun WidgetCustomizationPage(
     val trendBitmap = remember(trendDataPoints, selectedDayIndex) {
         if (trendDataPoints.isEmpty()) null
         else {
-            val trendSelectedIdx = if (trendDataPoints.size >= 7) {
-                (trendDataPoints.size - 7 + selectedDayIndex).coerceIn(0, trendDataPoints.size - 1)
-            } else {
-                selectedDayIndex.coerceIn(0, trendDataPoints.size - 1)
-            }
+            val trendSelectedIdx = (trendDataPoints.size - 7 + selectedDayIndex).coerceIn(0, trendDataPoints.size - 1)
             WidgetChartRenderer.drawCashflowTrend(480, 110, trendDataPoints, trendSelectedIdx)
         }
     }
@@ -222,25 +218,31 @@ fun WidgetCustomizationPage(
                 }
                 trendDataPoints = trendPoints
 
-                // 预渲染 7 日柱状图
+                // 预渲染 7 日柱状图 (单次批量查询)
                 val dailyExpenses = mutableListOf<Pair<String, Double>>()
                 val dailyDates = mutableListOf<Calendar>()
                 val barCal = Calendar.getInstance()
                 barCal.add(Calendar.DAY_OF_MONTH, -6)
                 val sdfDay = SimpleDateFormat("dd", Locale.US)
                 val sdfFull = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                val startDateStr = sdfFull.format(barCal.time)
+                val sevenDayTxs = db.localTransactionDao().getByDateRange(startDateStr, todayQuery)
+                val sevenDayExpByDate = sevenDayTxs
+                    .filter { it.type == "expense" }
+                    .groupBy { it.date }
                 for (i in 0..6) {
                     val fullDate = sdfFull.format(barCal.time)
                     val label = sdfDay.format(barCal.time)
-                    val dayTxs = db.localTransactionDao().getByDateRange(fullDate, fullDate)
-                    val dayExpAmt = dayTxs.filter { it.type == "expense" }.sumOf { it.amount }
+                    val dayExpAmt = (sevenDayExpByDate[fullDate] ?: emptyList()).sumOf { it.amount }
                     dailyExpenses.add(Pair(label, dayExpAmt))
                     dailyDates.add(barCal.clone() as Calendar)
                     barCal.add(Calendar.DAY_OF_MONTH, 1)
                 }
                 dailyExpenseList = dailyExpenses
                 dailyDateList = dailyDates
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                android.util.Log.w("WidgetCustomization", "Failed to load widget preview data: ${e.message}", e)
+            }
         }
     }
 
