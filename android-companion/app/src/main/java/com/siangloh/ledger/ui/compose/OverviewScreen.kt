@@ -791,31 +791,7 @@ fun OverviewScreen(
                         income = overviewData.incomeAmount,
                         expense = overviewData.totalSpending,
                         savings = overviewData.savingsAmount,
-                        net = overviewData.netSavings,
-                        onOpenDetail = {
-                            when (period) {
-                                "3m" -> {
-                                    val startMonth = shiftMonthString(currentMonthStr, -2)
-                                    val startDate = "$startMonth-01"
-                                    val cal = Calendar.getInstance().apply {
-                                        val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-                                        time = sdf.parse(currentMonthStr) ?: Date()
-                                    }
-                                    val lastDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
-                                    val endDate = String.format(Locale.getDefault(), "%s-%02d", currentMonthStr, lastDay)
-                                    onNavigateToCashflow(currentMonthStr, startDate, endDate)
-                                }
-                                "year" -> {
-                                    val yr = calendar.get(Calendar.YEAR)
-                                    val startDate = "$yr-01-01"
-                                    val endDate = "$yr-12-31"
-                                    onNavigateToCashflow(currentMonthStr, startDate, endDate)
-                                }
-                                else -> {
-                                    onNavigateToCashflow(currentMonthStr, null, null)
-                                }
-                            }
-                        }
+                        net = overviewData.netSavings
                     )
                 }
 
@@ -1228,15 +1204,16 @@ fun UnifiedOverviewHeroCard(
     expense: Double,
     savings: Double = 0.0,
     net: Double,
-    onOpenDetail: () -> Unit
+    onOpenDetail: (() -> Unit)? = null
 ) {
     val isPositive = net >= 0
     val expensePct = if (income > 0) (expense / income * 100.0).coerceIn(0.0, 100.0) else (if (expense > 0) 100.0 else 0.0)
     val savingsPct = if (income > 0) (savings / income * 100.0).coerceIn(0.0, 100.0) else 0.0
 
     Card(
-        onClick = onOpenDetail,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onOpenDetail != null) Modifier.clickable(onClick = onOpenDetail) else Modifier),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, Slate200),
@@ -1262,20 +1239,22 @@ fun UnifiedOverviewHeroCard(
                     fontSize = 15.sp,
                     color = Slate900
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = stringResource(R.string.view_cashflow_detail),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = PrimaryTeal
-                    )
-                    Spacer(Modifier.width(2.dp))
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        tint = PrimaryTeal,
-                        modifier = Modifier.size(13.dp)
-                    )
+                if (onOpenDetail != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = stringResource(R.string.view_cashflow_detail),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PrimaryTeal
+                        )
+                        Spacer(Modifier.width(2.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = PrimaryTeal,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
                 }
             }
 
