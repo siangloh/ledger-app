@@ -1493,6 +1493,10 @@ fun EditTransactionBottomSheet(
     var savingsCategories by remember { mutableStateOf<List<com.siangloh.ledger.data.CategoryRecord>>(emptyList()) }
     var showCustomCategoryDialog by remember { mutableStateOf(false) }
     var customCategoryInput by remember { mutableStateOf("") }
+    var showRebateDialog by remember { mutableStateOf(false) }
+    var isLoadingExpenses by remember { mutableStateOf(false) }
+    var recentExpenses by remember { mutableStateOf<List<TransactionRecord>>(emptyList()) }
+    var isOffsetting by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(Unit) {
@@ -1604,6 +1608,44 @@ fun EditTransactionBottomSheet(
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
                         }
+                    }
+                }
+
+                // 当为收入记录时，提供「抵扣支出 (回扣/AA还款)」快捷入口
+                if (tx.type == "income") {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = {
+                            showRebateDialog = true
+                            isLoadingExpenses = true
+                            scope.launch {
+                                NativeLedgerApi.getRecentExpenses(context, 20)
+                                    .onSuccess { recentExpenses = it }
+                                    .onFailure {
+                                        Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                isLoadingExpenses = false
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.45f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color(0xFFF0FDFA),
+                            contentColor = PrimaryTeal
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ReceiptLong,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.records_rebate_btn),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
 
@@ -1962,6 +2004,145 @@ fun EditTransactionBottomSheet(
                 }
             }
         }
+    }
+
+    // 选择目标支出进行抵扣/回扣弹窗
+    if (showRebateDialog) {
+        val incomeAmtStr = "RM ${String.format(Locale.getDefault(), "%.2f", tx.amount)}"
+        AlertDialog(
+            onDismissRequest = { if (!isOffsetting) showRebateDialog = false },
+            containerColor = Color.White,
+            title = {
+                Text(
+                    text = stringResource(R.string.records_rebate_dialog_title),
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900
+                )
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = stringResource(R.string.records_rebate_dialog_desc, incomeAmtStr),
+                        fontSize = 12.sp,
+                        color = Slate600
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    when {
+                        isLoadingExpenses -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(140.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = PrimaryTeal, modifier = Modifier.size(28.dp))
+                            }
+                        }
+                        recentExpenses.isEmpty() -> {
+                            Text(
+                                text = stringResource(R.string.records_rebate_empty),
+                                fontSize = 13.sp,
+                                color = Slate500,
+                                modifier = Modifier.padding(vertical = 16.dp)
+                            )
+                        }
+                        else -> {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 320.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(recentExpenses, key = { it.id }) { exp ->
+                                    val afterAmt = kotlin.math.max(0.0, exp.amount - tx.amount)
+                                    val catIcon = CategoryUiHelper.getCategoryEmoji(exp.category, exp.type)
+                                    val catTitle = CategoryUiHelper.getLocalizedCategoryName(context, exp.category)
+                                    val expNote = CategoryUiHelper.getLocalizedNote(context, exp.note).ifBlank { catTitle }
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = Slate50,
+                                        border = BorderStroke(1.dp, Slate200),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable(enabled = !isOffsetting) {
+                                                isOffsetting = true
+                                                scope.launch {
+                                                    NativeLedgerApi.offsetExpenseWithIncome(context, tx.id, exp.id)
+                                                        .onSuccess { msg ->
+                                                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                                            showRebateDialog = false
+                                                            onSaveSuccess()
+                                                        }
+                                                        .onFailure { err ->
+                                                            Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${err.message}", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    isOffsetting = false
+                                                }
+                                            }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Text(catIcon, fontSize = 18.sp)
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Column {
+                                                    Text(
+                                                        text = expNote,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = Slate900,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Text(
+                                                        text = "$catTitle · ${exp.date}",
+                                                        fontSize = 11.sp,
+                                                        color = Slate500
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column(horizontalAlignment = Alignment.End) {
+                                                Text(
+                                                    text = "RM ${String.format(Locale.getDefault(), "%.2f", exp.amount)}",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Slate800
+                                                )
+                                                Text(
+                                                    text = "→ RM ${String.format(Locale.getDefault(), "%.2f", afterAmt)}",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = PrimaryTeal
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(
+                    onClick = { showRebateDialog = false },
+                    enabled = !isOffsetting
+                ) {
+                    Text(stringResource(R.string.common_cancel), color = Slate600)
+                }
+            }
+        )
     }
 }
 

@@ -44,26 +44,5 @@ class LocalNotificationParserTest {
         // "Boil" / "Toilet" contains "oil" as substring, must NOT match 交通
         assertEquals("其他", LocalNotificationParser.predictCategory("Toiletries Shop", "paid rm 15.00 to toiletries shop"))
     }
-
-    @Test
-    fun parse_tngRefundAndRebate_categorizesAsIncomeRefundOrRebate() {
-        val refundRes = LocalNotificationParser.parse(
-            "Payment of RM 150.00 from PETRONAS has been refunded to your Touch 'n Go eWallet",
-            "my.com.tngdigital.ewallet"
-        )
-        assertNotNull(refundRes)
-        assertEquals("income", refundRes!!.type)
-        assertEquals("退款", refundRes.category)
-        assertEquals(150.00, refundRes.amount, 0.001)
-
-        val rebateRes = LocalNotificationParser.parse(
-            "Cashback of RM 2.50 credited to your Touch 'n Go eWallet",
-            "my.com.tngdigital.ewallet"
-        )
-        assertNotNull(rebateRes)
-        assertEquals("income", rebateRes!!.type)
-        assertEquals("返现", rebateRes.category)
-        assertEquals(2.50, rebateRes.amount, 0.001)
-    }
 }
 

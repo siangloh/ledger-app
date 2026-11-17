@@ -457,6 +457,99 @@ object LocalLedgerRepository {
         }
     }
 
+    /**
+     * 获取近期支出记录，供收入/回扣/朋友还款进行手动抵扣选择
+     */
+    suspend fun getRecentExpenses(context: Context, limit: Int = 20): Result<List<TransactionRecord>> = withContext(Dispatchers.IO) {
+        try {
+            val db = AppDatabase.getInstance(context)
+            val accountsMap = db.localAccountDao().getAll().associateBy { it.id }
+            val expenses = db.localTransactionDao().getAll()
+                .filter { it.type == "expense" }
+                .take(limit)
+                .map { tx ->
+                    val acc = tx.accountId?.let { accountsMap[it] }
+                        ?: resolveAccountFallback(tx.channel, tx.note, accountsMap.values)
+                    TransactionRecord(
+                        id = tx.id,
+                        date = tx.date,
+                        type = tx.type,
+                        category = tx.category,
+                        amount = tx.amount,
+                        note = tx.note,
+                        tags = tx.tags,
+                        accountId = tx.accountId ?: acc?.id,
+                        accountName = acc?.name ?: "默认账户",
+                        accountType = acc?.type ?: "savings",
+                        source = tx.source,
+                        channel = tx.channel,
+                        sourceLabel = if (tx.source == "auto_notification") "自动记账" else "手动记账",
+                        channelLabel = tx.channel
+                    )
+                }
+            Result.success(expenses)
+        } catch (e: Exception) {
+            Log.e(TAG, "getRecentExpenses failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 将一笔收入（如朋友 AA 转账、TNG 退款/回扣）手动抵扣到指定的历史支出中：
+     * 扣减目标支出金额并追加抵扣备注，同时移除该笔虚增收入记录。
+     */
+    suspend fun offsetExpenseWithIncome(
+        context: Context,
+        incomeTxId: Long,
+        targetExpenseId: Long
+    ): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val db = AppDatabase.getInstance(context)
+            val incomeTx = db.localTransactionDao().getById(incomeTxId)
+                ?: return@withContext Result.failure(Exception("未找到该笔收入记录"))
+            if (incomeTx.type != "income") {
+                return@withContext Result.failure(Exception("仅支持将收入记录用于抵扣支出"))
+            }
+
+            val targetExpense = db.localTransactionDao().getById(targetExpenseId)
+                ?: return@withContext Result.failure(Exception("未找到目标支出记录"))
+            if (targetExpense.type != "expense") {
+                return@withContext Result.failure(Exception("目标记录必须是支出类型"))
+            }
+
+            val offsetAmt = incomeTx.amount
+            val newAmt = kotlin.math.max(0.0, kotlin.math.round((targetExpense.amount - offsetAmt) * 100.0) / 100.0)
+            val amtStr = "RM ${String.format(Locale.getDefault(), "%.2f", offsetAmt)}"
+            val newAmtStr = "RM ${String.format(Locale.getDefault(), "%.2f", newAmt)}"
+            val lang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
+            val appCtx = com.siangloh.ledger.util.AppLanguageManager.wrapContext(context.applicationContext, lang)
+            val tag = appCtx.getString(com.siangloh.ledger.R.string.records_rebate_tag_fmt, amtStr)
+            val oldNote = targetExpense.note.trim()
+            val newNote = if (oldNote.isNotEmpty()) "$oldNote $tag" else tag
+
+            val updatedExpense = targetExpense.copy(
+                amount = newAmt,
+                note = newNote,
+                updatedAt = System.currentTimeMillis()
+            )
+            db.localTransactionDao().update(updatedExpense)
+            db.localTransactionDao().deleteById(incomeTxId)
+
+            cloudSyncScope.launch {
+                TursoCloudClient.updateTransaction(appCtx, updatedExpense)
+                TursoCloudClient.deleteTransaction(appCtx, incomeTxId, permanent = true)
+            }
+            notifyDataChanged(context)
+
+            val catDisplay = com.siangloh.ledger.ui.compose.CategoryUiHelper.getLocalizedCategoryName(appCtx, targetExpense.category)
+            val msg = appCtx.getString(com.siangloh.ledger.R.string.records_rebate_success_fmt, catDisplay, amtStr, newAmtStr)
+            Result.success(msg)
+        } catch (e: Exception) {
+            Log.e(TAG, "offsetExpenseWithIncome failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
     suspend fun restoreTransaction(context: Context, record: TransactionRecord): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val db = AppDatabase.getInstance(context)

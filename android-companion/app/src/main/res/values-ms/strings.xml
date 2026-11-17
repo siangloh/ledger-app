@@ -1022,4 +1022,12 @@
     <string name="widget_style_bars_desc">"7 bar bulat menyerlahkan hari ini untuk bandingkan belanja mingguan"</string>
     <string name="widget_style_compact_desc">"Sembunyikan carta untuk fokus pada baki bersih dan bil tertunggak"</string>
     <string name="widget_applied_toast">"✓ Gaya disimpan, widget skrin utama dikemas kini!"</string>
+
+    <!-- Rebat / Tolak Perbelanjaan -->
+    <string name="records_rebate_btn">"Tolak Perbelanjaan (Rebat)"</string>
+    <string name="records_rebate_dialog_title">"Pilih Perbelanjaan untuk Rebat"</string>
+    <string name="records_rebate_dialog_desc">"Tolak %1$s daripada perbelanjaan supaya tidak dikira sebagai pendapatan:"</string>
+    <string name="records_rebate_empty">"Tiada rekod perbelanjaan terkini"</string>
+    <string name="records_rebate_tag_fmt">"[Rebat ditolak %1$s]"</string>
+    <string name="records_rebate_success_fmt">"Berjaya ditolak! %2$s dikurangkan daripada \"%1$s\" (kini %3$s)"</string>
 </resources>

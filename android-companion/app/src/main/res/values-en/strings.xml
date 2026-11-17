@@ -1022,4 +1022,12 @@
     <string name="widget_style_bars_desc">"7 rounded mini bars highlighting today to track weekly spending spikes"</string>
     <string name="widget_style_compact_desc">"Hides chart to focus cleanly on net balance and upcoming bills"</string>
     <string name="widget_applied_toast">"✓ Style saved, home screen widget updated!"</string>
+
+    <!-- Rebate / Expense Offset -->
+    <string name="records_rebate_btn">"Offset Expense (Rebate)"</string>
+    <string name="records_rebate_dialog_title">"Select Expense to Offset"</string>
+    <string name="records_rebate_dialog_desc">"Deduct %1$s from an expense so it is not counted as income:"</string>
+    <string name="records_rebate_empty">"No recent expense records available"</string>
+    <string name="records_rebate_tag_fmt">"[Rebate offset %1$s]"</string>
+    <string name="records_rebate_success_fmt">"Offset applied! Deducted %2$s from \"%1$s\" (now %3$s)"</string>
 </resources>

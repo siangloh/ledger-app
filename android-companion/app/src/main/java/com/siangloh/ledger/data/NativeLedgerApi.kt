@@ -455,6 +455,15 @@ object NativeLedgerApi {
         LocalLedgerRepository.restoreTransaction(context, record)
     }
 
+    suspend fun getRecentExpenses(context: Context, limit: Int = 20): Result<List<TransactionRecord>> = withContext(Dispatchers.IO) {
+        LocalLedgerRepository.getRecentExpenses(context, limit)
+    }
+
+    suspend fun offsetExpenseWithIncome(context: Context, incomeTxId: Long, targetExpenseId: Long): Result<String> = withContext(Dispatchers.IO) {
+        invalidateCache()
+        LocalLedgerRepository.offsetExpenseWithIncome(context, incomeTxId, targetExpenseId)
+    }
+
     suspend fun getAccounts(context: Context, forceRefresh: Boolean = false): Result<AccountsSummary> = withContext(Dispatchers.IO) {
         LocalLedgerRepository.getAccountsSummary(context)
     }
