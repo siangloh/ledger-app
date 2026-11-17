@@ -484,13 +484,45 @@ object LocalLedgerRepository {
                         source = tx.source,
                         channel = tx.channel,
                         sourceLabel = if (tx.source == "auto_notification") "自动记账" else "手动记账",
-                        channelLabel = tx.channel
+                        channelLabel = tx.channel,
+                        toAccountId = tx.toAccountId
                     )
                 }
             Result.success(expenses)
         } catch (e: Exception) {
             Log.e(TAG, "getRecentExpenses failed: ${e.message}", e)
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Pure calculation helper for Rebate/Offset: deducts offsetAmount from expenseAmount (clamped at 0.00)
+     * and appends the rebate tag cleanly to existingNote.
+     */
+    fun computeRebateOffset(
+        expenseAmount: Double,
+        offsetAmount: Double,
+        existingNote: String,
+        tag: String
+    ): Pair<Double, String> {
+        val newAmt = kotlin.math.max(0.0, kotlin.math.round((expenseAmount - offsetAmount) * 100.0) / 100.0)
+        val oldNote = existingNote.trim()
+        val newNote = if (oldNote.isNotEmpty()) "$oldNote $tag" else tag
+        return newAmt to newNote
+    }
+
+    suspend fun findMatchingNotificationRawText(context: Context, amount: Double): String? = withContext(Dispatchers.IO) {
+        try {
+            val db = AppDatabase.getInstance(context)
+            val logs = db.notificationLogDao().getRecentLogs()
+            val formatted = String.format(Locale.US, "%.2f", amount)
+            val plain = if (amount % 1.0 == 0.0) amount.toInt().toString() else formatted
+            logs.firstOrNull { log ->
+                log.rawText.contains(formatted) || (plain != formatted && log.rawText.contains("RM$plain"))
+            }?.rawText
+        } catch (e: Exception) {
+            Log.w(TAG, "findMatchingNotificationRawText failed: ${e.message}")
+            null
         }
     }
 
@@ -518,14 +550,12 @@ object LocalLedgerRepository {
             }
 
             val offsetAmt = incomeTx.amount
-            val newAmt = kotlin.math.max(0.0, kotlin.math.round((targetExpense.amount - offsetAmt) * 100.0) / 100.0)
             val amtStr = "RM ${String.format(Locale.getDefault(), "%.2f", offsetAmt)}"
-            val newAmtStr = "RM ${String.format(Locale.getDefault(), "%.2f", newAmt)}"
             val lang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
             val appCtx = com.siangloh.ledger.util.AppLanguageManager.wrapContext(context.applicationContext, lang)
             val tag = appCtx.getString(com.siangloh.ledger.R.string.records_rebate_tag_fmt, amtStr)
-            val oldNote = targetExpense.note.trim()
-            val newNote = if (oldNote.isNotEmpty()) "$oldNote $tag" else tag
+            val (newAmt, newNote) = computeRebateOffset(targetExpense.amount, offsetAmt, targetExpense.note, tag)
+            val newAmtStr = "RM ${String.format(Locale.getDefault(), "%.2f", newAmt)}"
 
             val updatedExpense = targetExpense.copy(
                 amount = newAmt,
@@ -770,7 +800,8 @@ object LocalLedgerRepository {
                     source = tx.source,
                     channel = tx.channel,
                     sourceLabel = if (tx.source == "auto_notification") "自动记账" else "手动记账",
-                    channelLabel = tx.channel
+                    channelLabel = tx.channel,
+                    toAccountId = tx.toAccountId
                 )
             }
 

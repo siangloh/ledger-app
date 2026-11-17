@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -70,7 +71,7 @@ fun MainAppScreen(
 
     val navItems = listOf(
         NavItem(stringResource(R.string.nav_overview), Icons.Default.Dashboard),
-        NavItem(stringResource(R.string.nav_records), Icons.Default.ReceiptLong),
+        NavItem(stringResource(R.string.nav_records), Icons.AutoMirrored.Filled.ReceiptLong),
         NavItem(stringResource(R.string.nav_add), Icons.Default.AddCircle, isPrimaryAction = true),
         NavItem(stringResource(R.string.nav_analytics), Icons.Default.BarChart),
         NavItem(stringResource(R.string.nav_more), Icons.Default.Widgets)
@@ -158,18 +159,8 @@ fun MainAppScreen(
                                 overviewRevision = overviewRevision,
                                 onNavigateToRecords = { selectedTab = 1 },
                                 onNavigateToAdd = { selectedTab = 2 },
-                                onNavigateToAccounts = { selectedTab = 4 },
-                                onNavigateToTools = { selectedTab = 4 },
                                 onScanReceipt = onScanReceipt,
-                                onOpenSettings = onOpenSettings,
-                                onNavigateToCashflow = { m, sDate, eDate ->
-                                    cashflowMonth = m
-                                    cashflowStartDate = sDate
-                                    cashflowEndDate = eDate
-                                    cashflowRevision++
-                                    selectedTab = 3
-                                },
-                                cashflowRevision = cashflowRevision
+                                onOpenSettings = onOpenSettings
                             )
                         }
                         1 -> {

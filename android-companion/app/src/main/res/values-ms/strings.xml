@@ -623,6 +623,10 @@
     <string name="records_edit_category_label">Kategori</string>
     <string name="records_edit_date_label">Tarikh</string>
     <string name="records_edit_account_label">Akaun Sumber</string>
+    <string name="records_edit_to_account_label">Ke Akaun</string>
+    <string name="records_edit_transfer_same_account_err">Akaun sumber dan destinasi tidak boleh sama</string>
+    <string name="records_view_raw_notification">Lihat Pemberitahuan Asal</string>
+    <string name="records_raw_notification_title">Pemberitahuan Asal</string>
     <string name="records_edit_unspecified">Tidak ditentukan</string>
     <string name="records_edit_note_label">Peniaga / Catatan</string>
     <string name="records_edit_tags_label">Tag (cth. #food #lunch)</string>

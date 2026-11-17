@@ -623,6 +623,10 @@
     <string name="records_edit_category_label">Category</string>
     <string name="records_edit_date_label">Date</string>
     <string name="records_edit_account_label">From Account</string>
+    <string name="records_edit_to_account_label">To Account</string>
+    <string name="records_edit_transfer_same_account_err">Source and destination accounts cannot be the same</string>
+    <string name="records_view_raw_notification">View Original Notification</string>
+    <string name="records_raw_notification_title">Original Notification</string>
     <string name="records_edit_unspecified">Unspecified</string>
     <string name="records_edit_note_label">Merchant / Note</string>
     <string name="records_edit_tags_label">Tags (e.g. #food #lunch)</string>

@@ -623,6 +623,10 @@
     <string name="records_edit_category_label">分类</string>
     <string name="records_edit_date_label">记账日期</string>
     <string name="records_edit_account_label">账户来源 (From)</string>
+    <string name="records_edit_to_account_label">转入账户 (To)</string>
+    <string name="records_edit_transfer_same_account_err">内部互转的转出和转入账户不能相同</string>
+    <string name="records_view_raw_notification">查看抓取原文</string>
+    <string name="records_raw_notification_title">原始通知内容</string>
     <string name="records_edit_unspecified">未指定</string>
     <string name="records_edit_note_label">商户 / 备注</string>
     <string name="records_edit_tags_label">标签 (如: #food #lunch)</string>

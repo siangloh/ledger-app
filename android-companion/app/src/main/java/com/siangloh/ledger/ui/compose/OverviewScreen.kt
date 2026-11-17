@@ -342,14 +342,8 @@ fun OverviewScreen(
     overviewRevision: Int = 0,
     onNavigateToRecords: () -> Unit = {},
     onNavigateToAdd: () -> Unit = {},
-    onNavigateToAccounts: () -> Unit = {},
-    onNavigateToTools: () -> Unit = {},
     onScanReceipt: () -> Unit = {},
-    onOpenSettings: () -> Unit = {},
-    onNavigateToWeb: () -> Unit = onNavigateToRecords,
-    onQuickAdd: () -> Unit = onNavigateToAdd,
-    onNavigateToCashflow: (month: String, startDate: String?, endDate: String?) -> Unit = { _, _, _ -> },
-    cashflowRevision: Int = 0
+    onOpenSettings: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -618,7 +612,7 @@ fun OverviewScreen(
         refreshData(forceRefresh = false)
     }
 
-    LaunchedEffect(isActive, overviewRevision, cashflowRevision) {
+    LaunchedEffect(isActive, overviewRevision) {
         if (isActive) {
             if (!userSelectedMonthManually) {
                 val realNowMonth = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())

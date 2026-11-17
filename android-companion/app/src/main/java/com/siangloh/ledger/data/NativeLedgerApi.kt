@@ -40,7 +40,8 @@ data class TransactionRecord(
     val updatedAt: String? = null,
     val lastEditSource: String? = null,
     val isEdited: Boolean = false,
-    val hasMergedEvidence: Boolean = false
+    val hasMergedEvidence: Boolean = false,
+    val toAccountId: Int? = null
 )
 
 data class TransactionsPage(
@@ -439,10 +440,11 @@ object NativeLedgerApi {
         date: String,
         note: String,
         tags: String,
-        accountId: Int? = null
+        accountId: Int? = null,
+        toAccountId: Int? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
         invalidateCache()
-        LocalLedgerRepository.updateTransaction(context, txId, date, type, category, amount, note, tags, accountId)
+        LocalLedgerRepository.updateTransaction(context, txId, date, type, category, amount, note, tags, accountId, toAccountId)
     }
 
     suspend fun deleteTransaction(context: Context, txId: Long): Result<Unit> = withContext(Dispatchers.IO) {
@@ -462,6 +464,10 @@ object NativeLedgerApi {
     suspend fun offsetExpenseWithIncome(context: Context, incomeTxId: Long, targetExpenseId: Long): Result<String> = withContext(Dispatchers.IO) {
         invalidateCache()
         LocalLedgerRepository.offsetExpenseWithIncome(context, incomeTxId, targetExpenseId)
+    }
+
+    suspend fun findMatchingNotificationRawText(context: Context, amount: Double): String? = withContext(Dispatchers.IO) {
+        LocalLedgerRepository.findMatchingNotificationRawText(context, amount)
     }
 
     suspend fun getAccounts(context: Context, forceRefresh: Boolean = false): Result<AccountsSummary> = withContext(Dispatchers.IO) {

@@ -1483,6 +1483,9 @@ fun EditTransactionBottomSheet(
     var category by remember { mutableStateOf(tx.category) }
     var dateStr by remember { mutableStateOf(tx.date) }
     var selectedAccountId by remember { mutableStateOf<Int?>(tx.accountId) }
+    var selectedToAccountId by remember { mutableStateOf<Int?>(tx.toAccountId) }
+    var rawNotificationText by remember { mutableStateOf<String?>(null) }
+    var showRawNotificationDialog by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf(CategoryUiHelper.getLocalizedNote(context, tx.note)) }
     var tags by remember { mutableStateOf(CategoryUiHelper.getLocalizedTagName(context, tx.tags)) }
     var txType by remember { mutableStateOf(tx.type) }
@@ -1509,6 +1512,15 @@ fun EditTransactionBottomSheet(
             expenseCategories = catGroup.expenses
             incomeCategories = catGroup.incomes
             savingsCategories = catGroup.savings
+        }
+        if (tx.source == "auto_notification") {
+            rawNotificationText = NativeLedgerApi.findMatchingNotificationRawText(context, tx.amount)
+        }
+    }
+
+    LaunchedEffect(txType, accountsList) {
+        if (txType == "transfer" && selectedToAccountId == null && accountsList.size >= 2) {
+            selectedToAccountId = accountsList.firstOrNull { it.id != selectedAccountId }?.id
         }
     }
 
@@ -1931,6 +1943,77 @@ fun EditTransactionBottomSheet(
                     }
                 }
 
+                if (txType == "transfer" && accountsList.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.records_edit_to_account_label),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate800
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        accountsList.forEach { acc ->
+                            val isSelected = selectedToAccountId == acc.id
+                            val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(acc.name, null)
+                            val chipBg = if (isSelected) PrimaryTeal else badgeCfg.containerColor
+                            val chipFg = if (isSelected) Color.White else badgeCfg.contentColor
+                            val chipBorder = if (isSelected) null else BorderStroke(0.8.dp, if (badgeCfg.borderColor != Color.Transparent) badgeCfg.borderColor else Slate200)
+
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = chipBg,
+                                border = chipBorder,
+                                modifier = Modifier.clickable { selectedToAccountId = acc.id }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                                ) {
+                                    BrandIcon(config = badgeCfg, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = CategoryUiHelper.getLocalizedAccountName(context, acc.name),
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = chipFg
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!rawNotificationText.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = { showRawNotificationDialog = true },
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Slate200),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Slate700),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Notifications,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp),
+                            tint = PrimaryTeal
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.records_view_raw_notification),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(14.dp))
 
                 // 商户 / 备注
@@ -1967,6 +2050,10 @@ fun EditTransactionBottomSheet(
                             Toast.makeText(context, context.getString(R.string.records_edit_amount_invalid), Toast.LENGTH_SHORT).show()
                             return@Button
                         }
+                        if (txType == "transfer" && selectedAccountId != null && selectedToAccountId != null && selectedAccountId == selectedToAccountId) {
+                            Toast.makeText(context, context.getString(R.string.records_edit_transfer_same_account_err), Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
                         isSaving = true
                         scope.launch {
                             val res = NativeLedgerApi.updateTransaction(
@@ -1978,7 +2065,8 @@ fun EditTransactionBottomSheet(
                                 date = dateStr,
                                 note = note,
                                 tags = tags,
-                                accountId = selectedAccountId
+                                accountId = selectedAccountId,
+                                toAccountId = if (txType == "transfer") selectedToAccountId else null
                             )
                             isSaving = false
                             res.onSuccess {
@@ -2004,6 +2092,41 @@ fun EditTransactionBottomSheet(
                 }
             }
         }
+    }
+
+    if (showRawNotificationDialog && !rawNotificationText.isNullOrBlank()) {
+        AlertDialog(
+            onDismissRequest = { showRawNotificationDialog = false },
+            containerColor = Color.White,
+            title = {
+                Text(
+                    text = stringResource(R.string.records_raw_notification_title),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900
+                )
+            },
+            text = {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Slate50,
+                    border = BorderStroke(1.dp, Slate200),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = rawNotificationText ?: "",
+                        fontSize = 13.sp,
+                        color = Slate700,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showRawNotificationDialog = false }) {
+                    Text(stringResource(R.string.common_confirm), color = PrimaryTeal, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
     }
 
     // 选择目标支出进行抵扣/回扣弹窗
