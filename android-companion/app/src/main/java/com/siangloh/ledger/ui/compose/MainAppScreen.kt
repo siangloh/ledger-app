@@ -47,29 +47,26 @@ fun MainAppScreen(
     onLogout: () -> Unit = {},
     onOpenWebUrl: (String) -> Unit = {}
 ) {
-    var selectedTab by rememberSaveable { mutableIntStateOf(initialTab) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(if (openCashflowOnStart) 3 else initialTab) }
     val currentMonthStr = remember { java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US).format(java.util.Date()) }
-    var cashflowMonth by rememberSaveable { mutableStateOf<String?>(if (openCashflowOnStart) currentMonthStr else null) }
+    var cashflowMonth by rememberSaveable { mutableStateOf(currentMonthStr) }
     var cashflowStartDate by rememberSaveable { mutableStateOf<String?>(null) }
     var cashflowEndDate by rememberSaveable { mutableStateOf<String?>(null) }
-    var cashflowVisible by rememberSaveable { mutableStateOf(openCashflowOnStart) }
 
     LaunchedEffect(openCashflowOnStart) {
         if (openCashflowOnStart) {
-            selectedTab = 0
             cashflowMonth = currentMonthStr
-            cashflowVisible = true
+            cashflowStartDate = null
+            cashflowEndDate = null
+            selectedTab = 3
         }
     }
     var cashflowRevision by remember { mutableIntStateOf(0) }
     var overviewRevision by remember { mutableIntStateOf(0) }
     var showBudgetDialog by rememberSaveable { mutableStateOf(false) }
     val saveableStateHolder = rememberSaveableStateHolder()
-    val detailParallax by animateFloatAsState(
-        targetValue = if (cashflowVisible && selectedTab == 0) -0.08f else 0f,
-        animationSpec = tween(300, easing = FastOutSlowInEasing), label = "detailParallax")
 
-    BackHandler(enabled = selectedTab != 0 && !cashflowVisible) { selectedTab = 0 }
+    BackHandler(enabled = selectedTab != 0) { selectedTab = 0 }
 
     val navItems = listOf(
         NavItem(stringResource(R.string.nav_overview), Icons.Default.Dashboard),
@@ -98,12 +95,11 @@ fun MainAppScreen(
                         NavigationBarItem(
                             selected = isSelected,
                             onClick = {
-                                if (cashflowVisible) {
-                                    cashflowVisible = false
-                                    cashflowRevision++
-                                }
                                 if (index == 0 && selectedTab != 0) {
                                     overviewRevision++
+                                }
+                                if (index == 3 && selectedTab != 3) {
+                                    cashflowRevision++
                                 }
                                 selectedTab = index
                             },
@@ -143,10 +139,7 @@ fun MainAppScreen(
         ) {
             AnimatedContent(
                 targetState = selectedTab,
-                modifier = Modifier.fillMaxSize().graphicsLayer {
-                    translationX = detailParallax * size.width
-                    alpha = 1f + detailParallax * 2f
-                },
+                modifier = Modifier.fillMaxSize(),
                 transitionSpec = {
                     val forward = targetState > initialState
                     (slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { if (forward) it else -it } +
@@ -161,11 +154,11 @@ fun MainAppScreen(
                         0 -> {
                             OverviewScreen(
                                 showBottomBar = false,
-                                isActive = (selectedTab == 0 && !cashflowVisible),
+                                isActive = (selectedTab == 0),
                                 overviewRevision = overviewRevision,
                                 onNavigateToRecords = { selectedTab = 1 },
                                 onNavigateToAdd = { selectedTab = 2 },
-                                onNavigateToAccounts = { selectedTab = 3 },
+                                onNavigateToAccounts = { selectedTab = 4 },
                                 onNavigateToTools = { selectedTab = 4 },
                                 onScanReceipt = onScanReceipt,
                                 onOpenSettings = onOpenSettings,
@@ -173,7 +166,8 @@ fun MainAppScreen(
                                     cashflowMonth = m
                                     cashflowStartDate = sDate
                                     cashflowEndDate = eDate
-                                    cashflowVisible = true
+                                    cashflowRevision++
+                                    selectedTab = 3
                                 },
                                 cashflowRevision = cashflowRevision
                             )
@@ -191,14 +185,15 @@ fun MainAppScreen(
                             )
                         }
                         3 -> {
-                            val currentMonthStr = remember {
-                                java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US).format(java.util.Date())
+                            key(cashflowMonth, cashflowStartDate, cashflowEndDate) {
+                                CashflowAnalysisScreen(
+                                    initialMonth = cashflowMonth,
+                                    initialStartDate = cashflowStartDate,
+                                    initialEndDate = cashflowEndDate,
+                                    showBackButton = false,
+                                    onBack = { selectedTab = 0 }
+                                )
                             }
-                            CashflowAnalysisScreen(
-                                initialMonth = currentMonthStr,
-                                showBackButton = false,
-                                onBack = { selectedTab = 0 }
-                            )
                         }
                         4 -> {
                             MoreToolsScreen(
@@ -210,19 +205,6 @@ fun MainAppScreen(
                             )
                         }
                     }
-                }
-            }
-            AnimatedVisibility(
-                visible = selectedTab == 0 && cashflowVisible && cashflowMonth != null,
-                enter = slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200)),
-                exit = slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(220))
-            ) {
-                cashflowMonth?.let { month ->
-                    CashflowAnalysisScreen(
-                        initialMonth = month,
-                        initialStartDate = cashflowStartDate,
-                        initialEndDate = cashflowEndDate
-                    ) { cashflowVisible = false; cashflowRevision++ }
                 }
             }
             if (showBudgetDialog) {
