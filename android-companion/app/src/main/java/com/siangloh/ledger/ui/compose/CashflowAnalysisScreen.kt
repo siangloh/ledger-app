@@ -1715,6 +1715,49 @@ fun CashflowAnalysisScreen(
                     Text(stringResource(R.string.cfd_details_title), modifier = Modifier.weight(1f).padding(start = if (showBackButton) 4.dp else 8.dp), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
                 }
 
+                var analyticsMode by rememberSaveable { mutableIntStateOf(0) }
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Slate100,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val tabs = listOf(
+                            stringResource(R.string.analytics_tab_cashflow),
+                            stringResource(R.string.analytics_tab_advisor)
+                        )
+                        tabs.forEachIndexed { idx, label ->
+                            val selected = analyticsMode == idx
+                            Surface(
+                                shape = RoundedCornerShape(9.dp),
+                                color = if (selected) Color.White else Color.Transparent,
+                                shadowElevation = if (selected) 1.dp else 0.dp,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { analyticsMode = idx }
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selected) PrimaryTeal else Slate600,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 8.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 val expenseListState = rememberLazyListState()
                 val calendarListState = rememberLazyListState()
                 val incomeListState = rememberLazyListState()
@@ -1834,6 +1877,7 @@ fun CashflowAnalysisScreen(
                     }
                 }
 
+                if (analyticsMode == 0) {
                 Layout(
                     content = {
                         // Child 0: 可随整页上下滑动折叠的顶部区域（模式切换、日期选择、总览卡片）
@@ -2292,14 +2336,6 @@ fun CashflowAnalysisScreen(
                                         when (detailPages[page]) {
                             // ================= 支出 =================
                             CashflowDashboardTab.EXPENSE -> {
-                                if (advisorReport != null) {
-                                    item {
-                                        AiFinancialAdvisorCard(
-                                            report = advisorReport,
-                                            onRefresh = { refresh++ }
-                                        )
-                                    }
-                                }
                                 item {
                                     val transfer = transferAmount(data)
                                     val isPlatformMode = expenseViewMode == 1
@@ -2825,6 +2861,49 @@ fun CashflowAnalysisScreen(
                         headerPlaceable.placeRelative(0, headerY)
                         tabsPlaceable.placeRelative(0, tabsY)
                         pagerPlaceable.placeRelative(0, pagerY)
+                    }
+                }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
+                    ) {
+                        if (advisorReport != null) {
+                            item {
+                                AiFinancialAdvisorCard(
+                                    report = advisorReport,
+                                    onRefresh = { refresh++ }
+                                )
+                            }
+                        } else {
+                            item {
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color.White,
+                                    border = BorderStroke(1.dp, Slate200),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(32.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        CircularProgressIndicator(color = PrimaryTeal, modifier = Modifier.size(28.dp))
+                                        Text(
+                                            text = stringResource(R.string.analytics_advisor_loading),
+                                            fontSize = 13.sp,
+                                            color = Slate500
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
