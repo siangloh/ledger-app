@@ -243,7 +243,7 @@ object LocalNotificationParser {
                 val amt = parseAmount(mTngOut.group(1))
                 val rawMerchant = cleanMerchant(mTngOut.group(2) ?: "转账")
                 if (amt > 0) {
-                    return LocalParsedResult(amt, "transfer", "转账", rawMerchant, "转账给 $rawMerchant", "Touch 'n Go", today)
+                    return LocalParsedResult(amt, "expense", "其他", rawMerchant, "转账给 $rawMerchant", "Touch 'n Go", today)
                 }
             }
             val mTngOutAlt = TNG_TRANSFER_OUT_ALT_PATTERN.matcher(trimmed)
@@ -251,7 +251,7 @@ object LocalNotificationParser {
                 val amt = parseAmount(mTngOutAlt.group(1))
                 val rawMerchant = cleanMerchant(mTngOutAlt.group(2) ?: "转账")
                 if (amt > 0) {
-                    return LocalParsedResult(amt, "transfer", "转账", rawMerchant, "转账给 $rawMerchant", "Touch 'n Go", today)
+                    return LocalParsedResult(amt, "expense", "其他", rawMerchant, "转账给 $rawMerchant", "Touch 'n Go", today)
                 }
             }
             val mTngDed = TNG_DEDUCTED_PATTERN.matcher(trimmed)
@@ -293,10 +293,8 @@ object LocalNotificationParser {
                 val amt = parseAmount(mMay.group(1))
                 val rawMerchant = cleanMerchant(mMay.group(2) ?: "")
                 if (amt > 0) {
-                    val isTf = lower.contains("transfer")
-                    val cat = if (isTf) "转账" else predictCategory(rawMerchant, lower)
-                    val type = if (isTf) "transfer" else "expense"
-                    return LocalParsedResult(amt, type, cat, rawMerchant, rawMerchant, "Maybank", today)
+                    val cat = predictCategory(rawMerchant, lower)
+                    return LocalParsedResult(amt, "expense", cat, rawMerchant, rawMerchant, "Maybank", today)
                 }
             }
             val mMayOut = MAYBANK_TRANSFER_OUT_PATTERN.matcher(trimmed)
@@ -304,7 +302,7 @@ object LocalNotificationParser {
                 val amt = parseAmount(mMayOut.group(1))
                 val rawMerchant = cleanMerchant(mMayOut.group(2) ?: "转账")
                 if (amt > 0) {
-                    return LocalParsedResult(amt, "transfer", "转账", rawMerchant, "转账给 $rawMerchant", "Maybank", today)
+                    return LocalParsedResult(amt, "expense", "其他", rawMerchant, "转账给 $rawMerchant", "Maybank", today)
                 }
             }
             val mCard = MAYBANK_CARD_PATTERN.matcher(trimmed)
@@ -343,34 +341,29 @@ object LocalNotificationParser {
                 val amt = parseAmount(mPbbPay.group(1))
                 val rawMerchant = cleanMerchant(mPbbPay.group(2) ?: "Public Bank支出")
                 if (amt > 0) {
-                    val isTf = lower.contains("transfer")
-                    val cat = if (isTf) "转账" else predictCategory(rawMerchant, lower)
-                    val type = if (isTf) "transfer" else "expense"
-                    return LocalParsedResult(amt, type, cat, rawMerchant, rawMerchant, "Public Bank", today)
+                    val cat = predictCategory(rawMerchant, lower)
+                    return LocalParsedResult(amt, "expense", cat, rawMerchant, rawMerchant, "Public Bank", today)
                 }
             }
         }
 
         // 7. 通用兜底解析 (Setel, DuitNow QR, CIMB, Public Bank, 银行短信等)
-        val isTransfer = listOf("transfer", "transferred", "duitnow transfer", "转账", "duitnow to").any { lower.contains(it) }
-        val isExpense = isTransfer || listOf(
+        // 他人转入/转出默认归为 income/expense，只有用户在编辑页手动指定才算内部互转 (transfer)
+        val isOutgoingTransfer = listOf("transfer to", "transferred to", "duitnow to", "转账给").any { lower.contains(it) }
+        val isIncome = !isOutgoingTransfer && listOf("received from", "received", "credited", "duitnow transfer from", "transfer from", "收款", "转入", "到账").any { lower.contains(it) }
+        val isExpense = isOutgoingTransfer || listOf(
             "paid", "spent", "payment to", "payment of", "deducted", "debited",
-            "transfer to", "transferred to", "transfer of", "duitnow qr",
-            "扣款", "支付", "支出", "转账给", "using your cd", "using your card", "card transaction",
+            "transfer of", "duitnow qr", "duitnow transfer", "transfer", "transferred",
+            "扣款", "支付", "支出", "转账", "using your cd", "using your card", "card transaction",
             "fuel", "refuel", "petrol", "bayar", "bayaran", "transaksi", "berjaya"
         ).any { lower.contains(it) }
-        val isIncome = listOf("received from", "received", "credited", "duitnow transfer from", "transfer from", "收款", "转入", "到账").any { lower.contains(it) }
 
         if (isExpense || isIncome) {
             val mRm = GENERIC_RM_PATTERN.matcher(trimmed)
             if (mRm.find()) {
                 val amt = parseAmount(mRm.group(1))
                 if (amt > 0) {
-                    val type = when {
-                        isTransfer -> "transfer"
-                        isIncome && !isExpense -> "income"
-                        else -> "expense"
-                    }
+                    val type = if (isIncome) "income" else "expense"
                     val channel = when {
                         isSetel -> "Setel"
                         isTng -> "Touch 'n Go"
@@ -386,12 +379,11 @@ object LocalNotificationParser {
                     val regexMerchant = if (mMcht.find()) cleanMerchant(mMcht.group(1) ?: "", "") else ""
                     val rawMerchant = when {
                         regexMerchant.isNotBlank() -> regexMerchant
-                        isTransfer -> "转账"
                         type == "income" -> "$channel 入账"
+                        isOutgoingTransfer -> "$channel 转账"
                         else -> inferBrandFromText(lower) ?: if (channel != "银行/卡") "$channel 消费" else "日常消费"
                     }
                     val cat = when {
-                        isTransfer -> "转账"
                         type == "income" -> "其他收入"
                         else -> predictCategory(rawMerchant, lower)
                     }

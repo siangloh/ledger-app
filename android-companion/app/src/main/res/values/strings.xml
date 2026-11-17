@@ -11,7 +11,10 @@
     <string name="nav_records">流水</string>
     <string name="nav_add">记一笔</string>
     <string name="nav_accounts">资产</string>
+    <string name="nav_analytics">分析</string>
     <string name="nav_more">更多</string>
+    <string name="tools_accounts_title">账户与资产管理</string>
+    <string name="tools_accounts_desc">查看各银行卡/钱包余额、内部互转与对账校准</string>
 
     <!-- Period Selector -->
     <string name="period_monthly">月度</string>

@@ -11,7 +11,10 @@
     <string name="nav_records">Rekod</string>
     <string name="nav_add">Tambah</string>
     <string name="nav_accounts">Akaun</string>
+    <string name="nav_analytics">Analisis</string>
     <string name="nav_more">Lain-lain</string>
+    <string name="tools_accounts_title">Akaun &amp; Baki</string>
+    <string name="tools_accounts_desc">Urus dompet, pindahan dalaman dan penyelarasan baki</string>
 
     <!-- Period Selector -->
     <string name="period_monthly">Bulanan</string>

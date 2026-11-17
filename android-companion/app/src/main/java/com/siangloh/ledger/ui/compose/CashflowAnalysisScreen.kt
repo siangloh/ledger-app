@@ -1480,9 +1480,10 @@ fun CashflowAnalysisScreen(
     initialMonth: String,
     initialStartDate: String? = null,
     initialEndDate: String? = null,
+    showBackButton: Boolean = true,
     onBack: () -> Unit
 ) {
-    BackHandler(onBack = onBack)
+    BackHandler(enabled = showBackButton, onBack = onBack)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -1708,8 +1709,10 @@ fun CashflowAnalysisScreen(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cf_back), tint = Slate900) }
-                    Text(stringResource(R.string.cfd_details_title), modifier = Modifier.weight(1f).padding(start = 4.dp), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                    if (showBackButton) {
+                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cf_back), tint = Slate900) }
+                    }
+                    Text(stringResource(R.string.cfd_details_title), modifier = Modifier.weight(1f).padding(start = if (showBackButton) 4.dp else 8.dp), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
                 }
 
                 val expenseListState = rememberLazyListState()

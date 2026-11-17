@@ -44,5 +44,22 @@ class LocalNotificationParserTest {
         // "Boil" / "Toilet" contains "oil" as substring, must NOT match 交通
         assertEquals("其他", LocalNotificationParser.predictCategory("Toiletries Shop", "paid rm 15.00 to toiletries shop"))
     }
+
+    @Test
+    fun parse_peerTransfers_classifyAsIncomeOrExpenseNotInternalTransfer() {
+        val incoming = LocalNotificationParser.parse(
+            "You have received RM 66.66 via DuitNow transfer from NG TIAN YONG",
+            "my.com.tngdigital.ewallet"
+        )
+        assertNotNull(incoming)
+        assertEquals("income", incoming!!.type)
+
+        val outgoing = LocalNotificationParser.parse(
+            "You have transferred RM 2.34 to NG TIAN YONG",
+            "my.com.tngdigital.ewallet"
+        )
+        assertNotNull(outgoing)
+        assertEquals("expense", outgoing!!.type)
+    }
 }
 

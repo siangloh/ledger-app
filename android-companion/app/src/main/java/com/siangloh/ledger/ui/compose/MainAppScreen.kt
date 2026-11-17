@@ -75,7 +75,7 @@ fun MainAppScreen(
         NavItem(stringResource(R.string.nav_overview), Icons.Default.Dashboard),
         NavItem(stringResource(R.string.nav_records), Icons.Default.ReceiptLong),
         NavItem(stringResource(R.string.nav_add), Icons.Default.AddCircle, isPrimaryAction = true),
-        NavItem(stringResource(R.string.nav_accounts), Icons.Default.AccountBalanceWallet),
+        NavItem(stringResource(R.string.nav_analytics), Icons.Default.BarChart),
         NavItem(stringResource(R.string.nav_more), Icons.Default.Widgets)
     )
 
@@ -191,7 +191,14 @@ fun MainAppScreen(
                             )
                         }
                         3 -> {
-                            AccountsScreen()
+                            val currentMonthStr = remember {
+                                java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US).format(java.util.Date())
+                            }
+                            CashflowAnalysisScreen(
+                                initialMonth = currentMonthStr,
+                                showBackButton = false,
+                                onBack = { selectedTab = 0 }
+                            )
                         }
                         4 -> {
                             MoreToolsScreen(

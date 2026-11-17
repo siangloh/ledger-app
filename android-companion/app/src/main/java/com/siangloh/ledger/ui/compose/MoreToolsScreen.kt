@@ -278,6 +278,14 @@ fun MoreToolsScreen(
                     }
                 )
             }
+            "accounts" -> {
+                AccountsScreen(
+                    onBack = {
+                        activeSubPage = null
+                        refreshAll()
+                    }
+                )
+            }
             else -> {
                 Scaffold(
                     topBar = {
@@ -449,6 +457,13 @@ fun MoreToolsScreen(
             item {
                 BudgetManagementCard(
                     onOpenBudget = { activeSubPage = "budget" }
+                )
+            }
+
+            // 6.75 账户与资产管理 (Accounts & Balances)
+            item {
+                AccountsToolCard(
+                    onOpenAccounts = { activeSubPage = "accounts" }
                 )
             }
 
@@ -2751,6 +2766,68 @@ fun BudgetManagementCard(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = stringResource(R.string.budget_subtitle),
+                    fontSize = 12.sp,
+                    color = Slate500
+                )
+            }
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = Slate400,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Component: 账户与资产管理 (Accounts & Balances Card)
+// -----------------------------------------------------------------------------
+@Composable
+fun AccountsToolCard(
+    onOpenAccounts: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenAccounts),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(PrimaryTealSubtle, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AccountBalanceWallet,
+                    contentDescription = null,
+                    tint = PrimaryTeal,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.tools_accounts_title),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.tools_accounts_desc),
                     fontSize = 12.sp,
                     color = Slate500
                 )

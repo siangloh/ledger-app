@@ -1,6 +1,7 @@
 package com.siangloh.ledger.ui.compose
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -9,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,7 +38,10 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountsScreen() {
+fun AccountsScreen(onBack: (() -> Unit)? = null) {
+    if (onBack != null) {
+        BackHandler(onBack = onBack)
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -110,12 +115,27 @@ fun AccountsScreen() {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = stringResource(R.string.accounts_title),
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Slate900
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (onBack != null) {
+                            IconButton(
+                                onClick = onBack,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.cf_back),
+                                    tint = Slate900
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        Text(
+                            text = stringResource(R.string.accounts_title),
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate900
+                        )
+                    }
                     IconButton(
                         onClick = { loadAccounts() },
                         modifier = Modifier.size(36.dp)
