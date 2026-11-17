@@ -33,7 +33,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:text="@string/widget_title"
-                android:textColor="#475569"
+                android:textColor="@color/text_secondary"
                 android:textSize="12sp"
                 android:textStyle="bold" />
 
@@ -43,7 +43,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:text="· 11月"
-                android:textColor="#0F766E"
+                android:textColor="@color/primary"
                 android:textSize="12sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -73,7 +73,7 @@
                 android:gravity="center"
                 android:paddingHorizontal="8dp"
                 android:text="@string/widget_quick_add"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/on_primary"
                 android:textSize="11sp"
                 android:textStyle="bold"
                 android:background="@drawable/bg_widget_button" />
@@ -102,7 +102,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/widget_net_balance"
-                android:textColor="#64748B"
+                android:textColor="@color/text_muted"
                 android:textSize="10sp" />
 
             <TextView
@@ -110,7 +110,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="+RM 0.00"
-                android:textColor="#0F766E"
+                android:textColor="@color/primary"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:maxLines="1" />
@@ -131,7 +131,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/widget_safe_cashflow"
-                android:textColor="#64748B"
+                android:textColor="@color/text_muted"
                 android:textSize="9sp" />
 
             <TextView
@@ -139,7 +139,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="+RM 0.00"
-                android:textColor="#0F766E"
+                android:textColor="@color/primary"
                 android:textSize="13sp"
                 android:textStyle="bold"
                 android:maxLines="1" />
@@ -256,7 +256,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/widget_today_expense"
-                android:textColor="#64748B"
+                android:textColor="@color/text_muted"
                 android:textSize="10sp" />
 
             <TextView
@@ -264,7 +264,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="RM 0.00"
-                android:textColor="#111827"
+                android:textColor="@color/text_primary"
                 android:textSize="13sp"
                 android:textStyle="bold"
                 android:maxLines="1" />
@@ -286,7 +286,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/widget_pending_bills"
-                android:textColor="#64748B"
+                android:textColor="@color/text_muted"
                 android:textSize="10sp" />
 
             <TextView
@@ -294,7 +294,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0 笔待付"
-                android:textColor="#B45309"
+                android:textColor="@color/warning_amber"
                 android:textSize="13sp"
                 android:textStyle="bold"
                 android:maxLines="1" />

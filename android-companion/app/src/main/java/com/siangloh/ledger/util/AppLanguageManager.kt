@@ -43,7 +43,12 @@ object AppLanguageManager {
             cookieManager.setAcceptCookie(true)
             cookieManager.setCookie(serverUrl, "lang=$lang; path=/")
             cookieManager.flush()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.w("AppLanguageManager", "Failed to sync language cookie: ${e.message}")
+        }
+
+        // 同步刷新桌面小部件，使其文案即时跟随自定义语言
+        com.siangloh.ledger.widget.LedgerAppWidgetProvider.notifyDataChanged(context)
     }
 
     fun getLocale(lang: String): Locale {

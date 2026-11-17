@@ -97,7 +97,7 @@ fun WidgetCustomizationPage(
     var pendingCount by remember { mutableIntStateOf(0) }
     var pendingAmount by remember { mutableStateOf(0.0) }
     var monthDisplayStr by remember { mutableStateOf("") }
-    val currency = "RM"
+    var currency by remember { mutableStateOf("RM") }
 
     // 渲染生成的图表 Bitmaps 与数据缓存
     var trendDataPoints by remember { mutableStateOf<List<Double>>(emptyList()) }
@@ -108,7 +108,7 @@ fun WidgetCustomizationPage(
     val trendBitmap = remember(trendDataPoints, selectedDayIndex) {
         if (trendDataPoints.isEmpty()) null
         else {
-            val trendSelectedIdx = (trendDataPoints.size - 7 + selectedDayIndex).coerceIn(0, trendDataPoints.size - 1)
+            val trendSelectedIdx = WidgetChartRenderer.computeTrendSelectedIndex(trendDataPoints.size, selectedDayIndex)
             WidgetChartRenderer.drawCashflowTrend(480, 110, trendDataPoints, trendSelectedIdx)
         }
     }
@@ -172,6 +172,9 @@ fun WidgetCustomizationPage(
                 // 计算待缴账单
                 val toolsRes = LocalLedgerRepository.getToolsSummary(context).getOrNull()
                 val subs = toolsRes?.subscriptions ?: emptyList()
+                subs.firstOrNull { it.currency.isNotBlank() }?.currency?.let {
+                    currency = it
+                }
                 val linksArr = CashflowRepository.getPaymentLinks(context)
                 val linksList = mutableListOf<org.json.JSONObject>()
                 for (i in 0 until linksArr.length()) {

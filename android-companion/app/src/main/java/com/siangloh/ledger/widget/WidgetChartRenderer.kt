@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
@@ -22,14 +23,24 @@ object WidgetChartRenderer {
     const val PATTERN_COMPACT = 2    // 纯数字简洁模式 (无图表)
 
     /**
+     * 将近 7 天热区索引 (0..6) 映射到当月累计走势图的对应数据点索引，
+     * 兼容月初不足 7 天时的日期对齐。
+     */
+    fun computeTrendSelectedIndex(trendPointsCount: Int, selectedDayIndex: Int): Int {
+        if (trendPointsCount <= 0) return 0
+        return (trendPointsCount - 7 + selectedDayIndex).coerceIn(0, trendPointsCount - 1)
+    }
+
+    /**
      * 绘制现金流累积走势平滑曲线图 (Smooth Cashflow Trend Area Chart)
-     * 支持选中特定索引以高亮显示该点
+     * 支持选中特定索引以高亮显示该点，并支持浅色/深色主题自适应
      */
     fun drawCashflowTrend(
         widthPx: Int,
         heightPx: Int,
         dataPoints: List<Double>,
-        selectedIndex: Int = -1
+        selectedIndex: Int = -1,
+        isDarkTheme: Boolean = false
     ): Bitmap {
         val width = max(widthPx, 240)
         val height = max(heightPx, 60)
@@ -85,8 +96,18 @@ object WidgetChartRenderer {
         fillPath.close()
 
         val isPositive = (dataPoints.lastOrNull() ?: 0.0) >= 0.0
-        val lineColor = if (isPositive) Color.parseColor("#0F766E") else Color.parseColor("#E11D48")
-        val topFill = if (isPositive) Color.parseColor("#440F766E") else Color.parseColor("#44E11D48")
+        val lineColor = when {
+            isPositive && isDarkTheme -> Color.parseColor("#5EEAD4")
+            isPositive -> Color.parseColor("#0F766E")
+            isDarkTheme -> Color.parseColor("#FB7185")
+            else -> Color.parseColor("#E11D48")
+        }
+        val topFill = when {
+            isPositive && isDarkTheme -> Color.parseColor("#445EEAD4")
+            isPositive -> Color.parseColor("#440F766E")
+            isDarkTheme -> Color.parseColor("#44FB7185")
+            else -> Color.parseColor("#44E11D48")
+        }
         val botFill = Color.TRANSPARENT
 
         // 填充渐变面积
@@ -111,7 +132,12 @@ object WidgetChartRenderer {
         val targetPoint = points[targetIdx]
 
         val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isPositive) Color.parseColor("#660F766E") else Color.parseColor("#66E11D48")
+            color = when {
+                isPositive && isDarkTheme -> Color.parseColor("#665EEAD4")
+                isPositive -> Color.parseColor("#660F766E")
+                isDarkTheme -> Color.parseColor("#66FB7185")
+                else -> Color.parseColor("#66E11D48")
+            }
             style = Paint.Style.FILL
         }
         canvas.drawCircle(targetPoint.first, targetPoint.second, 7.5f, glowPaint)
@@ -123,7 +149,7 @@ object WidgetChartRenderer {
         canvas.drawCircle(targetPoint.first, targetPoint.second, 4.5f, dotPaint)
 
         val innerDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
+            color = if (isDarkTheme) Color.parseColor("#111827") else Color.WHITE
             style = Paint.Style.FILL
         }
         canvas.drawCircle(targetPoint.first, targetPoint.second, 2f, innerDotPaint)
@@ -133,13 +159,14 @@ object WidgetChartRenderer {
 
     /**
      * 绘制近 7 天支出柱状图 (7-Day Daily Spending Bar Chart)
-     * 支持选中某一天 (selectedIndex, 默认 6 即今天) 进行重点突出高亮
+     * 支持选中某一天 (selectedIndex, 默认 6 即今天) 进行重点突出高亮，并自适应浅色/深色主题
      */
     fun draw7DaySpendingBars(
         widthPx: Int,
         heightPx: Int,
         dailyExpenses: List<Pair<String, Double>>, // Pair(dateLabel e.g. "12", amount)
-        selectedIndex: Int = 6
+        selectedIndex: Int = 6,
+        isDarkTheme: Boolean = false
     ): Bitmap {
         val width = max(widthPx, 240)
         val height = max(heightPx, 60)
@@ -157,19 +184,20 @@ object WidgetChartRenderer {
         val effectiveWidth = width - paddingH * 2
         val effectiveHeight = height - paddingTop - paddingBottom
 
-        var maxVal = dailyExpenses.maxOfOrNull { it.second } ?: 0.0
-        if (maxVal <= 0.0) maxVal = 100.0
+        val rawMax = dailyExpenses.maxOfOrNull { it.second } ?: 0.0
+        val hasAnySpend = rawMax > 0.0
+        val maxVal = if (hasAnySpend) rawMax else 100.0
 
         val count = dailyExpenses.size
         val totalSlotWidth = effectiveWidth / count
         val barWidth = (totalSlotWidth * 0.45f).coerceIn(8f, 22f)
 
         val normalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#CBD5E1")
+            color = Color.parseColor(if (isDarkTheme) "#334155" else "#CBD5E1")
             style = Paint.Style.FILL
         }
         val selectedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#0F766E")
+            color = Color.parseColor(if (isDarkTheme) "#5EEAD4" else "#0F766E")
             style = Paint.Style.FILL
         }
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -178,10 +206,22 @@ object WidgetChartRenderer {
             textAlign = Paint.Align.CENTER
         }
         val textSelectedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#0F766E")
+            color = Color.parseColor(if (isDarkTheme) "#5EEAD4" else "#0F766E")
             textSize = 20f
             textAlign = Paint.Align.CENTER
             isFakeBoldText = true
+        }
+
+        // 若近 7 天均无消费，绘制一条极淡的虚线基准线提示空态
+        if (!hasAnySpend) {
+            val baseLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor(if (isDarkTheme) "#334155" else "#E2E8F0")
+                strokeWidth = 1.5f
+                style = Paint.Style.STROKE
+                pathEffect = DashPathEffect(floatArrayOf(6f, 6f), 0f)
+            }
+            val baseY = paddingTop + effectiveHeight - 2.5f
+            canvas.drawLine(paddingH, baseY, width - paddingH, baseY, baseLinePaint)
         }
 
         for (i in dailyExpenses.indices) {
