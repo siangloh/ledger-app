@@ -948,6 +948,12 @@
 
     <!-- Local AI Financial Advisor -->
     <string name="ai_advisor_card_title">✨ Wawasan Kewangan Pintar</string>
+    <string name="ai_advisor_cat_health_title">Status Kategori (Baik ✅ vs Perhatian ⚠️)</string>
+    <string name="ai_advisor_status_ok">✅ Baik</string>
+    <string name="ai_advisor_status_fixed">🔒 Bil Tetap</string>
+    <string name="ai_advisor_status_over">⚠️ Lebih</string>
+    <string name="ai_advisor_status_reached">⚠️ Had</string>
+    <string name="ai_advisor_status_high">⚠️ Tinggi</string>
     <string name="ai_advisor_score_label">Indeks Kesihatan</string>
     <string name="ai_advisor_reanalyze_btn">Nilai Semula</string>
     <string name="ai_advisor_score_excellent">Cemerlang</string>

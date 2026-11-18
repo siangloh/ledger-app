@@ -34,6 +34,17 @@ object LocalFinancialAdvisor {
     )
 
     @Immutable
+    data class CategoryHealthItem(
+        val categoryName: String,
+        val localizedName: String,
+        val amount: Double,
+        val currency: String,
+        val isFixed: Boolean,
+        val isOk: Boolean,
+        val statusLabel: String
+    )
+
+    @Immutable
     data class FinancialHealthReport(
         val score: Int,            // 0..100
         val scoreGrade: String,    // 优良 / 稳健 / 需关注 / 预警
@@ -42,8 +53,21 @@ object LocalFinancialAdvisor {
         val topExpenseCategory: String?,
         val topExpensePct: Double,
         val dailySafeAllowance: Double,
-        val insights: List<FinancialInsightItem>
+        val insights: List<FinancialInsightItem>,
+        val categoryHealth: List<CategoryHealthItem> = emptyList()
     )
+
+    private fun isFixedEssentialCategory(rawCategory: String): Boolean {
+        val lower = rawCategory.trim().lowercase(Locale.US)
+        if (lower.isEmpty()) return false
+        val fixedKeywords = listOf(
+            "住房", "房租", "水电", "房贷", "分期", "保险", "通讯", "转账",
+            "housing", "rent", "rental", "utilities", "utility", "bill", "mortgage",
+            "installment", "insurance", "telecom", "internet", "transfer",
+            "sewa", "bil", "pinjaman", "insurans", "ansuran"
+        )
+        return fixedKeywords.any { lower.contains(it) }
+    }
 
     /**
      * 根据当前收支报告数据与预算概览，秒级生成综合财务诊断报告
@@ -68,19 +92,26 @@ object LocalFinancialAdvisor {
             0.0
         }
 
-        // 2. 分类支出集中度分析 (Top Category Analysis)
+        // 2. 分类支出集中度分析 (排除房租/水电/固定账单等刚性支出，仅评估可控消费)
         val expCategories = cashflowData.optJSONArray("expense_categories")
-        var topCategoryName: String? = null
-        var topCategoryAmount = 0.0
-        if (expCategories != null && expCategories.length() > 0) {
-            val first = expCategories.optJSONObject(0)
-            if (first != null) {
-                topCategoryName = first.optString("label")
-                topCategoryAmount = first.optDouble("amount", 0.0)
+        val rawCategoryEntries = mutableListOf<Pair<String, Double>>()
+        if (expCategories != null) {
+            for (i in 0 until expCategories.length()) {
+                val obj = expCategories.optJSONObject(i) ?: continue
+                val lbl = obj.optString("label").trim()
+                val amt = obj.optDouble("amount", 0.0)
+                if (lbl.isNotEmpty() && amt > 0.0) {
+                    rawCategoryEntries.add(lbl to amt)
+                }
             }
         }
-        val topCategoryPct = if (expense > 0.0 && topCategoryAmount > 0.0) {
-            min(100.0, (topCategoryAmount / expense) * 100.0)
+        val discretionaryEntries = rawCategoryEntries.filterNot { isFixedEssentialCategory(it.first) }
+        val discretionaryTotal = discretionaryEntries.sumOf { it.second }
+        val topDiscretionary = discretionaryEntries.maxByOrNull { it.second }
+        var topCategoryName: String? = topDiscretionary?.first
+        var topCategoryAmount = topDiscretionary?.second ?: 0.0
+        val topCategoryPct = if (discretionaryTotal > 0.0 && topCategoryAmount > 0.0) {
+            min(100.0, (topCategoryAmount / discretionaryTotal) * 100.0)
         } else {
             0.0
         }
@@ -278,6 +309,33 @@ object LocalFinancialAdvisor {
             )
         }
 
+        // 7. 构建各分类健康状态清单 (让用户一眼看清哪些 OK ✅，哪些需注意 ⚠️)
+        val budgetByCategory = budgetOverview?.categories?.associateBy { it.category.trim().lowercase(Locale.US) } ?: emptyMap()
+        val categoryHealthList = rawCategoryEntries.map { (catName, amt) ->
+            val localized = CategoryUiHelper.getLocalizedCategoryName(context, catName)
+            val isFixed = isFixedEssentialCategory(catName)
+            val budgetItem = budgetByCategory[catName.trim().lowercase(Locale.US)]
+                ?: budgetByCategory[localized.trim().lowercase(Locale.US)]
+            val shareOfDiscretionary = if (!isFixed && discretionaryTotal > 0.0) (amt / discretionaryTotal) * 100.0 else 0.0
+
+            val (isOk, statusLabel) = when {
+                budgetItem?.level == "over" -> false to context.getString(R.string.ai_advisor_status_over)
+                budgetItem?.level == "reached" -> false to context.getString(R.string.ai_advisor_status_reached)
+                isFixed -> true to context.getString(R.string.ai_advisor_status_fixed)
+                discretionaryEntries.size >= 2 && shareOfDiscretionary >= 40.0 -> false to context.getString(R.string.ai_advisor_status_high)
+                else -> true to context.getString(R.string.ai_advisor_status_ok)
+            }
+            CategoryHealthItem(
+                categoryName = catName,
+                localizedName = localized,
+                amount = amt,
+                currency = currency,
+                isFixed = isFixed,
+                isOk = isOk,
+                statusLabel = statusLabel
+            )
+        }.sortedWith(compareBy<CategoryHealthItem> { it.isOk }.thenByDescending { it.amount })
+
         return FinancialHealthReport(
             score = score,
             scoreGrade = grade,
@@ -286,7 +344,8 @@ object LocalFinancialAdvisor {
             topExpenseCategory = topCategoryName,
             topExpensePct = topCategoryPct,
             dailySafeAllowance = dailySafeAllowance,
-            insights = insightList
+            insights = insightList,
+            categoryHealth = categoryHealthList
         )
     }
 }

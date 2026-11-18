@@ -218,8 +218,65 @@ object CategoryUiHelper {
     }
 
     fun getLocalizedNote(context: Context, rawNote: String): String {
-        if (rawNote.isBlank() || !rawNote.contains("[")) return rawNote
-        var result = rawNote
+        if (rawNote.isBlank()) return rawNote
+        val lang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
+        var result = rawNote.trim()
+
+        // 0. 本地兜底备注多语言转换 (按用户自定义语言显示)
+        when {
+            result == "本地消费" || result == "日常消费" -> result = when (lang) {
+                "en" -> "Local Spending"
+                "ms" -> "Perbelanjaan Tempatan"
+                else -> result
+            }
+            result == "本地入账" -> result = when (lang) {
+                "en" -> "Local Income"
+                "ms" -> "Pendapatan Tempatan"
+                else -> result
+            }
+            result.endsWith(" 消费") -> {
+                val ch = result.removeSuffix(" 消费").trim()
+                result = when (lang) {
+                    "en" -> "$ch Payment"
+                    "ms" -> "Bayaran $ch"
+                    else -> result
+                }
+            }
+            result.endsWith("支出") -> {
+                val ch = result.removeSuffix("支出").trim()
+                result = when (lang) {
+                    "en" -> "$ch Payment"
+                    "ms" -> "Bayaran $ch"
+                    else -> result
+                }
+            }
+            result.endsWith(" 入账") -> {
+                val ch = result.removeSuffix(" 入账").trim()
+                result = when (lang) {
+                    "en" -> "$ch Transfer In"
+                    "ms" -> "Terima daripada $ch"
+                    else -> result
+                }
+            }
+            result.startsWith("转账给 ") -> {
+                val target = result.removePrefix("转账给 ").trim()
+                result = when (lang) {
+                    "en" -> "Transfer to $target"
+                    "ms" -> "Pindah ke $target"
+                    else -> result
+                }
+            }
+            result.startsWith("收到 ") && result.endsWith(" 转账") -> {
+                val sender = result.removePrefix("收到 ").removeSuffix(" 转账").trim()
+                result = when (lang) {
+                    "en" -> "Received from $sender"
+                    "ms" -> "Terima daripada $sender"
+                    else -> result
+                }
+            }
+        }
+
+        if (!result.contains("[")) return result
 
         // 1. 退款扣减标签: [已扣减退款 RM 29.30] -> [Refund deducted RM 29.30]
         if (result.contains("退款", ignoreCase = true) || result.contains("refund", ignoreCase = true) || result.contains("bayaran balik", ignoreCase = true)) {

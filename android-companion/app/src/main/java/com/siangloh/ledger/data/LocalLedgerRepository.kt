@@ -239,16 +239,53 @@ object LocalLedgerRepository {
         }
     }
 
+    fun isMemorizableMerchant(rawMerchant: String): Boolean {
+        val m = rawMerchant.trim()
+        if (m.length < 2) return false
+        val lower = m.lowercase(Locale.US)
+        val blockedExact = setOf("本地消费", "本地入账", "日常消费", "本地商户", "转账", "local spending", "local income")
+        if (lower in blockedExact) return false
+        val blockedPrefixes = listOf("转账给 ", "收到 ", "transfer to ", "received from ")
+        if (blockedPrefixes.any { lower.startsWith(it) }) return false
+        val blockedSuffixes = listOf(" 消费", " 入账", "支出")
+        if (blockedSuffixes.any { m.endsWith(it) }) return false
+        return true
+    }
+
+    fun saveMerchantCategoryRule(context: Context, rawMerchant: String, category: String) {
+        if (!isMemorizableMerchant(rawMerchant)) return
+        val cleanCat = com.siangloh.ledger.ui.compose.CategoryUiHelper.cleanCategoryName(category)
+        if (cleanCat.isBlank() || cleanCat == "其他" || cleanCat == "转账") return
+        val key = rawMerchant.trim().lowercase(Locale.US)
+        context.getSharedPreferences("merchant_category_memory", Context.MODE_PRIVATE)
+            .edit()
+            .putString(key, cleanCat)
+            .apply()
+    }
+
+    fun lookupMerchantCategoryRule(context: Context, rawMerchant: String): String? {
+        if (!isMemorizableMerchant(rawMerchant)) return null
+        val key = rawMerchant.trim().lowercase(Locale.US)
+        return context.getSharedPreferences("merchant_category_memory", Context.MODE_PRIVATE)
+            .getString(key, null)
+            ?.takeIf { it.isNotBlank() }
+    }
+
     private suspend fun internalRecordNotification(context: Context, db: AppDatabase, parsed: LocalParsedResult): Long {
         val accounts = db.localAccountDao().getAll()
         val matchedAccount = resolveAccountFallback(parsed.channel, parsed.merchant, accounts) ?: accounts.firstOrNull()
+        val effectiveCategory = if (parsed.type == "expense") {
+            lookupMerchantCategoryRule(context, parsed.merchant) ?: parsed.category
+        } else {
+            parsed.category
+        }
 
         val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
         val tx = LocalTransaction(
             date = parsed.date,
             time = timeStr,
             type = parsed.type,
-            category = parsed.category,
+            category = effectiveCategory,
             amount = parsed.amount,
             note = parsed.merchant,
             tags = "自动记账",
@@ -384,6 +421,9 @@ object LocalLedgerRepository {
                 updatedAt = System.currentTimeMillis()
             )
             db.localTransactionDao().update(updated)
+            if (type == "expense" && old.category != category) {
+                saveMerchantCategoryRule(context, note, category)
+            }
 
             // 3. 应用新余额
             if (accountId != null) {
@@ -616,7 +656,11 @@ object LocalLedgerRepository {
         try {
             val db = AppDatabase.getInstance(context)
             val cleanCat = com.siangloh.ledger.ui.compose.CategoryUiHelper.cleanCategoryName(category)
+            val old = db.localTransactionDao().getById(id)
             db.localTransactionDao().updateCategory(id, cleanCat)
+            if (old != null && old.type == "expense") {
+                saveMerchantCategoryRule(context, old.note, cleanCat)
+            }
             val appCtx = context.applicationContext
             cloudSyncScope.launch {
                 TursoCloudClient.updateTransactionCategory(appCtx, id, cleanCat)

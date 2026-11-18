@@ -192,6 +192,73 @@ fun AiFinancialAdvisorCard(
                     report.insights.forEach { item ->
                         InsightRow(item = item)
                     }
+                    if (report.categoryHealth.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(R.string.ai_advisor_cat_health_title),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate800,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                        report.categoryHealth.forEach { catItem ->
+                            CategoryHealthRow(item = catItem)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryHealthRow(item: LocalFinancialAdvisor.CategoryHealthItem) {
+    val (bg, fg) = when {
+        !item.isOk -> Pair(Color(0xFFFEE2E2), Color(0xFFDC2626))
+        item.isFixed -> Pair(Color(0xFFF1F5F9), Slate600)
+        else -> Pair(Color(0xFFD1FAE5), Color(0xFF059669))
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = Color(0xFFF8FAFC),
+        border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = item.localizedName,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Slate800,
+                modifier = Modifier.weight(1f)
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "${item.currency} ${String.format(java.util.Locale.US, "%,.2f", item.amount)}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Slate600
+                )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = bg
+                ) {
+                    Text(
+                        text = item.statusLabel,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = fg,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
                 }
             }
         }

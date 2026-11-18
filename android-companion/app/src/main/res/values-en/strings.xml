@@ -948,6 +948,12 @@
 
     <!-- Local AI Financial Advisor -->
     <string name="ai_advisor_card_title">✨ Smart Financial Insights</string>
+    <string name="ai_advisor_cat_health_title">Category Health (OK ✅ vs Attention ⚠️)</string>
+    <string name="ai_advisor_status_ok">✅ OK</string>
+    <string name="ai_advisor_status_fixed">🔒 Fixed Bill</string>
+    <string name="ai_advisor_status_over">⚠️ Over</string>
+    <string name="ai_advisor_status_reached">⚠️ Limit</string>
+    <string name="ai_advisor_status_high">⚠️ High</string>
     <string name="ai_advisor_score_label">Health Index</string>
     <string name="ai_advisor_reanalyze_btn">Re-evaluate</string>
     <string name="ai_advisor_score_excellent">Excellent</string>

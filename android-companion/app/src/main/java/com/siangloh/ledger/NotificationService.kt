@@ -206,12 +206,17 @@ class NotificationService : NotificationListenerService() {
                         return@launch
                     }
                     if (parsed.amount > 0) {
+                        val effectiveCat = if (parsed.type == "expense") {
+                            com.siangloh.ledger.data.LocalLedgerRepository.lookupMerchantCategoryRule(this@NotificationService, parsed.merchant) ?: parsed.category
+                        } else {
+                            parsed.category
+                        }
                         val txId = com.siangloh.ledger.data.LocalLedgerRepository.recordNotificationTransaction(this@NotificationService, parsed)
                         com.siangloh.ledger.ui.overlay.InstantReviewManager.showInstantReview(
                             this@NotificationService,
                             parsed.merchant,
                             parsed.amount,
-                            parsed.category,
+                            effectiveCat,
                             parsed.channel,
                             txId
                         )

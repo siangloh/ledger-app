@@ -948,6 +948,12 @@
 
     <!-- AI 智能财务诊断与建议 (Local AI Financial Advisor) -->
     <string name="ai_advisor_card_title">✨ 智能财务诊断与建议</string>
+    <string name="ai_advisor_cat_health_title">各分类健康状态（OK ✅ vs 需关注 ⚠️）</string>
+    <string name="ai_advisor_status_ok">✅ 正常</string>
+    <string name="ai_advisor_status_fixed">🔒 固定支出</string>
+    <string name="ai_advisor_status_over">⚠️ 已超支</string>
+    <string name="ai_advisor_status_reached">⚠️ 达上限</string>
+    <string name="ai_advisor_status_high">⚠️ 偏高</string>
     <string name="ai_advisor_score_label">健康指数</string>
     <string name="ai_advisor_reanalyze_btn">重新诊断</string>
     <string name="ai_advisor_score_excellent">优良</string>

@@ -243,7 +243,7 @@ object LocalNotificationParser {
                 val amt = parseAmount(mTngOut.group(1))
                 val rawMerchant = cleanMerchant(mTngOut.group(2) ?: "转账")
                 if (amt > 0) {
-                    return LocalParsedResult(amt, "expense", "其他", rawMerchant, "转账给 $rawMerchant", "Touch 'n Go", today)
+                    return LocalParsedResult(amt, "expense", predictCategory(rawMerchant, lower), rawMerchant, "转账给 $rawMerchant", "Touch 'n Go", today)
                 }
             }
             val mTngOutAlt = TNG_TRANSFER_OUT_ALT_PATTERN.matcher(trimmed)
@@ -251,7 +251,7 @@ object LocalNotificationParser {
                 val amt = parseAmount(mTngOutAlt.group(1))
                 val rawMerchant = cleanMerchant(mTngOutAlt.group(2) ?: "转账")
                 if (amt > 0) {
-                    return LocalParsedResult(amt, "expense", "其他", rawMerchant, "转账给 $rawMerchant", "Touch 'n Go", today)
+                    return LocalParsedResult(amt, "expense", predictCategory(rawMerchant, lower), rawMerchant, "转账给 $rawMerchant", "Touch 'n Go", today)
                 }
             }
             val mTngDed = TNG_DEDUCTED_PATTERN.matcher(trimmed)
@@ -302,7 +302,7 @@ object LocalNotificationParser {
                 val amt = parseAmount(mMayOut.group(1))
                 val rawMerchant = cleanMerchant(mMayOut.group(2) ?: "转账")
                 if (amt > 0) {
-                    return LocalParsedResult(amt, "expense", "其他", rawMerchant, "转账给 $rawMerchant", "Maybank", today)
+                    return LocalParsedResult(amt, "expense", predictCategory(rawMerchant, lower), rawMerchant, "转账给 $rawMerchant", "Maybank", today)
                 }
             }
             val mCard = MAYBANK_CARD_PATTERN.matcher(trimmed)
