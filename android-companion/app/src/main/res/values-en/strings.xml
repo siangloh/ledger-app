@@ -16,6 +16,11 @@
     <string name="analytics_tab_advisor">💡 Smart Financial</string>
     <string name="analytics_advisor_loading">Analyzing your financial insights...</string>
     <string name="nav_more">More</string>
+    <string name="more_section_finance">💰 Finance</string>
+    <string name="more_section_tools">🛠️ Utilities</string>
+    <string name="more_section_system">⚙️ Automation &amp; System</string>
+    <string name="budget_subtitle_short">Limits &amp; daily safe</string>
+    <string name="common_items_unit">items</string>
     <string name="tools_accounts_title">Accounts &amp; Balances</string>
     <string name="tools_accounts_desc">Manage wallets, internal transfers, and balance reconciliation</string>
 
@@ -59,6 +64,26 @@
 
     <!-- Add Transaction -->
     <string name="add_title">New Transaction</string>
+    <string name="add_tab_manual">✏️ Add</string>
+    <string name="add_tab_split">🧾 Split Bill</string>
+    <string name="split_take_photo">Take Photo</string>
+    <string name="split_pick_photos">Upload Photos</string>
+    <string name="split_analyzing">Analyzing…</string>
+    <string name="split_tally_ok">Tally OK · %1$s</string>
+    <string name="split_tally_diff">Diff %1$s · Tap to check</string>
+    <string name="split_members_title">Split Members</string>
+    <string name="split_add_member_hint">Friend name</string>
+    <string name="split_me_default">Me</string>
+    <string name="split_all_btn">All</string>
+    <string name="split_add_item_btn">+ Add Item</string>
+    <string name="split_item_name_hint">Dish / Item name</string>
+    <string name="split_item_price_hint">Price (RM)</string>
+    <string name="split_tax_summary_fmt">Svc Charge RM %1$.2f · SST RM %2$.2f</string>
+    <string name="split_settlement_title">AA Settlement</string>
+    <string name="split_copy_whatsapp">Copy for WhatsApp</string>
+    <string name="split_copied_toast">AA breakdown copied! Ready to paste in group chat.</string>
+    <string name="split_record_expense">Record Total Paid</string>
+    <string name="split_empty_hint">Snap or upload receipts (processed in background—keep uploading!), then tap any receipt thumbnail to assign dishes.</string>
     <string name="add_expense">Expense</string>
     <string name="add_income">Income</string>
     <string name="add_transfer">Transfer</string>

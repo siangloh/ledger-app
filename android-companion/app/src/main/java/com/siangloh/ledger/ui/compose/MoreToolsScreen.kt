@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -348,64 +349,120 @@ fun MoreToolsScreen(
                 item { Spacer(modifier = Modifier.height(4.dp)) }
 
 
-            // 1. 待整理收件箱 (Pending Review)
-            item {
-                PendingInboxCard(
-                    pendingCount = pendingItems.size,
-                    pendingItems = pendingItems,
-                    errorMessage = pendingError,
-                    isLoading = isPendingLoading,
-                    onRetry = { refreshAll() },
-                    onItemAction = { id, action ->
-                        scope.launch {
-                            val res = NativeLedgerApi.handlePendingAction(context, id, action)
-                            res.onSuccess {
-                                Toast.makeText(context, context.getString(R.string.common_success), Toast.LENGTH_SHORT).show()
-                                refreshAll()
-                            }.onFailure {
-                                Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
+            // 1. 待整理收件箱 (仅在有待确认项目或报错时显示，平时保持页面极简)
+            if (pendingItems.isNotEmpty() || pendingError != null) {
+                item {
+                    PendingInboxCard(
+                        pendingCount = pendingItems.size,
+                        pendingItems = pendingItems,
+                        errorMessage = pendingError,
+                        isLoading = isPendingLoading,
+                        onRetry = { refreshAll() },
+                        onItemAction = { id, action ->
+                            scope.launch {
+                                val res = NativeLedgerApi.handlePendingAction(context, id, action)
+                                res.onSuccess {
+                                    Toast.makeText(context, context.getString(R.string.common_success), Toast.LENGTH_SHORT).show()
+                                    refreshAll()
+                                }.onFailure {
+                                    Toast.makeText(context, "${context.getString(R.string.common_failed)}: ${it.message}", Toast.LENGTH_SHORT).show()
+                                }
                             }
+                        },
+                        onCategorizeItem = { item ->
+                            categorizingItem = item
                         }
-                    },
-                    onCategorizeItem = { item ->
-                        categorizingItem = item
+                    )
+                }
+            }
+
+            // 2. 💰 财务管理 (2x2 紧凑四宫格)
+            item {
+                MoreSectionHeader(stringResource(R.string.more_section_finance))
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        FinanceBentoTile(
+                            icon = Icons.Default.AccountBalanceWallet,
+                            title = stringResource(R.string.tools_accounts_title),
+                            subtitle = "${localAccounts.size} ${stringResource(R.string.nav_accounts)}",
+                            modifier = Modifier.weight(1f),
+                            onClick = { activeSubPage = "accounts" }
+                        )
+                        FinanceBentoTile(
+                            icon = Icons.Default.Savings,
+                            title = stringResource(R.string.budget_title),
+                            subtitle = stringResource(R.string.budget_subtitle_short),
+                            modifier = Modifier.weight(1f),
+                            onClick = { activeSubPage = "budget" }
+                        )
                     }
-                )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        val subCount = toolsSummary?.subscriptions?.size ?: 0
+                        val instCount = toolsSummary?.installments?.size ?: 0
+                        FinanceBentoTile(
+                            icon = Icons.Default.Autorenew,
+                            title = stringResource(R.string.tools_subscriptions_title),
+                            subtitle = "$subCount ${stringResource(R.string.common_items_unit)}",
+                            modifier = Modifier.weight(1f),
+                            onClick = { activeSubPage = "subscription" }
+                        )
+                        FinanceBentoTile(
+                            icon = Icons.Default.CreditCard,
+                            title = stringResource(R.string.installments_card_title),
+                            subtitle = "$instCount ${stringResource(R.string.common_items_unit)}",
+                            modifier = Modifier.weight(1f),
+                            onClick = { activeSubPage = "installment" }
+                        )
+                    }
+                }
             }
 
-            // 2. 拍小票智能识别 (Receipt OCR)
+            // 3. 🛠️ 实用工具 (合并成一张带分隔线的紧凑列表卡)
             item {
-                ReceiptOcrBannerCard(
-                    onScanReceipt = onScanReceipt
-                )
+                MoreSectionHeader(stringResource(R.string.more_section_tools))
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Slate200)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        UtilitiesRow(
+                            icon = Icons.Default.CameraAlt,
+                            title = stringResource(R.string.tools_ocr_title),
+                            subtitle = stringResource(R.string.tools_ocr_camera_desc),
+                            onClick = onScanReceipt
+                        )
+                        HorizontalDivider(color = Slate100, thickness = 1.dp, modifier = Modifier.padding(horizontal = 16.dp))
+                        UtilitiesRow(
+                            icon = Icons.Default.DashboardCustomize,
+                            title = stringResource(R.string.tools_widget_customization),
+                            subtitle = stringResource(R.string.tools_widget_customization_desc),
+                            onClick = { activeSubPage = "widget_customization" }
+                        )
+                        HorizontalDivider(color = Slate100, thickness = 1.dp, modifier = Modifier.padding(horizontal = 16.dp))
+                        UtilitiesRow(
+                            icon = Icons.Default.DeleteOutline,
+                            title = stringResource(R.string.tools_recycle_bin),
+                            subtitle = stringResource(R.string.tools_recycle_bin_desc),
+                            onClick = { activeSubPage = "recycle_bin" }
+                        )
+                    }
+                }
             }
 
-            // 3. 周期记账与固定收支 (Subscriptions & Fixed Income)
+            // 4. ⚙️ 自动化与系统设置
             item {
-                SubscriptionsCard(
-                    subscriptions = toolsSummary?.subscriptions ?: emptyList(),
-                    totalMonthly = toolsSummary?.totalMonthlySub ?: 0.0,
-                    totalMonthlySavings = toolsSummary?.totalMonthlySavings ?: 0.0,
-                    totalMonthlyIncome = toolsSummary?.totalMonthlyIncome ?: 0.0,
-                    errorMessage = toolsError,
-                    onRetry = { refreshAll() },
-                    onOpenManage = { activeSubPage = "subscription" }
-                )
-            }
-
-            // 4. 分期与债务追踪 (Installments)
-            item {
-                InstallmentsCard(
-                    installments = toolsSummary?.installments ?: emptyList(),
-                    totalRemaining = toolsSummary?.totalRemainingInst ?: 0.0,
-                    errorMessage = toolsError,
-                    onRetry = { refreshAll() },
-                    onOpenManage = { activeSubPage = "installment" }
-                )
-            }
-
-            // 5. 自动化记账与权限设置 (Automation & Permissions)
-            item {
+                MoreSectionHeader(stringResource(R.string.more_section_system))
+                Spacer(modifier = Modifier.height(8.dp))
                 AutomationSettingsCard(
                     isListening = isListeningEnabled,
                     isBatteryOptimized = isIgnoringBatteryOptimizations,
@@ -446,36 +503,7 @@ fun MoreToolsScreen(
                 )
             }
 
-            // 6.5 回收站管理 (Recycle Bin)
-            item {
-                RecycleBinCard(
-                    onOpenRecycleBin = { activeSubPage = "recycle_bin" }
-                )
-            }
-
-            // 6.7 预算规划与每日安全限额 (Budget Management)
-            item {
-                BudgetManagementCard(
-                    onOpenBudget = { activeSubPage = "budget" }
-                )
-            }
-
-            // 6.75 账户与资产管理 (Accounts & Balances)
-            item {
-                AccountsToolCard(
-                    onOpenAccounts = { activeSubPage = "accounts" }
-                )
-            }
-
-            // 6.8 桌面微组件定制与实时预览 (Widget Customization & Live Preview)
-            item {
-                WidgetCustomizationCard(
-                    onOpenWidgetCustomization = { activeSubPage = "widget_customization" }
-                )
-            }
-
-
-            // 7. 界面语言设置 (Language Settings)
+            // 5. 界面语言设置 (Language Settings)
             item {
                 val currentLang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
                 LanguageSettingsCard(
@@ -487,7 +515,7 @@ fun MoreToolsScreen(
                 )
             }
 
-            // 8. 当前账户与退出登录 (Account & Logout)
+            // 6. 当前账户与退出登录 (Account & Logout)
             item {
                 val currentUsername = com.siangloh.ledger.data.AuthManager.getCurrentUsername(context).ifBlank {
                     NetworkHelper.getUsername(context).ifBlank { stringResource(R.string.nav_not_logged_in) }
@@ -2914,6 +2942,123 @@ fun BudgetManagementDialog(
     onDismiss: () -> Unit
 ) {
     BudgetManagementPage(onBack = onDismiss)
+}
+
+@Composable
+private fun MoreSectionHeader(title: String) {
+    Text(
+        text = title,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Bold,
+        color = Slate700,
+        modifier = Modifier.padding(horizontal = 2.dp)
+    )
+}
+
+@Composable
+private fun FinanceBentoTile(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(PrimaryTealSubtle, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = PrimaryTeal,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Column {
+                Text(
+                    text = title,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate900,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    fontSize = 11.sp,
+                    color = Slate500,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UtilitiesRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .background(PrimaryTealSubtle, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = PrimaryTeal,
+                modifier = Modifier.size(19.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Slate900
+            )
+            Text(
+                text = subtitle,
+                fontSize = 11.5.sp,
+                color = Slate500,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+            contentDescription = null,
+            tint = Slate400,
+            modifier = Modifier.size(16.dp)
+        )
+    }
 }
 
 // -----------------------------------------------------------------------------

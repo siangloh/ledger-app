@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -55,6 +56,7 @@ fun AddTransactionScreen(
     var savingsCategories by remember { mutableStateOf<List<CategoryRecord>>(emptyList()) }
     var showAllCategories by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
+    var addMode by rememberSaveable { mutableIntStateOf(0) } // 0 = Manual Add, 1 = Split Bill
 
     LaunchedEffect(Unit) {
         draft.ensureInitialized(context)
@@ -164,7 +166,7 @@ fun AddTransactionScreen(
                         fontWeight = FontWeight.Bold,
                         color = Slate900
                     )
-                    if (draft.amountText.isNotBlank() || draft.note.isNotBlank() || draft.tags.isNotBlank()) {
+                    if (addMode == 0 && (draft.amountText.isNotBlank() || draft.note.isNotBlank() || draft.tags.isNotBlank())) {
                         TextButton(
                             onClick = { draft.clear(context) },
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
@@ -173,6 +175,42 @@ fun AddTransactionScreen(
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 顶部双页签切换 (记一笔 | 拍照 AA 分账)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Slate100, RoundedCornerShape(10.dp))
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val modeTabs = listOf(
+                        stringResource(R.string.add_tab_manual),
+                        stringResource(R.string.add_tab_split)
+                    )
+                    modeTabs.forEachIndexed { idx, label ->
+                        val selected = addMode == idx
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selected) Color.White else Color.Transparent,
+                            shadowElevation = if (selected) 1.dp else 0.dp,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { addMode = idx }
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 13.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (selected) PrimaryTeal else Slate600,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 7.dp)
+                            )
+                        }
+                    }
+                }
+                if (addMode == 0) {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // 四向分段器 (支出 / 收入 / 储蓄 / 内部划转)
@@ -211,9 +249,11 @@ fun AddTransactionScreen(
                         }
                     }
                 }
+                }
             }
         },
         bottomBar = {
+            if (addMode == 0) {
             // 底部常驻保存操作区：键盘弹出时自动跟随，绝对不遮挡最后一个输入字段
             Surface(
                 modifier = Modifier
@@ -374,8 +414,27 @@ fun AddTransactionScreen(
                     }
                 }
             }
+            }
         }
     ) { paddingVals ->
+        if (addMode == 1) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingVals)
+                    .background(Slate50)
+                    .padding(16.dp)
+            ) {
+                SplitBillTabContent(
+                    onRecordTotalPaid = { totalAmt, merchantNote ->
+                        draft.txType = "expense"
+                        draft.amountText = String.format(Locale.US, "%.2f", totalAmt)
+                        draft.note = merchantNote
+                        addMode = 0
+                    }
+                )
+            }
+        } else {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -804,6 +863,7 @@ fun AddTransactionScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+        }
         }
     }
 }

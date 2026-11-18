@@ -16,6 +16,11 @@
     <string name="analytics_tab_advisor">💡 智能财务顾问</string>
     <string name="analytics_advisor_loading">正在生成智能财务分析...</string>
     <string name="nav_more">更多</string>
+    <string name="more_section_finance">💰 财务管理</string>
+    <string name="more_section_tools">🛠️ 实用工具</string>
+    <string name="more_section_system">⚙️ 自动化与系统</string>
+    <string name="budget_subtitle_short">限额与安全日均</string>
+    <string name="common_items_unit">项</string>
     <string name="tools_accounts_title">账户与资产管理</string>
     <string name="tools_accounts_desc">查看各银行卡/钱包余额、内部互转与对账校准</string>
 
@@ -59,6 +64,26 @@
 
     <!-- Add Transaction -->
     <string name="add_title">记一笔账</string>
+    <string name="add_tab_manual">✏️ 记一笔</string>
+    <string name="add_tab_split">🧾 拍照 AA 分账</string>
+    <string name="split_take_photo">拍照扫小票</string>
+    <string name="split_pick_photos">相册多图上传</string>
+    <string name="split_analyzing">分析中…</string>
+    <string name="split_tally_ok">核对一致 · %1$s</string>
+    <string name="split_tally_diff">差额 %1$s · 点击核对</string>
+    <string name="split_members_title">分账成员</string>
+    <string name="split_add_member_hint">输入朋友名字</string>
+    <string name="split_me_default">我</string>
+    <string name="split_all_btn">全选</string>
+    <string name="split_add_item_btn">+ 手动加菜</string>
+    <string name="split_item_name_hint">菜品 / 项目名称</string>
+    <string name="split_item_price_hint">价格 (RM)</string>
+    <string name="split_tax_summary_fmt">含服务费 RM %1$.2f · SST RM %2$.2f</string>
+    <string name="split_settlement_title">AA 结算结果</string>
+    <string name="split_copy_whatsapp">复制账单发 WhatsApp</string>
+    <string name="split_copied_toast">AA 账单已复制，可直接粘贴到群里！</string>
+    <string name="split_record_expense">将垫付总额记入账本</string>
+    <string name="split_empty_hint">拍一张或从相册选几张小票（后台自动识别，可连续上传），完成后点击缩略图即可分配菜品！</string>
     <string name="add_expense">支出</string>
     <string name="add_income">收入</string>
     <string name="add_transfer">转账</string>
