@@ -250,4 +250,104 @@ class ReceiptOcrEndToEndTest {
 
         SplitBillDraftHolder.clearReceipts()
     }
+
+    @Test
+    fun complexLongHotpotReceipt_withWrappedItemsDashRulesTiltAndBracketDiscountTalliesCleanly() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+
+        // Tall 920x2150 thermal strip rotated +3.8 deg (opposite direction tilt), dashed dividers,
+        // wrapped 2-line dish, add-on modifier, 0.00 free line, bracket discount, service charge,
+        // SST, rounding adjustment, and Visa/Points footer noise.
+        val width = 920
+        val height = 2150
+        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        canvas.drawColor(Color.rgb(235, 234, 230))
+        canvas.save()
+        canvas.rotate(3.8f, width / 2f, height / 2f)
+
+        val pHeader = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(30, 30, 35)
+            textSize = 36f
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        val pLeft = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(40, 40, 45)
+            textSize = 27f
+            typeface = Typeface.MONOSPACE
+            textAlign = Paint.Align.LEFT
+        }
+        val pRight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(40, 40, 45)
+            textSize = 27f
+            typeface = Typeface.MONOSPACE
+            textAlign = Paint.Align.RIGHT
+        }
+
+        var y = 110f
+        canvas.drawText("PAVILION STEAMBOAT HOUSE", width / 2f, y, pHeader)
+        y += 55f
+        canvas.drawText("Tax Invoice #INV-2026-991", 70f, y, pLeft)
+        y += 46f
+        canvas.drawText("Table: VIP-8   Pax: 6", 70f, y, pLeft)
+        y += 46f
+        canvas.drawText("Date: 19/11/2026 20:15", 70f, y, pLeft)
+        y += 48f
+        canvas.drawText("------------------------------------", 70f, y, pLeft)
+        y += 56f
+
+        val singleRows = listOf(
+            "Signature Mala Soup Base" to "",
+            "2 x 32.00" to "64.00",
+            "+ Sliced Pork Belly" to "28.00",
+            "+ Enoki Mushroom" to "9.50",
+            "+ Free Condiments" to "0.00",
+            "Australian Wagyu Beef" to "118.00",
+            "Handcrafted Prawn Paste" to "26.50",
+            "2x Homemade Barley Jug 14.00" to "28.00",
+            "White Rice" to "4.00",
+            "------------------------------------" to "",
+            "Sub-Total" to "278.00",
+            "Total Discount" to "(20.00)",
+            "Service Charge 10%" to "27.80",
+            "SST 6%" to "16.68",
+            "Rounding Adj" to "0.02",
+            "GRAND TOTAL" to "RM 302.50",
+            "------------------------------------" to "",
+            "VISA **** 4321" to "302.50",
+            "Member Points Earned: 302.00" to "",
+            "Thank You Please Visit Again" to ""
+        )
+
+        singleRows.forEach { (left, right) ->
+            if (left.isNotEmpty()) canvas.drawText(left, 70f, y, pLeft)
+            if (right.isNotEmpty()) canvas.drawText(right, width - 70f, y, pRight)
+            y += 72f
+        }
+        canvas.restore()
+
+        val photosDir = File(context.cacheDir, "receipt_photos").apply { mkdirs() }
+        val photoFile = File(photosDir, "test_complex_hotpot.jpg")
+        FileOutputStream(photoFile).use { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+        bmp.recycle()
+
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+        val result = ReceiptOcrParser.parseImageUriAsync(context, uri)
+        assertTrue("OCR failed: ${result.exceptionOrNull()?.message}", result.isSuccess)
+
+        val (previewBmp, parsed) = result.getOrThrow()
+        previewBmp.recycle()
+
+        // 7 paid items (Signature Mala Soup Base 64 + Pork Belly 28 + Enoki 9.50 + Wagyu 118 + Prawn 26.50 + 2x Barley 28 + White Rice 4)
+        assertTrue("Expected 7 items, got ${parsed.items.size}: ${parsed.items} | raw=${parsed.rawLines}", parsed.items.size == 7)
+        assertEquals("Expected Service Charge 27.80, lines=${parsed.rawLines}", 27.80, parsed.detectedServiceCharge, 0.05)
+        assertEquals("Expected SST 16.68, lines=${parsed.rawLines}", 16.68, parsed.detectedSst, 0.05)
+        assertEquals("Expected Adjustment -19.98, lines=${parsed.rawLines}", -19.98, parsed.detectedAdjustment, 0.05)
+        assertEquals("Expected Grand Total 302.50, lines=${parsed.rawLines}", 302.50, parsed.detectedTotal, 0.05)
+        assertTrue(
+            "Expected Tally OK (computed=${parsed.computedTotal}, detected=${parsed.detectedTotal}, diff=${parsed.tallyDiff}), lines=${parsed.rawLines}",
+            parsed.isTallied
+        )
+    }
 }

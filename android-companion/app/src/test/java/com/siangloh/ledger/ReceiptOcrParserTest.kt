@@ -101,5 +101,41 @@ class ReceiptOcrParserTest {
         assertEquals(22.00, result.computedTotal, 0.001)
         assertTrue(result.isTallied)
     }
+
+    @Test
+    fun parseLinesToReceiptResult_handlesWrappedItemsTotalDiscountTotalTaxAndThousandCommas() {
+        val lines = listOf(
+            "HAIDILAO HOTPOT PAVILION",
+            "Tax Invoice #HDL-99201",
+            "Dine In",
+            "Signature Tomato Soup Pot",
+            "2 x 38.00 76.00",
+            "+ Sliced Wagyu Beef 188.00",
+            "+ Fresh Prawn Paste 36.00",
+            "+ Condiments Free 0.00",
+            "Wagyu Platter Deluxe 1,000.00",
+            "Sub-Total 1,300.00",
+            "Total Discount (50.00)",
+            "Total Service Charge 10% 130.00",
+            "Total Tax 6% SST 78.00",
+            "Rounding Adj 0.02",
+            "GRAND TOTAL RM 1,458.02",
+            "Member Points 1,458.00",
+            "VISA **** 8842 1,458.02",
+            "Thank You!"
+        )
+        val result = ReceiptOcrParser.parseLinesToReceiptResult(lines)
+        assertEquals("HAIDILAO HOTPOT PAVILION", result.merchant)
+        assertEquals(4, result.items.size)
+        assertEquals("2x Signature Tomato Soup Pot", result.items[0].name)
+        assertEquals(76.00, result.items[0].price, 0.001)
+        assertEquals(1000.00, result.items[3].price, 0.001)
+        assertEquals(130.00, result.detectedServiceCharge, 0.001)
+        assertEquals(78.00, result.detectedSst, 0.001)
+        assertEquals(-49.98, result.detectedAdjustment, 0.001)
+        assertEquals(1458.02, result.detectedTotal, 0.001)
+        assertEquals(1458.02, result.computedTotal, 0.001)
+        assertTrue(result.isTallied)
+    }
 }
 

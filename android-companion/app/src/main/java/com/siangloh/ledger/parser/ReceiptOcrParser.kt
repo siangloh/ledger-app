@@ -96,9 +96,10 @@ object ReceiptOcrParser {
 
         val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, boundsOpts) }
+        val minDim = kotlin.math.min(boundsOpts.outWidth, boundsOpts.outHeight)
         val maxDim = max(boundsOpts.outWidth, boundsOpts.outHeight)
         var sampleSize = 1
-        while (maxDim / (sampleSize * 2) >= 1600) {
+        while (minDim / (sampleSize * 2) >= 1200 && maxDim / (sampleSize * 2) >= 2400) {
             sampleSize *= 2
         }
 
@@ -112,11 +113,12 @@ object ReceiptOcrParser {
             rawBmp.recycle()
         }
 
-        // Normalize to 1200..1800px longest side: downscale giant camera images, upscale small cropped strips
+        // Preserve width sharpness on tall narrow thermal receipts (max width <= 1400px, max height <= 3200px)
+        val curMin = kotlin.math.min(rotatedBmp.width, rotatedBmp.height)
         val curMax = max(rotatedBmp.width, rotatedBmp.height)
         val previewBmp = when {
-            curMax > 1800 -> {
-                val scale = 1800f / curMax
+            curMin > 1400 || curMax > 3200 -> {
+                val scale = kotlin.math.min(1400f / curMin.coerceAtLeast(1), 3200f / curMax.coerceAtLeast(1))
                 Bitmap.createScaledBitmap(
                     rotatedBmp,
                     (rotatedBmp.width * scale).toInt().coerceAtLeast(1),
@@ -202,11 +204,12 @@ object ReceiptOcrParser {
         val allLines = visionText.textBlocks.flatMap { it.lines }
         if (allLines.isEmpty()) return emptyList()
 
-        // Estimate camera tilt slope (dy / dx) from wide text lines' top-edge cornerPoints
+        // Estimate camera tilt slope (dy / dx) from wide text lines (ignoring divider rules like "----")
         val slopes = allLines.mapNotNull { line ->
             val pts = line.cornerPoints
             val box = line.boundingBox
-            if (pts != null && pts.size >= 2 && box != null) {
+            val hasAlnum = line.text.any { it.isLetterOrDigit() || it.code in 0x4E00..0x9FFF }
+            if (hasAlnum && pts != null && pts.size >= 2 && box != null) {
                 val dx = (pts[1].x - pts[0].x).toDouble()
                 val dy = (pts[1].y - pts[0].y).toDouble()
                 if (dx > max(40.0, box.height() * 1.5)) {
@@ -316,6 +319,7 @@ object ReceiptOcrParser {
         var detectedSst = 0.0
         var detectedAdjustment = 0.0
         var sawInclusiveTaxHint = false
+        var pendingWrappedName: String? = null
         val items = mutableListOf<ReceiptLineItem>()
 
         val skipKeywords = listOf(
@@ -324,7 +328,8 @@ object ReceiptOcrParser {
             "tel:", "tel ", "fax:", "gst reg", "gst id", "gst no", "sst reg", "sst id", "sst no",
             "invoice", "table", "pax", "cashier", "server", "qty", "thank you", "terima kasih",
             "date:", "time:", "tarikh", "masa", "balance", "tender", "paid", "payment",
-            "card no", "appr", "trace", "batch", "ref no", "order #", "bill #", "points", "member"
+            "card no", "appr", "trace", "batch", "ref no", "order #", "bill #", "points", "member",
+            "dine in", "dine-in", "take away", "takeaway", "welcome", "receipt #", "pos "
         )
 
         cleaned.forEachIndexed { idx, line ->
@@ -341,57 +346,103 @@ object ReceiptOcrParser {
                 lower.contains("sub total") ||
                 lower.contains("小计")
 
-            val isTotalLine = !isSubTotalLine && !lower.contains("total qty") && !lower.contains("total item") && (
+            val isRoundingLine = lower.contains("rounding") || lower.contains("round adj") ||
+                lower.contains("四舍五入") || lower.contains("pembundaran")
+
+            val isDiscountLine = lower.contains("discount") || lower.contains("voucher") ||
+                lower.contains("promo") || lower.contains("rebate") ||
+                lower.contains("less ") || lower.contains("savings") || lower.contains("折扣")
+
+            val isTaxLine = (lower.contains("sst") || lower.contains("gst") ||
+                lower.contains("service tax") || lower.contains("tax") ||
+                lower.contains("cukai") || lower.contains("税")) &&
+                !lower.contains("invoice") && !lower.contains("reg") &&
+                !lower.contains("id") && !lower.contains("no.")
+
+            val isServiceChargeLine = !isTaxLine &&
+                (lower.contains("service") || lower.contains("svc") ||
+                    lower.contains("s/c") || lower.contains("服务费")) &&
+                !lower.contains("tax inv")
+
+            val isTotalLine = !isSubTotalLine && !isDiscountLine && !isTaxLine &&
+                !isServiceChargeLine && !isRoundingLine &&
+                !lower.contains("total qty") && !lower.contains("total item") && (
                 lower.contains("grand total") || lower.contains("net total") ||
                     lower.contains("nett total") || lower.contains("amount due") ||
                     lower.contains("total amount") || lower.contains("total due") ||
-                    lower.contains("jumlah besar") || lower.contains("jumlah") ||
-                    lower.contains("合计") || lower.contains("总计") ||
+                    lower.contains("total payable") || lower.contains("jumlah besar") ||
+                    lower.contains("jumlah") || lower.contains("合计") || lower.contains("总计") ||
                     Regex("""\btotal\b""").containsMatchIn(lower)
                 )
 
             when {
                 isSubTotalLine && endAmount != null -> {
+                    pendingWrappedName = null
                     if (endAmount > 0) detectedSubtotal = endAmount
                 }
-                isTotalLine && endAmount != null -> {
-                    if (endAmount > 0) detectedTotal = endAmount
-                }
-                (lower.contains("rounding") || lower.contains("round adj") || lower.contains("四舍五入") || lower.contains("pembundaran")) && endAmount != null -> {
+                isRoundingLine && endAmount != null -> {
+                    pendingWrappedName = null
                     if (abs(endAmount) <= 1.0) detectedAdjustment += endAmount
                 }
-                (lower.contains("discount") || lower.contains("voucher") || lower.contains("promo") || lower.contains("rebate") || lower.contains("less ") || lower.contains("折扣")) && endAmount != null -> {
-                    // Discounts reduce the total even if OCR dropped the '-' sign
+                isDiscountLine && endAmount != null -> {
+                    pendingWrappedName = null
+                    // Discounts reduce total even if OCR dropped the '-' sign or parentheses
                     val adj = if (endAmount > 0 && abs(endAmount) < 10000) -endAmount else endAmount
                     if (abs(adj) < 10000) detectedAdjustment += adj
                 }
-                (lower.contains("service") || lower.contains("svc") || lower.contains("s/c") || lower.contains("服务费")) &&
-                    !lower.contains("tax inv") && endAmount != null -> {
-                    if (endAmount > 0 && endAmount < 1000) detectedServiceCharge += endAmount
-                }
-                (lower.contains("sst") || lower.contains("gst") || lower.contains("tax") || lower.contains("cukai") || lower.contains("税")) &&
-                    !lower.contains("invoice") && !lower.contains("reg") && !lower.contains("id") && !lower.contains("no.") && endAmount != null -> {
+                isTaxLine && endAmount != null -> {
+                    pendingWrappedName = null
                     if (lower.contains("incl") || lower.contains("included")) {
                         sawInclusiveTaxHint = true
                     }
-                    if (endAmount > 0 && endAmount < 1000) detectedSst += endAmount
+                    if (endAmount > 0 && endAmount < 2000) detectedSst += endAmount
+                }
+                isServiceChargeLine && endAmount != null -> {
+                    pendingWrappedName = null
+                    if (endAmount > 0 && endAmount < 2000) detectedServiceCharge += endAmount
+                }
+                isTotalLine && endAmount != null -> {
+                    pendingWrappedName = null
+                    if (endAmount > 0) detectedTotal = endAmount
                 }
                 isDateLine || isTimeLine || skipKeywords.any { lower.contains(it) } -> {
-                    // Ignore non-item receipt metadata, timestamps, payment & card footers
+                    pendingWrappedName = null
                 }
                 priceMatch != null && endAmount != null -> {
-                    val dishName = cleanItemName(priceMatch.groupValues[1])
+                    val rawPrefix = priceMatch.groupValues[1].trim()
+                    var dishName = cleanItemName(rawPrefix)
+                    val isQtyOrModifierOnly = dishName.matches(Regex("""^\d+\s*[xX*@]?$""")) ||
+                        dishName.startsWith("(") ||
+                        dishName.none { it.isLetter() || it.code in 0x4E00..0x9FFF }
+                    if (pendingWrappedName != null && (isQtyOrModifierOnly || rawPrefix.length <= 16)) {
+                        val qtyOnlyMatch = Regex("""^(\d+)\s*[xX*@]?$""").find(rawPrefix.replace(Regex("""\s+\d+[.,]\d{2}$"""), "").trim())
+                        dishName = if (qtyOnlyMatch != null) {
+                            "${qtyOnlyMatch.groupValues[1]}x $pendingWrappedName"
+                        } else if (dishName.any { it.isLetter() || it.code in 0x4E00..0x9FFF }) {
+                            "$pendingWrappedName $dishName".take(48)
+                        } else {
+                            pendingWrappedName!!
+                        }
+                    }
+                    pendingWrappedName = null
                     if ((dishName.any { it.isLetter() || it.code in 0x4E00..0x9FFF }) &&
-                        endAmount > 0.0 && endAmount < 10000.0
+                        endAmount > 0.0 && endAmount < 50000.0
                     ) {
                         items.add(
                             ReceiptLineItem(
                                 id = "item_${idx}_${items.size}",
-                                name = dishName,
+                                name = dishName.take(48),
                                 price = round2(endAmount)
                             )
                         )
                     }
+                }
+                else -> {
+                    val isMeaningfulText = idx > 1 &&
+                        line != merchant &&
+                        endAmount == null &&
+                        line.count { it.isLetter() || it.code in 0x4E00..0x9FFF } >= 3
+                    pendingWrappedName = if (isMeaningfulText) line.take(36) else null
                 }
             }
         }
