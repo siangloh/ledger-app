@@ -9,6 +9,9 @@ import androidx.core.content.FileProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.siangloh.ledger.parser.ReceiptOcrParser
+import com.siangloh.ledger.ui.compose.SplitBillDraftHolder
+import com.siangloh.ledger.ui.compose.SplitBillLogic
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -183,5 +186,68 @@ class ReceiptOcrEndToEndTest {
             "Expected Tally OK (computed=${parsed.computedTotal}, detected=${parsed.detectedTotal}, diff=${parsed.tallyDiff}), lines=${parsed.rawLines}",
             parsed.isTallied
         )
+    }
+
+    @Test
+    fun splitBillDraftHolder_persistsFriendsAndCompletesAsyncOcrWithSplitAndCharges() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        SplitBillDraftHolder.clearReceipts()
+        SplitBillDraftHolder.ensureInitialized(context, "Me")
+        SplitBillDraftHolder.addMember(context, "Alex", "Me")
+        assertTrue("Expected Alex in members", "Alex" in SplitBillDraftHolder.members)
+
+        // Draw receipt with "2x Chicken Rice 12.00 | 24.00" + "SST 6% | 1.44" + "TOTAL | 25.44"
+        val bmp = Bitmap.createBitmap(760, 560, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        canvas.drawColor(Color.WHITE)
+        val pLeft = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            textSize = 28f
+            typeface = Typeface.MONOSPACE
+            textAlign = Paint.Align.LEFT
+        }
+        val pRight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            textSize = 28f
+            typeface = Typeface.MONOSPACE
+            textAlign = Paint.Align.RIGHT
+        }
+        canvas.drawText("BISTRO TEST", 50f, 70f, pLeft)
+        canvas.drawText("2x Chicken Rice 12.00", 50f, 160f, pLeft)
+        canvas.drawText("24.00", 710f, 160f, pRight)
+        canvas.drawText("SST 6%", 50f, 240f, pLeft)
+        canvas.drawText("1.44", 710f, 240f, pRight)
+        canvas.drawText("TOTAL", 50f, 320f, pLeft)
+        canvas.drawText("25.44", 710f, 320f, pRight)
+
+        val photosDir = File(context.cacheDir, "receipt_photos").apply { mkdirs() }
+        val photoFile = File(photosDir, "test_holder_e2e.jpg")
+        FileOutputStream(photoFile).use { bmp.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+        bmp.recycle()
+
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+        SplitBillDraftHolder.enqueueReceiptAnalysis(context, uri)
+
+        var attempts = 0
+        while (attempts < 40 && SplitBillDraftHolder.receiptJobs.any { it.isAnalyzing }) {
+            delay(200)
+            attempts++
+        }
+        val job = SplitBillDraftHolder.receiptJobs.firstOrNull()
+        assertTrue("Expected completed receipt job", job != null && !job.isAnalyzing && job.errorMsg == null)
+        assertTrue("Expected item parsed, got ${job!!.items}", job.items.isNotEmpty())
+        assertTrue("Expected Tally OK, diff=${job.tallyDiff}", job.isTallied)
+
+        // Test splitting multi-quantity item into individual servings + adjusting charges
+        val firstItemId = job.items.first().id
+        SplitBillDraftHolder.splitMultiQuantityItemInJob(job.id, firstItemId)
+        val updatedJob = SplitBillDraftHolder.receiptJobs.first { it.id == job.id }
+        assertTrue("Expected split into >=2 rows, got ${updatedJob.items.size}", updatedJob.items.size >= 2)
+
+        SplitBillDraftHolder.updateJobCharges(job.id, serviceCharge = 2.40, sst = 1.44, adjustment = -0.04)
+        val totals = SplitBillLogic.computeMemberTotals(SplitBillDraftHolder.receiptJobs, SplitBillDraftHolder.members)
+        assertTrue("Expected positive split total for Me", (totals["Me"] ?: 0.0) > 10.0)
+
+        SplitBillDraftHolder.clearReceipts()
     }
 }
