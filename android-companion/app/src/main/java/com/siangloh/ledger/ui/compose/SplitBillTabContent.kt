@@ -565,6 +565,12 @@ fun SplitBillTabContent(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     val allSelected = members.all { it in item.assignedMembers }
+                                    val chipColors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Teal50,
+                                        selectedLabelColor = PrimaryTeal,
+                                        containerColor = Color.White,
+                                        labelColor = Slate700
+                                    )
                                     FilterChip(
                                         selected = allSelected,
                                         onClick = {
@@ -575,6 +581,7 @@ fun SplitBillTabContent(
                                                 } else j
                                             }
                                         },
+                                        colors = chipColors,
                                         label = { Text(stringResource(R.string.split_all_btn), fontSize = 11.sp) }
                                     )
                                     members.forEach { m ->
@@ -589,6 +596,7 @@ fun SplitBillTabContent(
                                                     } else j
                                                 }
                                             },
+                                            colors = chipColors,
                                             label = { Text(m, fontSize = 11.sp) }
                                         )
                                     }

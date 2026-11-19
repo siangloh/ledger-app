@@ -57,16 +57,19 @@ object LocalFinancialAdvisor {
         val categoryHealth: List<CategoryHealthItem> = emptyList()
     )
 
-    private fun isFixedEssentialCategory(rawCategory: String): Boolean {
-        val lower = rawCategory.trim().lowercase(Locale.US)
-        if (lower.isEmpty()) return false
+    private fun isFixedEssentialCategory(context: Context, rawCategory: String): Boolean {
+        val localized = CategoryUiHelper.getLocalizedCategoryName(context, rawCategory)
+        val candidates = listOf(rawCategory, localized)
+            .map { it.trim().lowercase(Locale.US) }
+            .filter { it.isNotEmpty() }
+        if (candidates.isEmpty()) return false
         val fixedKeywords = listOf(
-            "住房", "房租", "水电", "房贷", "分期", "保险", "通讯", "转账",
+            "住房", "房租", "租金", "账单", "水电", "物业", "房贷", "分期", "保险", "通讯", "转账",
             "housing", "rent", "rental", "utilities", "utility", "bill", "mortgage",
             "installment", "insurance", "telecom", "internet", "transfer",
-            "sewa", "bil", "pinjaman", "insurans", "ansuran"
+            "sewa", "bil", "pinjaman", "insurans", "ansuran", "perumahan"
         )
-        return fixedKeywords.any { lower.contains(it) }
+        return candidates.any { c -> fixedKeywords.any { k -> c.contains(k) } }
     }
 
     /**
@@ -105,7 +108,7 @@ object LocalFinancialAdvisor {
                 }
             }
         }
-        val discretionaryEntries = rawCategoryEntries.filterNot { isFixedEssentialCategory(it.first) }
+        val discretionaryEntries = rawCategoryEntries.filterNot { isFixedEssentialCategory(context, it.first) }
         val discretionaryTotal = discretionaryEntries.sumOf { it.second }
         val topDiscretionary = discretionaryEntries.maxByOrNull { it.second }
         var topCategoryName: String? = topDiscretionary?.first
@@ -313,7 +316,7 @@ object LocalFinancialAdvisor {
         val budgetByCategory = budgetOverview?.categories?.associateBy { it.category.trim().lowercase(Locale.US) } ?: emptyMap()
         val categoryHealthList = rawCategoryEntries.map { (catName, amt) ->
             val localized = CategoryUiHelper.getLocalizedCategoryName(context, catName)
-            val isFixed = isFixedEssentialCategory(catName)
+            val isFixed = isFixedEssentialCategory(context, catName)
             val budgetItem = budgetByCategory[catName.trim().lowercase(Locale.US)]
                 ?: budgetByCategory[localized.trim().lowercase(Locale.US)]
             val shareOfDiscretionary = if (!isFixed && discretionaryTotal > 0.0) (amt / discretionaryTotal) * 100.0 else 0.0

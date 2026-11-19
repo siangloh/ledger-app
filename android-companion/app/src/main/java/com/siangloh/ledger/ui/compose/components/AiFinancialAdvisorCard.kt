@@ -105,9 +105,11 @@ fun AiFinancialAdvisorCard(
                     Column {
                         Text(
                             text = stringResource(R.string.ai_advisor_card_title),
-                            fontSize = 14.sp,
+                            fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Slate900
+                            color = Slate900,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                         Text(
                             text = stringResource(R.string.ai_advisor_score_label) + ": ${report.score} / 100",
