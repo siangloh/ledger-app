@@ -60,9 +60,9 @@ class AdvisorInstrumentedTest {
         val budget = BudgetOverviewRecord(
             month = "2026-11",
             billingCycle = BillingCycleRecord("2026-11-01", "2026-11-30", "Nov", 1, 30, 15, 15),
-            overall = OverallBudgetRecord(3800.0, 3100.0, 700.0, 81.5, "ok"),
+            overall = OverallBudgetRecord(3800.0, 3100.0, 700.0, 81.5, "ok", 46.67, true, true),
             categories = listOf(
-                BudgetItemRecord("餐饮", 900.0, 1100.0, -200.0, 122.2, "over", false)
+                BudgetItemRecord("餐饮", 900.0, 1100.0, -200.0, 122.2, "over", "#EF4444")
             ),
             totalCategoriesBudgeted = 1,
             overCount = 1,
