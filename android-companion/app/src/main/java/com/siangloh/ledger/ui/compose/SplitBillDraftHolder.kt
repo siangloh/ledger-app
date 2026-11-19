@@ -38,6 +38,7 @@ data class ReceiptJobState(
     val sst: Double = 0.0,
     val adjustment: Double = 0.0,
     val detectedTotal: Double = 0.0,
+    val rawLines: List<String> = emptyList(),
     val errorMsg: String? = null
 ) {
     val itemsSubtotal: Double
@@ -123,6 +124,7 @@ object SplitBillDraftHolder {
     var members by mutableStateOf<List<String>>(emptyList())
     var receiptJobs by mutableStateOf<List<ReceiptJobState>>(emptyList())
     var activeJobId by mutableStateOf<String?>(null)
+    var pendingCameraUri: Uri? = null
 
     private val ocrScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val activeTasks = mutableMapOf<String, Job>()
@@ -234,6 +236,7 @@ object SplitBillDraftHolder {
                             sst = parsed.detectedSst,
                             adjustment = parsed.detectedAdjustment,
                             detectedTotal = parsed.detectedTotal,
+                            rawLines = parsed.rawLines,
                             errorMsg = null
                         )
                     } else j

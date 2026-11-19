@@ -350,4 +350,77 @@ class ReceiptOcrEndToEndTest {
             parsed.isTallied
         )
     }
+
+    @Test
+    fun mixedFontSizeTotalAndShadedWarmLightingReceipt_extractsAndResolvesCameraIntent() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+
+        // Confirm ACTION_IMAGE_CAPTURE resolves under Android 11+ <queries> without declaring CAMERA perm
+        val capIntent = android.content.Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
+        val resolved = context.packageManager.resolveActivity(capIntent, 0)
+        assertTrue("Expected camera activity to resolve", resolved != null)
+
+        // Warm shaded lighting receipt with 2x bold font on RM TOTAL price and tax codes
+        val width = 820
+        val height = 1000
+        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        // Warm dim beige background with darker shadow stripe
+        canvas.drawColor(Color.rgb(212, 200, 182))
+        val shadowPaint = Paint().apply { color = Color.rgb(172, 162, 148) }
+        canvas.drawRect(0f, 300f, width.toFloat(), 650f, shadowPaint)
+
+        val pLeft = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(35, 35, 38)
+            textSize = 27f
+            typeface = Typeface.MONOSPACE
+            textAlign = Paint.Align.LEFT
+        }
+        val pRight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(35, 35, 38)
+            textSize = 27f
+            typeface = Typeface.MONOSPACE
+            textAlign = Paint.Align.RIGHT
+        }
+        val pBigRight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(20, 20, 20)
+            textSize = 48f
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            textAlign = Paint.Align.RIGHT
+        }
+
+        var y = 90f
+        canvas.drawText("WARUNG KOPI KL", 60f, y, pLeft)
+        y += 80f
+        listOf(
+            "Mee Goreng Mamak" to "12.50 SR",
+            "Roti Bom" to "4.00 SR",
+            "Kopi O Kosong" to "3.50 SR",
+            "Sub-Total" to "20.00",
+            "Service Charge 10%" to "2.00"
+        ).forEach { (l, r) ->
+            canvas.drawText(l, 60f, y, pLeft)
+            canvas.drawText(r, width - 60f, y, pRight)
+            y += 75f
+        }
+        y += 20f
+        canvas.drawText("GRAND TOTAL", 60f, y, pLeft)
+        canvas.drawText("RM 22.00", width - 60f, y + 6f, pBigRight)
+
+        val photosDir = File(context.cacheDir, "receipt_photos").apply { mkdirs() }
+        val photoFile = File(photosDir, "test_warm_mixed_font.jpg")
+        FileOutputStream(photoFile).use { bmp.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+        bmp.recycle()
+
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+        val res = ReceiptOcrParser.parseImageUriAsync(context, uri)
+        assertTrue("OCR failed: ${res.exceptionOrNull()?.message}", res.isSuccess)
+        val (previewBmp, parsed) = res.getOrThrow()
+        previewBmp.recycle()
+
+        assertEquals("Expected 3 items, got ${parsed.items} | raw=${parsed.rawLines}", 3, parsed.items.size)
+        assertEquals("Expected Svc 2.00, lines=${parsed.rawLines}", 2.00, parsed.detectedServiceCharge, 0.05)
+        assertEquals("Expected Total 22.00, lines=${parsed.rawLines}", 22.00, parsed.detectedTotal, 0.05)
+        assertTrue("Expected Tally OK, diff=${parsed.tallyDiff}, raw=${parsed.rawLines}", parsed.isTallied)
+    }
 }

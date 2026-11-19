@@ -137,5 +137,30 @@ class ReceiptOcrParserTest {
         assertEquals(1458.02, result.computedTotal, 0.001)
         assertTrue(result.isTallied)
     }
+
+    @Test
+    fun parseLinesToReceiptResult_handlesSplitPriceRowsTaxTagsAndBrokenDecimalDots() {
+        val lines = listOf(
+            "BANANA LEAF CURRY HOUSE",
+            "Date: 19/11/2026",
+            "Banana Leaf Set",
+            "RM 18. 50 (ST)",
+            "Ayam Goreng Berempah 14.50 T1",
+            "Teh Tarik Kurang Manis 4 .50 SR",
+            "SST 6%",
+            "2.25",
+            "GRAND TOTAL",
+            "RM 39.75"
+        )
+        val result = ReceiptOcrParser.parseLinesToReceiptResult(lines)
+        assertEquals(3, result.items.size)
+        assertEquals("Banana Leaf Set", result.items[0].name)
+        assertEquals(18.50, result.items[0].price, 0.001)
+        assertEquals(14.50, result.items[1].price, 0.001)
+        assertEquals(4.50, result.items[2].price, 0.001)
+        assertEquals(2.25, result.detectedSst, 0.001)
+        assertEquals(39.75, result.detectedTotal, 0.001)
+        assertTrue(result.isTallied)
+    }
 }
 

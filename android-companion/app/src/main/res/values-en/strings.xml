@@ -84,6 +84,8 @@
     <string name="split_qty_btn">Split %1$d</string>
     <string name="split_clear_all">Clear All</string>
     <string name="split_tap_zoom">Tap image to zoom</string>
+    <string name="split_raw_lines_toggle">Show extracted receipt text</string>
+    <string name="split_camera_unavailable">Could not open camera app, try Upload Photos instead</string>
     <string name="split_my_share_fmt">My share: RM %1$.2f</string>
     <string name="split_record_choice_title">How to record this bill?</string>
     <string name="split_record_my_share_fmt">Record My Share Only (RM %1$.2f)</string>

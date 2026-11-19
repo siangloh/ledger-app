@@ -84,6 +84,8 @@
     <string name="split_qty_btn">拆%1$d份</string>
     <string name="split_clear_all">清空列表</string>
     <string name="split_tap_zoom">点击放大查看原图</string>
+    <string name="split_raw_lines_toggle">展开小票识别原文（核对漏项）</string>
+    <string name="split_camera_unavailable">无法打开系统相机，请改用相册上传</string>
     <string name="split_my_share_fmt">我的应付：RM %1$.2f</string>
     <string name="split_record_choice_title">选择入账方式</string>
     <string name="split_record_my_share_fmt">只记我本人消费（RM %1$.2f）</string>

@@ -84,6 +84,8 @@
     <string name="split_qty_btn">Pecah %1$d</string>
     <string name="split_clear_all">Kosongkan Semua</string>
     <string name="split_tap_zoom">Ketik gambar untuk zum</string>
+    <string name="split_raw_lines_toggle">Papar teks resit yang dibaca</string>
+    <string name="split_camera_unavailable">Tidak dapat buka kamera, sila muat naik dari galeri</string>
     <string name="split_my_share_fmt">Bahagian saya: RM %1$.2f</string>
     <string name="split_record_choice_title">Pilih cara rekod bil</string>
     <string name="split_record_my_share_fmt">Rekod Bahagian Saya (RM %1$.2f)</string>

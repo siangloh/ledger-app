@@ -1,12 +1,11 @@
 package com.siangloh.ledger.ui.compose
 
-import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -45,7 +44,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.siangloh.ledger.R
 import com.siangloh.ledger.ui.compose.theme.*
@@ -76,28 +74,25 @@ fun SplitBillTabContent(
     var editingChargesJob by remember { mutableStateOf<ReceiptJobState?>(null) }
     var zoomBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var showRecordChoiceDialog by remember { mutableStateOf(false) }
-    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
 
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        val uri = pendingCameraUri
+        val uri = SplitBillDraftHolder.pendingCameraUri
+        SplitBillDraftHolder.pendingCameraUri = null
         if (ok && uri != null) {
             SplitBillDraftHolder.enqueueReceiptAnalysis(context, uri)
         }
     }
 
     fun launchCameraCapture() {
-        val photosDir = File(context.cacheDir, "receipt_photos").apply { mkdirs() }
-        val photoFile = File(photosDir, "receipt_${System.currentTimeMillis()}.jpg")
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
-        pendingCameraUri = uri
-        cameraLauncher.launch(uri)
-    }
-
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
-            launchCameraCapture()
-        } else {
-            Toast.makeText(context, context.getString(R.string.split_camera_perm_denied), Toast.LENGTH_SHORT).show()
+        try {
+            val photosDir = File(context.cacheDir, "receipt_photos").apply { mkdirs() }
+            val photoFile = File(photosDir, "receipt_${System.currentTimeMillis()}.jpg")
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+            SplitBillDraftHolder.pendingCameraUri = uri
+            cameraLauncher.launch(uri)
+        } catch (e: Exception) {
+            Log.w("SplitBillTabContent", "Failed to launch camera capture", e)
+            Toast.makeText(context, context.getString(R.string.split_camera_unavailable), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -133,14 +128,7 @@ fun SplitBillTabContent(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Button(
-                onClick = {
-                    val hasCam = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                    if (hasCam) {
-                        launchCameraCapture()
-                    } else {
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                },
+                onClick = { launchCameraCapture() },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.weight(1f).height(46.dp)
@@ -803,6 +791,35 @@ private fun ReceiptDetailDialog(
 
                 TextButton(onClick = onRequestAddItem) {
                     Text(stringResource(R.string.split_add_item_btn), color = PrimaryTeal, fontWeight = FontWeight.Bold)
+                }
+
+                if (job.rawLines.isNotEmpty()) {
+                    var showRawLines by remember(job.id) { mutableStateOf(false) }
+                    Text(
+                        text = stringResource(R.string.split_raw_lines_toggle),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Slate500,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { showRawLines = !showRawLines }
+                            .padding(vertical = 4.dp)
+                    )
+                    if (showRawLines) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Slate100,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = job.rawLines.joinToString("\n"),
+                                fontSize = 11.sp,
+                                color = Slate700,
+                                lineHeight = 16.sp,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
                 }
             }
         },
