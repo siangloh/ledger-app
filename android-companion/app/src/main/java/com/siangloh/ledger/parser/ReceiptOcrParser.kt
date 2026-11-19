@@ -13,6 +13,7 @@ import android.net.Uri
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -36,6 +37,7 @@ data class ParsedReceiptData(
     val detectedSubtotal: Double,
     val detectedServiceCharge: Double,
     val detectedSst: Double,
+    val detectedAdjustment: Double = 0.0,
     val detectedTotal: Double,
     val computedTotal: Double,
     val isTallied: Boolean,
@@ -45,8 +47,23 @@ data class ParsedReceiptData(
 
 object ReceiptOcrParser {
 
-    private val PRICE_AT_END_REGEX = Regex("""^(.*?)\s+(?:RM|MYR)?\s*([0-9]{1,5}\.[0-9]{2})\s*[A-Za-z*#]*$""", RegexOption.IGNORE_CASE)
-    private val ANY_AMOUNT_REGEX = Regex("""(?:RM|MYR)?\s*([0-9]{1,5}\.[0-9]{2})""", RegexOption.IGNORE_CASE)
+    // Support standard decimals (14.50), comma-thousands (1,234.50), or OCR comma-decimals (14,50)
+    private val PRICE_AT_END_REGEX = Regex(
+        """^(.*?)\s+(?:RM|MYR|\$)?\s*([0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2}|[0-9]{1,5}[.,][0-9]{2})\s*[A-Za-z*#]*$""",
+        RegexOption.IGNORE_CASE
+    )
+    private val SIGNED_AMOUNT_REGEX = Regex(
+        """(\(?-?\s*(?:RM|MYR|\$)?\s*(?:[0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2}|[0-9]{1,5}[.,][0-9]{2})\)?)""",
+        RegexOption.IGNORE_CASE
+    )
+    private val DATE_SLASH_OR_DOT_REGEX = Regex("""^\s*(?:date|tarikh|日期)?[:\s-]*\d{1,4}[/.-]\d{1,2}[/.-]\d{2,4}.*$""", RegexOption.IGNORE_CASE)
+    private val TIME_ONLY_REGEX = Regex("""\b\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?\b""", RegexOption.IGNORE_CASE)
+    private val TRAILING_UNIT_PRICE_REGEX = Regex(
+        """^(.*?)(?:\s+@|\s+x\s*\d+|\s+(?:RM|MYR)?\s*[0-9]{1,5}[.,][0-9]{2})+$""",
+        RegexOption.IGNORE_CASE
+    )
+    private val LEADING_QTY_REGEX = Regex("""^(\d+)\s*[xX*]\s+(.+)$""")
+    private val LEADING_BARE_QTY_REGEX = Regex("""^(\d{1,2})\s+([A-Za-z\u4E00-\u9FFF].+)$""")
 
     suspend fun parseImageUriAsync(context: Context, uri: Uri): Result<Pair<Bitmap, ParsedReceiptData>> =
         withContext(Dispatchers.IO) {
@@ -81,7 +98,7 @@ object ReceiptOcrParser {
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, boundsOpts) }
         val maxDim = max(boundsOpts.outWidth, boundsOpts.outHeight)
         var sampleSize = 1
-        while (maxDim / sampleSize > 1600) {
+        while (maxDim / (sampleSize * 2) >= 1600) {
             sampleSize *= 2
         }
 
@@ -95,28 +112,36 @@ object ReceiptOcrParser {
             rawBmp.recycle()
         }
 
-        // Scale to max 1600px if still larger
+        // Normalize to 1200..1800px longest side: downscale giant camera images, upscale small cropped strips
         val curMax = max(rotatedBmp.width, rotatedBmp.height)
-        val previewBmp = if (curMax > 1600) {
-            val scale = 1600f / curMax
-            val scaled = Bitmap.createScaledBitmap(
-                rotatedBmp,
-                (rotatedBmp.width * scale).toInt().coerceAtLeast(1),
-                (rotatedBmp.height * scale).toInt().coerceAtLeast(1),
-                true
-            )
-            if (scaled !== rotatedBmp) rotatedBmp.recycle()
-            scaled
-        } else {
-            rotatedBmp
+        val previewBmp = when {
+            curMax > 1800 -> {
+                val scale = 1800f / curMax
+                Bitmap.createScaledBitmap(
+                    rotatedBmp,
+                    (rotatedBmp.width * scale).toInt().coerceAtLeast(1),
+                    (rotatedBmp.height * scale).toInt().coerceAtLeast(1),
+                    true
+                ).also { if (it !== rotatedBmp) rotatedBmp.recycle() }
+            }
+            curMax in 1 until 1000 -> {
+                val scale = (1200f / curMax).coerceAtMost(2.5f)
+                Bitmap.createScaledBitmap(
+                    rotatedBmp,
+                    (rotatedBmp.width * scale).toInt().coerceAtLeast(1),
+                    (rotatedBmp.height * scale).toInt().coerceAtLeast(1),
+                    true
+                ).also { if (it !== rotatedBmp) rotatedBmp.recycle() }
+            }
+            else -> rotatedBmp
         }
 
-        // Fast contrast boost copy for thermal receipt OCR
+        // Fast grayscale + contrast boost copy for faded thermal receipt OCR
         val enhanced = Bitmap.createBitmap(previewBmp.width, previewBmp.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(enhanced)
         val cm = ColorMatrix().apply {
             setSaturation(0f) // grayscale
-            val contrast = 1.35f
+            val contrast = 1.4f
             val translate = (-0.5f * contrast + 0.5f) * 255f
             val contrastMatrix = ColorMatrix(
                 floatArrayOf(
@@ -145,30 +170,56 @@ object ReceiptOcrParser {
         return Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
     }
 
-    private suspend fun recognizeText(bitmap: Bitmap): Text =
-        suspendCancellableCoroutine { cont ->
-            val image = InputImage.fromBitmap(bitmap, 0)
-            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-            recognizer.process(image)
-                .addOnSuccessListener { result ->
-                    if (cont.isActive) cont.resume(result)
-                }
-                .addOnFailureListener { err ->
-                    if (cont.isActive) cont.resumeWithException(err)
-                }
+    private suspend fun recognizeText(bitmap: Bitmap): Text {
+        return try {
+            runRecognizer(bitmap, ChineseTextRecognizerOptions.Builder().build())
+        } catch (_: Exception) {
+            runRecognizer(bitmap, TextRecognizerOptions.DEFAULT_OPTIONS)
         }
+    }
+
+    private suspend fun runRecognizer(
+        bitmap: Bitmap,
+        options: com.google.mlkit.vision.text.TextRecognizerOptionsInterface
+    ): Text = suspendCancellableCoroutine { cont ->
+        val image = InputImage.fromBitmap(bitmap, 0)
+        val recognizer = TextRecognition.getClient(options)
+        recognizer.process(image)
+            .addOnSuccessListener { result ->
+                if (cont.isActive) cont.resume(result)
+            }
+            .addOnFailureListener { err ->
+                if (cont.isActive) cont.resumeWithException(err)
+            }
+    }
 
     /**
-     * Reconstruct horizontal receipt lines using bounding box Y-center alignment
-     * so left-column item names and right-column prices stay on the same line.
+     * Reconstruct horizontal receipt lines using bounding box Y-center alignment with tilt
+     * compensation (deskewing by the median line slope from ML Kit cornerPoints), so tilted
+     * handheld photos still keep left-column dish names and right-column prices on one row.
      */
     private fun reconstructHorizontalLines(visionText: Text): List<String> {
         val allLines = visionText.textBlocks.flatMap { it.lines }
         if (allLines.isEmpty()) return emptyList()
 
+        // Estimate camera tilt slope (dy / dx) from wide text lines' top-edge cornerPoints
+        val slopes = allLines.mapNotNull { line ->
+            val pts = line.cornerPoints
+            val box = line.boundingBox
+            if (pts != null && pts.size >= 2 && box != null) {
+                val dx = (pts[1].x - pts[0].x).toDouble()
+                val dy = (pts[1].y - pts[0].y).toDouble()
+                if (dx > max(40.0, box.height() * 1.5)) {
+                    (dy / dx).coerceIn(-0.35, 0.35)
+                } else null
+            } else null
+        }.sorted()
+        val medianSlope = if (slopes.isNotEmpty()) slopes[slopes.size / 2] else 0.0
+
         val withBoxes = allLines.mapNotNull { line ->
             val box = line.boundingBox ?: return@mapNotNull null
-            Triple(line.text.trim(), box, box.centerY())
+            val deskewedY = box.centerY() - box.centerX() * medianSlope
+            Triple(line.text.trim(), box, deskewedY)
         }.filter { it.first.isNotBlank() }
 
         if (withBoxes.isEmpty()) {
@@ -176,11 +227,11 @@ object ReceiptOcrParser {
         }
 
         val heights = withBoxes.map { it.second.height() }.sorted()
-        val medianHeight = heights[heights.size / 2].coerceAtLeast(12)
-        val yTolerance = (medianHeight * 0.6f).toInt().coerceAtLeast(8)
+        val medianHeight = heights[heights.size / 2].coerceAtLeast(12).toDouble()
+        val yTolerance = max(8.0, medianHeight * 0.65)
 
         val sortedByY = withBoxes.sortedBy { it.third }
-        val rows = mutableListOf<MutableList<Triple<String, android.graphics.Rect, Int>>>()
+        val rows = mutableListOf<MutableList<Triple<String, android.graphics.Rect, Double>>>()
 
         for (entry in sortedByY) {
             val targetRow = rows.lastOrNull()?.let { lastRow ->
@@ -199,67 +250,145 @@ object ReceiptOcrParser {
         }
     }
 
+    private fun parseAmountToken(token: String): Double? {
+        val raw = token.trim()
+        val isNegative = raw.startsWith("-") || (raw.startsWith("(") && raw.endsWith(")"))
+        var numeric = raw
+            .replace("(", "")
+            .replace(")", "")
+            .replace("-", "")
+            .replace(Regex("(?i)(?:RM|MYR|\\$)"), "")
+            .trim()
+        // If format is like 1,234.50 -> strip thousand commas
+        if (numeric.contains('.') && numeric.contains(',')) {
+            numeric = numeric.replace(",", "")
+        } else if (Regex("""^\d{1,5},\d{2}$""").matches(numeric)) {
+            // Thermal OCR often reads '.' as ',' -> e.g. 14,50 -> 14.50
+            numeric = numeric.replace(',', '.')
+        } else {
+            numeric = numeric.replace(",", "")
+        }
+        val value = numeric.toDoubleOrNull() ?: return null
+        return if (isNegative) -value else value
+    }
+
+    private fun cleanItemName(rawPrefix: String): String {
+        var name = rawPrefix.trim()
+        // Strip trailing unit prices / "@ 12.00" when a row has [Item  Qty  UnitPrice  LineTotal]
+        val strippedTrailing = TRAILING_UNIT_PRICE_REGEX.find(name)?.groupValues?.get(1)?.trim()
+        if (!strippedTrailing.isNullOrBlank() && strippedTrailing.any { it.isLetter() || it.code > 0x4E00 }) {
+            name = strippedTrailing
+        }
+        // Normalize leading "2 x Soup" -> "2x Soup", "2 Soup" -> "2x Soup"
+        val qtyMatch = LEADING_QTY_REGEX.find(name)
+        if (qtyMatch != null) {
+            val qty = qtyMatch.groupValues[1].toIntOrNull() ?: 1
+            val dish = qtyMatch.groupValues[2].trim()
+            name = if (qty > 1) "${qty}x $dish" else dish
+        } else {
+            val bareQtyMatch = LEADING_BARE_QTY_REGEX.find(name)
+            if (bareQtyMatch != null) {
+                val qty = bareQtyMatch.groupValues[1].toIntOrNull() ?: 1
+                val dish = bareQtyMatch.groupValues[2].trim()
+                name = if (qty in 2..20) "${qty}x $dish" else dish
+            }
+        }
+        return name.trim().take(48)
+    }
+
     /**
-     * Pure Kotlin receipt line parser that extracts items, Service Charge, SST, and Total,
-     * and verifies whether the sum of items + taxes tallies with the receipt Total.
+     * Pure Kotlin receipt line parser that extracts items, Service Charge, SST, Rounding/Discount,
+     * and Total, verifying whether the sum of items + charges + adjustments tallies with Total.
      */
     fun parseLinesToReceiptResult(lines: List<String>): ParsedReceiptData {
         val cleaned = lines.map { it.trim() }.filter { it.isNotBlank() }
         val merchant = cleaned.firstOrNull { line ->
             val lower = line.lowercase(Locale.US)
             !lower.startsWith("tel") && !lower.startsWith("tax inv") &&
-                !lower.startsWith("receipt") && line.any { it.isLetter() }
+                !lower.startsWith("receipt") && !lower.startsWith("sst") &&
+                !lower.startsWith("gst") && !DATE_SLASH_OR_DOT_REGEX.matches(line) &&
+                line.any { it.isLetter() || it.code in 0x4E00..0x9FFF }
         }?.take(40) ?: "Receipt"
 
         var detectedTotal = 0.0
         var detectedSubtotal = 0.0
         var detectedServiceCharge = 0.0
         var detectedSst = 0.0
+        var detectedAdjustment = 0.0
+        var sawInclusiveTaxHint = false
         val items = mutableListOf<ReceiptLineItem>()
 
         val skipKeywords = listOf(
-            "cash", "change", "rounding", "visa", "mastercard", "duitnow",
-            "ewallet", "tng", "grabpay", "tel:", "fax:", "gst reg", "sst reg",
-            "invoice", "table", "pax", "cashier", "server", "qty", "thank you"
+            "cash", "change", "visa", "mastercard", "master card", "amex", "duitnow",
+            "ewallet", "e-wallet", "tng", "grabpay", "shopeepay", "boost",
+            "tel:", "tel ", "fax:", "gst reg", "gst id", "gst no", "sst reg", "sst id", "sst no",
+            "invoice", "table", "pax", "cashier", "server", "qty", "thank you", "terima kasih",
+            "date:", "time:", "tarikh", "masa", "balance", "tender", "paid", "payment",
+            "card no", "appr", "trace", "batch", "ref no", "order #", "bill #", "points", "member"
         )
 
         cleaned.forEachIndexed { idx, line ->
             val lower = line.lowercase(Locale.US)
+            val isDateLine = DATE_SLASH_OR_DOT_REGEX.matches(line)
+            val isTimeLine = TIME_ONLY_REGEX.containsMatchIn(line) && !lower.contains("total")
+
             val priceMatch = PRICE_AT_END_REGEX.find(line)
-            val endAmount = priceMatch?.groupValues?.get(2)?.toDoubleOrNull()
-                ?: ANY_AMOUNT_REGEX.findAll(line).lastOrNull()?.groupValues?.get(1)?.toDoubleOrNull()
+            val endAmount = priceMatch?.groupValues?.get(2)?.let { parseAmountToken(it) }
+                ?: SIGNED_AMOUNT_REGEX.findAll(line).lastOrNull()?.groupValues?.get(1)?.let { parseAmountToken(it) }
+
+            val isSubTotalLine = lower.contains("subtotal") ||
+                lower.contains("sub-total") ||
+                lower.contains("sub total") ||
+                lower.contains("小计")
+
+            val isTotalLine = !isSubTotalLine && !lower.contains("total qty") && !lower.contains("total item") && (
+                lower.contains("grand total") || lower.contains("net total") ||
+                    lower.contains("nett total") || lower.contains("amount due") ||
+                    lower.contains("total amount") || lower.contains("total due") ||
+                    lower.contains("jumlah besar") || lower.contains("jumlah") ||
+                    lower.contains("合计") || lower.contains("总计") ||
+                    Regex("""\btotal\b""").containsMatchIn(lower)
+                )
 
             when {
-                (lower.contains("grand total") || lower.contains("net total") ||
-                    lower.contains("amount due") || lower.contains("total amount") ||
-                    lower.contains("jumlah") || lower.contains("合计") ||
-                    (lower.contains("total") && !lower.contains("subtotal"))) && endAmount != null -> {
-                    if (endAmount > 0) detectedTotal = endAmount
-                }
-                lower.contains("subtotal") && endAmount != null -> {
+                isSubTotalLine && endAmount != null -> {
                     if (endAmount > 0) detectedSubtotal = endAmount
                 }
-                (lower.contains("service") || lower.contains("svc") || lower.contains("s/c")) && endAmount != null -> {
-                    if (endAmount > 0 && endAmount < 500) detectedServiceCharge += endAmount
+                isTotalLine && endAmount != null -> {
+                    if (endAmount > 0) detectedTotal = endAmount
                 }
-                (lower.contains("sst") || lower.contains("gst") || lower.contains("tax")) &&
-                    !lower.contains("invoice") && !lower.contains("reg") && endAmount != null -> {
-                    if (endAmount > 0 && endAmount < 500) detectedSst += endAmount
+                (lower.contains("rounding") || lower.contains("round adj") || lower.contains("四舍五入") || lower.contains("pembundaran")) && endAmount != null -> {
+                    if (abs(endAmount) <= 1.0) detectedAdjustment += endAmount
                 }
-                skipKeywords.any { lower.contains(it) } -> {
-                    // Ignore non-item footer/payment metadata
+                (lower.contains("discount") || lower.contains("voucher") || lower.contains("promo") || lower.contains("rebate") || lower.contains("less ") || lower.contains("折扣")) && endAmount != null -> {
+                    // Discounts reduce the total even if OCR dropped the '-' sign
+                    val adj = if (endAmount > 0 && abs(endAmount) < 10000) -endAmount else endAmount
+                    if (abs(adj) < 10000) detectedAdjustment += adj
                 }
-                priceMatch != null -> {
-                    val rawName = priceMatch.groupValues[1].trim()
-                        .replace(Regex("""^\d+\s*[xX*]\s*"""), "")
-                        .trim()
-                    val price = priceMatch.groupValues[2].toDoubleOrNull() ?: 0.0
-                    if (rawName.any { it.isLetter() } && price > 0.0 && price < 10000.0) {
+                (lower.contains("service") || lower.contains("svc") || lower.contains("s/c") || lower.contains("服务费")) &&
+                    !lower.contains("tax inv") && endAmount != null -> {
+                    if (endAmount > 0 && endAmount < 1000) detectedServiceCharge += endAmount
+                }
+                (lower.contains("sst") || lower.contains("gst") || lower.contains("tax") || lower.contains("cukai") || lower.contains("税")) &&
+                    !lower.contains("invoice") && !lower.contains("reg") && !lower.contains("id") && !lower.contains("no.") && endAmount != null -> {
+                    if (lower.contains("incl") || lower.contains("included")) {
+                        sawInclusiveTaxHint = true
+                    }
+                    if (endAmount > 0 && endAmount < 1000) detectedSst += endAmount
+                }
+                isDateLine || isTimeLine || skipKeywords.any { lower.contains(it) } -> {
+                    // Ignore non-item receipt metadata, timestamps, payment & card footers
+                }
+                priceMatch != null && endAmount != null -> {
+                    val dishName = cleanItemName(priceMatch.groupValues[1])
+                    if ((dishName.any { it.isLetter() || it.code in 0x4E00..0x9FFF }) &&
+                        endAmount > 0.0 && endAmount < 10000.0
+                    ) {
                         items.add(
                             ReceiptLineItem(
                                 id = "item_${idx}_${items.size}",
-                                name = rawName.take(48),
-                                price = round2(price)
+                                name = dishName,
+                                price = round2(endAmount)
                             )
                         )
                     }
@@ -268,7 +397,17 @@ object ReceiptOcrParser {
         }
 
         val itemsSum = round2(items.sumOf { it.price })
-        val computedTotal = round2(itemsSum + detectedServiceCharge + detectedSst)
+        // If receipt printed "Incl. 6% SST" and Subtotal+Adjustment already equals Total, don't double-add inclusive SST
+        val sumExclusive = round2(itemsSum + detectedServiceCharge + detectedSst + detectedAdjustment)
+        val sumInclusive = round2(itemsSum + detectedServiceCharge + detectedAdjustment)
+        if (detectedTotal > 0.0 && detectedSst > 0.0 &&
+            (sawInclusiveTaxHint || abs(sumInclusive - detectedTotal) <= 0.05) &&
+            abs(sumExclusive - detectedTotal) > 0.05
+        ) {
+            detectedSst = 0.0
+        }
+
+        val computedTotal = round2(itemsSum + detectedServiceCharge + detectedSst + detectedAdjustment)
         val effectiveTotal = if (detectedTotal > 0.0) round2(detectedTotal) else computedTotal
         val tallyDiff = if (detectedTotal > 0.0) round2(computedTotal - detectedTotal) else 0.0
         val isTallied = detectedTotal <= 0.0 || abs(tallyDiff) <= 0.05
@@ -279,6 +418,7 @@ object ReceiptOcrParser {
             detectedSubtotal = round2(detectedSubtotal),
             detectedServiceCharge = round2(detectedServiceCharge),
             detectedSst = round2(detectedSst),
+            detectedAdjustment = round2(detectedAdjustment),
             detectedTotal = effectiveTotal,
             computedTotal = computedTotal,
             isTallied = isTallied,

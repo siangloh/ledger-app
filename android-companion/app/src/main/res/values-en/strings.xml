@@ -76,9 +76,12 @@
     <string name="split_me_default">Me</string>
     <string name="split_all_btn">All</string>
     <string name="split_add_item_btn">+ Add Item</string>
+    <string name="split_edit_item_btn">Edit Item</string>
     <string name="split_item_name_hint">Dish / Item name</string>
     <string name="split_item_price_hint">Price (RM)</string>
     <string name="split_tax_summary_fmt">Svc Charge RM %1$.2f · SST RM %2$.2f</string>
+    <string name="split_adj_summary_fmt"> · Rounding/Disc RM %1$.2f</string>
+    <string name="split_camera_perm_denied">Camera permission is required to snap receipts</string>
     <string name="split_settlement_title">AA Settlement</string>
     <string name="split_copy_whatsapp">Copy for WhatsApp</string>
     <string name="split_copied_toast">AA breakdown copied! Ready to paste in group chat.</string>

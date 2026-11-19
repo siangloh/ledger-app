@@ -76,9 +76,12 @@
     <string name="split_me_default">我</string>
     <string name="split_all_btn">全选</string>
     <string name="split_add_item_btn">+ 手动加菜</string>
+    <string name="split_edit_item_btn">修改菜品</string>
     <string name="split_item_name_hint">菜品 / 项目名称</string>
     <string name="split_item_price_hint">价格 (RM)</string>
     <string name="split_tax_summary_fmt">含服务费 RM %1$.2f · SST RM %2$.2f</string>
+    <string name="split_adj_summary_fmt"> · 折扣/尾数调整 RM %1$.2f</string>
+    <string name="split_camera_perm_denied">需要相机权限才能拍照扫描小票</string>
     <string name="split_settlement_title">AA 结算结果</string>
     <string name="split_copy_whatsapp">复制账单发 WhatsApp</string>
     <string name="split_copied_toast">AA 账单已复制，可直接粘贴到群里！</string>

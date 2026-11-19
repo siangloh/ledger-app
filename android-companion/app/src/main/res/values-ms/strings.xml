@@ -76,9 +76,12 @@
     <string name="split_me_default">Saya</string>
     <string name="split_all_btn">Semua</string>
     <string name="split_add_item_btn">+ Tambah Item</string>
+    <string name="split_edit_item_btn">Sunting Item</string>
     <string name="split_item_name_hint">Nama hidangan / item</string>
     <string name="split_item_price_hint">Harga (RM)</string>
     <string name="split_tax_summary_fmt">Caj Servis RM %1$.2f · SST RM %2$.2f</string>
+    <string name="split_adj_summary_fmt"> · Pembundaran/Diskaun RM %1$.2f</string>
+    <string name="split_camera_perm_denied">Kebenaran kamera diperlukan untuk mengambil gambar resit</string>
     <string name="split_settlement_title">Ringkasan AA</string>
     <string name="split_copy_whatsapp">Salin ke WhatsApp</string>
     <string name="split_copied_toast">Ringkasan AA disalin! Sedia untuk ditampal ke grup.</string>

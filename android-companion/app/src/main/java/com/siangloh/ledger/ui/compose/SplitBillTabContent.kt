@@ -1,13 +1,16 @@
 package com.siangloh.ledger.ui.compose
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -66,6 +69,7 @@ data class ReceiptJobState(
     val items: List<SplitItemState> = emptyList(),
     val serviceCharge: Double = 0.0,
     val sst: Double = 0.0,
+    val adjustment: Double = 0.0,
     val detectedTotal: Double = 0.0,
     val errorMsg: String? = null
 ) {
@@ -73,7 +77,7 @@ data class ReceiptJobState(
         get() = round(items.sumOf { it.price } * 100.0) / 100.0
 
     val computedTotal: Double
-        get() = round((itemsSubtotal + serviceCharge + sst) * 100.0) / 100.0
+        get() = round((itemsSubtotal + serviceCharge + sst + adjustment) * 100.0) / 100.0
 
     val tallyDiff: Double
         get() = if (detectedTotal > 0.0) round((computedTotal - detectedTotal) * 100.0) / 100.0 else 0.0
@@ -95,6 +99,7 @@ fun SplitBillTabContent(
     var receiptJobs by remember { mutableStateOf<List<ReceiptJobState>>(emptyList()) }
     var activeJobId by remember { mutableStateOf<String?>(null) }
     var showAddItemDialogForJob by remember { mutableStateOf<String?>(null) }
+    var editingItemTarget by remember { mutableStateOf<Pair<String, SplitItemState>?>(null) }
     var newItemName by remember { mutableStateOf("") }
     var newItemPrice by remember { mutableStateOf("") }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
@@ -123,6 +128,7 @@ fun SplitBillTabContent(
                             items = splitItems,
                             serviceCharge = parsed.detectedServiceCharge,
                             sst = parsed.detectedSst,
+                            adjustment = parsed.detectedAdjustment,
                             detectedTotal = parsed.detectedTotal
                         )
                     } else j
@@ -144,6 +150,22 @@ fun SplitBillTabContent(
         }
     }
 
+    fun launchCameraCapture() {
+        val photosDir = File(context.cacheDir, "receipt_photos").apply { mkdirs() }
+        val photoFile = File(photosDir, "receipt_${System.currentTimeMillis()}.jpg")
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+        pendingCameraUri = uri
+        cameraLauncher.launch(uri)
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            launchCameraCapture()
+        } else {
+            Toast.makeText(context, context.getString(R.string.split_camera_perm_denied), Toast.LENGTH_SHORT).show()
+        }
+    }
+
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         uris.forEach { uri -> enqueueReceiptAnalysis(uri) }
     }
@@ -154,7 +176,7 @@ fun SplitBillTabContent(
         members.forEach { map[it] = 0.0 }
         receiptJobs.filter { !it.isAnalyzing }.forEach { job ->
             val jobItemsSub = job.itemsSubtotal
-            val jobTax = job.serviceCharge + job.sst
+            val jobExtra = job.serviceCharge + job.sst + job.adjustment
             val jobPersonSub = mutableMapOf<String, Double>()
             job.items.forEach { item ->
                 val assignees = item.assignedMembers.filter { it in members }
@@ -167,7 +189,7 @@ fun SplitBillTabContent(
             }
             val assignedSubTotal = jobPersonSub.values.sum()
             val taxFactor = if (assignedSubTotal > 0.0 && jobItemsSub > 0.0) {
-                (assignedSubTotal + jobTax * (assignedSubTotal / jobItemsSub)) / assignedSubTotal
+                (assignedSubTotal + jobExtra * (assignedSubTotal / jobItemsSub)) / assignedSubTotal
             } else 1.0
             jobPersonSub.forEach { (m, sub) ->
                 map[m] = (map[m] ?: 0.0) + sub * taxFactor
@@ -178,7 +200,7 @@ fun SplitBillTabContent(
 
     val grandTotalAll = remember(receiptJobs) {
         round(receiptJobs.filter { !it.isAnalyzing }.sumOf {
-            if (it.detectedTotal > 0.0) it.detectedTotal else it.computedTotal
+            if (it.items.isNotEmpty()) it.computedTotal else it.detectedTotal
         } * 100.0) / 100.0
     }
 
@@ -195,10 +217,12 @@ fun SplitBillTabContent(
         ) {
             Button(
                 onClick = {
-                    val photoFile = File(context.cacheDir, "receipt_${System.currentTimeMillis()}.jpg")
-                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
-                    pendingCameraUri = uri
-                    cameraLauncher.launch(uri)
+                    val hasCam = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                    if (hasCam) {
+                        launchCameraCapture()
+                    } else {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                 shape = RoundedCornerShape(12.dp),
@@ -524,9 +548,13 @@ fun SplitBillTabContent(
                         )
                     }
 
-                    if (activeJob.serviceCharge > 0 || activeJob.sst > 0) {
+                    if (activeJob.serviceCharge > 0 || activeJob.sst > 0 || activeJob.adjustment != 0.0) {
+                        val taxPart = stringResource(R.string.split_tax_summary_fmt, activeJob.serviceCharge, activeJob.sst)
+                        val adjPart = if (activeJob.adjustment != 0.0) {
+                            stringResource(R.string.split_adj_summary_fmt, activeJob.adjustment)
+                        } else ""
                         Text(
-                            text = stringResource(R.string.split_tax_summary_fmt, activeJob.serviceCharge, activeJob.sst),
+                            text = taxPart + adjPart,
                             fontSize = 11.5.sp,
                             color = Slate600,
                             fontWeight = FontWeight.Medium
@@ -548,7 +576,18 @@ fun SplitBillTabContent(
                                 ) {
                                     Text(item.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate900, modifier = Modifier.weight(1f))
                                     Text("RM ${String.format(Locale.US, "%.2f", item.price)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                                    Spacer(Modifier.width(6.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = null,
+                                        tint = PrimaryTeal,
+                                        modifier = Modifier.size(16.dp).clickable {
+                                            newItemName = item.name
+                                            newItemPrice = String.format(Locale.US, "%.2f", item.price)
+                                            editingItemTarget = activeJob.id to item
+                                        }
+                                    )
+                                    Spacer(Modifier.width(8.dp))
                                     Icon(
                                         imageVector = Icons.Default.DeleteOutline,
                                         contentDescription = null,
@@ -617,6 +656,61 @@ fun SplitBillTabContent(
             confirmButton = {
                 TextButton(onClick = { activeJobId = null }) {
                     Text(stringResource(R.string.common_confirm), color = PrimaryTeal, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    if (editingItemTarget != null) {
+        val (targetJobId, targetItem) = editingItemTarget!!
+        AlertDialog(
+            onDismissRequest = { editingItemTarget = null },
+            containerColor = Color.White,
+            title = { Text(stringResource(R.string.split_edit_item_btn), fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = newItemName,
+                        onValueChange = { newItemName = it },
+                        label = { Text(stringResource(R.string.split_item_name_hint)) },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = newItemPrice,
+                        onValueChange = { newItemPrice = it },
+                        label = { Text(stringResource(R.string.split_item_price_hint)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val p = newItemPrice.toDoubleOrNull() ?: 0.0
+                    if (newItemName.isNotBlank() && p > 0.0) {
+                        receiptJobs = receiptJobs.map { j ->
+                            if (j.id == targetJobId) {
+                                j.copy(
+                                    items = j.items.map { it2 ->
+                                        if (it2.id == targetItem.id) {
+                                            it2.copy(
+                                                name = newItemName.trim(),
+                                                price = round(p * 100.0) / 100.0
+                                            )
+                                        } else it2
+                                    }
+                                )
+                            } else j
+                        }
+                    }
+                    editingItemTarget = null
+                }) {
+                    Text(stringResource(R.string.common_confirm), color = PrimaryTeal, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingItemTarget = null }) {
+                    Text(stringResource(R.string.common_cancel), color = Slate600)
                 }
             }
         )
