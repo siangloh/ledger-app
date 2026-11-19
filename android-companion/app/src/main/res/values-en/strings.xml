@@ -1038,6 +1038,42 @@
     <string name="ai_advisor_desc_daily_safe">%1$d days remaining in this cycle. Keeping daily discretionary spending within this limit achieves your goals.</string>
     <string name="ai_advisor_title_cycle_wrapup">Plan Next Billing Cycle</string>
     <string name="ai_advisor_desc_cycle_wrapup">This cycle is coming to an end. Review this month\'s spending and prepare next month\'s category limits.</string>
+
+    <!-- Deep Financial Advisor Metrics & Insights -->
+    <string name="ai_advisor_kpi_daily_safe">Safe Daily</string>
+    <string name="ai_advisor_kpi_proj_net">Proj. Month-End</string>
+    <string name="ai_advisor_kpi_runway">Safety Runway</string>
+    <string name="ai_advisor_kpi_runway_fmt">%1$.1f mo</string>
+    <string name="ai_advisor_kpi_savings_rate">Savings Rate</string>
+    <string name="ai_advisor_mix_title">Spend Mix (50%% Needs · 30%% Wants · 20%% Saved)</string>
+    <string name="ai_advisor_mix_needs_fmt">Needs %1$.0f%%</string>
+    <string name="ai_advisor_mix_wants_fmt">Wants %1$.0f%%</string>
+    <string name="ai_advisor_mix_save_fmt">Saved %1$.0f%%</string>
+    <string name="ai_advisor_tag_forecast">Forecast</string>
+    <string name="ai_advisor_tag_bills">Due Bills</string>
+    <string name="ai_advisor_tag_habit">Habit</string>
+    <string name="ai_advisor_tag_weekend">Weekend</string>
+    <string name="ai_advisor_tag_runway">Resilience</string>
+    <string name="ai_advisor_tag_credit">Credit</string>
+    <string name="ai_advisor_title_burn_warn">Projected Overspend of %1$s by Month-End</string>
+    <string name="ai_advisor_desc_burn_warn">At %1$s/day variable burn, month-end total spend could reach %2$s. Slow daily discretionary spend to %3$s to finish positive.</string>
+    <string name="ai_advisor_title_burn_ok">Projected Month-End Surplus: %1$s</string>
+    <string name="ai_advisor_desc_burn_ok">Factoring in fixed bills and your %1$s/day flexible pace, your month-end cashflow remains comfortably positive.</string>
+    <string name="ai_advisor_title_pending_bills">%1$d Unpaid Fixed Bills Remaining (%2$s)</string>
+    <string name="ai_advisor_desc_pending_bills_ok">Includes %1$s. True free cash available after reserving for these bills is %2$s.</string>
+    <string name="ai_advisor_desc_pending_bills_tight">Includes %1$s. Free cash turns tight after bill reserves (shortfall %2$s)—hold non-essential buys now.</string>
+    <string name="ai_advisor_title_repeat_merchant">Frequent Spend: "%1$s" (%2$dx)</string>
+    <string name="ai_advisor_desc_repeat_merchant">Totaled %1$s (%2$s avg/visit). At this pace it costs ~%3$s/year—consider bundling or trimming visits.</string>
+    <string name="ai_advisor_title_outlier_spend">Large Outlier: "%1$s" (%2$.0f%% of wants)</string>
+    <string name="ai_advisor_desc_outlier_spend">This single %1$s purchase drove a large spike; keep remaining daily buys light to balance the cycle.</string>
+    <string name="ai_advisor_title_weekend_skew">Weekend Spend Is %1$.1fx Higher Than Weekdays</string>
+    <string name="ai_advisor_desc_weekend_skew">Weekends average %1$s/day vs %2$s/day on weekdays. Trimming one impulse weekend outing frees ~%3$s/month.</string>
+    <string name="ai_advisor_title_runway_low">Liquid Emergency Buffer: %1$.1f Months (Low)</string>
+    <string name="ai_advisor_desc_runway_low">Your liquid balances cover less than the recommended 3 months of expenses. Prioritize routing surpluses to savings.</string>
+    <string name="ai_advisor_title_runway_strong">Strong Safety Cushion: %1$.1f Months Runway</string>
+    <string name="ai_advisor_desc_runway_strong">Liquid reserves cover over 6 months of expenses. Excess monthly surplus can be directed to long-term growth.</string>
+    <string name="ai_advisor_title_credit_high">"%1$s" Credit Utilization at %2$.0f%%</string>
+    <string name="ai_advisor_desc_credit_high">Current card balance %1$s is elevated relative to its limit. Set aside repayment early to avoid interest charges.</string>
 <!-- Bill Reminders & Calendar Integration -->
     <string name="cf_add_to_calendar">Add to Calendar</string>
     <string name="cf_calendar_added">Added to calendar</string>

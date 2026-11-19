@@ -181,6 +181,67 @@ fun AiFinancialAdvisorCard(
                 )
             }
 
+            // 3-KPI Financial Snapshot Strip
+            val currencyLabel = report.categoryHealth.firstOrNull()?.currency ?: "RM"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AdvisorKpiChip(
+                    label = stringResource(R.string.ai_advisor_kpi_daily_safe),
+                    value = "$currencyLabel ${String.format(java.util.Locale.US, "%.0f", report.dailySafeAllowance)}",
+                    valueColor = PrimaryTeal,
+                    modifier = Modifier.weight(1f)
+                )
+                val projPositive = report.projectedMonthEndNet >= 0.0
+                val projValue = if (report.hasProjection) {
+                    val sign = if (projPositive) "+" else "-"
+                    "$sign$currencyLabel ${String.format(java.util.Locale.US, "%.0f", kotlin.math.abs(report.projectedMonthEndNet))}"
+                } else {
+                    String.format(java.util.Locale.US, "%.1f%%", report.savingsRatePct)
+                }
+                AdvisorKpiChip(
+                    label = if (report.hasProjection) stringResource(R.string.ai_advisor_kpi_proj_net)
+                    else stringResource(R.string.ai_advisor_kpi_savings_rate),
+                    value = projValue,
+                    valueColor = if (!report.hasProjection || projPositive) Color(0xFF059669) else Color(0xFFDC2626),
+                    modifier = Modifier.weight(1f)
+                )
+                val showSavingsInThird = report.runwayMonths == null && report.hasProjection
+                val thirdVal = when {
+                    report.runwayMonths != null -> stringResource(R.string.ai_advisor_kpi_runway_fmt, report.runwayMonths)
+                    showSavingsInThird -> String.format(java.util.Locale.US, "%.1f%%", report.savingsRatePct)
+                    else -> String.format(java.util.Locale.US, "%.0f%%", report.wantsPct)
+                }
+                val thirdColor = when {
+                    report.runwayMonths == null && showSavingsInThird -> PrimaryTeal
+                    report.runwayMonths == null -> Color(0xFFD97706)
+                    report.runwayMonths >= 6.0 -> Color(0xFF059669)
+                    report.runwayMonths < 3.0 -> Color(0xFFD97706)
+                    else -> PrimaryTeal
+                }
+                AdvisorKpiChip(
+                    label = when {
+                        report.runwayMonths != null -> stringResource(R.string.ai_advisor_kpi_runway)
+                        showSavingsInThird -> stringResource(R.string.ai_advisor_kpi_savings_rate)
+                        else -> stringResource(R.string.ai_advisor_tag_optimize)
+                    },
+                    value = thirdVal,
+                    valueColor = thirdColor,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // 50/30/20 Spend Mix Bar
+            val mixTotal = (report.needsPct + report.wantsPct + report.savedPct)
+            if (mixTotal > 0.5) {
+                SpendStructureBar(
+                    needsPct = report.needsPct,
+                    wantsPct = report.wantsPct,
+                    savedPct = report.savedPct
+                )
+            }
+
             // Expandable Insight Items List
             AnimatedVisibility(
                 visible = expanded,
@@ -330,6 +391,96 @@ private fun InsightRow(item: LocalFinancialAdvisor.FinancialInsightItem) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun AdvisorKpiChip(
+    label: String,
+    value: String,
+    valueColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = Color(0xFFF8FAFC),
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                color = Slate500,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+            Text(
+                text = value,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = valueColor,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpendStructureBar(
+    needsPct: Double,
+    wantsPct: Double,
+    savedPct: Double
+) {
+    val total = (needsPct + wantsPct + savedPct).coerceAtLeast(1.0)
+    val needsWeight = (needsPct / total).toFloat().coerceAtLeast(0.01f)
+    val wantsWeight = (wantsPct / total).toFloat().coerceAtLeast(0.01f)
+    val savedWeight = (savedPct / total).toFloat().coerceAtLeast(0.01f)
+
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.ai_advisor_mix_title),
+            fontSize = 10.5.sp,
+            color = Slate500,
+            fontWeight = FontWeight.Medium
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Slate200)
+        ) {
+            if (needsPct > 0.0) {
+                Box(modifier = Modifier.weight(needsWeight).height(8.dp).background(Color(0xFF64748B)))
+            }
+            if (wantsPct > 0.0) {
+                Box(modifier = Modifier.weight(wantsWeight).height(8.dp).background(Color(0xFFF59E0B)))
+            }
+            if (savedPct > 0.0) {
+                Box(modifier = Modifier.weight(savedWeight).height(8.dp).background(PrimaryTeal))
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            MixLegendDot(Color(0xFF64748B), stringResource(R.string.ai_advisor_mix_needs_fmt, needsPct))
+            MixLegendDot(Color(0xFFF59E0B), stringResource(R.string.ai_advisor_mix_wants_fmt, wantsPct))
+            MixLegendDot(PrimaryTeal, stringResource(R.string.ai_advisor_mix_save_fmt, savedPct))
+        }
+    }
+}
+
+@Composable
+private fun MixLegendDot(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(color))
+        Text(text = label, fontSize = 10.5.sp, color = Slate700, fontWeight = FontWeight.SemiBold)
     }
 }
 

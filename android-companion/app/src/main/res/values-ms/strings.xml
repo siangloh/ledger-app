@@ -1038,6 +1038,42 @@
     <string name="ai_advisor_desc_daily_safe">%1$d hari lagi dalam kitaran ini. Kekalkan perbelanjaan harian dalam had ini untuk capai sasaran.</string>
     <string name="ai_advisor_title_cycle_wrapup">Rancang Kitaran Seterusnya</string>
     <string name="ai_advisor_desc_cycle_wrapup">Kitaran ini hampir tamat. Semak perbelanjaan bulan ini dan sediakan had belanjawan bulan depan.</string>
+
+    <!-- Metrik & Wawasan Kewangan Mendalam -->
+    <string name="ai_advisor_kpi_daily_safe">Had Harian</string>
+    <string name="ai_advisor_kpi_proj_net">Unjuran Akhir</string>
+    <string name="ai_advisor_kpi_runway">Dana Kecemasan</string>
+    <string name="ai_advisor_kpi_runway_fmt">%1$.1f bln</string>
+    <string name="ai_advisor_kpi_savings_rate">Kadar Simpanan</string>
+    <string name="ai_advisor_mix_title">Struktur Belanja (Keperluan 50%% · Kehendak 30%% · Simpanan 20%%)</string>
+    <string name="ai_advisor_mix_needs_fmt">Keperluan %1$.0f%%</string>
+    <string name="ai_advisor_mix_wants_fmt">Kehendak %1$.0f%%</string>
+    <string name="ai_advisor_mix_save_fmt">Simpan %1$.0f%%</string>
+    <string name="ai_advisor_tag_forecast">Unjuran</string>
+    <string name="ai_advisor_tag_bills">Bil Tetap</string>
+    <string name="ai_advisor_tag_habit">Kekerapan</string>
+    <string name="ai_advisor_tag_weekend">Hujung Minggu</string>
+    <string name="ai_advisor_tag_runway">Ketahanan</string>
+    <string name="ai_advisor_tag_credit">Kredit</string>
+    <string name="ai_advisor_title_burn_warn">Unjuran Terlebih Belanja %1$s Akhir Bulan</string>
+    <string name="ai_advisor_desc_burn_warn">Pada kadar harian %1$s, jumlah belanja dijangka mencecah %2$s. Kawal perbelanjaan harian ke %3$s untuk kekal positif.</string>
+    <string name="ai_advisor_title_burn_ok">Unjuran Lebihan Akhir Bulan: %1$s</string>
+    <string name="ai_advisor_desc_burn_ok">Mengambil kira bil tetap dan kadar harian %1$s, aliran tunai akhir bulan kekal sihat.</string>
+    <string name="ai_advisor_title_pending_bills">%1$d Bil Tetap Belum Dibayar (%2$s)</string>
+    <string name="ai_advisor_desc_pending_bills_ok">Termasuk %1$s. Tunai bebas sebenar selepas rezab bil ini ialah %2$s.</string>
+    <string name="ai_advisor_desc_pending_bills_tight">Termasuk %1$s. Baki tunai ketat selepas rezab bil (kurang %2$s)—tangguhkan belanja bukan keperluan.</string>
+    <string name="ai_advisor_title_repeat_merchant">Belanja Kerap: "%1$s" (%2$dx)</string>
+    <string name="ai_advisor_desc_repeat_merchant">Jumlah %1$s (purata %2$s). Jika diteruskan, kos tahunan ~%3$s—pertimbangkan had kekerapan.</string>
+    <string name="ai_advisor_title_outlier_spend">Belanja Besar: "%1$s" (%2$.0f%% kehendak)</string>
+    <string name="ai_advisor_desc_outlier_spend">Pembelian %1$s ini menaikkan graf; perlahankan belanja harian sepanjang baki kitaran.</string>
+    <string name="ai_advisor_title_weekend_skew">Belanja Hujung Minggu %1$.1fx Lebih Tinggi</string>
+    <string name="ai_advisor_desc_weekend_skew">Purata hujung minggu %1$s/hari berbanding %2$s/hari bekerja. Kurangkan satu aktiviti luar jimat ~%3$s/bulan.</string>
+    <string name="ai_advisor_title_runway_low">Dana Kecemasan Cair: %1$.1f Bulan (Rendah)</string>
+    <string name="ai_advisor_desc_runway_low">Simpanan cair meliputi kurang 3 bulan perbelanjaan. Utamakan tambah dana kecemasan daripada lebihan bulanan.</string>
+    <string name="ai_advisor_title_runway_strong">Pelindung Kukuh: Dana Cukup %1$.1f Bulan</string>
+    <string name="ai_advisor_desc_runway_strong">Simpanan cair melebihi 6 bulan keperluan. Lebihan bulanan boleh disalurkan kepada pelaburan jangka panjang.</string>
+    <string name="ai_advisor_title_credit_high">Penggunaan Kredit "%1$s" pada %2$.0f%%</string>
+    <string name="ai_advisor_desc_credit_high">Baki semasa %1$s agak tinggi berbanding had. Sediakan bayaran awal untuk elak caj faedah.</string>
 <!-- Peringatan Bil & Kalendar -->
     <string name="cf_add_to_calendar">Tambah ke Kalendar</string>
     <string name="cf_calendar_added">Ditambah ke kalendar</string>

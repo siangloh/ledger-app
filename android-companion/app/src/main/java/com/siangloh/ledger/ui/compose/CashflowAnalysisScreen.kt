@@ -1553,9 +1553,9 @@ fun CashflowAnalysisScreen(
         }
     }
     var budgetOverview by remember { mutableStateOf<BudgetOverviewRecord?>(null) }
-    val advisorReport = remember(result?.data, budgetOverview, refresh) {
+    val advisorReport = remember(result?.data, budgetOverview, availableAccounts, refresh) {
         result?.data?.let { data ->
-            LocalFinancialAdvisor.analyze(context, data, budgetOverview)
+            LocalFinancialAdvisor.analyze(context, data, budgetOverview, availableAccounts)
         }
     }
 

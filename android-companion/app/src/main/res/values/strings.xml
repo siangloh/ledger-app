@@ -1038,6 +1038,42 @@
     <string name="ai_advisor_desc_daily_safe">距离本周期结束还有 %1$d 天，将每日弹性花费控制在此金额内，即可平稳达成目标。</string>
     <string name="ai_advisor_title_cycle_wrapup">合理规划下一账单周期</string>
     <string name="ai_advisor_desc_cycle_wrapup">本周期即将结束，建议复盘本月实际开销并提前微调下月总预算与分类额度。</string>
+
+    <!-- Deep Financial Advisor Metrics & Insights -->
+    <string name="ai_advisor_kpi_daily_safe">每日安全额度</string>
+    <string name="ai_advisor_kpi_proj_net">月底预计结余</string>
+    <string name="ai_advisor_kpi_runway">应急储备</string>
+    <string name="ai_advisor_kpi_runway_fmt">%1$.1f 个月</string>
+    <string name="ai_advisor_kpi_savings_rate">净留存率</string>
+    <string name="ai_advisor_mix_title">收支结构（建议比例：必需 50%% · 弹性 30%% · 储蓄 20%%）</string>
+    <string name="ai_advisor_mix_needs_fmt">必需 %1$.0f%%</string>
+    <string name="ai_advisor_mix_wants_fmt">弹性 %1$.0f%%</string>
+    <string name="ai_advisor_mix_save_fmt">结余 %1$.0f%%</string>
+    <string name="ai_advisor_tag_forecast">趋势预测</string>
+    <string name="ai_advisor_tag_bills">待缴账单</string>
+    <string name="ai_advisor_tag_habit">高频消费</string>
+    <string name="ai_advisor_tag_weekend">周末规律</string>
+    <string name="ai_advisor_tag_runway">风险防御</string>
+    <string name="ai_advisor_tag_credit">信用提醒</string>
+    <string name="ai_advisor_title_burn_warn">月底预计超支 %1$s，需降速控费</string>
+    <string name="ai_advisor_desc_burn_warn">当前弹性消费日均约 %1$s，照此节奏月底总支出预计达 %2$s。建议将余下天数日均压低至 %3$s 以内。</string>
+    <string name="ai_advisor_title_burn_ok">按当前节奏，月底预计结余 %1$s</string>
+    <string name="ai_advisor_desc_burn_ok">已计入固定账单与当前弹性日均（%1$s/天），月底财务状态健康可控。</string>
+    <string name="ai_advisor_title_pending_bills">尚有 %1$d 笔待缴固定账单（共 %2$s）</string>
+    <string name="ai_advisor_desc_pending_bills_ok">包含 %1$s。扣除预留后，当前可自由支配净额为 %2$s。</string>
+    <string name="ai_advisor_desc_pending_bills_tight">包含 %1$s。扣除待缴账单后资金已吃紧（差额 %2$s），建议立即暂缓非刚需购买。</string>
+    <string name="ai_advisor_title_repeat_merchant">高频漏斗：「%1$s」已消费 %2$d 次</string>
+    <string name="ai_advisor_desc_repeat_merchant">本期累计花费 %1$s（均单 %2$s），若保持该频率全年将支出约 %3$s，可评估是否有替代或减频空间。</string>
+    <string name="ai_advisor_title_outlier_spend">大额单笔波动：「%1$s」占弹性支出 %2$.0f%%</string>
+    <string name="ai_advisor_desc_outlier_spend">单笔金额 %1$s 显著高于日常均值，本月余下天数建议控制其他非必要采购以平衡总体预算。</string>
+    <string name="ai_advisor_title_weekend_skew">周末日均支出是工作日的 %1$.1f 倍</string>
+    <string name="ai_advisor_desc_weekend_skew">周末日均约 %1$s，工作日约 %2$s。若每次周末减少一次非计划消费，月均可多留 %3$s。</string>
+    <string name="ai_advisor_title_runway_low">流动应急金可支撑 %1$.1f 个月（偏低）</string>
+    <string name="ai_advisor_desc_runway_low">按当前月均开销测算，流动储备低于 3 个月安全线，建议优先将月结余转入备用金账户。</string>
+    <string name="ai_advisor_title_runway_strong">安全垫充裕：应急金可支撑 %1$.1f 个月</string>
+    <string name="ai_advisor_desc_runway_strong">流动资金已覆盖半年以上生活支出，抗突发风险能力出色，多余结余可考虑长期稳健增值。</string>
+    <string name="ai_advisor_title_credit_high">「%1$s」额度已使用 %2$.0f%%</string>
+    <string name="ai_advisor_desc_credit_high">当前待还余额 %1$s 已接近较高占用区间，建议提前准备还款资金并避开分期利息。</string>
 <!-- 账单到期提醒与系统日历联动 -->
     <string name="cf_add_to_calendar">添加至系统日历</string>
     <string name="cf_calendar_added">已添加到系统日历</string>
