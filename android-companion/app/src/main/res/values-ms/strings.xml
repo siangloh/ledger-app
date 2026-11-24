@@ -1125,4 +1125,9 @@
     <string name="records_rebate_empty">"Tiada rekod perbelanjaan terkini"</string>
     <string name="records_rebate_tag_fmt">"[Rebat ditolak %1$s]"</string>
     <string name="records_rebate_success_fmt">"Berjaya ditolak! %2$s dikurangkan daripada \"%1$s\" (kini %3$s)"</string>
+
+    <!-- Kemasan UI Bahagi Bil -->
+    <string name="split_empty_title">Imbas atau Muat Naik Resit</string>
+    <string name="split_queue_header_fmt">Resit (%1$d)</string>
+    <string name="split_items_count_fmt">%1$d item</string>
 </resources>

@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
@@ -39,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -120,7 +122,7 @@ fun SplitBillTabContent(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         // 1. Camera & Multi-Photo Upload Actions (non-blocking background queue)
         Row(
@@ -130,121 +132,243 @@ fun SplitBillTabContent(
             Button(
                 onClick = { launchCameraCapture() },
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.weight(1f).height(46.dp)
+                shape = RoundedCornerShape(14.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.5.dp),
+                modifier = Modifier.weight(1f).height(50.dp)
             ) {
-                Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(19.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.split_take_photo), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.split_take_photo), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
 
             OutlinedButton(
                 onClick = { galleryLauncher.launch("image/*") },
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, PrimaryTeal),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryTeal),
-                modifier = Modifier.weight(1f).height(46.dp)
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.2.dp, PrimaryTeal.copy(alpha = 0.6f)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Teal50,
+                    contentColor = PrimaryTeal
+                ),
+                modifier = Modifier.weight(1f).height(50.dp)
             ) {
-                Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(19.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.split_pick_photos), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.split_pick_photos), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
         }
 
-        // 2. Background Receipt Queue (thumbnails with remove badge, spinner, tally badge)
+        // 2. Background Receipt Queue (empty state or horizontal thumbnail cards)
         if (receiptJobs.isEmpty()) {
             Surface(
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(18.dp),
                 color = Color.White,
+                shadowElevation = 0.5.dp,
                 border = BorderStroke(1.dp, Slate200),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = stringResource(R.string.split_empty_hint),
-                    fontSize = 12.5.sp,
-                    color = Slate500,
-                    lineHeight = 18.sp,
-                    modifier = Modifier.padding(16.dp)
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Teal50,
+                        border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.2f)),
+                        modifier = Modifier.size(52.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.ReceiptLong,
+                                contentDescription = null,
+                                tint = PrimaryTeal,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = stringResource(R.string.split_empty_title),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = stringResource(R.string.split_empty_hint),
+                        fontSize = 12.5.sp,
+                        color = Slate500,
+                        lineHeight = 18.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Text(
-                    text = stringResource(R.string.split_clear_all),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Slate500,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { SplitBillDraftHolder.clearReceipts() }
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                items(receiptJobs, key = { it.id }) { job ->
-                    ReceiptThumbnailCard(
-                        job = job,
-                        isSelected = activeJobId == job.id,
-                        onSelectOrRetry = {
-                            if (!job.isAnalyzing) {
-                                if (job.errorMsg != null) {
-                                    SplitBillDraftHolder.retryJob(context, job.id)
-                                } else {
-                                    SplitBillDraftHolder.activeJobId = job.id
-                                }
-                            }
-                        },
-                        onRemove = { SplitBillDraftHolder.removeJob(job.id) }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.split_queue_header_fmt, receiptJobs.size),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate800
                     )
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Slate100,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { SplitBillDraftHolder.clearReceipts() }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteSweep,
+                                contentDescription = null,
+                                tint = Slate500,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = stringResource(R.string.split_clear_all),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Slate600
+                            )
+                        }
+                    }
+                }
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(receiptJobs, key = { it.id }) { job ->
+                        ReceiptThumbnailCard(
+                            job = job,
+                            isSelected = activeJobId == job.id,
+                            onSelectOrRetry = {
+                                if (!job.isAnalyzing) {
+                                    if (job.errorMsg != null) {
+                                        SplitBillDraftHolder.retryJob(context, job.id)
+                                    } else {
+                                        SplitBillDraftHolder.activeJobId = job.id
+                                    }
+                                }
+                            },
+                            onRemove = { SplitBillDraftHolder.removeJob(job.id) }
+                        )
+                    }
                 }
             }
         }
 
         // 3. Members Management Card (saved automatically for future bills)
         Surface(
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(18.dp),
             color = Color.White,
+            shadowElevation = 0.5.dp,
             border = BorderStroke(1.dp, Slate200),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.split_members_title), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Group,
+                            contentDescription = null,
+                            tint = PrimaryTeal,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.split_members_title),
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate900
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Teal50
+                    ) {
+                        Text(
+                            text = "${members.size}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryTeal,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     members.forEach { m ->
+                        val isMe = m == defaultMe
+                        val initial = m.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
                         Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = Teal50,
-                            border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.35f))
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (isMe) PrimaryTeal else Teal50,
+                            border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = if (isMe) 1f else 0.35f))
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                modifier = Modifier.padding(start = 5.dp, end = 10.dp, top = 4.dp, bottom = 4.dp)
                             ) {
-                                Text(m, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = PrimaryTeal)
-                                if (m != defaultMe) {
-                                    Spacer(Modifier.width(4.dp))
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (isMe) Color.White.copy(alpha = 0.22f) else PrimaryTeal,
+                                    modifier = Modifier.size(22.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = initial,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = m,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isMe) Color.White else PrimaryTeal
+                                )
+                                if (!isMe) {
+                                    Spacer(Modifier.width(5.dp))
                                     Icon(
                                         imageVector = Icons.Default.Close,
                                         contentDescription = null,
-                                        tint = PrimaryTeal,
-                                        modifier = Modifier.size(13.dp).clickable {
-                                            SplitBillDraftHolder.removeMember(context, m, defaultMe)
-                                        }
+                                        tint = PrimaryTeal.copy(alpha = 0.8f),
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clip(CircleShape)
+                                            .clickable {
+                                                SplitBillDraftHolder.removeMember(context, m, defaultMe)
+                                            }
                                     )
                                 }
                             }
                         }
                     }
                 }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -253,13 +377,12 @@ fun SplitBillTabContent(
                     OutlinedTextField(
                         value = newMemberText,
                         onValueChange = { newMemberText = it },
-                        placeholder = { Text(stringResource(R.string.split_add_member_hint), fontSize = 12.sp) },
+                        placeholder = { Text(stringResource(R.string.split_add_member_hint), fontSize = 12.5.sp, color = Slate400) },
                         singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryTeal,
-                            unfocusedBorderColor = Slate200
-                        )
+                        textStyle = LocalTextStyle.current.copy(fontSize = 13.5.sp, color = Slate900),
+                        colors = ledgerInputColors(containerColor = Slate50)
                     )
                     Button(
                         onClick = {
@@ -269,10 +392,11 @@ fun SplitBillTabContent(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.height(48.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp),
+                        modifier = Modifier.height(50.dp)
                     ) {
-                        Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(19.dp))
                     }
                 }
             }
@@ -281,80 +405,168 @@ fun SplitBillTabContent(
         // 4. Settlement Summary Card
         if (receiptJobs.any { !it.isAnalyzing && it.items.isNotEmpty() }) {
             Surface(
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(18.dp),
                 color = Color.White,
+                shadowElevation = 1.dp,
                 border = BorderStroke(1.dp, Slate200),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Top highlighted summary header
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Teal50)
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
                     ) {
-                        Column {
-                            Text(stringResource(R.string.split_settlement_title), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                            if (members.size > 1 && myShare > 0.0) {
-                                Text(
-                                    text = stringResource(R.string.split_my_share_fmt, myShare),
-                                    fontSize = 11.5.sp,
-                                    color = Slate500,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                        Text(
-                            text = "RM ${String.format(Locale.US, "%.2f", grandTotalAll)}",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = PrimaryTeal
-                        )
-                    }
-                    memberTotals.forEach { (member, total) ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(member, fontSize = 13.sp, color = Slate700, fontWeight = FontWeight.Medium)
-                            Text("RM ${String.format(Locale.US, "%.2f", total)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = stringResource(R.string.split_settlement_title),
+                                    fontSize = 14.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Slate900
+                                )
+                                if (members.size > 1 && myShare > 0.0) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = Color.White,
+                                        border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.25f))
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.split_my_share_fmt, myShare),
+                                            fontSize = 11.sp,
+                                            color = PrimaryTeal,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            Text(
+                                text = "RM ${String.format(Locale.US, "%.2f", grandTotalAll)}",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = PrimaryTeal,
+                                style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum")
+                            )
                         }
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    HorizontalDivider(color = PrimaryTeal.copy(alpha = 0.12f), thickness = 1.dp)
+
+                    // Per-member breakdown rows
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        OutlinedButton(
-                            onClick = {
-                                val sb = StringBuilder("🧾 AA Split Summary (Total RM ${String.format(Locale.US, "%.2f", grandTotalAll)})\n")
-                                memberTotals.forEach { (m, amt) ->
-                                    sb.append("• $m: RM ${String.format(Locale.US, "%.2f", amt)}\n")
+                        val entries = memberTotals.entries.toList()
+                        entries.forEachIndexed { idx, (member, total) ->
+                            val isMe = member == defaultMe
+                            val initial = member.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = if (isMe) PrimaryTeal else Slate200,
+                                        modifier = Modifier.size(26.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = initial,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isMe) Color.White else Slate700
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = member,
+                                        fontSize = 13.5.sp,
+                                        color = if (isMe) Slate900 else Slate700,
+                                        fontWeight = if (isMe) FontWeight.Bold else FontWeight.Medium
+                                    )
                                 }
-                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                cm.setPrimaryClip(ClipData.newPlainText("AA Split", sb.toString().trim()))
-                                Toast.makeText(context, context.getString(R.string.split_copied_toast), Toast.LENGTH_SHORT).show()
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, PrimaryTeal),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryTeal),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(stringResource(R.string.split_copy_whatsapp), fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                Text(
+                                    text = "RM ${String.format(Locale.US, "%.2f", total)}",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isMe) PrimaryTeal else Slate900,
+                                    style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum")
+                                )
+                            }
+                            if (idx < entries.lastIndex) {
+                                HorizontalDivider(color = Slate100, thickness = 1.dp)
+                            }
                         }
 
-                        Button(
-                            onClick = {
-                                if (members.size > 1 && myShare > 0.0 && abs(myShare - grandTotalAll) > 0.01) {
-                                    showRecordChoiceDialog = true
-                                } else {
-                                    onRecordTotalPaid(grandTotalAll, merchantSummary)
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f)
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text(stringResource(R.string.split_record_expense), fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                            OutlinedButton(
+                                onClick = {
+                                    val sb = StringBuilder("🧾 AA Split Summary (Total RM ${String.format(Locale.US, "%.2f", grandTotalAll)})\n")
+                                    memberTotals.forEach { (m, amt) ->
+                                        sb.append("• $m: RM ${String.format(Locale.US, "%.2f", amt)}\n")
+                                    }
+                                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    cm.setPrimaryClip(ClipData.newPlainText("AA Split", sb.toString().trim()))
+                                    Toast.makeText(context, context.getString(R.string.split_copied_toast), Toast.LENGTH_SHORT).show()
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.2.dp, PrimaryTeal),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryTeal),
+                                contentPadding = PaddingValues(horizontal = 10.dp),
+                                modifier = Modifier.weight(1f).height(46.dp)
+                            ) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text(
+                                    text = stringResource(R.string.split_copy_whatsapp),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Button(
+                                onClick = {
+                                    if (members.size > 1 && myShare > 0.0 && abs(myShare - grandTotalAll) > 0.01) {
+                                        showRecordChoiceDialog = true
+                                    } else {
+                                        onRecordTotalPaid(grandTotalAll, merchantSummary)
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp),
+                                modifier = Modifier.weight(1f).height(46.dp)
+                            ) {
+                                Icon(Icons.Default.CheckCircleOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text(
+                                    text = stringResource(R.string.split_record_expense),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 }
@@ -447,46 +659,53 @@ fun SplitBillTabContent(
     if (showRecordChoiceDialog) {
         AlertDialog(
             onDismissRequest = { showRecordChoiceDialog = false },
+            shape = RoundedCornerShape(20.dp),
             containerColor = Color.White,
             title = {
-                Text(stringResource(R.string.split_record_choice_title), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                Text(stringResource(R.string.split_record_choice_title), fontSize = 16.5.sp, fontWeight = FontWeight.ExtraBold, color = Slate900)
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         color = Teal50,
-                        border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.45f)),
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            showRecordChoiceDialog = false
-                            onRecordTotalPaid(myShare, "$merchantSummary (AA)")
-                        }
+                        border = BorderStroke(1.2.dp, PrimaryTeal.copy(alpha = 0.45f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable {
+                                showRecordChoiceDialog = false
+                                onRecordTotalPaid(myShare, "$merchantSummary (AA)")
+                            }
                     ) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(stringResource(R.string.split_record_my_share_fmt, myShare), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = PrimaryTeal)
-                            Text(stringResource(R.string.split_record_my_share_desc), fontSize = 11.5.sp, color = Slate600, lineHeight = 16.sp)
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(stringResource(R.string.split_record_my_share_fmt, myShare), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PrimaryTeal)
+                            Text(stringResource(R.string.split_record_my_share_desc), fontSize = 12.sp, color = Slate600, lineHeight = 17.sp)
                         }
                     }
 
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         color = Slate50,
                         border = BorderStroke(1.dp, Slate200),
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            showRecordChoiceDialog = false
-                            onRecordTotalPaid(grandTotalAll, "$merchantSummary (AA垫付 · 待Rebate)")
-                        }
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable {
+                                showRecordChoiceDialog = false
+                                onRecordTotalPaid(grandTotalAll, "$merchantSummary (AA垫付 · 待Rebate)")
+                            }
                     ) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(stringResource(R.string.split_record_advance_fmt, grandTotalAll), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                            Text(stringResource(R.string.split_record_advance_desc), fontSize = 11.5.sp, color = Slate600, lineHeight = 16.sp)
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(stringResource(R.string.split_record_advance_fmt, grandTotalAll), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                            Text(stringResource(R.string.split_record_advance_desc), fontSize = 12.sp, color = Slate600, lineHeight = 17.sp)
                         }
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showRecordChoiceDialog = false }) {
-                    Text(stringResource(R.string.common_cancel), color = Slate600)
+                    Text(stringResource(R.string.common_cancel), color = Slate600, fontWeight = FontWeight.SemiBold)
                 }
             }
         )
@@ -501,23 +720,25 @@ private fun ReceiptThumbnailCard(
     onRemove: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         color = Color.White,
+        shadowElevation = if (isSelected) 3.dp else 1.dp,
         border = BorderStroke(
             width = if (isSelected) 2.dp else 1.dp,
             color = if (isSelected) PrimaryTeal else Slate200
         ),
         modifier = Modifier
-            .width(156.dp)
+            .width(164.dp)
+            .clip(RoundedCornerShape(16.dp))
             .clickable(enabled = !job.isAnalyzing, onClick = onSelectOrRetry)
     ) {
         Box {
-            Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(78.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .height(86.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(Slate100),
                     contentAlignment = Alignment.Center
                 ) {
@@ -528,10 +749,17 @@ private fun ReceiptThumbnailCard(
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.ReceiptLong,
+                            contentDescription = null,
+                            tint = Slate300,
+                            modifier = Modifier.size(28.dp)
+                        )
                     }
                     if (job.isAnalyzing) {
                         Box(
-                            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)),
                             contentAlignment = Alignment.Center
                         ) {
                             CircularProgressIndicator(
@@ -543,25 +771,35 @@ private fun ReceiptThumbnailCard(
                     }
                 }
 
-                Text(
-                    text = if (job.isAnalyzing) stringResource(R.string.split_analyzing) else job.merchant,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate900,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = if (job.isAnalyzing) stringResource(R.string.split_analyzing) else job.merchant,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (!job.isAnalyzing && job.errorMsg == null) {
+                        Text(
+                            text = stringResource(R.string.split_items_count_fmt, job.items.size),
+                            fontSize = 10.5.sp,
+                            color = Slate500,
+                            maxLines = 1
+                        )
+                    }
+                }
 
                 if (!job.isAnalyzing) {
                     val badgeBg = when {
-                        job.errorMsg != null -> Color(0xFFFEE2E2)
-                        job.isTallied -> Color(0xFFD1FAE5)
-                        else -> Color(0xFFFEF3C7)
+                        job.errorMsg != null -> Rose50
+                        job.isTallied -> Emerald50
+                        else -> Amber50
                     }
                     val badgeFg = when {
-                        job.errorMsg != null -> Color(0xFFDC2626)
-                        job.isTallied -> Color(0xFF059669)
-                        else -> Color(0xFFD97706)
+                        job.errorMsg != null -> ExpenseRed
+                        job.isTallied -> Emerald700
+                        else -> Amber700
                     }
                     val badgeText = when {
                         job.errorMsg != null -> "Error · Retry"
@@ -574,15 +812,20 @@ private fun ReceiptThumbnailCard(
                             "RM ${String.format(Locale.US, "%.2f", abs(job.tallyDiff))}"
                         )
                     }
-                    Surface(shape = RoundedCornerShape(6.dp), color = badgeBg) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = badgeBg,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text(
                             text = badgeText,
-                            fontSize = 10.sp,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = badgeFg,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                         )
                     }
                 }
@@ -592,7 +835,7 @@ private fun ReceiptThumbnailCard(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(4.dp)
+                    .padding(6.dp)
                     .size(22.dp)
                     .clip(CircleShape)
                     .background(Color.Black.copy(alpha = 0.55f))
@@ -623,212 +866,375 @@ private fun ReceiptDetailDialog(
     onUpdateAssignees: (String, Set<String>) -> Unit,
     onRequestAddItem: () -> Unit
 ) {
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
-        title = {
-            Column {
-                Text(job.merchant, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                Text(
-                    text = if (job.isTallied) {
-                        stringResource(R.string.split_tally_ok, "RM ${String.format(Locale.US, "%.2f", job.computedTotal)}")
-                    } else {
-                        stringResource(R.string.split_tally_diff, "RM ${String.format(Locale.US, "%.2f", abs(job.tallyDiff))}")
-                    },
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (job.isTallied) Color(0xFF059669) else Color(0xFFD97706)
-                )
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                job.thumbnail?.let { bmp ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 150.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable { onZoomImage(bmp) }
-                    ) {
-                        Image(
-                            bitmap = bmp.asImageBitmap(),
-                            contentDescription = job.merchant,
-                            contentScale = ContentScale.FillWidth,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Color.Black.copy(alpha = 0.6f),
-                            modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                            ) {
-                                Icon(Icons.Default.ZoomIn, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
-                                Spacer(Modifier.width(3.dp))
-                                Text(stringResource(R.string.split_tap_zoom), fontSize = 10.sp, color = Color.White)
-                            }
-                        }
-                    }
-                }
-
-                // Tappable Service Charge / SST / Adjustment summary row
-                val taxPart = stringResource(R.string.split_tax_summary_fmt, job.serviceCharge, job.sst)
-                val adjPart = if (job.adjustment != 0.0) stringResource(R.string.split_adj_summary_fmt, job.adjustment) else ""
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Teal50.copy(alpha = 0.6f),
-                    border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.25f)),
-                    modifier = Modifier.fillMaxWidth().clickable(onClick = onEditCharges)
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(22.dp),
+            color = Color.White,
+            shadowElevation = 8.dp,
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .heightIn(max = 640.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Sticky Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 18.dp, end = 12.dp, top = 16.dp, bottom = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            text = taxPart + adjPart,
-                            fontSize = 11.5.sp,
-                            color = Slate700,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.weight(1f)
+                            text = job.merchant,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Slate900,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        Icon(Icons.Default.Edit, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(15.dp))
-                    }
-                }
-
-                job.items.forEach { item ->
-                    val multiQty = SplitBillLogic.extractQuantityPrefix(item.name)?.first
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = Slate50,
-                        border = BorderStroke(1.dp, Slate200),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(item.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate900, modifier = Modifier.weight(1f))
-                                Text("RM ${String.format(Locale.US, "%.2f", item.price)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                                if (multiQty != null) {
-                                    Spacer(Modifier.width(6.dp))
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = Teal50,
-                                        border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.4f)),
-                                        modifier = Modifier.clickable { onSplitQuantityItem(item.id) }
-                                    ) {
-                                        Text(
-                                            text = stringResource(R.string.split_qty_btn, multiQty),
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = PrimaryTeal,
-                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
-                                Spacer(Modifier.width(8.dp))
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = null,
-                                    tint = PrimaryTeal,
-                                    modifier = Modifier.size(16.dp).clickable { onEditItem(item) }
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Icon(
-                                    imageVector = Icons.Default.DeleteOutline,
-                                    contentDescription = null,
-                                    tint = Slate400,
-                                    modifier = Modifier.size(16.dp).clickable { onDeleteItem(item.id) }
-                                )
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                val allSelected = members.all { it in item.assignedMembers }
-                                val chipColors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Teal50,
-                                    selectedLabelColor = PrimaryTeal,
-                                    containerColor = Color.White,
-                                    labelColor = Slate700
-                                )
-                                FilterChip(
-                                    selected = allSelected,
-                                    onClick = {
-                                        onUpdateAssignees(item.id, if (allSelected) emptySet() else members.toSet())
-                                    },
-                                    colors = chipColors,
-                                    label = { Text(stringResource(R.string.split_all_btn), fontSize = 11.sp) }
-                                )
-                                members.forEach { m ->
-                                    val isAssigned = m in item.assignedMembers
-                                    FilterChip(
-                                        selected = isAssigned,
-                                        onClick = {
-                                            val next = if (isAssigned) item.assignedMembers - m else item.assignedMembers + m
-                                            onUpdateAssignees(item.id, next)
-                                        },
-                                        colors = chipColors,
-                                        label = { Text(m, fontSize = 11.sp) }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                TextButton(onClick = onRequestAddItem) {
-                    Text(stringResource(R.string.split_add_item_btn), color = PrimaryTeal, fontWeight = FontWeight.Bold)
-                }
-
-                if (job.rawLines.isNotEmpty()) {
-                    var showRawLines by remember(job.id) { mutableStateOf(false) }
-                    Text(
-                        text = stringResource(R.string.split_raw_lines_toggle),
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Slate500,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable { showRawLines = !showRawLines }
-                            .padding(vertical = 4.dp)
-                    )
-                    if (showRawLines) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = Slate100,
-                            modifier = Modifier.fillMaxWidth()
+                            color = if (job.isTallied) Emerald50 else Amber50
                         ) {
                             Text(
-                                text = job.rawLines.joinToString("\n"),
-                                fontSize = 11.sp,
-                                color = Slate700,
-                                lineHeight = 16.sp,
-                                modifier = Modifier.padding(10.dp)
+                                text = if (job.isTallied) {
+                                    stringResource(R.string.split_tally_ok, "RM ${String.format(Locale.US, "%.2f", job.computedTotal)}")
+                                } else {
+                                    stringResource(R.string.split_tally_diff, "RM ${String.format(Locale.US, "%.2f", abs(job.tallyDiff))}")
+                                },
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (job.isTallied) Emerald700 else Amber700,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                         }
                     }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(Slate100)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            tint = Slate600,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = Slate100, thickness = 1.dp)
+
+                // Scrollable body
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    job.thumbnail?.let { bmp ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 156.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, Slate200, RoundedCornerShape(12.dp))
+                                .clickable { onZoomImage(bmp) }
+                        ) {
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = job.merchant,
+                                contentScale = ContentScale.FillWidth,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color.Black.copy(alpha = 0.65f),
+                                modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(Icons.Default.ZoomIn, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(stringResource(R.string.split_tap_zoom), fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                                }
+                            }
+                        }
+                    }
+
+                    // Tappable Service Charge / SST / Adjustment summary row
+                    val taxPart = stringResource(R.string.split_tax_summary_fmt, job.serviceCharge, job.sst)
+                    val adjPart = if (job.adjustment != 0.0) stringResource(R.string.split_adj_summary_fmt, job.adjustment) else ""
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Teal50,
+                        border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.3f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable(onClick = onEditCharges)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = taxPart + adjPart,
+                                fontSize = 12.sp,
+                                color = Slate800,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Surface(
+                                shape = CircleShape,
+                                color = Color.White,
+                                modifier = Modifier.size(26.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Edit, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    // Dish item cards
+                    job.items.forEach { item ->
+                        val multiQty = SplitBillLogic.extractQuantityPrefix(item.name)?.first
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = Slate50,
+                            border = BorderStroke(1.dp, Slate200),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = item.name,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Slate900,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "RM ${String.format(Locale.US, "%.2f", item.price)}",
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = PrimaryTeal,
+                                        style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum")
+                                    )
+                                }
+
+                                // Compact action row + member selector
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        val allSelected = members.all { it in item.assignedMembers }
+                                        AssigneePill(
+                                            label = stringResource(R.string.split_all_btn),
+                                            selected = allSelected,
+                                            onClick = {
+                                                onUpdateAssignees(item.id, if (allSelected) emptySet() else members.toSet())
+                                            }
+                                        )
+                                        members.forEach { m ->
+                                            val isAssigned = m in item.assignedMembers
+                                            AssigneePill(
+                                                label = m,
+                                                selected = isAssigned,
+                                                onClick = {
+                                                    val next = if (isAssigned) item.assignedMembers - m else item.assignedMembers + m
+                                                    onUpdateAssignees(item.id, next)
+                                                }
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(Modifier.width(8.dp))
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        if (multiQty != null) {
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = Teal50,
+                                                border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.45f)),
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .clickable { onSplitQuantityItem(item.id) }
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.split_qty_btn, multiQty),
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = PrimaryTeal,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                                                )
+                                            }
+                                        }
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = Color.White,
+                                            border = BorderStroke(1.dp, Slate200),
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .clickable { onEditItem(item) }
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(Icons.Default.Edit, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(14.dp))
+                                            }
+                                        }
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = Color.White,
+                                            border = BorderStroke(1.dp, Slate200),
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .clickable { onDeleteItem(item.id) }
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = Slate400, modifier = Modifier.size(15.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (job.rawLines.isNotEmpty()) {
+                        var showRawLines by remember(job.id) { mutableStateOf(false) }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showRawLines = !showRawLines }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.split_raw_lines_toggle),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Slate500
+                            )
+                            Icon(
+                                imageVector = if (showRawLines) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = Slate500,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        if (showRawLines) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Slate100,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = job.rawLines.joinToString("\n"),
+                                    fontSize = 11.sp,
+                                    color = Slate700,
+                                    lineHeight = 16.sp,
+                                    modifier = Modifier.padding(10.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = Slate100, thickness = 1.dp)
+
+                // Sticky Footer
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = onRequestAddItem,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.split_add_item_btn),
+                            color = PrimaryTeal,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Button(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 22.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.common_confirm),
+                            color = Color.White,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.common_confirm), color = PrimaryTeal, fontWeight = FontWeight.Bold)
-            }
         }
-    )
+    }
+}
+
+@Composable
+private fun AssigneePill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = if (selected) PrimaryTeal else Color.White,
+        border = BorderStroke(1.dp, if (selected) PrimaryTeal else Slate200),
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+    ) {
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) Color.White else Slate700,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+        )
+    }
 }
 
 @Composable
@@ -902,30 +1308,37 @@ private fun EditChargesDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(20.dp),
         containerColor = Color.White,
-        title = { Text(stringResource(R.string.split_edit_charges_btn), fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.split_edit_charges_btn), fontSize = 16.5.sp, fontWeight = FontWeight.ExtraBold, color = Slate900) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = svcText,
                     onValueChange = { svcText = it },
-                    label = { Text(stringResource(R.string.split_svc_label)) },
+                    label = { Text(stringResource(R.string.split_svc_label), fontSize = 12.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    colors = ledgerInputColors(containerColor = Slate50)
                 )
                 OutlinedTextField(
                     value = sstText,
                     onValueChange = { sstText = it },
-                    label = { Text(stringResource(R.string.split_sst_label)) },
+                    label = { Text(stringResource(R.string.split_sst_label), fontSize = 12.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    colors = ledgerInputColors(containerColor = Slate50)
                 )
                 OutlinedTextField(
                     value = adjText,
                     onValueChange = { adjText = it },
-                    label = { Text(stringResource(R.string.split_adj_label)) },
+                    label = { Text(stringResource(R.string.split_adj_label), fontSize = 12.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                    singleLine = true
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    colors = ledgerInputColors(containerColor = Slate50)
                 )
             }
         },
@@ -960,22 +1373,27 @@ private fun ReceiptItemFormDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(20.dp),
         containerColor = Color.White,
-        title = { Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+        title = { Text(title, fontSize = 16.5.sp, fontWeight = FontWeight.ExtraBold, color = Slate900) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = itemName,
                     onValueChange = { itemName = it },
-                    label = { Text(stringResource(R.string.split_item_name_hint)) },
-                    singleLine = true
+                    label = { Text(stringResource(R.string.split_item_name_hint), fontSize = 12.sp) },
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    colors = ledgerInputColors(containerColor = Slate50)
                 )
                 OutlinedTextField(
                     value = itemPrice,
                     onValueChange = { itemPrice = it },
-                    label = { Text(stringResource(R.string.split_item_price_hint)) },
+                    label = { Text(stringResource(R.string.split_item_price_hint), fontSize = 12.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    colors = ledgerInputColors(containerColor = Slate50)
                 )
             }
         },

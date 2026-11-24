@@ -1125,4 +1125,9 @@
     <string name="records_rebate_empty">"No recent expense records available"</string>
     <string name="records_rebate_tag_fmt">"[Rebate offset %1$s]"</string>
     <string name="records_rebate_success_fmt">"Offset applied! Deducted %2$s from \"%1$s\" (now %3$s)"</string>
+
+    <!-- Split Bill UI Polish -->
+    <string name="split_empty_title">Scan or Upload a Receipt</string>
+    <string name="split_queue_header_fmt">Receipts (%1$d)</string>
+    <string name="split_items_count_fmt">%1$d items</string>
 </resources>

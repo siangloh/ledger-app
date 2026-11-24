@@ -1125,4 +1125,9 @@
     <string name="records_rebate_empty">暂无可抵扣的近期支出记录</string>
     <string name="records_rebate_tag_fmt">[已抵扣 %1$s]</string>
     <string name="records_rebate_success_fmt">已成功从「%1$s」扣除 %2$s（现为 %3$s）</string>
+
+    <!-- 拍照 AA 分账界面补充文案 -->
+    <string name="split_empty_title">拍摄或上传餐厅小票</string>
+    <string name="split_queue_header_fmt">已上传小票 (%1$d)</string>
+    <string name="split_items_count_fmt">%1$d 项明细</string>
 </resources>

@@ -1,11 +1,14 @@
 package com.siangloh.ledger.ui.compose
 
 import android.app.DatePickerDialog
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -13,11 +16,14 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.siangloh.ledger.R
@@ -130,7 +136,9 @@ fun AddTransactionScreen(
         try {
             val parsed = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(draft.dateStr)
             if (parsed != null) cal.time = parsed
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.d("AddTransactionScreen", "Fallback to current date for draft.dateStr=${draft.dateStr}", e)
+        }
 
         DatePickerDialog(
             context,
@@ -146,6 +154,19 @@ fun AddTransactionScreen(
         ).show()
     }
 
+    val activeAccentColor = when (draft.txType) {
+        "income" -> IncomeGreen
+        "transfer" -> Slate700
+        "savings" -> PrimaryTeal
+        else -> ExpenseRed
+    }
+    val activeAccentSubtle = when (draft.txType) {
+        "income" -> Emerald50
+        "transfer" -> Slate100
+        "savings" -> PrimaryTealSubtle
+        else -> Rose50
+    }
+
     Scaffold(
         topBar = {
             Column(
@@ -153,103 +174,147 @@ fun AddTransactionScreen(
                     .fillMaxWidth()
                     .background(Color.White)
                     .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.add_title),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Slate900
-                    )
-                    if (addMode == 0 && (draft.amountText.isNotBlank() || draft.note.isNotBlank() || draft.tags.isNotBlank())) {
-                        TextButton(
-                            onClick = { draft.clear(context) },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text(stringResource(R.string.clear_draft), fontSize = 12.sp, color = Slate500)
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // 顶部双页签切换 (记一笔 | 拍照 AA 分账)
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Slate100, RoundedCornerShape(10.dp))
-                        .padding(3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
-                    val modeTabs = listOf(
-                        stringResource(R.string.add_tab_manual),
-                        stringResource(R.string.add_tab_split)
-                    )
-                    modeTabs.forEachIndexed { idx, label ->
-                        val selected = addMode == idx
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (selected) Color.White else Color.Transparent,
-                            shadowElevation = if (selected) 1.dp else 0.dp,
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.add_title),
+                            fontSize = 21.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Slate900,
+                            letterSpacing = (-0.3).sp
+                        )
+                        if (addMode == 0 && (draft.amountText.isNotBlank() || draft.note.isNotBlank() || draft.tags.isNotBlank())) {
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = Slate100,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .clickable { draft.clear(context) }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.RestartAlt,
+                                        contentDescription = null,
+                                        tint = Slate500,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = stringResource(R.string.clear_draft),
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Slate600
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // 顶部双页签切换 (记一笔 | 拍照 AA 分账)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Slate100, RoundedCornerShape(12.dp))
+                            .padding(3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val modeTabs = listOf(
+                            Triple(0, Icons.Default.EditNote, stringResource(R.string.add_tab_manual)),
+                            Triple(1, Icons.Default.ReceiptLong, stringResource(R.string.add_tab_split))
+                        )
+                        modeTabs.forEach { (idx, icon, label) ->
+                            val selected = addMode == idx
+                            Surface(
+                                shape = RoundedCornerShape(9.dp),
+                                color = if (selected) Color.White else Color.Transparent,
+                                shadowElevation = if (selected) 1.5.dp else 0.dp,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .clickable { addMode = idx }
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        tint = if (selected) PrimaryTeal else Slate500,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = label,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (selected) PrimaryTeal else Slate600,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (addMode == 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // 四向语义分段器 (支出 / 收入 / 储蓄 / 内部划转)
+                        Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .clickable { addMode = idx }
+                                .fillMaxWidth()
+                                .background(Slate100, RoundedCornerShape(12.dp))
+                                .padding(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text(
-                                text = label,
-                                fontSize = 13.sp,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (selected) PrimaryTeal else Slate600,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(vertical = 7.dp)
+                            val types = listOf(
+                                Triple("expense", stringResource(R.string.add_expense), ExpenseRed),
+                                Triple("income", stringResource(R.string.add_income), IncomeGreen),
+                                Triple("savings", stringResource(R.string.add_savings), PrimaryTeal),
+                                Triple("transfer", stringResource(R.string.add_transfer), Slate700)
                             )
+                            types.forEach { (typeKey, label, typeColor) ->
+                                val isSelected = draft.txType == typeKey
+                                Surface(
+                                    shape = RoundedCornerShape(9.dp),
+                                    color = if (isSelected) typeColor else Color.Transparent,
+                                    shadowElevation = if (isSelected) 1.dp else 0.dp,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(9.dp))
+                                        .clickable { draft.txType = typeKey }
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 12.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else Slate600,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(vertical = 7.dp, horizontal = 2.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-                if (addMode == 0) {
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // 四向分段器 (支出 / 收入 / 储蓄 / 内部划转)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Slate100, RoundedCornerShape(10.dp))
-                        .padding(3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    val types = listOf(
-                        "expense" to stringResource(R.string.add_expense),
-                        "income" to stringResource(R.string.add_income),
-                        "savings" to stringResource(R.string.add_savings),
-                        "transfer" to stringResource(R.string.add_transfer)
-                    )
-                    types.forEach { (typeKey, label) ->
-                        val isSelected = draft.txType == typeKey
-                        val bg = if (isSelected) PrimaryTeal else Color.Transparent
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = bg,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { draft.txType = typeKey }
-                        ) {
-                            Text(
-                                text = label,
-                                fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) Color.White else Slate700,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                modifier = Modifier.padding(vertical = 7.dp)
-                            )
-                        }
-                    }
-                }
-                }
+                HorizontalDivider(color = Slate200.copy(alpha = 0.7f), thickness = 1.dp)
             }
         },
         bottomBar = {
@@ -386,11 +451,12 @@ fun AddTransactionScreen(
                             }
                         },
                         enabled = !isSaving,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = when (draft.txType) {
                                 "income" -> IncomeGreen
-                                "transfer" -> Slate700
+                                "transfer" -> Slate800
                                 "savings" -> PrimaryTeal
                                 else -> PrimaryTeal
                             },
@@ -398,17 +464,26 @@ fun AddTransactionScreen(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
+                            .height(52.dp)
                     ) {
                         if (isSaving) {
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                            val parsedAmt = draft.amountText.toDoubleOrNull() ?: 0.0
+                            val baseLabel = if (draft.txType == "transfer") stringResource(R.string.add_save_transfer) else stringResource(R.string.add_save)
+                            val btnText = if (parsedAmt > 0.0) {
+                                "$baseLabel · RM ${String.format(Locale.US, "%.2f", parsedAmt)}"
+                            } else {
+                                baseLabel
+                            }
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(19.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (draft.txType == "transfer") stringResource(R.string.add_save_transfer) else stringResource(R.string.add_save),
+                                text = btnText,
                                 fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -441,34 +516,60 @@ fun AddTransactionScreen(
                 .padding(paddingVals)
                 .background(Slate50)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 1. 金额录入紧凑卡片 (Tabular numbers, 48px高度输入，无多余占屏空隙)
+            // 1. Hero 金额录入卡片 (大字号 Tabular Numbers + 币种徽章 + 快捷加额胶囊)
             Surface(
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(18.dp),
                 color = Color.White,
-                shadowElevation = 0.5.dp,
+                shadowElevation = 1.dp,
                 border = BorderStroke(1.dp, Slate200),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    Text(stringResource(R.string.amount_label), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Slate500)
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.amount_label),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Slate500
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = activeAccentSubtle
+                        ) {
+                            Text(
+                                text = "MYR",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = activeAccentColor,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "MYR",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Slate600
+                            text = "RM",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = activeAccentColor.copy(alpha = 0.85f)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         OutlinedTextField(
                             value = draft.amountText,
                             onValueChange = {
@@ -476,26 +577,54 @@ fun AddTransactionScreen(
                                     draft.amountText = it
                                 }
                             },
-                            placeholder = { Text("0.00", fontSize = 24.sp, color = Slate400) },
+                            placeholder = {
+                                Text(
+                                    text = "0.00",
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Slate300,
+                                    style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum")
+                                )
+                            },
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            trailingIcon = if (draft.amountText.isNotEmpty()) {
+                                {
+                                    IconButton(
+                                        onClick = { draft.amountText = "" },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Cancel,
+                                            contentDescription = null,
+                                            tint = Slate400,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            } else null,
                             textStyle = LocalTextStyle.current.copy(
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontFeatureSettings = "tnum",
                                 color = when (draft.txType) {
                                     "income" -> IncomeGreen
-                                    "transfer" -> Slate700
+                                    "transfer" -> Slate800
+                                    "savings" -> PrimaryTeal
                                     else -> Slate900
                                 }
                             ),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = when (draft.txType) {
                                     "income" -> IncomeGreen
-                                    "transfer" -> Slate700
+                                    "transfer" -> Slate800
+                                    "savings" -> PrimaryTeal
                                     else -> Slate900
                                 },
                                 unfocusedTextColor = when (draft.txType) {
                                     "income" -> IncomeGreen
-                                    "transfer" -> Slate700
+                                    "transfer" -> Slate800
+                                    "savings" -> PrimaryTeal
                                     else -> Slate900
                                 },
                                 cursorColor = PrimaryTeal,
@@ -508,19 +637,25 @@ fun AddTransactionScreen(
                         )
                     }
 
+                    HorizontalDivider(
+                        color = Slate100,
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+
                     // 常用金额微调胶囊
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         listOf("10", "20", "50", "100").forEach { quickAmt ->
                             Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = Slate100,
+                                shape = RoundedCornerShape(20.dp),
+                                color = Slate50,
+                                border = BorderStroke(1.dp, Slate200),
                                 modifier = Modifier
                                     .weight(1f)
+                                    .clip(RoundedCornerShape(20.dp))
                                     .clickable {
                                         val current = draft.amountText.toDoubleOrNull() ?: 0.0
                                         draft.amountText = String.format(Locale.US, "%.2f", current + quickAmt.toDouble())
@@ -528,19 +663,17 @@ fun AddTransactionScreen(
                             ) {
                                 Text(
                                     text = "+$quickAmt",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
                                     color = Slate700,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    modifier = Modifier.padding(vertical = 5.dp)
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(vertical = 6.dp)
                                 )
                             }
                         }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
 
             // 2. 分类选择 (只在非 transfer 时显示；支持常用收起，避免数十个全量平铺挡住保存)
             if (draft.txType != "transfer") {
@@ -551,36 +684,52 @@ fun AddTransactionScreen(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(18.dp),
                     color = Color.White,
-                    shadowElevation = 0.5.dp,
+                    shadowElevation = 1.dp,
                     border = BorderStroke(1.dp, Slate200),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp)
+                            .padding(16.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(stringResource(R.string.add_category), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                            Text(
+                                text = stringResource(R.string.add_category),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Slate900
+                            )
                             if (currentCats.size > 8) {
-                                Text(
-                                    text = if (showAllCategories) stringResource(R.string.collapse_categories) else stringResource(R.string.add_more_categories_fmt, currentCats.size),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = PrimaryTeal,
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
                                         .clickable { showAllCategories = !showAllCategories }
-                                        .padding(4.dp)
-                                )
+                                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = if (showAllCategories) stringResource(R.string.collapse_categories) else stringResource(R.string.add_more_categories_fmt, currentCats.size),
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = PrimaryTeal
+                                    )
+                                    Icon(
+                                        imageVector = if (showAllCategories) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        tint = PrimaryTeal,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         val fallbackCats = when (draft.txType) {
                             "income" -> listOf("工资", "兼职", "奖金", "投资", "其他")
@@ -592,48 +741,54 @@ fun AddTransactionScreen(
                         val displayCats = if (showAllCategories) allCats else allCats.take(8)
 
                         val chunked = displayCats.chunked(4)
-                        chunked.forEach { rowCats ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 3.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                rowCats.forEach { cat ->
-                                    val isSelected = draft.selectedCategory == cat.name
-                                    val emoji = CategoryUiHelper.getCategoryEmoji(cat.name, draft.txType)
-                                    val tintBg = if (isSelected) PrimaryTealSubtle else Slate100
-                                    val borderStroke = if (isSelected) BorderStroke(1.5.dp, PrimaryTeal) else null
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            chunked.forEach { rowCats ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowCats.forEach { cat ->
+                                        val isSelected = draft.selectedCategory == cat.name
+                                        val emoji = CategoryUiHelper.getCategoryEmoji(cat.name, draft.txType)
+                                        val tintBg = if (isSelected) PrimaryTealSubtle else Slate50
+                                        val borderStroke = BorderStroke(
+                                            width = if (isSelected) 1.5.dp else 1.dp,
+                                            color = if (isSelected) PrimaryTeal else Slate200.copy(alpha = 0.7f)
+                                        )
 
-                                    Surface(
-                                        shape = RoundedCornerShape(10.dp),
-                                        color = tintBg,
-                                        border = borderStroke,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable { draft.selectedCategory = cat.name }
-                                    ) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            modifier = Modifier.padding(vertical = 8.dp, horizontal = 2.dp)
+                                        Surface(
+                                            shape = RoundedCornerShape(14.dp),
+                                            color = tintBg,
+                                            border = borderStroke,
+                                            shadowElevation = if (isSelected) 1.dp else 0.dp,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(14.dp))
+                                                .clickable { draft.selectedCategory = cat.name }
                                         ) {
-                                            Text(emoji, fontSize = 18.sp)
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = CategoryUiHelper.getLocalizedCategoryName(context, cat.name),
-                                                fontSize = 11.sp,
-                                                lineHeight = 12.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) PrimaryTeal else Slate700,
-                                                textAlign = TextAlign.Center,
-                                                maxLines = 2
-                                            )
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp)
+                                            ) {
+                                                Text(emoji, fontSize = 21.sp)
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = CategoryUiHelper.getLocalizedCategoryName(context, cat.name),
+                                                    fontSize = 11.sp,
+                                                    lineHeight = 13.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (isSelected) PrimaryTeal else Slate700,
+                                                    textAlign = TextAlign.Center,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
                                         }
                                     }
-                                }
-                                if (rowCats.size < 4) {
-                                    for (i in 0 until (4 - rowCats.size)) {
-                                        Spacer(modifier = Modifier.weight(1f))
+                                    if (rowCats.size < 4) {
+                                        for (i in 0 until (4 - rowCats.size)) {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                        }
                                     }
                                 }
                             }
@@ -641,9 +796,14 @@ fun AddTransactionScreen(
 
                         // 收入专属分组 (主业 / 副业)
                         if (draft.txType == "income") {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(stringResource(R.string.income_group), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Slate700)
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = stringResource(R.string.income_group),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Slate700
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -652,20 +812,24 @@ fun AddTransactionScreen(
                                 groups.forEach { (grpKey, grpLabel) ->
                                     val isGrpSelected = draft.incomeGroup == grpKey
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (isGrpSelected) PrimaryTealSubtle else Slate100,
-                                        border = if (isGrpSelected) BorderStroke(1.dp, PrimaryTeal) else null,
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (isGrpSelected) Emerald50 else Slate50,
+                                        border = BorderStroke(
+                                            width = if (isGrpSelected) 1.5.dp else 1.dp,
+                                            color = if (isGrpSelected) IncomeGreen else Slate200
+                                        ),
                                         modifier = Modifier
                                             .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
                                             .clickable { draft.incomeGroup = grpKey }
                                     ) {
                                         Text(
                                             text = grpLabel,
-                                            fontSize = 11.sp,
+                                            fontSize = 12.sp,
                                             fontWeight = if (isGrpSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isGrpSelected) PrimaryTeal else Slate700,
-                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                            modifier = Modifier.padding(vertical = 7.dp)
+                                            color = if (isGrpSelected) IncomeGreen else Slate700,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(vertical = 8.dp)
                                         )
                                     }
                                 }
@@ -673,25 +837,24 @@ fun AddTransactionScreen(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // 3. 结算账户选择卡片
+            // 3. 结算账户选择卡片 (带品牌图标与实时余额参考)
             Surface(
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(18.dp),
                 color = Color.White,
-                shadowElevation = 0.5.dp,
+                shadowElevation = 1.dp,
                 border = BorderStroke(1.dp, Slate200),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = if (draft.txType == "transfer") stringResource(R.string.add_account_from) else stringResource(R.string.add_account_settlement),
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     if (accounts.isEmpty()) {
                         Text(stringResource(R.string.add_no_accounts_configured), fontSize = 12.sp, color = Slate400)
@@ -700,161 +863,64 @@ fun AddTransactionScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             accounts.forEach { acc ->
                                 val isSelected = draft.selectedAccountId == acc.id
-                                val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(acc.name, null)
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isSelected) PrimaryTeal else Slate100,
-                                    modifier = Modifier.clickable { draft.selectedAccountId = acc.id }
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
-                                    ) {
-                                        BrandIcon(config = badgeCfg, modifier = Modifier.size(15.dp))
-                                        Spacer(modifier = Modifier.width(5.dp))
-                                        Text(
-                                            text = acc.name,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) Color.White else Slate700
-                                        )
-                                    }
-                                }
+                                AccountChipPill(
+                                    account = acc,
+                                    isSelected = isSelected,
+                                    onClick = { draft.selectedAccountId = acc.id }
+                                )
                             }
                         }
                     }
 
-                    // 如果是账户互转，选择转入账户
+                    // 如果是账户互转，展示方向指示与转入账户
                     if (draft.txType == "transfer") {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(stringResource(R.string.add_account_to), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            HorizontalDivider(modifier = Modifier.weight(1f), color = Slate200)
+                            Surface(
+                                shape = CircleShape,
+                                color = Teal50,
+                                border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.35f)),
+                                modifier = Modifier.padding(horizontal = 10.dp).size(26.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDownward,
+                                        contentDescription = null,
+                                        tint = PrimaryTeal,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
+                            }
+                            HorizontalDivider(modifier = Modifier.weight(1f), color = Slate200)
+                        }
+                        Text(
+                            text = stringResource(R.string.add_account_to),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate900
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             accounts.forEach { acc ->
                                 val isSelected = draft.selectedToAccountId == acc.id
-                                val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(acc.name, null)
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isSelected) PrimaryTeal else Slate100,
-                                    modifier = Modifier.clickable { draft.selectedToAccountId = acc.id }
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
-                                    ) {
-                                        BrandIcon(config = badgeCfg, modifier = Modifier.size(15.dp))
-                                        Spacer(modifier = Modifier.width(5.dp))
-                                        Text(
-                                            text = acc.name,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) Color.White else Slate700
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // 4. 补充信息（折叠式区域，降低主路径滚动负担，日期支持原生弹窗挑选）
-            val hasDetails = draft.note.isNotBlank() || draft.tags.isNotBlank() || draft.isDetailsExpanded
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = Color.White,
-                shadowElevation = 0.5.dp,
-                border = BorderStroke(1.dp, Slate200),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { draft.isDetailsExpanded = !draft.isDetailsExpanded },
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = stringResource(R.string.add_extra_details_title),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Slate800
-                        )
-                        Text(
-                            text = if (hasDetails) stringResource(R.string.collapse_categories) else stringResource(R.string.expand_details),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = PrimaryTeal
-                        )
-                    }
-
-                    if (hasDetails) {
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        OutlinedTextField(
-                            value = draft.note,
-                            onValueChange = { draft.note = it },
-                            label = { Text(stringResource(R.string.add_tx_note_label), fontSize = 12.sp, color = Slate600) },
-                            placeholder = { Text(stringResource(R.string.add_tx_note_placeholder), fontSize = 12.sp, color = Slate400) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(color = Slate900),
-                            colors = ledgerInputColors(containerColor = Slate50)
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        OutlinedTextField(
-                            value = draft.tags,
-                            onValueChange = { draft.tags = it },
-                            label = { Text(stringResource(R.string.add_tx_tags_label), fontSize = 12.sp, color = Slate600) },
-                            placeholder = { Text(stringResource(R.string.add_tx_tags_placeholder), fontSize = 12.sp, color = Slate400) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(color = Slate900),
-                            colors = ledgerInputColors(containerColor = Slate50)
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // 日期选择卡片：展示日期并附带日历图标，点击唤出原生日历
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, Slate200),
-                            color = Slate50,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { showDatePicker() }
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(stringResource(R.string.add_tx_date_label), fontSize = 10.sp, color = Slate500)
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(draft.dateStr, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
-                                }
-                                Icon(
-                                    imageVector = Icons.Default.CalendarMonth,
-                                    contentDescription = stringResource(R.string.add_tx_pick_date),
-                                    tint = PrimaryTeal,
-                                    modifier = Modifier.size(20.dp)
+                                AccountChipPill(
+                                    account = acc,
+                                    isSelected = isSelected,
+                                    onClick = { draft.selectedToAccountId = acc.id }
                                 )
                             }
                         }
@@ -862,8 +928,216 @@ fun AddTransactionScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // 4. 补充信息（折叠式卡片，折叠态也直观展示已选日期，支持平滑展开）
+            val hasDetails = draft.note.isNotBlank() || draft.tags.isNotBlank() || draft.isDetailsExpanded
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = Color.White,
+                shadowElevation = 1.dp,
+                border = BorderStroke(1.dp, Slate200),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { draft.isDetailsExpanded = !draft.isDetailsExpanded }
+                            .padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.add_extra_details_title),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Slate900
+                            )
+                            if (!hasDetails) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Slate100,
+                                    modifier = Modifier.clickable { showDatePicker() }
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CalendarMonth,
+                                            contentDescription = null,
+                                            tint = PrimaryTeal,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = draft.dateStr,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Slate700
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (hasDetails) stringResource(R.string.collapse_categories) else stringResource(R.string.expand_details),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = PrimaryTeal
+                            )
+                            Icon(
+                                imageVector = if (hasDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = PrimaryTeal,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    AnimatedVisibility(visible = hasDetails) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedTextField(
+                                value = draft.note,
+                                onValueChange = { draft.note = it },
+                                label = { Text(stringResource(R.string.add_tx_note_label), fontSize = 12.sp, color = Slate600) },
+                                placeholder = { Text(stringResource(R.string.add_tx_note_placeholder), fontSize = 12.sp, color = Slate400) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = LocalTextStyle.current.copy(color = Slate900, fontSize = 13.5.sp),
+                                colors = ledgerInputColors(containerColor = Slate50)
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            OutlinedTextField(
+                                value = draft.tags,
+                                onValueChange = { draft.tags = it },
+                                label = { Text(stringResource(R.string.add_tx_tags_label), fontSize = 12.sp, color = Slate600) },
+                                placeholder = { Text(stringResource(R.string.add_tx_tags_placeholder), fontSize = 12.sp, color = Slate400) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = LocalTextStyle.current.copy(color = Slate900, fontSize = 13.5.sp),
+                                colors = ledgerInputColors(containerColor = Slate50)
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // 日期选择卡片：展示日期并附带日历图标，点击唤出原生日历
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, Slate200),
+                                color = Slate50,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { showDatePicker() }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(stringResource(R.string.add_tx_date_label), fontSize = 10.5.sp, color = Slate500)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = draft.dateStr,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Slate900,
+                                            style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum")
+                                        )
+                                    }
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Teal50,
+                                        modifier = Modifier.size(34.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.CalendarMonth,
+                                                contentDescription = stringResource(R.string.add_tx_pick_date),
+                                                tint = PrimaryTeal,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
         }
+        }
+    }
+}
+
+@Composable
+private fun AccountChipPill(
+    account: AccountRecord,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val badgeCfg = SourceBrandBadgeHelper.getAccountBrandConfig(account.name, null)
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) PrimaryTeal else Slate50,
+        border = BorderStroke(
+            width = if (isSelected) 1.5.dp else 1.dp,
+            color = if (isSelected) PrimaryTeal else Slate200
+        ),
+        shadowElevation = if (isSelected) 1.5.dp else 0.dp,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            BrandIcon(config = badgeCfg, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(7.dp))
+            Column {
+                Text(
+                    text = account.name,
+                    fontSize = 12.5.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                    color = if (isSelected) Color.White else Slate800,
+                    maxLines = 1
+                )
+                Text(
+                    text = "${account.currency.ifBlank { "RM" }} ${String.format(Locale.US, "%,.2f", account.balance)}",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (isSelected) Color.White.copy(alpha = 0.85f) else Slate500,
+                    style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"),
+                    maxLines = 1
+                )
+            }
+            if (isSelected) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(15.dp)
+                )
+            }
         }
     }
 }
