@@ -784,11 +784,18 @@ fun PendingInboxCard(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            val badgeText = when {
+                                            val rawBadgeText = when {
                                                 item.reviewReason == "suspected_duplicate" || item.suspectedDuplicateId != null -> stringResource(R.string.tools_reason_suspected_dup)
                                                 item.reviewReason == "unmatched_account" -> stringResource(R.string.tools_reason_unmatched_acc)
                                                 isPending -> stringResource(R.string.tools_reason_pending_transfer)
                                                 else -> stringResource(R.string.tools_reason_unclassified)
+                                            }
+                                            val badgeText = rawBadgeText.replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), "")
+                                            val badgeIcon = when {
+                                                item.reviewReason == "suspected_duplicate" || item.suspectedDuplicateId != null -> Icons.Rounded.WarningAmber
+                                                item.reviewReason == "unmatched_account" -> Icons.Rounded.AccountBalance
+                                                isPending -> Icons.Rounded.SwapHoriz
+                                                else -> Icons.Rounded.HelpOutline
                                             }
                                             val badgeBg = when {
                                                 item.reviewReason == "suspected_duplicate" || item.suspectedDuplicateId != null -> Color(0xFFFEF3C7)
@@ -803,17 +810,28 @@ fun PendingInboxCard(
                                                 else -> ExpenseRed
                                             }
                                             Surface(
-                                                shape = RoundedCornerShape(4.dp),
+                                                shape = RoundedCornerShape(6.dp),
                                                 color = badgeBg,
                                                 modifier = Modifier.padding(end = 6.dp)
                                             ) {
-                                                Text(
-                                                    text = badgeText,
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = badgeFg,
-                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                                                )
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = badgeIcon,
+                                                        contentDescription = null,
+                                                        tint = badgeFg,
+                                                        modifier = Modifier.size(11.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(3.dp))
+                                                    Text(
+                                                        text = badgeText,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = badgeFg
+                                                    )
+                                                }
                                             }
                                             Text(
                                                 text = item.note.ifBlank { if (isPending) stringResource(R.string.tools_default_transfer_note) else stringResource(R.string.tools_default_captured_note) },
@@ -1194,14 +1212,21 @@ fun SubscriptionsCard(
                         CircularProgressIndicator(color = PrimaryTeal)
                     }
                 } else if (matchRecords.isEmpty()) {
-                    Box(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 24.dp),
-                        contentAlignment = Alignment.Center
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Rounded.CheckCircleOutline,
+                            contentDescription = null,
+                            tint = PrimaryTeal,
+                            modifier = Modifier.size(32.dp)
+                        )
                         Text(
-                            text = stringResource(R.string.tools_smart_match_empty),
+                            text = stringResource(R.string.tools_smart_match_empty).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), ""),
                             fontSize = 13.sp,
                             color = Slate500,
                             textAlign = TextAlign.Center
@@ -1227,15 +1252,26 @@ fun SubscriptionsCard(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = "📅 ${match.txDate} · ${match.txNote.ifEmpty { stringResource(R.string.type_expense) }}",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Slate800,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier.weight(1f)
-                                        )
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.CalendarMonth,
+                                                contentDescription = null,
+                                                tint = Slate500,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "${match.txDate} · ${match.txNote.ifEmpty { stringResource(R.string.type_expense) }}",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Slate800,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
                                         Text(
                                             text = "- RM ${String.format(Locale.getDefault(), "%.2f", match.txAmount)}",
                                             fontSize = 13.sp,
@@ -1252,20 +1288,40 @@ fun SubscriptionsCard(
                                                 color = Color(0xFFFEE2E2),
                                                 modifier = Modifier.fillMaxWidth()
                                             ) {
-                                                Text(
-                                                    text = stringResource(R.string.tools_smart_match_warning),
-                                                    fontSize = 11.sp,
-                                                    color = Color(0xFFB91C1C),
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                                    fontWeight = FontWeight.Medium
-                                                )
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.WarningAmber,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFFB91C1C),
+                                                        modifier = Modifier.size(13.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = stringResource(R.string.tools_smart_match_warning).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), ""),
+                                                        fontSize = 11.sp,
+                                                        color = Color(0xFFB91C1C),
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                }
                                             }
                                         } else {
-                                            Text(
-                                                text = stringResource(R.string.tools_match_sub_fmt, match.matchedSubName ?: "", match.matchedSubNextBilling ?: "-"),
-                                                fontSize = 11.sp,
-                                                color = PrimaryTeal
-                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.AutoAwesome,
+                                                    contentDescription = null,
+                                                    tint = PrimaryTeal,
+                                                    modifier = Modifier.size(13.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = stringResource(R.string.tools_match_sub_fmt, match.matchedSubName ?: "", match.matchedSubNextBilling ?: "-").replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), ""),
+                                                    fontSize = 11.sp,
+                                                    color = PrimaryTeal
+                                                )
+                                            }
                                         }
 
                                         Spacer(modifier = Modifier.height(6.dp))

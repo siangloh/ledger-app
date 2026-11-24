@@ -2255,13 +2255,24 @@ fun UncategorizedReviewBottomSheet(
             Spacer(modifier = Modifier.height(14.dp))
 
             if (items.isEmpty()) {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 32.dp),
-                    contentAlignment = Alignment.Center
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(text = stringResource(R.string.uncategorized_inbox_zero), color = Slate400, fontSize = 14.sp)
+                    Icon(
+                        imageVector = Icons.Rounded.CheckCircleOutline,
+                        contentDescription = null,
+                        tint = PrimaryTeal,
+                        modifier = Modifier.size(34.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.uncategorized_inbox_zero).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), ""),
+                        color = Slate500,
+                        fontSize = 14.sp
+                    )
                 }
             } else {
                 LazyColumn(
@@ -2286,33 +2297,45 @@ fun UncategorizedReviewBottomSheet(
                                     Column(modifier = Modifier.weight(1f)) {
                                         if (item.reviewReason == "suspected_duplicate" || item.suspectedDuplicateId != null) {
                                             Surface(
-                                                shape = RoundedCornerShape(4.dp),
+                                                shape = RoundedCornerShape(6.dp),
                                                 color = Amber50,
                                                 border = BorderStroke(1.dp, Amber200),
                                                 modifier = Modifier.padding(bottom = 4.dp)
                                             ) {
-                                                Text(
-                                                    text = stringResource(R.string.pending_reason_duplicate),
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Amber700,
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
                                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
+                                                ) {
+                                                    Icon(Icons.Rounded.WarningAmber, contentDescription = null, tint = Amber700, modifier = Modifier.size(12.dp))
+                                                    Spacer(modifier = Modifier.width(3.dp))
+                                                    Text(
+                                                        text = stringResource(R.string.pending_reason_duplicate).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), ""),
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Amber700
+                                                    )
+                                                }
                                             }
                                         } else if (item.reviewReason == "unmatched_account") {
                                             Surface(
-                                                shape = RoundedCornerShape(4.dp),
+                                                shape = RoundedCornerShape(6.dp),
                                                 color = Color(0xFFF3E8FF),
                                                 border = BorderStroke(1.dp, Color(0xFFD8B4FE)),
                                                 modifier = Modifier.padding(bottom = 4.dp)
                                             ) {
-                                                Text(
-                                                    text = stringResource(R.string.pending_reason_account),
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF7E22CE),
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
                                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
+                                                ) {
+                                                    Icon(Icons.Rounded.AccountBalance, contentDescription = null, tint = Color(0xFF7E22CE), modifier = Modifier.size(12.dp))
+                                                    Spacer(modifier = Modifier.width(3.dp))
+                                                    Text(
+                                                        text = stringResource(R.string.pending_reason_account).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), ""),
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFF7E22CE)
+                                                    )
+                                                }
                                             }
                                         }
 
@@ -2370,28 +2393,40 @@ fun UncategorizedReviewBottomSheet(
                                         ) {
                                             Button(
                                                 onClick = { onResolvePending(item.id, "merge") },
-                                                modifier = Modifier.weight(1f).height(48.dp),
-                                                colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
-                                                contentPadding = PaddingValues(horizontal = 4.dp)
+                                                modifier = Modifier.weight(1f).height(42.dp),
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                                                contentPadding = PaddingValues(horizontal = 6.dp)
                                             ) {
-                                                Text(stringResource(R.string.pending_btn_merge), fontSize = 12.sp, color = Color.White)
+                                                Icon(Icons.Rounded.Merge, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(stringResource(R.string.pending_btn_merge).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), ""), fontSize = 12.sp, color = Color.White)
                                             }
                                             OutlinedButton(
                                                 onClick = { onResolvePending(item.id, "mark-not-duplicate") },
-                                                modifier = Modifier.weight(1f).height(48.dp),
-                                                contentPadding = PaddingValues(horizontal = 4.dp)
+                                                modifier = Modifier.weight(1f).height(42.dp),
+                                                shape = RoundedCornerShape(10.dp),
+                                                contentPadding = PaddingValues(horizontal = 6.dp)
                                             ) {
-                                                Text(stringResource(R.string.pending_btn_not_duplicate), fontSize = 12.sp, color = Slate700)
+                                                Icon(Icons.Rounded.Check, contentDescription = null, tint = Slate700, modifier = Modifier.size(15.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(stringResource(R.string.pending_btn_not_duplicate).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), ""), fontSize = 12.sp, color = Slate700)
                                             }
                                         }
                                     } else {
-                                        Text(
-                                            text = stringResource(R.string.pending_hold_help),
-                                            fontSize = 11.sp,
-                                            color = Slate500,
-                                            lineHeight = 15.sp,
-                                            modifier = Modifier.padding(bottom = 6.dp)
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.Top,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        ) {
+                                            Icon(Icons.Rounded.Info, contentDescription = null, tint = Slate400, modifier = Modifier.size(14.dp).padding(top = 1.dp))
+                                            Spacer(modifier = Modifier.width(5.dp))
+                                            Text(
+                                                text = stringResource(R.string.pending_hold_help).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), ""),
+                                                fontSize = 11.sp,
+                                                color = Slate500,
+                                                lineHeight = 15.sp
+                                            )
+                                        }
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -2435,11 +2470,14 @@ fun UncategorizedReviewBottomSheet(
                                                 )
                                             )
                                         },
-                                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
                                         contentPadding = PaddingValues(0.dp)
                                     ) {
-                                        Text(stringResource(R.string.btn_select_category), fontSize = 13.sp, color = Color.White)
+                                        Icon(Icons.Rounded.Category, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(stringResource(R.string.btn_select_category).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), ""), fontSize = 13.sp, color = Color.White)
                                     }
                                 }
                             }
