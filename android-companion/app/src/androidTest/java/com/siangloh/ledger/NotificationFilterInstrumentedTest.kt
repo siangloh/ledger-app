@@ -59,7 +59,7 @@ class NotificationFilterInstrumentedTest {
                 outcome = "ignored_duplicate_cross_app"
             )
         )
-        val logs = db.notificationLogDao().getRecentLogs(5)
+        val logs = db.notificationLogDao().getRecentLogs()
         assertTrue("Expected ignored_duplicate_cross_app logged in Room", logs.any { it.outcome == "ignored_duplicate_cross_app" })
     }
 }
