@@ -567,7 +567,7 @@
     <string name="badge_auto">自动记账</string>
     <string name="badge_manual">手动记账</string>
     <string name="network_blocked_cached">网络连接受阻，已呈现最近快照数据</string>
-    <string name="network_offline_no_cache">网络未连接，且尚无历史缓存</string>
+    <string name="network_offline_no_cache">网络未连接，且尚无离线记录</string>
     <string name="network_error_cached_simple">网络连接异常，已呈现最近快照数据</string>
 
     <!-- Cashflow Analysis Range & Savings Tab Localization -->

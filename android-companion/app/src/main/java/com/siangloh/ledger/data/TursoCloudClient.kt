@@ -368,7 +368,9 @@ object TursoCloudClient {
                         localTrashIds[tid] = delTime
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to parse local_recycle_bin_prefs JSON: ${e.message}")
+            }
 
             val uploadStmts = mutableListOf<Pair<String, List<Any?>>>()
 
@@ -598,7 +600,9 @@ object TursoCloudClient {
                     try {
                         db.cachedCategoryDao().clearAll()
                         db.cachedCategoryDao().insertAll(cachedCats)
-                    } catch (_: Exception) {}
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to update cachedCategoryDao: ${e.message}")
+                    }
                     Log.i(TAG, "Synced ${localCats.size} categories from Turso.")
                 }
 
@@ -626,7 +630,9 @@ object TursoCloudClient {
                         if (timePart.isNotBlank()) timeStr = timePart
                         try {
                             createdAtMillis = sdfIso.parse(createdAtRaw.substringBefore("."))?.time ?: createdAtMillis
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) {
+                            Log.d(TAG, "Failed to parse created_at '$createdAtRaw': ${e.message}")
+                        }
                     }
                     val accountId = asLong(row["account_id"])?.toInt()
 
@@ -957,7 +963,9 @@ object TursoCloudClient {
                     val intent = Intent("com.siangloh.ledger.DATA_SYNCED")
                     intent.setPackage(context.packageName)
                     context.sendBroadcast(intent)
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    Log.d(TAG, "Failed to broadcast DATA_SYNCED: ${e.message}")
+                }
 
                 Result.success(syncedTxCount)
             },

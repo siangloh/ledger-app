@@ -81,6 +81,37 @@ object LocalNotificationParser {
         Regex("""(?:已支付|成功支付|成功转账|成功扣款|已扣款|已到账|已入账|已退回|已退款)""")
     )
 
+    // Shopee 非支付类噪音词（卖家聊天、物流配送、好评提醒等，防止 com.shopee.my 误记）
+    private val SHOPEE_NOISE_KEYWORDS = listOf(
+        "replied", "chat", "parcel", "shipped", "delivered", "out for delivery",
+        "seller", "rating", "review", "has arrived", "to ship", "tracking",
+        "已发货", "已送达", "派送中", "卖家", "物流", "包裹", "评价"
+    )
+
+    /**
+     * 跨应用同金额防重器：防止银行 App 推送 + 银行 SMS 短信在短时间内对同一笔扣款重复入账。
+     * 默认窗口 3 分钟（180 秒），按 (type, amountCents) 跨包名去重。
+     */
+    class CrossAppDeduplicator(private val windowMs: Long = 180_000L) {
+        private val recentKeys = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+        fun isDuplicateAndRecord(type: String, amount: Double, nowMs: Long = System.currentTimeMillis()): Boolean {
+            if (amount <= 0.0) return false
+            val cents = Math.round(amount * 100.0)
+            val key = "$type:$cents"
+            val lastSeen = recentKeys[key]
+            if (lastSeen != null && (nowMs - lastSeen) in 0 until windowMs) {
+                return true
+            }
+            recentKeys[key] = nowMs
+            if (recentKeys.size > 200) {
+                val cutoff = nowMs - (windowMs * 2)
+                recentKeys.entries.removeIf { it.value < cutoff }
+            }
+            return false
+        }
+    }
+
     /**
      * 统一广告/营销推广判定器（供 NotificationService Phase-1 与 LocalNotificationParser 共用，保证双层规则严格一致）
      */
@@ -272,6 +303,16 @@ object LocalNotificationParser {
         }
 
         val pkg = packageName?.lowercase(Locale.ROOT) ?: ""
+
+        // 1.5 Shopee 专属严控：仅允许明确涉及 ShopeePay / SPayLater / 支付退款的通知，拦截卖家聊天/物流/降价提醒
+        if (pkg.contains("shopee")) {
+            val isShopeeNoise = SHOPEE_NOISE_KEYWORDS.any { lower.contains(it) }
+            val hasShopeePaySignal = listOf("shopeepay", "spaylater", "paid", "payment", "refund", "已支付", "退款").any { lower.contains(it) }
+            if (isShopeeNoise || !hasShopeePaySignal) {
+                return LocalParsedResult(0.0, "expense", "广告过滤", "Shopee非支付通知", "已过滤Shopee非支付消息", "", getToday(), isPromo = true)
+            }
+        }
+
         val isTng = pkg.contains("touchngo") || pkg.contains("tng") || pkg.contains("ewallet") || lower.contains("touch 'n go") || lower.contains("tng") || lower.contains("ewallet")
         val isGrab = pkg.contains("grab") || lower.contains("grab")
         val isMaybank = pkg.contains("maybank") || pkg.contains("m2u") || pkg.contains("mae") || lower.contains("maybank") || lower.contains("mae")

@@ -113,5 +113,33 @@ class LocalNotificationParserTest {
         assertEquals("income", settledCashback.type)
         assertEquals("返现", settledCashback.category)
     }
+
+    @Test
+    fun parse_shopeeNonPaymentNoiseBlocked_whileShopeePayRecorded() {
+        val noise1 = LocalNotificationParser.parse("Seller replied: This item is RM 35.00 only!", "com.shopee.my")
+        org.junit.Assert.assertTrue(noise1 == null || noise1.isPromo)
+
+        val noise2 = LocalNotificationParser.parse("Your parcel worth RM 49.90 has been delivered!", "com.shopee.my")
+        org.junit.Assert.assertTrue(noise2 == null || noise2.isPromo)
+
+        val realPay = LocalNotificationParser.parse("ShopeePay: You have paid RM 49.90 to Uniqlo Official", "com.shopee.my")
+        assertNotNull(realPay)
+        assertFalse(realPay!!.isPromo)
+        assertEquals(49.90, realPay.amount, 0.01)
+    }
+
+    @Test
+    fun crossAppDeduplicator_suppressesSameAmountWithinWindowAndAllowsDifferentOrLater() {
+        val dedup = LocalNotificationParser.CrossAppDeduplicator(windowMs = 180_000L)
+        val t0 = 1_700_000_000_000L
+        // First notification (e.g. Maybank App push): allowed
+        assertFalse(dedup.isDuplicateAndRecord("expense", 45.50, t0))
+        // Second notification 60s later (e.g. Bank SMS for same RM 45.50): suppressed
+        org.junit.Assert.assertTrue(dedup.isDuplicateAndRecord("expense", 45.50, t0 + 60_000L))
+        // Different amount within window: allowed
+        assertFalse(dedup.isDuplicateAndRecord("expense", 12.00, t0 + 90_000L))
+        // Same amount after 3-minute window expires: allowed
+        assertFalse(dedup.isDuplicateAndRecord("expense", 45.50, t0 + 181_000L))
+    }
 }
 

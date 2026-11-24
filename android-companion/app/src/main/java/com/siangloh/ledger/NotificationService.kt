@@ -19,6 +19,7 @@ class NotificationService : NotificationListenerService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val recentNotifications = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val crossAppDeduplicator = com.siangloh.ledger.parser.LocalNotificationParser.CrossAppDeduplicator()
 
     companion object {
         private const val TAG = "LedgerNotifService"
@@ -103,9 +104,6 @@ class NotificationService : NotificationListenerService() {
             .trim()
 
         if (fullContent.isBlank()) return
-        val eventId = java.util.UUID.nameUUIDFromBytes(
-            (sbn.key + ":" + sbn.postTime + ":" + fullContent).toByteArray(Charsets.UTF_8)
-        ).toString()
 
         // 0. 短时重复通知拦截 (例如系统进度更新、通知栏触碰刷新造成的重复触发)
         val cacheKey = "$pkgName:$fullContent"
@@ -204,6 +202,21 @@ class NotificationService : NotificationListenerService() {
                         return@launch
                     }
                     if (parsed.amount > 0) {
+                        // 跨应用 3 分钟同金额防重（防止银行 App 通知 + SMS 短信对同一笔消费重复记账）
+                        if (crossAppDeduplicator.isDuplicateAndRecord(parsed.type, parsed.amount)) {
+                            Log.i(TAG, "Cross-app duplicate suppressed: ${parsed.type} ${parsed.amount} from [$pkgName]")
+                            insertLogAndPrune(
+                                db,
+                                NotificationLog(
+                                    sourcePackage = pkgName,
+                                    rawText = fullContent,
+                                    matchedPhase1 = true,
+                                    sentToBackend = false,
+                                    outcome = "ignored_duplicate_cross_app"
+                                )
+                            )
+                            return@launch
+                        }
                         val effectiveCat = if (parsed.type == "expense") {
                             com.siangloh.ledger.data.LocalLedgerRepository.lookupMerchantCategoryRule(this@NotificationService, parsed.merchant) ?: parsed.category
                         } else {

@@ -59,7 +59,7 @@
     <string name="sync_retry_btn">Retry Sync</string>
     <string name="sync_failed_reason">Reason: %1$s</string>
     <string name="sync_pending_banner_title">Offline Queue (%1$d)</string>
-    <string name="network_error_cached">⚠️ Network unavailable, showing cached snapshot · Tap to retry</string>
+    <string name="network_error_cached">⚠️ Network unavailable, showing saved data · Tap to retry</string>
     <string name="network_retry">Tap to retry</string>
 
     <!-- Add Transaction -->
@@ -566,9 +566,9 @@
     <string name="go_to_detail_page">View Detailed Records</string>
     <string name="badge_auto">Auto</string>
     <string name="badge_manual">Manual</string>
-    <string name="network_blocked_cached">Network blocked, showing latest cached snapshot</string>
-    <string name="network_offline_no_cache">Offline and no cached data available</string>
-    <string name="network_error_cached_simple">Network error, showing latest cached snapshot</string>
+    <string name="network_blocked_cached">Network unavailable, showing latest saved data</string>
+    <string name="network_offline_no_cache">Offline and no saved data available</string>
+    <string name="network_error_cached_simple">Network error, showing latest saved data</string>
 
     <!-- Cashflow Analysis Range & Savings Tab Localization -->
     <string name="view_by_month">By Month</string>

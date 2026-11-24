@@ -69,10 +69,14 @@ class SyncWorker(
         Log.i(TAG, "Starting background sync...")
         try {
             com.siangloh.ledger.data.TursoCloudClient.syncAllFromTurso(applicationContext)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "syncAllFromTurso skipped/failed during background sync: ${e.message}")
+        }
         try {
             com.siangloh.ledger.data.LocalLedgerRepository.checkAndGenerateDueRecurring(applicationContext)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "checkAndGenerateDueRecurring failed during background sync: ${e.message}")
+        }
         val db = AppDatabase.getInstance(applicationContext)
 
         try {
@@ -91,7 +95,9 @@ class SyncWorker(
                                 val intent = android.content.Intent("com.siangloh.ledger.SYNC_COMPLETED")
                                 intent.setPackage(applicationContext.packageName)
                                 applicationContext.sendBroadcast(intent)
-                            } catch (_: Exception) {}
+                            } catch (e: Exception) {
+                                Log.d(TAG, "Failed to broadcast SYNC_COMPLETED: ${e.message}")
+                            }
                         }
                         failedMap.forEach { (fid, ferr) ->
                             db.pendingTransactionDao().markAsFailed(fid, ferr)
