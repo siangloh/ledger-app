@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -231,9 +232,11 @@ fun AddTransactionScreen(
                             .padding(3.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        val manualLabel = stringResource(R.string.add_tab_manual).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), "")
+                        val splitLabel = stringResource(R.string.add_tab_split).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), "")
                         val modeTabs = listOf(
-                            Triple(0, Icons.Default.EditNote, stringResource(R.string.add_tab_manual)),
-                            Triple(1, Icons.Default.ReceiptLong, stringResource(R.string.add_tab_split))
+                            Triple(0, Icons.Default.EditNote, manualLabel),
+                            Triple(1, Icons.AutoMirrored.Filled.ReceiptLong, splitLabel)
                         )
                         modeTabs.forEach { (idx, icon, label) ->
                             val selected = addMode == idx
@@ -707,6 +710,12 @@ fun AddTransactionScreen(
                                 color = Slate900
                             )
                             if (currentCats.size > 8) {
+                                val rawMoreLabel = if (showAllCategories) {
+                                    stringResource(R.string.collapse_categories)
+                                } else {
+                                    stringResource(R.string.add_more_categories_fmt, currentCats.size)
+                                }
+                                val cleanMoreLabel = rawMoreLabel.replace(Regex("[▾▴▼▲]+$"), "").trim()
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier
@@ -715,7 +724,7 @@ fun AddTransactionScreen(
                                         .padding(horizontal = 6.dp, vertical = 3.dp)
                                 ) {
                                     Text(
-                                        text = if (showAllCategories) stringResource(R.string.collapse_categories) else stringResource(R.string.add_more_categories_fmt, currentCats.size),
+                                        text = cleanMoreLabel,
                                         fontSize = 11.5.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = PrimaryTeal
@@ -763,12 +772,16 @@ fun AddTransactionScreen(
                                             shadowElevation = if (isSelected) 1.dp else 0.dp,
                                             modifier = Modifier
                                                 .weight(1f)
+                                                .height(78.dp)
                                                 .clip(RoundedCornerShape(14.dp))
                                                 .clickable { draft.selectedCategory = cat.name }
                                         ) {
                                             Column(
                                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp)
+                                                verticalArrangement = Arrangement.Center,
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .padding(vertical = 6.dp, horizontal = 4.dp)
                                             ) {
                                                 Text(emoji, fontSize = 21.sp)
                                                 Spacer(modifier = Modifier.height(4.dp))
@@ -985,8 +998,9 @@ fun AddTransactionScreen(
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            val detailsToggleRaw = if (hasDetails) stringResource(R.string.collapse_categories) else stringResource(R.string.expand_details)
                             Text(
-                                text = if (hasDetails) stringResource(R.string.collapse_categories) else stringResource(R.string.expand_details),
+                                text = detailsToggleRaw.replace(Regex("[▾▴▼▲]+$"), "").trim(),
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = PrimaryTeal
