@@ -130,11 +130,9 @@ class NotificationService : NotificationListenerService() {
         val hasVerb = TRANSACTION_VERBS.any { lower.contains(it) }
         val hasAmount = AMOUNT_REGEX.containsMatchIn(fullContent)
 
-        // 3. Phase-1 纯营销/广告拦截：若命中强营销关键词且缺少已完成动账凭证，直接本地拦截
-        val hasPurePromoWord = PURE_PROMO_KEYWORDS.any { lower.contains(it) }
-        val hasCompletedTxn = COMPLETED_TXN_VERBS.any { lower.contains(it) }
-        if (hasPurePromoWord && !hasCompletedTxn) {
-            Log.d(TAG, "Phase-1 Filtered: contains pure promo keywords without completed transaction -> $fullContent")
+        // 3. Phase-1 统一营销/广告拦截：调用 LocalNotificationParser 统一强/弱广告规则引擎
+        if (com.siangloh.ledger.parser.LocalNotificationParser.isPromotionalOrAd(fullContent)) {
+            Log.d(TAG, "Phase-1 Filtered: promotional/ad notification -> $fullContent")
             serviceScope.launch {
                 insertLogAndPrune(
                     db,
@@ -234,7 +232,9 @@ class NotificationService : NotificationListenerService() {
                             val intent = android.content.Intent("com.siangloh.ledger.SYNC_COMPLETED")
                             intent.setPackage(packageName)
                             sendBroadcast(intent)
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) {
+                            Log.d(TAG, "Failed to send SYNC_COMPLETED broadcast: ${e.message}")
+                        }
                         return@launch
                     }
                 }

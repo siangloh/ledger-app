@@ -61,5 +61,57 @@ class LocalNotificationParserTest {
         assertNotNull(outgoing)
         assertEquals("expense", outgoing!!.type)
     }
+
+    @Test
+    fun parse_promotionalAdsWithAmounts_areBlockedAsPromo() {
+        val adCases = listOf(
+            "You've received a RM20 voucher! Min spend RM50." to "com.shopee.my",
+            "Bayar guna DuitNow QR & menang pulangan tunai sehingga RM88! Transaksi minimum RM10." to "my.com.tngdigital.ewallet",
+            "Enjoy RM10 instant rebate when you spend RM50 at Watsons!" to "my.com.tngdigital.ewallet",
+            "Get up to RM20 cashback on your next purchase!" to "com.grabtaxi.passenger",
+            "Fuel up RM50 at Petronas & earn 3x Mesra points!" to "com.setel.mobile",
+            "Refuel RM40 with Setel and get RM5!" to "com.setel.mobile",
+            "Transfer RM50 via DuitNow Transfer to win iPhone 16!" to "com.maybank2u.life",
+            "GrabFood: RM12 OFF your next order! Order now." to "com.grabtaxi.passenger",
+            "Cashback of RM15 when you spend RM100 this weekend! Limited time offer." to "com.v2.cimb.malaysia",
+            "Special deal! RM9.90 combo offer at McDonald's today!" to "com.grabtaxi.passenger",
+            "MAE: Enjoy 3.88% p.a. & earn RM50 bonus interest!" to "com.maybank2u.life",
+            "You have received RM10 off voucher for your next GrabFood order!" to "com.grabtaxi.passenger",
+            "Stand a chance to win RM500 cashback!" to "com.myboost"
+        )
+
+        for ((text, pkg) in adCases) {
+            val result = LocalNotificationParser.parse(text, pkg)
+            val blocked = result == null || result.isPromo
+            org.junit.Assert.assertTrue(
+                "Expected ad notification to be blocked, but got $result for: $text",
+                blocked
+            )
+        }
+    }
+
+    @Test
+    fun parse_realReceiptsWithLoyaltyFooterOrSettledCashback_stillRecordAccurately() {
+        // Real payment receipt with points footer must NOT be falsely blocked
+        val receiptWithPoints = LocalNotificationParser.parse(
+            "Payment of RM 15.00 to ZUS Coffee successful. You earned 15 GoRewards points!",
+            "my.com.tngdigital.ewallet"
+        )
+        assertNotNull(receiptWithPoints)
+        assertFalse(receiptWithPoints!!.isPromo)
+        assertEquals(15.0, receiptWithPoints.amount, 0.01)
+        assertEquals("expense", receiptWithPoints.type)
+
+        // Real settled cashback credited to wallet must still record as income
+        val settledCashback = LocalNotificationParser.parse(
+            "RM 2.50 cashback has been credited to your Touch 'n Go eWallet",
+            "my.com.tngdigital.ewallet"
+        )
+        assertNotNull(settledCashback)
+        assertFalse(settledCashback!!.isPromo)
+        assertEquals(2.50, settledCashback.amount, 0.01)
+        assertEquals("income", settledCashback.type)
+        assertEquals("返现", settledCashback.category)
+    }
 }
 

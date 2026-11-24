@@ -19,14 +19,88 @@ data class LocalParsedResult(
 
 object LocalNotificationParser {
 
-    private val PROMO_KEYWORDS = listOf(
-        "apply online", "apply & get", "apply for", "credit cardmember", "eligible for",
-        "double cashback", "win a", "win up to", "contest", "rewards point", "free gift",
-        "t&cs apply", "terms and conditions", "exclusive offer", "limited time offer",
+    // Layer A: 绝对广告/非动账强特征词（即便夹杂 received / paid / transaksi 等词也一律拦截）
+    private val HARD_PROMO_KEYWORDS = listOf(
+        // 券/折扣/满减
+        "voucher", "baucar", "coupon", "kupon", "promo code", "use code", "tebus", "rebut",
+        "penebusan", "claim now", "claim your", "claim voucher", "redeem now", "redeem great rewards",
+        "% off", "off!", "diskaun", "discount", "min. spend", "min spend", "minimum spend",
+        "no min. spend", "no min spend", "tiada perbelanjaan minimum", "belanja minimum",
+        "with min ", "优惠券", "代金券", "领券", "满减", "立减", "折扣", "免费领",
+        // 抽奖/活动/拉新
+        "win a ", "win up to", "to win ", "win big", "win exciting", "stand a chance", "chance to win",
+        "berpeluang", "menang", "lucky draw", "cabutan bertuah", "giveaway", "contest", "spin & win",
+        "shake & win", "jackpot", "cash prize", "prizes", "invite friend", "invite a friend",
+        "referral", "refer & earn", "邀请好友", "分享领", "抽奖", "赢取",
+        // 电商促销/购物车/直播/行动号召
+        "flash sale", "shocking sale", "super brand day", "brand day", "payday sale",
+        "mega sale", "big sale", "raya sale", "cny sale", "free shipping", "free delivery",
+        "penghantaran percuma", "add to cart", "in your cart", "left in your cart",
+        "wishlist", "price drop", "back in stock", "live stream", "livestream",
+        "shop now", "order now", "buy now", "book now", "checkout now", "grab yours",
+        "limited time offer", "limited offer", "limited redemption", "limited redemptions",
+        "limited slots", "penebusan terhad", "exclusive offer", "special offer", "special deal",
+        "hot deal", "great deal", "don't miss", "dont miss", "hurry", "last chance",
+        "ends today", "ends soon", "today only", "while stocks last", "valid until", "valid till",
+        "t&cs apply", "t&c apply", "terms and conditions", "tap here", "tap to ", "click here",
+        "learn more", "find out more", "expiring soon", "expires soon", "waiting for you",
+        "unclaimed", "free gift", "hadiah", "percuma", "限时", "特惠", "大促", "包邮", "秒杀", "好礼",
+        // 诱导支付/充值/借贷/理财广告
+        "top up now", "reload now", "pay now", "pay with duitnow", "pay with shopeepay",
+        "pay with grabpay", "pay with tng", "pay with", "bayar guna", "bayar dengan",
+        "apply online", "apply & get", "apply for", "apply now", "cash loan", "personal loan",
+        "credit cardmember", "eligible for", "double cashback", "0% interest", "p.a.",
+        "interest rate", "returns up to", "bonus interest", "fixed deposit", "fd rate",
+        "充值返", "立即充值", "申请贷款", "贷款",
+        // 安全验证码/非交易通知
         "otp", "tac", "one-time password", "verification code", "reset password",
-        "free shipping", "tebus baucar", "voucher", "super brand day", "flash sale",
-        "% off", "save up to", "claim voucher", "spin & win", "payday sale"
+        "login alert", "new login", "验证码", "登录提醒"
     )
+
+    // Layer A 正则：动态金额型促销文案（如 "Get RM15", "Up to RM88", "RM10 off", "Spend RM50"）
+    private val HARD_PROMO_PATTERNS = listOf(
+        Regex("""\b(?:up to|sehingga|save up to|save|jimat|get up to|get|dapatkan|enjoy up to|enjoy|earn up to|earn|win|menang|unlock|claim)\s+(?:RM|MYR|\$)\s*[0-9]""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:RM|MYR|\$)\s*[0-9]+(?:\.[0-9]{1,2})?\s+off\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:when you|once you|if you)\s+(?:spend|pay|transfer|reload|top up|order|shop|use)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:spend|belanja|fuel up|refuel)\s+(?:RM|MYR|\$)\s*[0-9]""", RegexOption.IGNORE_CASE),
+        Regex("""\boff\s+your\s+(?:next|first|order|purchase|ride|meal)\b""", RegexOption.IGNORE_CASE)
+    )
+
+    // Layer B: 弱营销信号词（若通知中缺少真实已完成动账凭证，则按广告拦截；真实收据尾部附带积分提示则放行）
+    private val SOFT_PROMO_KEYWORDS = listOf(
+        "just for you", "cashback", "rebate", "rewards", "reward", "points", "coins",
+        "promo", "offer", "deal", "sale", "bonus", "exclusive", "surprise", "unlock", "collect",
+        "pulangan tunai", "ganjaran", "mata ganjaran", "promosi", "tawaran"
+    )
+
+    // 明确的已完成动账凭证（过去式/已扣款/已入账，用于与弱营销信号区分）
+    private val STRICT_COMPLETED_PATTERNS = listOf(
+        Regex("""\b(?:you have paid|you've paid|you paid|paid\s+(?:RM|MYR)|payment\s+of\s+(?:RM|MYR)|has been deducted|have been deducted|debited|charged\s+(?:RM|MYR)|transferred\s+(?:RM|MYR)|has been transferred|received\s+(?:RM|MYR)|credited\s+(?:RM|MYR)|has been credited|has been refunded|refunded\s+(?:RM|MYR)|using your (?:cd|card)|card transaction alert)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:RM|MYR)\s*[0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?\s+(?:paid to|spent|deducted|debited|transferred to|has been deducted|has been transferred|credited|refunded)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:bayaran|transaksi)\b.*\bberjaya\b|\bberjaya\b.*\b(?:bayaran|transaksi)\b""", RegexOption.IGNORE_CASE),
+        Regex("""(?:已支付|成功支付|成功转账|成功扣款|已扣款|已到账|已入账|已退回|已退款)""")
+    )
+
+    /**
+     * 统一广告/营销推广判定器（供 NotificationService Phase-1 与 LocalNotificationParser 共用，保证双层规则严格一致）
+     */
+    fun isPromotionalOrAd(text: String): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return false
+        val lower = trimmed.lowercase(Locale.ROOT)
+
+        // 1. 强广告/促销/验证码词库或动态金额促销句式 -> 无条件拦截
+        if (HARD_PROMO_KEYWORDS.any { lower.contains(it) }) return true
+        if (HARD_PROMO_PATTERNS.any { it.containsMatchIn(trimmed) }) return true
+
+        // 2. 弱营销词：只有明确存在真实已完成动账结构（如收据附带“赚取积分”）才放行，否则拦截
+        if (SOFT_PROMO_KEYWORDS.any { lower.contains(it) }) {
+            val hasStrictCompleted = STRICT_COMPLETED_PATTERNS.any { it.containsMatchIn(trimmed) }
+            if (!hasStrictCompleted) return true
+        }
+
+        return false
+    }
 
     private val INTERNAL_TRANSFER_KEYWORDS = listOf(
         "into your go+ account", "into your go+", "cashed in", "cash in successful",
@@ -184,8 +258,8 @@ object LocalNotificationParser {
         if (trimmed.isEmpty()) return null
         val lower = trimmed.lowercase(Locale.ROOT)
 
-        // 1. 营销广告过滤
-        if (PROMO_KEYWORDS.any { lower.contains(it) }) {
+        // 1. 营销广告过滤（统一强/弱广告规则引擎）
+        if (isPromotionalOrAd(trimmed)) {
             return LocalParsedResult(0.0, "expense", "广告过滤", "营销推广", "命中营销广告词库", "", getToday(), isPromo = true)
         }
 
@@ -348,14 +422,17 @@ object LocalNotificationParser {
         }
 
         // 7. 通用兜底解析 (Setel, DuitNow QR, CIMB, Public Bank, 银行短信等)
-        // 他人转入/转出默认归为 income/expense，只有用户在编辑页手动指定才算内部互转 (transfer)
-        val isOutgoingTransfer = listOf("transfer to", "transferred to", "duitnow to", "转账给").any { lower.contains(it) }
-        val isIncome = !isOutgoingTransfer && listOf("received from", "received", "credited", "duitnow transfer from", "transfer from", "收款", "转入", "到账").any { lower.contains(it) }
+        // 严禁仅凭孤立名词 (如 fuel/petrol/transfer/bayar) 触发，必须具备明确已完成/过去式动账动作词，防止广告漏网
+        val isOutgoingTransfer = listOf("transferred to", "has been transferred to", "duitnow transfer to", "转账给", "转账成功").any { lower.contains(it) }
+        val isIncome = !isOutgoingTransfer && listOf(
+            "received from", "you have received", "you've received", "credited",
+            "duitnow transfer from", "transfer from", "已收款", "已到账", "已入账", "收款", "转入"
+        ).any { lower.contains(it) }
         val isExpense = isOutgoingTransfer || listOf(
-            "paid", "spent", "payment to", "payment of", "deducted", "debited",
-            "transfer of", "duitnow qr", "duitnow transfer", "transfer", "transferred",
-            "扣款", "支付", "支出", "转账", "using your cd", "using your card", "card transaction",
-            "fuel", "refuel", "petrol", "bayar", "bayaran", "transaksi", "berjaya"
+            "paid", "spent", "payment to", "payment of", "deducted", "debited", "charged",
+            "transfer of", "transferred", "successful", "completed", "berjaya",
+            "已支付", "已付款", "已扣款", "扣款", "支出",
+            "using your cd", "using your card", "card transaction"
         ).any { lower.contains(it) }
 
         if (isExpense || isIncome) {
@@ -402,8 +479,17 @@ object LocalNotificationParser {
         today: String
     ): LocalParsedResult? {
         val isRebate = listOf("rebate", "cashback", "回扣", "返现").any { lower.contains(it) }
-        val isRefund = listOf("refund", "refunded", "退款", "退回", "pulangan").any { lower.contains(it) }
+        val isRefund = listOf("refunded", "refund of", "payment refunded", "has been refunded", "退款", "退回", "pulangan").any { lower.contains(it) }
         if (!isRebate && !isRefund) return null
+
+        // 返现/回扣必须明确包含已入账/已发放动词，严禁把“消费满50返10元”类广告当成真实收入
+        if (isRebate && !isRefund) {
+            val hasSettledRebate = listOf(
+                "credited", "received", "has been credited", "was credited", "into your", "to your",
+                "dikreditkan", "diterima", "已到账", "已入账", "已返现", "已发放"
+            ).any { lower.contains(it) }
+            if (!hasSettledRebate) return null
+        }
 
         val mRef = REFUND_REBATE_PATTERN.matcher(trimmed)
         var amt = 0.0
