@@ -1,10 +1,22 @@
 package com.siangloh.ledger.ui.compose
 
 import android.content.Context
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ShowChart
+import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.siangloh.ledger.R
 import com.siangloh.ledger.ui.compose.theme.*
 
@@ -13,6 +25,35 @@ data class CategoryIconSpec(
     val tint: Color,
     val bg: Color
 )
+
+@Composable
+fun CategoryIconBadge(
+    category: String,
+    type: String = "expense",
+    size: Dp = 36.dp,
+    iconSize: Dp = 19.dp,
+    selected: Boolean = false
+) {
+    val spec = if (type == "account") {
+        CategoryUiHelper.getAccountTypeIconSpec(category)
+    } else {
+        CategoryUiHelper.getCategoryIconSpec(category, type)
+    }
+    Surface(
+        shape = CircleShape,
+        color = if (selected) PrimaryTeal else spec.bg,
+        modifier = Modifier.size(size)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = spec.icon,
+                contentDescription = null,
+                tint = if (selected) Color.White else spec.tint,
+                modifier = Modifier.size(iconSize)
+            )
+        }
+    }
+}
 
 object CategoryUiHelper {
     private val REGEX_CATEGORY_JSON = Regex("""['"]?category['"]?\s*:\s*['"]([^'"}]+)['"]""")
@@ -109,7 +150,7 @@ object CategoryUiHelper {
                 clean.contains("应急") || clean.contains("备用") || clean.contains("emergency") ->
                     CategoryIconSpec(Icons.Rounded.Shield, Emerald700, Emerald50)
                 clean.contains("投资") || clean.contains("理财") || clean.contains("基金") || clean.contains("股票") || clean.contains("invest") ->
-                    CategoryIconSpec(Icons.Rounded.ShowChart, Sky600, Sky50)
+                    CategoryIconSpec(Icons.AutoMirrored.Rounded.ShowChart, Sky600, Sky50)
                 clean.contains("车") || clean.contains("car") ->
                     CategoryIconSpec(Icons.Rounded.DirectionsCar, Sky600, Sky50)
                 clean.contains("房") || clean.contains("house") || clean.contains("home") ->
@@ -133,7 +174,7 @@ object CategoryUiHelper {
                 clean.contains("奖金") || clean.contains("分红") || clean.contains("bonus") ->
                     CategoryIconSpec(Icons.Rounded.CardGiftcard, Amber700, Amber50)
                 clean.contains("投资") || clean.contains("利息") || clean.contains("invest") || clean.contains("pelaburan") ->
-                    CategoryIconSpec(Icons.Rounded.TrendingUp, PrimaryTeal, Teal50)
+                    CategoryIconSpec(Icons.AutoMirrored.Rounded.TrendingUp, PrimaryTeal, Teal50)
                 clean.contains("兼职") || clean.contains("副业") || clean.contains("part-time") || clean.contains("sampingan") ->
                     CategoryIconSpec(Icons.Rounded.Work, Sky600, Sky50)
                 clean.contains("退款") || clean.contains("报销") || clean.contains("返现") || clean.contains("回扣") ||
@@ -205,6 +246,18 @@ object CategoryUiHelper {
             "investment" -> "📈"
             "cash" -> "💵"
             else -> "📂"
+        }
+    }
+
+    fun getAccountTypeIconSpec(type: String): CategoryIconSpec {
+        return when (type.lowercase()) {
+            "savings" -> CategoryIconSpec(Icons.Rounded.Savings, PrimaryTeal, Teal50)
+            "current" -> CategoryIconSpec(Icons.Rounded.AccountBalance, Sky600, Sky50)
+            "credit_card" -> CategoryIconSpec(Icons.Rounded.CreditCard, Color(0xFF4F46E5), Color(0xFFEEF2FF))
+            "e_wallet" -> CategoryIconSpec(Icons.Rounded.AccountBalanceWallet, Emerald700, Emerald50)
+            "investment" -> CategoryIconSpec(Icons.AutoMirrored.Rounded.TrendingUp, Amber700, Amber50)
+            "cash" -> CategoryIconSpec(Icons.Rounded.Payments, IncomeGreen, Emerald50)
+            else -> CategoryIconSpec(Icons.Rounded.AccountBalanceWallet, Slate600, Slate100)
         }
     }
 

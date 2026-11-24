@@ -392,7 +392,7 @@ fun AccountCard(
     onReconcile: (AccountRecord) -> Unit = {}
 ) {
     val context = LocalContext.current
-    val icon = CategoryUiHelper.getAccountTypeIcon(account.type)
+    val accountIconSpec = CategoryUiHelper.getAccountTypeIconSpec(account.type)
     val typeName = CategoryUiHelper.getAccountTypeName(context, account.type)
 
     Surface(
@@ -422,7 +422,7 @@ fun AccountCard(
                     Box(
                         modifier = Modifier
                             .size(44.dp)
-                            .background(if (badgeCfg.iconRes != null) Color.Transparent else Slate100, CircleShape),
+                            .background(if (badgeCfg.iconRes != null) Color.Transparent else accountIconSpec.bg, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         if (badgeCfg.iconRes != null) {
@@ -432,7 +432,12 @@ fun AccountCard(
                                 modifier = Modifier.size(40.dp)
                             )
                         } else {
-                            Text(text = icon, fontSize = 22.sp)
+                            Icon(
+                                imageVector = accountIconSpec.icon,
+                                contentDescription = account.name,
+                                tint = accountIconSpec.tint,
+                                modifier = Modifier.size(22.dp)
+                            )
                         }
                     }
                     Spacer(modifier = Modifier.width(12.dp))

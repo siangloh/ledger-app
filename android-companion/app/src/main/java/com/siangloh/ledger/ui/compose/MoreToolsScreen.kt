@@ -2019,10 +2019,11 @@ fun QuickCategorizeDialog(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         row.forEach { catName ->
-                            val emoji = emojiMap[catName] ?: CategoryUiHelper.getCategoryEmoji(catName)
+                            val iconSpec = CategoryUiHelper.getCategoryIconSpec(catName)
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = Slate100,
+                                shape = RoundedCornerShape(10.dp),
+                                color = Slate50,
+                                border = BorderStroke(1.dp, Slate200),
                                 modifier = Modifier
                                     .weight(1f)
                                     .clickable { onConfirmCategory(catName) }
@@ -2032,7 +2033,12 @@ fun QuickCategorizeDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center
                                 ) {
-                                    Text(emoji, fontSize = 14.sp)
+                                    Icon(
+                                        imageVector = iconSpec.icon,
+                                        contentDescription = null,
+                                        tint = iconSpec.tint,
+                                        modifier = Modifier.size(15.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = CategoryUiHelper.getLocalizedCategoryName(context, catName),

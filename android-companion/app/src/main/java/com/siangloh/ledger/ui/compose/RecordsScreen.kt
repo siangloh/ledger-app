@@ -1249,9 +1249,6 @@ fun TransactionCard(
     val context = LocalContext.current
 
     // Remember expensive computations & string formatting so lazy list scrolling stays buttery smooth
-    val emoji = remember(tx.category, tx.type) { CategoryUiHelper.getCategoryEmoji(tx.category, tx.type) }
-    val catColor = remember(tx.category) { CategoryUiHelper.getCategoryColor(tx.category) }
-
     val amountColor = remember(tx.type) {
         when (tx.type) {
             "income" -> Emerald600
@@ -1318,15 +1315,13 @@ fun TransactionCard(
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 1. Emoji 图标背景圆圈 (42.dp)
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .background(catColor.copy(alpha = 0.12f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = emoji, fontSize = 20.sp)
-            }
+            // 1. 矢量分类图标徽章 (42.dp)
+            CategoryIconBadge(
+                category = tx.category,
+                type = tx.type,
+                size = 42.dp,
+                iconSize = 21.dp
+            )
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -1683,7 +1678,7 @@ fun EditTransactionBottomSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val localizedCat = CategoryUiHelper.getLocalizedCategoryName(context, category)
-                    val catEmoji = CategoryUiHelper.getCategoryEmoji(category, txType)
+                    val catIconSpec = CategoryUiHelper.getCategoryIconSpec(category, txType)
 
                     // 类别选择卡片：展示本地化图标与分类名称，点击唤出自定义输入
                     Surface(
@@ -1711,8 +1706,13 @@ fun EditTransactionBottomSheet(
                                 Text(stringResource(R.string.records_edit_category_label), fontSize = 10.sp, color = Slate500)
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(catEmoji, fontSize = 14.sp)
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = catIconSpec.icon,
+                                        contentDescription = null,
+                                        tint = catIconSpec.tint,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
                                     Text(
                                         text = localizedCat.ifBlank { stringResource(R.string.uncategorized_status) },
                                         fontSize = 13.sp,
@@ -1790,7 +1790,7 @@ fun EditTransactionBottomSheet(
                         currentCats.forEach { cat ->
                             val isSelected = category == cat.name ||
                                 CategoryUiHelper.getLocalizedCategoryName(context, category) == CategoryUiHelper.getLocalizedCategoryName(context, cat.name)
-                            val emoji = CategoryUiHelper.getCategoryEmoji(cat.name, txType)
+                            val chipIconSpec = CategoryUiHelper.getCategoryIconSpec(cat.name, txType)
                             val locName = CategoryUiHelper.getLocalizedCategoryName(context, cat.name)
 
                             Surface(
@@ -1803,7 +1803,12 @@ fun EditTransactionBottomSheet(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                                 ) {
-                                    Text(emoji, fontSize = 12.sp)
+                                    Icon(
+                                        imageVector = chipIconSpec.icon,
+                                        contentDescription = null,
+                                        tint = if (isSelected) Color.White else chipIconSpec.tint,
+                                        modifier = Modifier.size(14.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = locName,
@@ -2179,7 +2184,6 @@ fun EditTransactionBottomSheet(
                             ) {
                                 items(recentExpenses, key = { it.id }) { exp ->
                                     val afterAmt = kotlin.math.max(0.0, exp.amount - tx.amount)
-                                    val catIcon = CategoryUiHelper.getCategoryEmoji(exp.category, exp.type)
                                     val catTitle = CategoryUiHelper.getLocalizedCategoryName(context, exp.category)
                                     val expNote = CategoryUiHelper.getLocalizedNote(context, exp.note).ifBlank { catTitle }
                                     Surface(
@@ -2215,7 +2219,12 @@ fun EditTransactionBottomSheet(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 modifier = Modifier.weight(1f)
                                             ) {
-                                                Text(catIcon, fontSize = 18.sp)
+                                                CategoryIconBadge(
+                                                    category = exp.category,
+                                                    type = exp.type,
+                                                    size = 34.dp,
+                                                    iconSize = 18.dp
+                                                )
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Column {
                                                     Text(

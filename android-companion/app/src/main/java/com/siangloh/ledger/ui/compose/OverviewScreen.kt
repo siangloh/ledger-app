@@ -1888,7 +1888,6 @@ fun TransactionCardItem(
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val emoji = CategoryUiHelper.getCategoryEmoji(tx.category, tx.type)
     val localizedCategory = CategoryUiHelper.getLocalizedCategoryName(context, tx.category)
 
     Surface(
@@ -1910,15 +1909,12 @@ fun TransactionCardItem(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(Slate100),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = emoji, fontSize = 20.sp)
-                }
+                CategoryIconBadge(
+                    category = tx.category,
+                    type = tx.type,
+                    size = 42.dp,
+                    iconSize = 21.dp
+                )
 
                 Spacer(modifier = Modifier.width(12.dp))
 
@@ -2155,25 +2151,33 @@ fun QuickCategoryBottomSheet(
                     ) {
                         rowItems.forEach { catName ->
                             val isSelected = catName == selectedCat
-                            val emoji = emojiMap[catName] ?: CategoryUiHelper.getCategoryEmoji(catName)
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) Emerald500 else Slate100,
+                                color = if (isSelected) PrimaryTealSubtle else Slate50,
+                                border = BorderStroke(
+                                    width = if (isSelected) 1.5.dp else 1.dp,
+                                    color = if (isSelected) PrimaryTeal else Slate200.copy(alpha = 0.7f)
+                                ),
                                 modifier = Modifier
                                     .weight(1f)
                                     .clickable { selectedCat = catName }
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(vertical = 10.dp),
+                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Text(text = emoji, fontSize = 20.sp)
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                    CategoryIconBadge(
+                                        category = catName,
+                                        size = 34.dp,
+                                        iconSize = 18.dp,
+                                        selected = isSelected
+                                    )
+                                    Spacer(modifier = Modifier.height(5.dp))
                                     Text(
                                         text = CategoryUiHelper.getLocalizedCategoryName(context, catName),
-                                        fontSize = 12.sp,
+                                        fontSize = 11.5.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.White else Slate700,
+                                        color = if (isSelected) PrimaryTeal else Slate700,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )

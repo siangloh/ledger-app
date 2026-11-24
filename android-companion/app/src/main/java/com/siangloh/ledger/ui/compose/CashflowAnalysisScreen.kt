@@ -193,7 +193,8 @@ data class DonutSliceData(
     val iconEmoji: String = "",
     val transactionIds: List<Int> = emptyList(),
     val key: String = "",
-    val incomePercent: Double? = null
+    val incomePercent: Double? = null,
+    val iconType: String = "expense"
 )
 
 enum class CashflowDashboardTab { OVERVIEW, EXPENSE, CALENDAR, INCOME, SAVINGS, BILLS }
@@ -217,11 +218,12 @@ private fun expenseSlices(data: JSONObject, includeTransfer: Boolean): List<Donu
             amount = amt,
             percent = if (total > 0) amt / total * 100.0 else 0.0,
             color = ChartPalette[idx % ChartPalette.size],
-            iconEmoji = CategoryUiHelper.getCategoryEmoji(raw, "expense"),
+            iconEmoji = "",
             transactionIds = group.optJSONArray("transaction_ids")
                 ?.let { arr -> (0 until arr.length()).map { arr.getInt(it) } } ?: emptyList(),
             key = raw,
-            incomePercent = if (group.isNull("income_percent")) null else group.optDouble("income_percent")
+            incomePercent = if (group.isNull("income_percent")) null else group.optDouble("income_percent"),
+            iconType = "expense"
         )
     }
 }
@@ -240,11 +242,12 @@ private fun expensePlatformSlices(data: JSONObject): List<DonutSliceData> {
             amount = amt,
             percent = pct,
             color = ChartPalette[idx % ChartPalette.size],
-            iconEmoji = CategoryUiHelper.getCategoryEmoji(raw, "expense"),
+            iconEmoji = "",
             transactionIds = group.optJSONArray("transaction_ids")
                 ?.let { arr -> (0 until arr.length()).map { arr.getInt(it) } } ?: emptyList(),
             key = raw,
-            incomePercent = if (group.isNull("income_percent")) null else group.optDouble("income_percent")
+            incomePercent = if (group.isNull("income_percent")) null else group.optDouble("income_percent"),
+            iconType = "platform"
         )
     }
 }
@@ -261,10 +264,11 @@ private fun incomeSlices(data: JSONObject): List<DonutSliceData> {
             amount = group.optDouble("amount", 0.0),
             percent = pct,
             color = ChartPalette[idx % ChartPalette.size],
-            iconEmoji = CategoryUiHelper.getCategoryEmoji(raw, "income"),
+            iconEmoji = "",
             transactionIds = group.optJSONArray("transaction_ids")
                 ?.let { arr -> (0 until arr.length()).map { arr.getInt(it) } } ?: emptyList(),
-            key = raw
+            key = raw,
+            iconType = "income"
         )
     }
 }
@@ -283,11 +287,12 @@ private fun savingsSlices(data: JSONObject): List<DonutSliceData> {
             amount = amt,
             percent = if (total > 0) amt / total * 100.0 else 0.0,
             color = ChartPalette[idx % ChartPalette.size],
-            iconEmoji = CategoryUiHelper.getCategoryEmoji(raw, "savings"),
+            iconEmoji = "",
             transactionIds = group.optJSONArray("transaction_ids")
                 ?.let { arr -> (0 until arr.length()).map { arr.getInt(it) } } ?: emptyList(),
             key = raw,
-            incomePercent = if (group.isNull("income_percent")) null else group.optDouble("income_percent")
+            incomePercent = if (group.isNull("income_percent")) null else group.optDouble("income_percent"),
+            iconType = "savings"
         )
     }
 }
@@ -305,11 +310,12 @@ private fun savingsPlatformSlices(data: JSONObject): List<DonutSliceData> {
             amount = amt,
             percent = if (total > 0) amt / total * 100.0 else 0.0,
             color = ChartPalette[idx % ChartPalette.size],
-            iconEmoji = "🏦",
+            iconEmoji = "",
             transactionIds = group.optJSONArray("transaction_ids")
                 ?.let { arr -> (0 until arr.length()).map { arr.getInt(it) } } ?: emptyList(),
             key = raw,
-            incomePercent = if (group.isNull("income_percent")) null else group.optDouble("income_percent")
+            incomePercent = if (group.isNull("income_percent")) null else group.optDouble("income_percent"),
+            iconType = "platform"
         )
     }
 }
@@ -381,11 +387,15 @@ private fun PlatformCashflowCard(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                            val brandCfg = com.siangloh.ledger.ui.compose.components.SourceBrandBadgeHelper.getAccountBrandConfig(item.platform, null)
                             Box(
                                 Modifier.size(34.dp).clip(CircleShape).background(Teal50),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(CategoryUiHelper.getCategoryEmoji(item.platform, "platform").ifEmpty { "💳" }, fontSize = 16.sp)
+                                com.siangloh.ledger.ui.compose.components.BrandIcon(
+                                    config = brandCfg,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                             Column {
                                 Text(item.platform, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate900, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -600,8 +610,21 @@ private fun RankedBarRow(
     ) {
         Column(Modifier.padding(horizontal = 6.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(32.dp).clip(CircleShape).background(slice.color.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                    Text(slice.iconEmoji.ifEmpty { "🏷️" }, fontSize = 15.sp)
+                if (slice.iconType == "platform") {
+                    val brandCfg = com.siangloh.ledger.ui.compose.components.SourceBrandBadgeHelper.getAccountBrandConfig(slice.key.ifBlank { slice.label }, null)
+                    Box(Modifier.size(34.dp).clip(CircleShape).background(slice.color.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                        com.siangloh.ledger.ui.compose.components.BrandIcon(
+                            config = brandCfg,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
+                } else {
+                    CategoryIconBadge(
+                        category = slice.key.ifBlank { slice.label },
+                        type = slice.iconType,
+                        size = 34.dp,
+                        iconSize = 18.dp
+                    )
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
@@ -1266,12 +1289,12 @@ private fun MonthlyDailyCalendarCard(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         modifier = Modifier.weight(1f)
                                     ) {
-                                        Box(
-                                            modifier = Modifier.size(28.dp).clip(CircleShape).background(Teal50),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(CategoryUiHelper.getCategoryEmoji(cat, "expense"), fontSize = 14.sp)
-                                        }
+                                        CategoryIconBadge(
+                                            category = cat,
+                                            type = "expense",
+                                            size = 30.dp,
+                                            iconSize = 16.dp
+                                        )
                                         Column(Modifier.weight(1f)) {
                                             Text(note, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate900, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
