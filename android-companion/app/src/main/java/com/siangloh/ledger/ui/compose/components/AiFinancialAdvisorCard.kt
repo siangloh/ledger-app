@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -100,11 +101,16 @@ fun AiFinancialAdvisorCard(
                             .background(Teal50),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "✨", fontSize = 16.sp)
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Rounded.AutoAwesome,
+                            contentDescription = null,
+                            tint = PrimaryTeal,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                     Column {
                         Text(
-                            text = stringResource(R.string.ai_advisor_card_title),
+                            text = stringResource(R.string.ai_advisor_card_title).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), ""),
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate900,

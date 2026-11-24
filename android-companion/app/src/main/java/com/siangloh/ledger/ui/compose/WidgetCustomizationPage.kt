@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
@@ -386,7 +387,13 @@ fun WidgetCustomizationPage(
                     modifier = Modifier.padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "💡 ", fontSize = 16.sp)
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Rounded.Lightbulb,
+                        contentDescription = null,
+                        tint = Color(0xFFD97706),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
                     Text(
                         text = stringResource(R.string.widget_customization_tip),
                         fontSize = 12.sp,
@@ -474,7 +481,12 @@ private fun WidgetPreviewCard(
                             .clickable { onResetToday() }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text("🔄", fontSize = 11.sp)
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Rounded.Refresh,
+                                contentDescription = null,
+                                tint = Color(0xFF475569),
+                                modifier = Modifier.size(14.dp)
+                            )
                         }
                     }
 

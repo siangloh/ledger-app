@@ -36,6 +36,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -1752,30 +1753,44 @@ fun CashflowAnalysisScreen(
                             .padding(4.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        val cashflowLabel = stringResource(R.string.analytics_tab_cashflow).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), "")
+                        val advisorLabel = stringResource(R.string.analytics_tab_advisor).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), "")
                         val tabs = listOf(
-                            stringResource(R.string.analytics_tab_cashflow),
-                            stringResource(R.string.analytics_tab_advisor)
+                            Triple(0, Icons.Rounded.BarChart, cashflowLabel),
+                            Triple(1, Icons.Rounded.AutoAwesome, advisorLabel)
                         )
-                        tabs.forEachIndexed { idx, label ->
+                        tabs.forEach { (idx, tabIcon, label) ->
                             val selected = analyticsMode == idx
                             Surface(
                                 shape = RoundedCornerShape(9.dp),
                                 color = if (selected) Color.White else Color.Transparent,
-                                shadowElevation = if (selected) 1.dp else 0.dp,
+                                shadowElevation = if (selected) 1.5.dp else 0.dp,
                                 modifier = Modifier
                                     .weight(1f)
+                                    .clip(RoundedCornerShape(9.dp))
                                     .clickable { analyticsMode = idx }
                             ) {
-                                Text(
-                                    text = label,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (selected) PrimaryTeal else Slate600,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
+                                Row(
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(vertical = 8.dp, horizontal = 8.dp)
-                                )
+                                ) {
+                                    Icon(
+                                        imageVector = tabIcon,
+                                        contentDescription = null,
+                                        tint = if (selected) PrimaryTeal else Slate500,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(5.dp))
+                                    Text(
+                                        text = label,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (selected) PrimaryTeal else Slate600,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
@@ -2640,7 +2655,20 @@ fun CashflowAnalysisScreen(
                                                 horizontalAlignment = Alignment.CenterHorizontally,
                                                 verticalArrangement = Arrangement.Center
                                             ) {
-                                                Text("💰", fontSize = 36.sp)
+                                                Surface(
+                                                    shape = CircleShape,
+                                                    color = Teal50,
+                                                    modifier = Modifier.size(54.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Icon(
+                                                            imageVector = Icons.Rounded.Savings,
+                                                            contentDescription = null,
+                                                            tint = PrimaryTeal,
+                                                            modifier = Modifier.size(28.dp)
+                                                        )
+                                                    }
+                                                }
                                                 Spacer(Modifier.height(10.dp))
                                                 Text(stringResource(R.string.cf_no_savings_in_period), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
                                                 Spacer(Modifier.height(4.dp))
@@ -3056,7 +3084,13 @@ fun CashflowAnalysisScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            Text("📅 ", fontSize = 13.sp)
+                            Icon(
+                                imageVector = Icons.Rounded.CalendarMonth,
+                                contentDescription = null,
+                                tint = PrimaryTeal,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(5.dp))
                             Text(
                                 text = stringResource(R.string.cf_add_to_calendar),
                                 fontSize = 12.sp,

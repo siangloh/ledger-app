@@ -21,6 +21,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -1583,7 +1584,12 @@ fun UncategorizedInboxBanner(
                         .background(Color(0xFFFBBF24)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "🏷️", fontSize = 16.sp)
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Rounded.LocalOffer,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(17.dp)
+                    )
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
@@ -2090,13 +2096,6 @@ fun QuickCategoryBottomSheet(
     val context = LocalContext.current
     val initialCleanCat = CategoryUiHelper.cleanCategoryName(transaction.category)
     var selectedCat by remember { mutableStateOf(initialCleanCat.ifBlank { "餐饮" }) }
-
-    val emojiMap = mapOf(
-        "餐饮" to "🍔", "交通" to "🚗", "杂货" to "🛒", "账单" to "💡",
-        "购物" to "🛍️", "娱乐" to "🎮", "医疗" to "💊", "转账" to "🔄",
-        "工资" to "💰", "理财" to "📈", "教育" to "📚", "居家" to "🏠",
-        "旅行" to "✈️", "数码" to "📱", "其他" to "🏷️"
-    )
 
     val allCategories = remember(availableCategories, transaction.category) {
         val list = mutableListOf<String>()

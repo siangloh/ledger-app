@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -1967,13 +1968,6 @@ fun QuickCategorizeDialog(
         }
     }
 
-    val emojiMap = mapOf(
-        "餐饮" to "🍔", "交通" to "🚗", "杂货" to "🛒", "账单" to "💡",
-        "购物" to "🛍️", "娱乐" to "🎮", "医疗" to "💊", "居家" to "🏠",
-        "数码" to "📱", "理财" to "📈", "教育" to "📚", "其他" to "🏷️",
-        "工资" to "💰", "奖金" to "🎁", "储蓄" to "🏦"
-    )
-
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
@@ -2952,13 +2946,33 @@ fun BudgetManagementDialog(
 
 @Composable
 private fun MoreSectionHeader(title: String) {
-    Text(
-        text = title,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Bold,
-        color = Slate700,
+    val cleanTitle = title.replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), "")
+    val sectionIcon = when {
+        title.contains("💰") -> androidx.compose.material.icons.Icons.Rounded.AccountBalanceWallet
+        title.contains("🛠") -> androidx.compose.material.icons.Icons.Rounded.Build
+        title.contains("⚙") -> androidx.compose.material.icons.Icons.Rounded.Tune
+        else -> null
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier.padding(horizontal = 2.dp)
-    )
+    ) {
+        if (sectionIcon != null) {
+            Icon(
+                imageVector = sectionIcon,
+                contentDescription = null,
+                tint = PrimaryTeal,
+                modifier = Modifier.size(15.dp)
+            )
+        }
+        Text(
+            text = cleanTitle,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = Slate700
+        )
+    }
 }
 
 @Composable

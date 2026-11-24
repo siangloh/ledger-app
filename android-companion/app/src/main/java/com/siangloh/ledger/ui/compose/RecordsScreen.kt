@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -806,7 +807,20 @@ fun RecordsScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Text(text = "📭", fontSize = 48.sp)
+                    Surface(
+                        shape = CircleShape,
+                        color = Slate100,
+                        modifier = Modifier.size(64.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Rounded.Inbox,
+                                contentDescription = null,
+                                tint = Slate400,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = stringResource(R.string.records_empty_title),
@@ -861,7 +875,12 @@ fun RecordsScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier.weight(1f)
                                         ) {
-                                            Text(text = if (hasFailures) "⚠️" else "💾", fontSize = 18.sp)
+                                            Icon(
+                                                imageVector = if (hasFailures) androidx.compose.material.icons.Icons.Rounded.WarningAmber else androidx.compose.material.icons.Icons.Rounded.CloudUpload,
+                                                contentDescription = null,
+                                                tint = if (hasFailures) Rose600 else Amber700,
+                                                modifier = Modifier.size(20.dp)
+                                            )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Column {
                                                 val anomalyText = stringResource(R.string.records_sync_anomaly_fmt, failedCount, pendingCount)

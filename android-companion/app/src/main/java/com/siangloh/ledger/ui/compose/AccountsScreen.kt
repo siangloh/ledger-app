@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -318,7 +319,20 @@ fun AccountsScreen(onBack: (() -> Unit)? = null) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.padding(32.dp)
                         ) {
-                            Text("🏦", fontSize = 40.sp)
+                            Surface(
+                                shape = CircleShape,
+                                color = Teal50,
+                                modifier = Modifier.size(58.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = androidx.compose.material.icons.Icons.Rounded.AccountBalance,
+                                        contentDescription = null,
+                                        tint = PrimaryTeal,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            }
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(stringResource(R.string.no_accounts_configured), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
                             Spacer(modifier = Modifier.height(4.dp))
@@ -476,13 +490,24 @@ fun AccountCard(
                                     shape = RoundedCornerShape(4.dp),
                                     color = Amber500.copy(alpha = 0.12f)
                                 ) {
-                                    Text(
-                                        text = "⚖️ " + stringResource(R.string.unreconciled_badge, account.unreconciledCount),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Amber700,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = androidx.compose.material.icons.Icons.Rounded.Balance,
+                                            contentDescription = null,
+                                            tint = Amber700,
+                                            modifier = Modifier.size(11.dp)
+                                        )
+                                        Spacer(Modifier.width(3.dp))
+                                        Text(
+                                            text = stringResource(R.string.unreconciled_badge, account.unreconciledCount),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Amber700
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -511,8 +536,15 @@ fun AccountCard(
                         border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.5f)),
                         shape = RoundedCornerShape(8.dp)
                     ) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Rounded.Balance,
+                            contentDescription = null,
+                            tint = PrimaryTeal,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
                         Text(
-                            text = "⚖️ " + stringResource(R.string.reconcile_btn),
+                            text = stringResource(R.string.reconcile_btn),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = PrimaryTeal
