@@ -758,7 +758,7 @@ fun AddTransactionScreen(
                                 ) {
                                     rowCats.forEach { cat ->
                                         val isSelected = draft.selectedCategory == cat.name
-                                        val emoji = CategoryUiHelper.getCategoryEmoji(cat.name, draft.txType)
+                                        val iconSpec = CategoryUiHelper.getCategoryIconSpec(cat.name, draft.txType)
                                         val tintBg = if (isSelected) PrimaryTealSubtle else Slate50
                                         val borderStroke = BorderStroke(
                                             width = if (isSelected) 1.5.dp else 1.dp,
@@ -772,7 +772,7 @@ fun AddTransactionScreen(
                                             shadowElevation = if (isSelected) 1.dp else 0.dp,
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .height(78.dp)
+                                                .height(84.dp)
                                                 .clip(RoundedCornerShape(14.dp))
                                                 .clickable { draft.selectedCategory = cat.name }
                                         ) {
@@ -783,8 +783,21 @@ fun AddTransactionScreen(
                                                     .fillMaxSize()
                                                     .padding(vertical = 6.dp, horizontal = 4.dp)
                                             ) {
-                                                Text(emoji, fontSize = 21.sp)
-                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Surface(
+                                                    shape = CircleShape,
+                                                    color = if (isSelected) PrimaryTeal else iconSpec.bg,
+                                                    modifier = Modifier.size(34.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Icon(
+                                                            imageVector = iconSpec.icon,
+                                                            contentDescription = null,
+                                                            tint = if (isSelected) Color.White else iconSpec.tint,
+                                                            modifier = Modifier.size(19.dp)
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(5.dp))
                                                 Text(
                                                     text = CategoryUiHelper.getLocalizedCategoryName(context, cat.name),
                                                     fontSize = 11.sp,

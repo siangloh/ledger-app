@@ -1,9 +1,18 @@
 package com.siangloh.ledger.ui.compose
 
 import android.content.Context
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.siangloh.ledger.R
 import com.siangloh.ledger.ui.compose.theme.*
+
+data class CategoryIconSpec(
+    val icon: ImageVector,
+    val tint: Color,
+    val bg: Color
+)
 
 object CategoryUiHelper {
     private val REGEX_CATEGORY_JSON = Regex("""['"]?category['"]?\s*:\s*['"]([^'"}]+)['"]""")
@@ -85,6 +94,90 @@ object CategoryUiHelper {
             clean.contains("旅") || clean.contains("酒店") || clean.contains("机票") || clean.contains("travel") || clean.contains("melancong") || clean.contains("cuti") -> "✈️"
             clean.contains("储蓄") || clean.contains("理财") || clean.contains("saving") || clean.contains("simpanan") -> "🏦"
             else -> "🏷️"
+        }
+    }
+
+    fun getCategoryIconSpec(category: String, type: String = "expense"): CategoryIconSpec {
+        val clean = cleanCategoryName(category).trim().lowercase()
+        if (clean.contains("内部") || clean.contains("划转") || clean.contains("自转") || clean.contains("转账") || clean.contains("transfer") || clean.contains("pindahan")) {
+            return CategoryIconSpec(Icons.Rounded.SwapHoriz, Slate700, Slate100)
+        }
+        if (type == "savings") {
+            return when {
+                clean.contains("定期") || clean.contains("存款") || clean.contains("fixed") || clean.contains("deposit") ->
+                    CategoryIconSpec(Icons.Rounded.AccountBalance, PrimaryTeal, Teal50)
+                clean.contains("应急") || clean.contains("备用") || clean.contains("emergency") ->
+                    CategoryIconSpec(Icons.Rounded.Shield, Emerald700, Emerald50)
+                clean.contains("投资") || clean.contains("理财") || clean.contains("基金") || clean.contains("股票") || clean.contains("invest") ->
+                    CategoryIconSpec(Icons.Rounded.ShowChart, Sky600, Sky50)
+                clean.contains("车") || clean.contains("car") ->
+                    CategoryIconSpec(Icons.Rounded.DirectionsCar, Sky600, Sky50)
+                clean.contains("房") || clean.contains("house") || clean.contains("home") ->
+                    CategoryIconSpec(Icons.Rounded.Home, Teal700, Teal50)
+                clean.contains("心愿") || clean.contains("愿望") || clean.contains("wish") || clean.contains("dream") ->
+                    CategoryIconSpec(Icons.Rounded.Star, Amber700, Amber50)
+                clean.contains("教育") || clean.contains("学费") || clean.contains("edu") ->
+                    CategoryIconSpec(Icons.Rounded.School, Sky700, Sky50)
+                clean.contains("退休") || clean.contains("养老") || clean.contains("retire") ->
+                    CategoryIconSpec(Icons.Rounded.BeachAccess, Color(0xFFEA580C), Color(0xFFFFF7ED))
+                clean.contains("黄金") || clean.contains("gold") ->
+                    CategoryIconSpec(Icons.Rounded.MonetizationOn, Amber700, Amber50)
+                else ->
+                    CategoryIconSpec(Icons.Rounded.Savings, PrimaryTeal, Teal50)
+            }
+        }
+        if (type == "income") {
+            return when {
+                clean.contains("工资") || clean.contains("薪水") || clean.contains("salary") || clean.contains("gaji") ->
+                    CategoryIconSpec(Icons.Rounded.AccountBalanceWallet, IncomeGreen, Emerald50)
+                clean.contains("奖金") || clean.contains("分红") || clean.contains("bonus") ->
+                    CategoryIconSpec(Icons.Rounded.CardGiftcard, Amber700, Amber50)
+                clean.contains("投资") || clean.contains("利息") || clean.contains("invest") || clean.contains("pelaburan") ->
+                    CategoryIconSpec(Icons.Rounded.TrendingUp, PrimaryTeal, Teal50)
+                clean.contains("兼职") || clean.contains("副业") || clean.contains("part-time") || clean.contains("sampingan") ->
+                    CategoryIconSpec(Icons.Rounded.Work, Sky600, Sky50)
+                clean.contains("退款") || clean.contains("报销") || clean.contains("返现") || clean.contains("回扣") ||
+                    clean.contains("refund") || clean.contains("rebate") || clean.contains("cashback") || clean.contains("reimburse") ->
+                    CategoryIconSpec(Icons.Rounded.Receipt, PrimaryTeal, Teal50)
+                else ->
+                    CategoryIconSpec(Icons.Rounded.Payments, IncomeGreen, Emerald50)
+            }
+        }
+        return when {
+            clean.contains("餐") || clean.contains("外卖") || clean.contains("美食") || clean.contains("早餐") || clean.contains("午餐") || clean.contains("晚餐") ||
+                clean.contains("food") || clean.contains("makan") || clean.contains("dining") ->
+                CategoryIconSpec(Icons.Rounded.Restaurant, Color(0xFFEA580C), Color(0xFFFFF7ED))
+            clean.contains("交通") || clean.contains("打车") || clean.contains("油费") || clean.contains("停车") || clean.contains("grab") ||
+                clean.contains("transport") || clean.contains("pengangkutan") ->
+                CategoryIconSpec(Icons.Rounded.DirectionsCar, Sky600, Sky50)
+            clean.contains("杂货") || clean.contains("超市") || clean.contains("生活") || clean.contains("grocer") || clean.contains("runcit") ->
+                CategoryIconSpec(Icons.Rounded.ShoppingCart, Emerald700, Emerald50)
+            clean.contains("通讯") || clean.contains("通信") || clean.contains("话费") || clean.contains("网费") || clean.contains("宽带") ||
+                clean.contains("telecom") || clean.contains("phone") || clean.contains("mobile") || clean.contains("internet") || clean.contains("wifi") ->
+                CategoryIconSpec(Icons.Rounded.PhoneIphone, Color(0xFF4F46E5), Color(0xFFEEF2FF))
+            clean.contains("账单") || clean.contains("水费") || clean.contains("电费") ||
+                clean.contains("bill") || clean.contains("bil") || clean.contains("utilit") ->
+                CategoryIconSpec(Icons.Rounded.Bolt, Amber700, Amber50)
+            clean.contains("购") || clean.contains("衣服") || clean.contains("鞋") || clean.contains("shop") || clean.contains("beli") ->
+                CategoryIconSpec(Icons.Rounded.ShoppingBag, Rose600, Rose50)
+            clean.contains("娱乐") || clean.contains("电影") || clean.contains("游戏") || clean.contains("聚会") ||
+                clean.contains("game") || clean.contains("entertain") || clean.contains("hiburan") ->
+                CategoryIconSpec(Icons.Rounded.SportsEsports, Color(0xFF7C3AED), Color(0xFFF5F3FF))
+            clean.contains("医疗") || clean.contains("看病") || clean.contains("药") || clean.contains("保健") ||
+                clean.contains("health") || clean.contains("medic") || clean.contains("perubatan") ->
+                CategoryIconSpec(Icons.Rounded.MedicalServices, ExpenseRed, Rose50)
+            clean.contains("住") || clean.contains("房租") || clean.contains("物业") || clean.contains("rent") || clean.contains("sewa") || clean.contains("housing") ->
+                CategoryIconSpec(Icons.Rounded.Home, Teal700, Teal50)
+            clean.contains("教") || clean.contains("学") || clean.contains("书") || clean.contains("edu") || clean.contains("pendidikan") ->
+                CategoryIconSpec(Icons.Rounded.School, Sky700, Sky50)
+            clean.contains("宠") || clean.contains("pet") ->
+                CategoryIconSpec(Icons.Rounded.Pets, Amber700, Amber50)
+            clean.contains("旅") || clean.contains("酒店") || clean.contains("机票") || clean.contains("travel") || clean.contains("melancong") || clean.contains("cuti") ->
+                CategoryIconSpec(Icons.Rounded.Flight, Sky600, Sky50)
+            clean.contains("储蓄") || clean.contains("理财") || clean.contains("saving") || clean.contains("simpanan") ->
+                CategoryIconSpec(Icons.Rounded.Savings, PrimaryTeal, Teal50)
+            else ->
+                CategoryIconSpec(Icons.Rounded.Category, Slate600, Slate100)
         }
     }
 
