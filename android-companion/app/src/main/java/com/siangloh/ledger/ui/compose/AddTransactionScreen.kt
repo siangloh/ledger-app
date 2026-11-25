@@ -4,7 +4,6 @@ import android.app.DatePickerDialog
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -198,11 +197,7 @@ fun AddTransactionScreen(
                             color = Slate900,
                             letterSpacing = (-0.3).sp
                         )
-                        AnimatedVisibility(
-                            visible = addMode == 0 && (draft.amountText.isNotBlank() || draft.note.isNotBlank() || draft.tags.isNotBlank()),
-                            enter = fadeIn(tween(180)) + scaleIn(initialScale = 0.9f, animationSpec = tween(180)),
-                            exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.9f, animationSpec = tween(150))
-                        ) {
+                        if (addMode == 0 && (draft.amountText.isNotBlank() || draft.note.isNotBlank() || draft.tags.isNotBlank())) {
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
                                 color = Slate100,
@@ -313,79 +308,73 @@ fun AddTransactionScreen(
                         }
                     }
 
-                    // 四向语义分段器 (支出 / 收入 / 储蓄 / 内部划转) —— 随页签平滑展开收起 + 彩色滑动胶囊
-                    AnimatedVisibility(
-                        visible = addMode == 0,
-                        enter = expandVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeIn(tween(180)),
-                        exit = shrinkVertically(animationSpec = tween(180, easing = FastOutSlowInEasing)) + fadeOut(tween(140))
-                    ) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            val types = listOf(
-                                Triple("expense", stringResource(R.string.add_expense), ExpenseRed),
-                                Triple("income", stringResource(R.string.add_income), IncomeGreen),
-                                Triple("savings", stringResource(R.string.add_savings), PrimaryTeal),
-                                Triple("transfer", stringResource(R.string.add_transfer), Slate700)
+                    // 四向语义分段器 (支出 / 收入 / 储蓄 / 内部划转) —— 仅保留胶囊滑块动画，不触发布局高度伸缩重排
+                    if (addMode == 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val types = listOf(
+                            Triple("expense", stringResource(R.string.add_expense), ExpenseRed),
+                            Triple("income", stringResource(R.string.add_income), IncomeGreen),
+                            Triple("savings", stringResource(R.string.add_savings), PrimaryTeal),
+                            Triple("transfer", stringResource(R.string.add_transfer), Slate700)
+                        )
+                        val selectedTypeIdx = types.indexOfFirst { it.first == draft.txType }.coerceAtLeast(0)
+                        BoxWithConstraints(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(36.dp)
+                                .background(Slate100, RoundedCornerShape(12.dp))
+                                .padding(3.dp)
+                        ) {
+                            val typeTabWidth = maxWidth / types.size
+                            val typeIndicatorOffset by animateDpAsState(
+                                targetValue = typeTabWidth * selectedTypeIdx,
+                                animationSpec = spring(
+                                    dampingRatio = 0.82f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                ),
+                                label = "txTypeIndicatorOffset"
                             )
-                            val selectedTypeIdx = types.indexOfFirst { it.first == draft.txType }.coerceAtLeast(0)
-                            BoxWithConstraints(
+                            val typePillColor by animateColorAsState(
+                                targetValue = types[selectedTypeIdx].third,
+                                animationSpec = tween(220),
+                                label = "txTypePillColor"
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(9.dp),
+                                color = typePillColor,
+                                shadowElevation = 1.dp,
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(36.dp)
-                                    .background(Slate100, RoundedCornerShape(12.dp))
-                                    .padding(3.dp)
-                            ) {
-                                val typeTabWidth = maxWidth / types.size
-                                val typeIndicatorOffset by animateDpAsState(
-                                    targetValue = typeTabWidth * selectedTypeIdx,
-                                    animationSpec = spring(
-                                        dampingRatio = 0.82f,
-                                        stiffness = Spring.StiffnessMediumLow
-                                    ),
-                                    label = "txTypeIndicatorOffset"
-                                )
-                                val typePillColor by animateColorAsState(
-                                    targetValue = types[selectedTypeIdx].third,
-                                    animationSpec = tween(220),
-                                    label = "txTypePillColor"
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(9.dp),
-                                    color = typePillColor,
-                                    shadowElevation = 1.dp,
-                                    modifier = Modifier
-                                        .width(typeTabWidth)
-                                        .fillMaxHeight()
-                                        .offset(x = typeIndicatorOffset)
-                                ) {}
+                                    .width(typeTabWidth)
+                                    .fillMaxHeight()
+                                    .offset(x = typeIndicatorOffset)
+                            ) {}
 
-                                Row(modifier = Modifier.fillMaxSize()) {
-                                    types.forEach { (typeKey, label, _) ->
-                                        val isSelected = draft.txType == typeKey
-                                        val labelColor by animateColorAsState(
-                                            targetValue = if (isSelected) Color.White else Slate600,
-                                            animationSpec = tween(180),
-                                            label = "txTypeTextColor"
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                types.forEach { (typeKey, label, _) ->
+                                    val isSelected = draft.txType == typeKey
+                                    val labelColor by animateColorAsState(
+                                        targetValue = if (isSelected) Color.White else Slate600,
+                                        animationSpec = tween(180),
+                                        label = "txTypeTextColor"
+                                    )
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .clip(RoundedCornerShape(9.dp))
+                                            .clickable { draft.txType = typeKey }
+                                            .padding(horizontal = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 12.5.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = labelColor,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .fillMaxHeight()
-                                                .clip(RoundedCornerShape(9.dp))
-                                                .clickable { draft.txType = typeKey }
-                                                .padding(horizontal = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = label,
-                                                fontSize = 12.5.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = labelColor,
-                                                textAlign = TextAlign.Center,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
                                     }
                                 }
                             }
@@ -396,17 +385,7 @@ fun AddTransactionScreen(
             }
         },
         bottomBar = {
-            AnimatedVisibility(
-                visible = addMode == 0,
-                enter = slideInVertically(
-                    animationSpec = tween(220, easing = FastOutSlowInEasing),
-                    initialOffsetY = { it }
-                ) + fadeIn(tween(180)),
-                exit = slideOutVertically(
-                    animationSpec = tween(180, easing = FastOutSlowInEasing),
-                    targetOffsetY = { it }
-                ) + fadeOut(tween(140))
-            ) {
+            if (addMode == 0) {
             val saveBtnColor by animateColorAsState(
                 targetValue = when (draft.txType) {
                     "income" -> IncomeGreen
@@ -585,30 +564,12 @@ fun AddTransactionScreen(
             }
         }
     ) { paddingVals ->
-        AnimatedContent(
-            targetState = addMode,
-            transitionSpec = {
-                val forward = targetState > initialState
-                val dir = if (forward) 1 else -1
-                (slideInHorizontally(
-                    animationSpec = tween(250, easing = FastOutSlowInEasing),
-                    initialOffsetX = { fullWidth -> dir * (fullWidth / 4) }
-                ) + fadeIn(animationSpec = tween(200))) togetherWith
-                (slideOutHorizontally(
-                    animationSpec = tween(200, easing = FastOutSlowInEasing),
-                    targetOffsetX = { fullWidth -> -dir * (fullWidth / 4) }
-                ) + fadeOut(animationSpec = tween(150))) using SizeTransform(clip = true)
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingVals)
-                .background(Slate50),
-            label = "addModeContentTransition"
-        ) { targetMode ->
-        if (targetMode == 1) {
+        if (addMode == 1) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(paddingVals)
+                    .background(Slate50)
                     .padding(16.dp)
             ) {
                 SplitBillTabContent(
@@ -624,6 +585,8 @@ fun AddTransactionScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(paddingVals)
+                .background(Slate50)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -1215,7 +1178,6 @@ fun AddTransactionScreen(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-        }
         }
         }
     }
