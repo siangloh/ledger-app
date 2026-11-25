@@ -1596,7 +1596,7 @@ fun CashflowAnalysisScreen(
             CashflowDashboardTab.BILLS
         )
     }
-    val pagerState = rememberPagerState(initialPage = 0) { detailPages.size }
+    var activeDetailTab by rememberSaveable { mutableStateOf(CashflowDashboardTab.EXPENSE) }
     var selectedDay by rememberSaveable { mutableStateOf<Int?>(null) }
     var includeTransfer by rememberSaveable { mutableStateOf(false) }
     var showCharts by rememberSaveable { mutableStateOf(false) }
@@ -1796,137 +1796,26 @@ fun CashflowAnalysisScreen(
                     }
                 }
 
-                val expenseListState = rememberLazyListState()
-                val calendarListState = rememberLazyListState()
-                val incomeListState = rememberLazyListState()
-                val savingsListState = rememberLazyListState()
-                val billsListState = rememberLazyListState()
-                val pageListStates = remember(
-                    expenseListState,
-                    calendarListState,
-                    incomeListState,
-                    savingsListState,
-                    billsListState
-                ) {
-                    listOf(
-                        expenseListState,
-                        calendarListState,
-                        incomeListState,
-                        savingsListState,
-                        billsListState
-                    )
-                }
-
-                var headerHeightPx by remember { mutableFloatStateOf(0f) }
-                var headerOffsetPx by rememberSaveable { mutableFloatStateOf(0f) }
-
-                val nestedScrollConnection = remember {
-                    object : NestedScrollConnection {
-                        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                            val delta = available.y
-                            if (delta < 0f && headerHeightPx > 0f) {
-                                val oldOffset = headerOffsetPx
-                                val newOffset = (oldOffset + delta).coerceIn(-headerHeightPx, 0f)
-                                val consumed = newOffset - oldOffset
-                                if (consumed != 0f) {
-                                    headerOffsetPx = newOffset
-                                    return Offset(0f, consumed)
-                                }
-                            }
-                            return Offset.Zero
-                        }
-
-                        override fun onPostScroll(
-                            consumed: Offset,
-                            available: Offset,
-                            source: NestedScrollSource
-                        ): Offset {
-                            val delta = available.y
-                            if (delta > 0f && headerHeightPx > 0f) {
-                                val oldOffset = headerOffsetPx
-                                val newOffset = (oldOffset + delta).coerceIn(-headerHeightPx, 0f)
-                                val consumedByHeader = newOffset - oldOffset
-                                if (consumedByHeader != 0f) {
-                                    headerOffsetPx = newOffset
-                                    return Offset(0f, consumedByHeader)
-                                }
-                            }
-                            return Offset.Zero
-                        }
-
-                        override suspend fun onPostFling(
-                            consumed: Velocity,
-                            available: Velocity
-                        ): Velocity {
-                            if (available.y > 0f && headerHeightPx > 0f && headerOffsetPx < 0f) {
-                                val start = headerOffsetPx
-                                Animatable(start).animateTo(
-                                    0f,
-                                    animationSpec = tween(250, easing = FastOutSlowInEasing)
-                                ) {
-                                    headerOffsetPx = value
-                                }
-                                return Velocity(0f, available.y)
-                            }
-                            return Velocity.Zero
-                        }
-                    }
-                }
-
-                val headerScrollState = rememberScrollableState { delta ->
-                    val hHeight = headerHeightPx
-                    if (delta < 0f && hHeight > 0f) {
-                        val oldOffset = headerOffsetPx
-                        val newOffset = (oldOffset + delta).coerceIn(-hHeight, 0f)
-                        val consumedByHeader = newOffset - oldOffset
-                        headerOffsetPx = newOffset
-                        val remaining = delta - consumedByHeader
-                        if (remaining < 0f && result != null) {
-                            val activeList = pageListStates[pagerState.currentPage]
-                            val consumedByList = -activeList.dispatchRawDelta(-remaining)
-                            consumedByHeader + consumedByList
-                        } else {
-                            consumedByHeader
-                        }
-                    } else if (delta > 0f && hHeight > 0f) {
-                        val oldOffset = headerOffsetPx
-                        val newOffset = (oldOffset + delta).coerceIn(-hHeight, 0f)
-                        val consumedByHeader = newOffset - oldOffset
-                        headerOffsetPx = newOffset
-                        val remaining = delta - consumedByHeader
-                        if (remaining > 0f && result != null) {
-                            val activeList = pageListStates[pagerState.currentPage]
-                            val consumedByList = -activeList.dispatchRawDelta(-remaining)
-                            consumedByHeader + consumedByList
-                        } else {
-                            consumedByHeader
-                        }
-                    } else {
-                        0f
-                    }
-                }
+                val mainListState = rememberLazyListState()
 
                 fun switchToTab(tab: CashflowDashboardTab) {
-                    val idx = detailPages.indexOf(tab)
-                    if (idx >= 0 && idx != pagerState.currentPage) {
-                        scope.launch {
-                            pagerState.animateScrollToPage(idx, animationSpec = tween(300, easing = FastOutSlowInEasing))
-                        }
-                    }
+                    activeDetailTab = tab
                 }
 
                 if (analyticsMode == 0) {
-                Layout(
-                    content = {
-                        // Child 0: 可随整页上下滑动折叠的顶部区域（模式切换、日期选择、总览卡片）
+                LazyColumn(
+                    state = mainListState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(top = 4.dp, bottom = 28.dp)
+                ) {
+                    // 顶部总览与日期切换（作为统一列表的首项，自然跟随手指 120fps 惯性滑动，绝不卡顿）
+                    item(key = "cashflow_header_controls") {
                         Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
-                                .scrollable(
-                                    state = headerScrollState,
-                                    orientation = Orientation.Vertical
-                                ),
+                            modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             // 模式切换（按月查看 / 自定义区间）
@@ -2268,110 +2157,73 @@ fun CashflowAnalysisScreen(
                                 }
                             }
                         }
+                    }
 
-                        // Child 1: 吸顶的 Tab 切换条
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Slate50)
-                                .padding(horizontal = 16.dp)
-                                .scrollable(
-                                    state = headerScrollState,
-                                    orientation = Orientation.Vertical
-                                )
-                        ) {
-                            if (result != null) {
-                                Box(
-                                    Modifier
+                    // 吸顶的 Tab 切换条（平滑吸顶，点击即切，绝不与纵向滑动打架）
+                    if (result != null) {
+                        stickyHeader(key = "cashflow_sticky_tabs") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Slate50)
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Slate100)
+                                        .padding(3.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    BoxWithConstraints(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .heightIn(min = 46.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(Slate100)
-                                    ) {
-                                        val width = maxWidth / detailPages.size
-                                        val pageOffset = (pagerState.currentPage + pagerState.currentPageOffsetFraction)
-                                            .let { if (it.isNaN()) 0f else it }
-                                            .coerceIn(0f, (detailPages.size - 1).toFloat())
-                                        Box(Modifier.matchParentSize()) {
-                                            Box(
-                                                Modifier
-                                                    .width(width)
-                                                    .fillMaxHeight()
-                                                    .offset {
-                                                        IntOffset((width.toPx() * pageOffset).roundToInt(), 0)
-                                                    }
-                                                    .padding(3.dp)
-                                                    .background(Color.White, RoundedCornerShape(9.dp))
+                                    val labels = listOf(
+                                        R.string.cf_tab_expense,
+                                        R.string.cf_tab_calendar,
+                                        R.string.cf_tab_income,
+                                        R.string.cf_tab_savings,
+                                        R.string.cf_tab_bills
+                                    )
+                                    detailPages.forEachIndexed { index, tab ->
+                                        val selected = activeDetailTab == tab
+                                        Surface(
+                                            shape = RoundedCornerShape(9.dp),
+                                            color = if (selected) Color.White else Color.Transparent,
+                                            shadowElevation = if (selected) 1.dp else 0.dp,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(9.dp))
+                                                .selectable(
+                                                    selected = selected,
+                                                    role = androidx.compose.ui.semantics.Role.Tab,
+                                                    onClick = { switchToTab(tab) }
+                                                )
+                                        ) {
+                                            Text(
+                                                text = stringResource(labels.getOrElse(index) { R.string.cf_tab_expense }),
+                                                fontSize = 12.sp,
+                                                color = if (selected) PrimaryTeal else Slate600,
+                                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                                textAlign = TextAlign.Center,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.padding(horizontal = 2.dp, vertical = 9.dp)
                                             )
-                                        }
-                                        Row(Modifier.fillMaxWidth()) {
-                                            val labels = listOf(
-                                                R.string.cf_tab_expense,
-                                                R.string.cf_tab_calendar,
-                                                R.string.cf_tab_income,
-                                                R.string.cf_tab_savings,
-                                                R.string.cf_tab_bills
-                                            )
-                                            detailPages.forEachIndexed { index, tab ->
-                                                val selected = pagerState.currentPage == index
-                                                val emphasis = (1f - kotlin.math.abs(pageOffset - index)).coerceIn(0f, 1f)
-                                                Box(
-                                                    Modifier
-                                                        .weight(1f)
-                                                        .selectable(
-                                                            selected = selected,
-                                                            role = androidx.compose.ui.semantics.Role.Tab,
-                                                            onClick = { switchToTab(tab) }
-                                                        )
-                                                        .padding(horizontal = 2.dp, vertical = 12.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        stringResource(labels.getOrElse(index) { R.string.cf_tab_expense }),
-                                                        fontSize = 12.sp,
-                                                        color = androidx.compose.ui.graphics.lerp(Slate600, PrimaryTeal, emphasis),
-                                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                                        textAlign = TextAlign.Center
-                                                    )
-                                                }
-                                            }
                                         }
                                     }
                                 }
                             }
                         }
+                    }
 
-                        // Child 2: 整体横向滑动的 HorizontalPager
-                        Box(Modifier.fillMaxSize()) {
-                            result?.let { report ->
-                                val data = report.data
-                                val cur = data.optString("currency")
-                                val isOnline = !report.cached
-                                val prev = prevData?.takeIf { it.optString("currency") == cur && it.optString("month") == shiftMonth(month, -1) }
-                                val daily = dailyExpense(data, month)
-                                val todayDay = todayDayIfCurrent(month)
+                    result?.let { report ->
+                        val data = report.data
+                        val cur = data.optString("currency")
+                        val isOnline = !report.cached
+                        val prev = prevData?.takeIf { it.optString("currency") == cur && it.optString("month") == shiftMonth(month, -1) }
+                        val daily = dailyExpense(data, month)
+                        val todayDay = todayDayIfCurrent(month)
 
-                                HorizontalPager(
-                                    state = pagerState,
-                                    modifier = Modifier.fillMaxSize(),
-                                    key = { detailPages[it].name },
-                                    beyondBoundsPageCount = 1
-                                ) { page ->
-                                    val listState = pageListStates[page]
-                                    LazyColumn(
-                                        state = listState,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(horizontal = 16.dp),
-                                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                                        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
-                                    ) {
-                                        when (detailPages[page]) {
+                        when (activeDetailTab) {
                             // ================= 支出 =================
                             CashflowDashboardTab.EXPENSE -> {
                                 item {
@@ -2873,45 +2725,6 @@ fun CashflowAnalysisScreen(
                             }
                         }
                         item { Spacer(Modifier.height(18.dp)) }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .clipToBounds()
-                        .nestedScroll(nestedScrollConnection)
-                ) { measurables, constraints ->
-                    val maxWidth = constraints.maxWidth
-                    val maxHeight = constraints.maxHeight
-
-                    val headerPlaceable = measurables[0].measure(
-                        constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
-                    )
-                    val tabsPlaceable = measurables[1].measure(
-                        constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
-                    )
-
-                    val hHeight = headerPlaceable.height.toFloat()
-                    val tHeight = tabsPlaceable.height
-                    headerHeightPx = hHeight
-
-                    val currentOffset = headerOffsetPx.coerceIn(-hHeight, 0f)
-                    val headerY = currentOffset.roundToInt()
-                    val tabsY = (hHeight + currentOffset).roundToInt()
-                    val pagerY = tabsY + tHeight
-                    val pagerHeight = (maxHeight - pagerY).coerceAtLeast(0)
-
-                    val pagerPlaceable = measurables[2].measure(
-                        Constraints.fixed(maxWidth, pagerHeight)
-                    )
-
-                    layout(maxWidth, maxHeight) {
-                        headerPlaceable.placeRelative(0, headerY)
-                        tabsPlaceable.placeRelative(0, tabsY)
-                        pagerPlaceable.placeRelative(0, pagerY)
                     }
                 }
                 } else {
