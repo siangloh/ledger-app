@@ -2,8 +2,11 @@ package com.siangloh.ledger.ui.compose
 
 import android.app.DatePickerDialog
 import android.content.Context
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -76,6 +79,12 @@ fun RecordsScreen(
             } ?: emptyList()
         )
     }
+    var hasLoadedOnce by remember {
+        mutableStateOf(
+            LocalDataStore.getRecords(context, selectedMonth, selectedType, searchQuery, 1) != null
+        )
+    }
+    var monthSlideDir by remember { mutableIntStateOf(1) }
     var pendingTransactions by remember { mutableStateOf<List<PendingTransaction>>(emptyList()) }
     var isSyncingPending by remember { mutableStateOf(false) }
     var totalCount by remember { mutableStateOf(0) }
@@ -174,6 +183,7 @@ fun RecordsScreen(
             transactions = emptyList()
             totalCount = 0
             hasMore = false
+            hasLoadedOnce = true
             isLoading = false
             loadPending()
             if (!forceRefresh) return
@@ -191,17 +201,21 @@ fun RecordsScreen(
                     transactions = pageObj.items
                     totalCount = pageObj.totalCount
                     hasMore = pageObj.hasMore
+                    hasLoadedOnce = true
                     isLoading = false
                     loadPending()
                     // 核心：若非强制刷新，只要本地有快照（或在 5 分钟新鲜期内），直接消费本地存储，严禁发起网络请求！
                     if (!forceRefresh) {
                         return
                     }
-                } catch (_: Exception) {
-                    transactions = emptyList()
-                    isLoading = true
+                } catch (e: Exception) {
+                    Log.w("RecordsScreen", "Failed to parse cached records snapshot", e)
+                    if (!hasLoadedOnce) {
+                        transactions = emptyList()
+                        isLoading = true
+                    }
                 }
-            } else {
+            } else if (!hasLoadedOnce) {
                 transactions = emptyList()
                 isLoading = true
             }
@@ -228,6 +242,7 @@ fun RecordsScreen(
                 limit = 50,
                 forceRefresh = forceRefresh
             )
+            hasLoadedOnce = true
             isLoading = false
             isLoadingMore = false
             res.onSuccess { page ->
@@ -403,6 +418,7 @@ fun RecordsScreen(
                 ) {
                     IconButton(
                         onClick = {
+                            monthSlideDir = -1
                             selectedMonth = shiftMonthString(selectedMonth, -1)
                         },
                         modifier = Modifier.size(44.dp)
@@ -418,16 +434,33 @@ fun RecordsScreen(
                         color = Slate100,
                         modifier = Modifier.padding(horizontal = 4.dp)
                     ) {
-                        Text(
-                            text = formatDisplayMonth(selectedMonth, context),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Slate800,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                        )
+                        AnimatedContent(
+                            targetState = selectedMonth,
+                            transitionSpec = {
+                                val dir = monthSlideDir
+                                (slideInHorizontally(
+                                    animationSpec = tween(220, easing = FastOutSlowInEasing),
+                                    initialOffsetX = { fullWidth -> dir * (fullWidth / 3) }
+                                ) + fadeIn(animationSpec = tween(180))) togetherWith
+                                (slideOutHorizontally(
+                                    animationSpec = tween(180, easing = FastOutSlowInEasing),
+                                    targetOffsetX = { fullWidth -> -dir * (fullWidth / 3) }
+                                ) + fadeOut(animationSpec = tween(140)))
+                            },
+                            label = "recordsMonthSlide"
+                        ) { targetMonth ->
+                            Text(
+                                text = formatDisplayMonth(targetMonth, context),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Slate800,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                            )
+                        }
                     }
                     IconButton(
                         onClick = {
+                            monthSlideDir = 1
                             selectedMonth = shiftMonthString(selectedMonth, 1)
                         },
                         modifier = Modifier.size(44.dp)
@@ -797,7 +830,7 @@ fun RecordsScreen(
                 .padding(paddingVals)
                 .background(Slate50)
         ) {
-            if (isLoading && transactions.isEmpty() && pendingTransactions.isEmpty()) {
+            if (!hasLoadedOnce && isLoading && transactions.isEmpty() && pendingTransactions.isEmpty()) {
                 RecordsSkeletonList()
             } else if (transactions.isEmpty() && pendingTransactions.isEmpty()) {
                 Column(

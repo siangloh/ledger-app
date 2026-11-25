@@ -39,9 +39,9 @@ fun Modifier.shimmerEffect(): Modifier = composed {
     )
 
     val shimmerColors = listOf(
-        Color(0xFFE2E8F0), // Slate 200
-        Color(0xFFF8FAFC), // Slate 50 (动态高光扫光)
-        Color(0xFFE2E8F0)  // Slate 200
+        Color(0xFFF1F5F9), // Slate 100
+        Color(0xFFF8FAFC), // Slate 50 (柔和微光扫光)
+        Color(0xFFF1F5F9)  // Slate 100
     )
 
     val brush = Brush.linearGradient(
@@ -86,7 +86,8 @@ fun SpendingHeroCardSkeleton(
 ) {
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF0F172A),
+        color = Color.White,
+        border = BorderStroke(1.dp, Slate200),
         modifier = modifier.fillMaxWidth()
     ) {
         Column(

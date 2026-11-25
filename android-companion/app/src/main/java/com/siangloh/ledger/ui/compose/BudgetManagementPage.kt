@@ -55,7 +55,7 @@ fun BudgetManagementPage(
     BackHandler { onBack() }
 
     fun loadBudget() {
-        isLoading = true
+        if (overview == null) isLoading = true
         errorMessage = null
         scope.launch {
             val res = NativeLedgerApi.getBudgetOverview(context)

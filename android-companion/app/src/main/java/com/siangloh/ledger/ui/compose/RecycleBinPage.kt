@@ -47,15 +47,18 @@ fun RecycleBinPage(
     var showEmptyConfirm by remember { mutableStateOf(false) }
     var isOperating by remember { mutableStateOf(false) }
 
+    var hasLoadedOnce by remember { mutableStateOf(false) }
+
     BackHandler { onBack() }
 
     fun loadItems() {
-        isLoading = true
+        if (!hasLoadedOnce) isLoading = true
         errorMessage = null
         scope.launch {
             val localItems = LocalLedgerRepository.getRecycleBinItems(context)
             items = localItems
             totalCount = localItems.size
+            hasLoadedOnce = true
             isLoading = false
         }
     }

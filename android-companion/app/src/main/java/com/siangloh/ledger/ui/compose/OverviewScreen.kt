@@ -382,7 +382,9 @@ fun OverviewScreen(
         } else null
     }
     var overviewData by remember { mutableStateOf(initialCache ?: OverviewData()) }
+    var hasLoadedOnce by remember { mutableStateOf(initialCache != null) }
     var isLoading by remember { mutableStateOf(initialCache == null) }
+    var monthSlideDir by remember { mutableIntStateOf(1) }
     var hasNetworkError by remember { mutableStateOf(false) }
     var networkErrorMessage by remember { mutableStateOf("") }
 
@@ -484,6 +486,7 @@ fun OverviewScreen(
 
         if (isFutureMonth) {
             overviewData = OverviewData(lastActiveTime = "刚刚", isListening = isListeningActual)
+            hasLoadedOnce = true
             isLoading = false
             hasNetworkError = false
             networkErrorMessage = ""
@@ -493,21 +496,22 @@ fun OverviewScreen(
         val cachedJson = com.siangloh.ledger.data.LocalDataStore.getOverview(context, username, period, currentMonthStr)
         val isFresh = com.siangloh.ledger.data.LocalDataStore.isOverviewFresh(context, username, period, currentMonthStr)
 
-        if (!cachedJson.isNullOrBlank() && !forceRefresh) {
+        if (!cachedJson.isNullOrBlank()) {
             try {
                 val jObj = JSONObject(cachedJson)
                 val cachedPeriod = jObj.optString("period", "month")
                 if (cachedPeriod == period) {
                     overviewData = parseOverviewJson(cachedJson, isListeningActual, isOfflineCache = !isFresh)
+                    hasLoadedOnce = true
                     isLoading = false
                     hasNetworkError = false
                     networkErrorMessage = ""
-                    if (isFresh) return
+                    if (!forceRefresh && isFresh) return
                 }
             } catch (_: Exception) {
-                isLoading = true
+                if (!hasLoadedOnce) isLoading = true
             }
-        } else {
+        } else if (!hasLoadedOnce) {
             isLoading = true
         }
 
@@ -604,6 +608,7 @@ fun OverviewScreen(
                     }
                 }
             } finally {
+                hasLoadedOnce = true
                 isLoading = false
             }
         }
@@ -734,14 +739,17 @@ fun OverviewScreen(
                 PeriodSelector(
                     period = period,
                     rangeLabel = displayRangeLabel,
+                    slideDirection = monthSlideDir,
                     onPeriodChanged = { newPeriod ->
                         if (period != newPeriod) {
+                            monthSlideDir = 1
                             period = newPeriod
                             selectedSparklineDate = null
                             refreshData(forceRefresh = true)
                         }
                     },
                     onPrevMonth = {
+                        monthSlideDir = -1
                         userSelectedMonthManually = true
                         when (period) {
                             "month" -> calendar.add(Calendar.MONTH, -1)
@@ -753,6 +761,7 @@ fun OverviewScreen(
                         refreshData(forceRefresh = true)
                     },
                     onNextMonth = {
+                        monthSlideDir = 1
                         userSelectedMonthManually = true
                         when (period) {
                             "month" -> calendar.add(Calendar.MONTH, 1)
@@ -766,9 +775,8 @@ fun OverviewScreen(
                 )
             }
 
-            // 3. 内容区局部动态数据：仅在数据为空且加载中时，对特定组件展示骨架屏！
-            // 顶栏状态与周期切换 Tab 始终保持可见可交互，杜绝整屏骨架白闪！
-            if (isLoading && overviewData.recentTransactions.isEmpty() && overviewData.totalSpending == 0.0 && overviewData.incomeAmount == 0.0) {
+            // 3. 内容区局部动态数据：仅在首次冷启动尚未加载过任何数据时展示浅色骨架屏，切月/切Tab绝不闪骨架！
+            if (!hasLoadedOnce && isLoading) {
                 item {
                     SpendingHeroCardSkeleton()
                 }
@@ -1064,6 +1072,7 @@ fun OverviewScreen(
 fun PeriodSelector(
     period: String,
     rangeLabel: String,
+    slideDirection: Int = 1,
     onPeriodChanged: (String) -> Unit,
     onPrevMonth: () -> Unit,
     onNextMonth: () -> Unit
@@ -1163,13 +1172,25 @@ fun PeriodSelector(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                     }
-                    Text(
-                        text = rangeLabel,
-                        color = Slate900,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
+                    AnimatedContent(
+                        targetState = rangeLabel,
+                        transitionSpec = {
+                            val dir = slideDirection
+                            (slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { w -> if (dir >= 0) w / 3 else -w / 3 } +
+                                fadeIn(tween(200))) togetherWith
+                                (slideOutHorizontally(tween(180, easing = FastOutSlowInEasing)) { w -> if (dir >= 0) -w / 3 else w / 3 } +
+                                    fadeOut(tween(160)))
+                        },
+                        label = "overviewRangeSlide"
+                    ) { targetLabel ->
+                        Text(
+                            text = targetLabel,
+                            color = Slate900,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
                 IconButton(
                     onClick = onNextMonth,
@@ -1471,18 +1492,14 @@ fun SpendingHeroCard(
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Slate900),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color(0xFF0F172A), Color(0xFF1E293B))
-                    )
-                )
                 .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
             Row(
