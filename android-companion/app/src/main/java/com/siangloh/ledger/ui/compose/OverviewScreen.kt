@@ -1082,6 +1082,12 @@ fun PeriodSelector(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Row 1: 3 equal-width Segmented Tabs [ 月度 / Monthly / Bulanan ] [ 近3个月 / Last 3 months / 3 bulan terkini ] [ 年度 / Yearly / Tahunan ]
+        val tabs = listOf(
+            "month" to stringResource(R.string.period_monthly),
+            "3m" to stringResource(R.string.period_3m),
+            "year" to stringResource(R.string.period_yearly)
+        )
+        val selectedPeriodIdx = tabs.indexOfFirst { it.first == period }.coerceAtLeast(0)
         Surface(
             shape = RoundedCornerShape(12.dp),
             color = Slate100,
@@ -1089,37 +1095,53 @@ fun PeriodSelector(
                 .fillMaxWidth()
                 .height(48.dp)
         ) {
-            Row(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(3.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(3.dp)
             ) {
-                val tabs = listOf(
-                    "month" to stringResource(R.string.period_monthly),
-                    "3m" to stringResource(R.string.period_3m),
-                    "year" to stringResource(R.string.period_yearly)
+                val tabWidth = maxWidth / tabs.size
+                val indicatorOffset by animateDpAsState(
+                    targetValue = tabWidth * selectedPeriodIdx,
+                    animationSpec = spring(
+                        dampingRatio = 0.82f,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    label = "periodTabIndicatorOffset"
                 )
-                tabs.forEach { (key, label) ->
-                    val isSelected = period == key
-                    Surface(
-                        shape = RoundedCornerShape(9.dp),
-                        color = if (isSelected) Color.White else Color.Transparent,
-                        shadowElevation = if (isSelected) 1.5.dp else 0.dp,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clickable { onPeriodChanged(key) }
-                    ) {
+                Surface(
+                    shape = RoundedCornerShape(9.dp),
+                    color = Color.White,
+                    shadowElevation = 1.5.dp,
+                    modifier = Modifier
+                        .width(tabWidth)
+                        .fillMaxHeight()
+                        .offset(x = indicatorOffset)
+                ) {}
+
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    tabs.forEach { (key, label) ->
+                        val isSelected = period == key
+                        val labelColor by animateColorAsState(
+                            targetValue = if (isSelected) PrimaryTeal else Slate600,
+                            animationSpec = tween(200),
+                            label = "periodTabLabelColor"
+                        )
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
-                                .fillMaxSize()
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(9.dp))
+                                .clickable { onPeriodChanged(key) }
                                 .padding(horizontal = 4.dp)
                         ) {
                             Text(
                                 text = label,
-                                color = if (isSelected) PrimaryTeal else Slate600,
+                                color = labelColor,
                                 fontSize = 13.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 textAlign = TextAlign.Center,

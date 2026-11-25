@@ -6,6 +6,9 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -663,34 +666,66 @@ fun RecordsScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // 类型切换 Chip 栏
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // 类型切换分段胶囊栏（带弹性滑动指示器动画）
+                val types = listOf(
+                    "all" to stringResource(R.string.type_all),
+                    "expense" to stringResource(R.string.type_expense),
+                    "income" to stringResource(R.string.type_income),
+                    "transfer" to stringResource(R.string.type_transfer)
+                )
+                val selectedTypeIdx = types.indexOfFirst { it.first == selectedType }.coerceAtLeast(0)
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(38.dp)
+                        .background(Slate100, RoundedCornerShape(14.dp))
+                        .padding(3.dp)
                 ) {
-                    val types = listOf(
-                        "all" to stringResource(R.string.type_all),
-                        "expense" to stringResource(R.string.type_expense),
-                        "income" to stringResource(R.string.type_income),
-                        "transfer" to stringResource(R.string.type_transfer)
+                    val tabWidth = maxWidth / types.size
+                    val indicatorOffset by animateDpAsState(
+                        targetValue = tabWidth * selectedTypeIdx,
+                        animationSpec = spring(
+                            dampingRatio = 0.82f,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        label = "recordsTypeIndicatorOffset"
                     )
-                    types.forEach { (typeKey, typeLabel) ->
-                        val isSelected = selectedType == typeKey
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = if (isSelected) PrimaryTeal else Slate100,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { selectedType = typeKey }
-                        ) {
-                            Text(
-                                text = typeLabel,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) Color.White else Slate600,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                modifier = Modifier.padding(vertical = 8.dp)
+                    Surface(
+                        shape = RoundedCornerShape(11.dp),
+                        color = PrimaryTeal,
+                        shadowElevation = 1.dp,
+                        modifier = Modifier
+                            .width(tabWidth)
+                            .fillMaxHeight()
+                            .offset(x = indicatorOffset)
+                    ) {}
+
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        types.forEach { (typeKey, typeLabel) ->
+                            val isSelected = selectedType == typeKey
+                            val labelColor by animateColorAsState(
+                                targetValue = if (isSelected) Color.White else Slate600,
+                                animationSpec = tween(180),
+                                label = "recordsTypeTextColor"
                             )
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(11.dp))
+                                    .clickable { selectedType = typeKey }
+                            ) {
+                                Text(
+                                    text = typeLabel,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = labelColor,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 }

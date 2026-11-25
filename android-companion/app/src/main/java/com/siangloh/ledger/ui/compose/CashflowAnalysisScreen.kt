@@ -10,7 +10,10 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -1759,56 +1762,86 @@ fun CashflowAnalysisScreen(
                 }
 
                 var analyticsMode by rememberSaveable { mutableIntStateOf(0) }
+                val cashflowLabel = stringResource(R.string.analytics_tab_cashflow).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), "")
+                val advisorLabel = stringResource(R.string.analytics_tab_advisor).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), "")
+                val analyticsTabs = listOf(
+                    Triple(0, Icons.Rounded.BarChart, cashflowLabel),
+                    Triple(1, Icons.Rounded.AutoAwesome, advisorLabel)
+                )
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = Slate100,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .height(42.dp)
                 ) {
-                    Row(
+                    BoxWithConstraints(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            .fillMaxSize()
+                            .padding(4.dp)
                     ) {
-                        val cashflowLabel = stringResource(R.string.analytics_tab_cashflow).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), "")
-                        val advisorLabel = stringResource(R.string.analytics_tab_advisor).replace(Regex("^[\\p{So}\\p{Sk}\\uFE0F\\s]+"), "")
-                        val tabs = listOf(
-                            Triple(0, Icons.Rounded.BarChart, cashflowLabel),
-                            Triple(1, Icons.Rounded.AutoAwesome, advisorLabel)
+                        val tabWidth = maxWidth / analyticsTabs.size
+                        val indicatorOffset by animateDpAsState(
+                            targetValue = tabWidth * analyticsMode,
+                            animationSpec = spring(
+                                dampingRatio = 0.82f,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            label = "analyticsModeIndicatorOffset"
                         )
-                        tabs.forEach { (idx, tabIcon, label) ->
-                            val selected = analyticsMode == idx
-                            Surface(
-                                shape = RoundedCornerShape(9.dp),
-                                color = if (selected) Color.White else Color.Transparent,
-                                shadowElevation = if (selected) 1.5.dp else 0.dp,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(9.dp))
-                                    .clickable { analyticsMode = idx }
-                            ) {
-                                Row(
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 8.dp)
+                        Surface(
+                            shape = RoundedCornerShape(9.dp),
+                            color = Color.White,
+                            shadowElevation = 1.5.dp,
+                            modifier = Modifier
+                                .width(tabWidth)
+                                .fillMaxHeight()
+                                .offset(x = indicatorOffset)
+                        ) {}
+
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            analyticsTabs.forEach { (idx, tabIcon, label) ->
+                                val selected = analyticsMode == idx
+                                val iconTint by animateColorAsState(
+                                    targetValue = if (selected) PrimaryTeal else Slate500,
+                                    animationSpec = tween(200),
+                                    label = "analyticsTabIconColor"
+                                )
+                                val textColor by animateColorAsState(
+                                    targetValue = if (selected) PrimaryTeal else Slate600,
+                                    animationSpec = tween(200),
+                                    label = "analyticsTabTextColor"
+                                )
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(9.dp))
+                                        .clickable { analyticsMode = idx }
+                                        .padding(horizontal = 8.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = tabIcon,
-                                        contentDescription = null,
-                                        tint = if (selected) PrimaryTeal else Slate500,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(Modifier.width(5.dp))
-                                    Text(
-                                        text = label,
-                                        fontSize = 13.sp,
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (selected) PrimaryTeal else Slate600,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = tabIcon,
+                                            contentDescription = null,
+                                            tint = iconTint,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(5.dp))
+                                        Text(
+                                            text = label,
+                                            fontSize = 13.sp,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                            color = textColor,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -2199,46 +2232,72 @@ fun CashflowAnalysisScreen(
                                     .background(Slate50)
                                     .padding(vertical = 4.dp)
                             ) {
-                                Row(
+                                val labels = listOf(
+                                    R.string.cf_tab_expense,
+                                    R.string.cf_tab_calendar,
+                                    R.string.cf_tab_income,
+                                    R.string.cf_tab_savings,
+                                    R.string.cf_tab_bills
+                                )
+                                val activeIdx = detailPages.indexOf(activeDetailTab).coerceAtLeast(0)
+                                BoxWithConstraints(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .height(40.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(Slate100)
-                                        .padding(3.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                        .padding(3.dp)
                                 ) {
-                                    val labels = listOf(
-                                        R.string.cf_tab_expense,
-                                        R.string.cf_tab_calendar,
-                                        R.string.cf_tab_income,
-                                        R.string.cf_tab_savings,
-                                        R.string.cf_tab_bills
+                                    val tabWidth = maxWidth / detailPages.size
+                                    val indicatorOffset by animateDpAsState(
+                                        targetValue = tabWidth * activeIdx,
+                                        animationSpec = spring(
+                                            dampingRatio = 0.82f,
+                                            stiffness = Spring.StiffnessMediumLow
+                                        ),
+                                        label = "cashflowStickyTabOffset"
                                     )
-                                    detailPages.forEachIndexed { index, tab ->
-                                        val selected = activeDetailTab == tab
-                                        Surface(
-                                            shape = RoundedCornerShape(9.dp),
-                                            color = if (selected) Color.White else Color.Transparent,
-                                            shadowElevation = if (selected) 1.dp else 0.dp,
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(9.dp))
-                                                .selectable(
-                                                    selected = selected,
-                                                    role = androidx.compose.ui.semantics.Role.Tab,
-                                                    onClick = { switchToTab(tab) }
-                                                )
-                                        ) {
-                                            Text(
-                                                text = stringResource(labels.getOrElse(index) { R.string.cf_tab_expense }),
-                                                fontSize = 12.sp,
-                                                color = if (selected) PrimaryTeal else Slate600,
-                                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                                textAlign = TextAlign.Center,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.padding(horizontal = 2.dp, vertical = 9.dp)
+                                    Surface(
+                                        shape = RoundedCornerShape(9.dp),
+                                        color = Color.White,
+                                        shadowElevation = 1.dp,
+                                        modifier = Modifier
+                                            .width(tabWidth)
+                                            .fillMaxHeight()
+                                            .offset(x = indicatorOffset)
+                                    ) {}
+
+                                    Row(modifier = Modifier.fillMaxSize()) {
+                                        detailPages.forEachIndexed { index, tab ->
+                                            val selected = activeDetailTab == tab
+                                            val labelColor by animateColorAsState(
+                                                targetValue = if (selected) PrimaryTeal else Slate600,
+                                                animationSpec = tween(180),
+                                                label = "cashflowStickyTabColor"
                                             )
+                                            Box(
+                                                contentAlignment = Alignment.Center,
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .fillMaxHeight()
+                                                    .clip(RoundedCornerShape(9.dp))
+                                                    .selectable(
+                                                        selected = selected,
+                                                        role = androidx.compose.ui.semantics.Role.Tab,
+                                                        onClick = { switchToTab(tab) }
+                                                    )
+                                                    .padding(horizontal = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = stringResource(labels.getOrElse(index) { R.string.cf_tab_expense }),
+                                                    fontSize = 12.sp,
+                                                    color = labelColor,
+                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                                    textAlign = TextAlign.Center,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
                                         }
                                     }
                                 }
