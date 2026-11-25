@@ -1149,4 +1149,32 @@
     <!-- Penasihat Kewangan: Anggaran Jumlah Simpanan -->
     <string name="ai_advisor_kpi_est_saved">Anggaran Simpanan</string>
     <string name="ai_advisor_saved_breakdown_fmt">Anggaran jumlah disimpan akhir bulan: %1$s (Simpanan %2$s + Baki %3$s)</string>
+
+    <!-- Kunci Privasi & Sandaran Data -->
+    <string name="security_section_title">Privasi &amp; Keselamatan Data</string>
+    <string name="security_app_lock_title">Kunci Aplikasi Biometrik</string>
+    <string name="security_app_lock_subtitle">Sahkan cap jari, wajah atau PIN skrin semasa membuka aplikasi</string>
+    <string name="security_app_lock_unsupported">Sila tetapkan cap jari, wajah atau kunci skrin dalam tetapan telefon dahulu</string>
+    <string name="security_app_lock_enabled_toast">Kunci aplikasi diaktifkan</string>
+    <string name="security_app_lock_disabled_toast">Kunci aplikasi dimatikan</string>
+    <string name="security_app_lock_prompt_title">Sahkan Identiti Anda</string>
+    <string name="security_app_lock_prompt_subtitle">Gunakan cap jari, wajah atau PIN peranti untuk meneruskan</string>
+    <string name="security_app_lock_overlay_title">Aplikasi Dikunci</string>
+    <string name="security_app_lock_overlay_subtitle">Baki dan rekod kewangan anda dilindungi</string>
+    <string name="security_app_lock_unlock_btn">Buka Kunci Sekarang</string>
+    <string name="security_backup_export_title">Eksport Sandaran Penuh</string>
+    <string name="security_backup_export_desc">Simpan semua akaun, kategori dan rekod untuk pemindahan peranti</string>
+    <string name="security_backup_restore_title">Pulihkan daripada Sandaran</string>
+    <string name="security_backup_restore_desc">Pilih fail sandaran terdahulu untuk memulihkan semua rekod</string>
+    <string name="security_csv_export_title">Eksport Penyata (CSV)</string>
+    <string name="security_csv_export_desc">Eksport jadual transaksi serasi Excel untuk semakan</string>
+    <string name="security_backup_export_success_fmt">Sandaran berjaya! %1$d akaun dan %2$d rekod disimpan</string>
+    <string name="security_backup_export_failed">Eksport sandaran gagal, sila cuba lagi</string>
+    <string name="security_csv_export_success_fmt">Berjaya mengeksport %1$d rekod ke CSV</string>
+    <string name="security_csv_export_failed">Eksport CSV gagal, sila cuba lagi</string>
+    <string name="security_restore_confirm_title">Pulihkan Sandaran Ini?</string>
+    <string name="security_restore_confirm_msg_fmt">Sandaran ini mengandungi %1$d akaun, %2$d kategori dan %3$d rekod. Pemulihan akan menggantikan data semasa pada peranti ini.</string>
+    <string name="security_restore_confirm_btn">Pulihkan Sekarang</string>
+    <string name="security_restore_success_fmt">Berjaya memulihkan %1$d rekod</string>
+    <string name="security_restore_invalid_file">Fail sandaran tidak sah atau rosak</string>
 </resources>

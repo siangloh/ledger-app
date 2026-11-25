@@ -1149,4 +1149,32 @@
     <!-- Smart Financial Advisor: Estimated Total Saved -->
     <string name="ai_advisor_kpi_est_saved">Est. Total Saved</string>
     <string name="ai_advisor_saved_breakdown_fmt">Est. total saved at month-end: %1$s (Saved %2$s + Remaining %3$s)</string>
+
+    <!-- Privacy App Lock & Data Backup / Export -->
+    <string name="security_section_title">Privacy &amp; Data Safety</string>
+    <string name="security_app_lock_title">Biometric App Lock</string>
+    <string name="security_app_lock_subtitle">Require fingerprint, face, or device PIN when opening the app</string>
+    <string name="security_app_lock_unsupported">Please set up fingerprint, face unlock, or a screen lock in phone settings first</string>
+    <string name="security_app_lock_enabled_toast">App lock enabled</string>
+    <string name="security_app_lock_disabled_toast">App lock disabled</string>
+    <string name="security_app_lock_prompt_title">Verify to Unlock Ledger</string>
+    <string name="security_app_lock_prompt_subtitle">Use fingerprint, face, or device PIN to continue</string>
+    <string name="security_app_lock_overlay_title">Ledger Locked</string>
+    <string name="security_app_lock_overlay_subtitle">Your balances and records are protected</string>
+    <string name="security_app_lock_unlock_btn">Unlock Now</string>
+    <string name="security_backup_export_title">Export Full Backup</string>
+    <string name="security_backup_export_desc">Save all accounts, categories, and records for seamless device transfer</string>
+    <string name="security_backup_restore_title">Restore from Backup</string>
+    <string name="security_backup_restore_desc">Select a previously exported backup file to restore your ledger</string>
+    <string name="security_csv_export_title">Export Statement (CSV)</string>
+    <string name="security_csv_export_desc">Export an Excel-ready spreadsheet of all your transactions</string>
+    <string name="security_backup_export_success_fmt">Backup saved! %1$d accounts and %2$d records exported</string>
+    <string name="security_backup_export_failed">Backup export failed. Please try again</string>
+    <string name="security_csv_export_success_fmt">Exported %1$d records to CSV successfully</string>
+    <string name="security_csv_export_failed">CSV export failed. Please try again</string>
+    <string name="security_restore_confirm_title">Restore This Backup?</string>
+    <string name="security_restore_confirm_msg_fmt">This backup contains %1$d accounts, %2$d categories, and %3$d records. Restoring will replace your current records on this device.</string>
+    <string name="security_restore_confirm_btn">Restore Now</string>
+    <string name="security_restore_success_fmt">Restored %1$d records successfully</string>
+    <string name="security_restore_invalid_file">Invalid or corrupted backup file</string>
 </resources>

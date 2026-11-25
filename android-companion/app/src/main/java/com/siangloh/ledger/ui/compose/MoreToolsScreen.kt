@@ -504,7 +504,12 @@ fun MoreToolsScreen(
                 )
             }
 
-            // 5. 界面语言设置 (Language Settings)
+            // 5. 隐私与数据安全 (Privacy App Lock + Backup/Restore + CSV Export)
+            item {
+                com.siangloh.ledger.ui.compose.components.SecurityAndBackupCard()
+            }
+
+            // 6. 界面语言设置 (Language Settings)
             item {
                 val currentLang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(context)
                 LanguageSettingsCard(

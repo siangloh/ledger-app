@@ -2,6 +2,7 @@ package com.siangloh.ledger.data
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.Build
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -56,5 +57,50 @@ object BiometricHelper {
         })
 
         prompt.authenticate(promptInfo)
+    }
+
+    /**
+     * 用于应用隐私锁解锁：支持指纹、面容及系统锁屏密码兜底，防止无法解锁。
+     */
+    fun authenticateForAppLock(
+        activity: FragmentActivity,
+        title: String,
+        subtitle: String,
+        negativeButtonText: String,
+        onSuccess: () -> Unit,
+        onError: (errorCode: Int, errString: String) -> Unit = { _, _ -> }
+    ) {
+        val executor = ContextCompat.getMainExecutor(activity)
+        val builder = BiometricPrompt.PromptInfo.Builder()
+            .setTitle(title)
+            .setSubtitle(subtitle)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            builder.setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+        } else {
+            builder.setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.BIOMETRIC_WEAK
+            )
+            builder.setNegativeButtonText(negativeButtonText)
+        }
+
+        val prompt = BiometricPrompt(activity, executor, object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                super.onAuthenticationSucceeded(result)
+                onSuccess()
+            }
+
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                super.onAuthenticationError(errorCode, errString)
+                onError(errorCode, errString.toString())
+            }
+        })
+
+        prompt.authenticate(builder.build())
     }
 }

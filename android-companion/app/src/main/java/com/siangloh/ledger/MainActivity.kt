@@ -45,6 +45,7 @@ import androidx.lifecycle.lifecycleScope
 import com.siangloh.ledger.sync.SyncWorker
 import com.siangloh.ledger.ui.AppSelectionActivity
 import com.siangloh.ledger.ui.NotificationLogActivity
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.siangloh.ledger.ui.QuickAddActivity
@@ -140,18 +141,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var onLogoutCallback: (() -> Unit)? = null
+    private val isAppLockedState = androidx.compose.runtime.mutableStateOf(false)
 
     private fun initComposeOverview() {
+        if (com.siangloh.ledger.data.AuthManager.isLoggedIn(this) &&
+            com.siangloh.ledger.util.AppLockManager.shouldRequireUnlock(this)
+        ) {
+            isAppLockedState.value = true
+        }
         composeView.setContent {
             com.siangloh.ledger.ui.compose.theme.LedgerTheme {
                 val context = androidx.compose.ui.platform.LocalContext.current
                 var isLoggedIn by androidx.compose.runtime.remember {
                     androidx.compose.runtime.mutableStateOf(com.siangloh.ledger.data.AuthManager.isLoggedIn(context))
                 }
+                val isAppLocked by isAppLockedState
 
                 androidx.compose.runtime.DisposableEffect(Unit) {
                     onLogoutCallback = {
                         isLoggedIn = false
+                        isAppLockedState.value = false
                     }
                     onDispose {
                         onLogoutCallback = null
@@ -159,22 +168,35 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (isLoggedIn) {
-                    com.siangloh.ledger.ui.compose.MainAppScreen(
-                        openCashflowOnStart = openCashflowState.value,
-                        onScanReceipt = { showReceiptScanChooser() },
-                        onOpenSettings = { showAppSettingsDialog() },
-                        onLogout = {
-                            com.siangloh.ledger.data.AuthManager.logout(context)
-                            isLoggedIn = false
-                            Toast.makeText(context, context.getString(R.string.tools_logout), Toast.LENGTH_SHORT).show()
-                        },
-                        onOpenWebUrl = {
-                            Toast.makeText(this@MainActivity, "Native Compose Mode", Toast.LENGTH_SHORT).show()
+                    androidx.compose.foundation.layout.Box(
+                        modifier = androidx.compose.ui.Modifier.fillMaxSize()
+                    ) {
+                        com.siangloh.ledger.ui.compose.MainAppScreen(
+                            openCashflowOnStart = openCashflowState.value,
+                            onScanReceipt = { showReceiptScanChooser() },
+                            onOpenSettings = { showAppSettingsDialog() },
+                            onLogout = {
+                                com.siangloh.ledger.data.AuthManager.logout(context)
+                                com.siangloh.ledger.util.AppLockManager.resetSessionLock()
+                                isAppLockedState.value = false
+                                isLoggedIn = false
+                                Toast.makeText(context, context.getString(R.string.tools_logout), Toast.LENGTH_SHORT).show()
+                            },
+                            onOpenWebUrl = {
+                                Toast.makeText(this@MainActivity, "Native Compose Mode", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                        if (isAppLocked) {
+                            com.siangloh.ledger.ui.compose.components.AppLockOverlay(
+                                onUnlocked = { isAppLockedState.value = false }
+                            )
                         }
-                    )
+                    }
                 } else {
                     com.siangloh.ledger.ui.compose.LoginScreen(
                         onLoginSuccess = {
+                            com.siangloh.ledger.util.AppLockManager.markUnlocked()
+                            isAppLockedState.value = false
                             isLoggedIn = true
                         }
                     )
@@ -203,8 +225,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) {
+            com.siangloh.ledger.util.AppLockManager.recordBackgroundTimestamp()
+        }
+    }
+
     override fun onResume() {
         super.onResume()
+        if (com.siangloh.ledger.data.AuthManager.isLoggedIn(this) &&
+            com.siangloh.ledger.util.AppLockManager.shouldRequireUnlock(this)
+        ) {
+            isAppLockedState.value = true
+        }
         if (isWebViewInitialized) {
             webView.onResume()
             webView.resumeTimers()

@@ -28,4 +28,7 @@ interface LocalAccountDao {
 
     @Query("UPDATE local_accounts SET balance = balance + :delta WHERE id = :id")
     suspend fun updateBalance(id: Int, delta: Double)
+
+    @Query("DELETE FROM local_accounts")
+    suspend fun deleteAll()
 }
