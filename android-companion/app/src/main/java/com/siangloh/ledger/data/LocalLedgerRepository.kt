@@ -685,11 +685,12 @@ object LocalLedgerRepository {
                 val unreconciled = allTxs.count {
                     (it.accountId == a.id || it.toAccountId == a.id) && !it.tags.contains("#reconciled")
                 }
+                // 本月收支仅统计真实收入与真实支出，排除内部互转 (type == "transfer")，避免左口袋转右口袋误显示为支出/收入
                 val inAmt = thisMonthTxs.filter {
-                    (it.accountId == a.id && it.type == "income") || (it.toAccountId == a.id && it.type == "transfer")
+                    it.accountId == a.id && it.type == "income"
                 }.sumOf { it.amount }
                 val outAmt = thisMonthTxs.filter {
-                    it.accountId == a.id && (it.type == "expense" || it.type == "transfer")
+                    it.accountId == a.id && it.type == "expense"
                 }.sumOf { it.amount }
 
                 AccountRecord(
