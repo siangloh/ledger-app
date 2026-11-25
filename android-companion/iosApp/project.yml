@@ -1,0 +1,38 @@
+name: iosApp
+options:
+  bundleIdPrefix: com.siangloh
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  iosApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: iosApp
+    info:
+      path: iosApp/Info.plist
+      properties:
+        CFBundleDisplayName: Ledger
+        CFBundleShortVersionString: "1.0.5"
+        CFBundleVersion: "6"
+        CFBundleLocalizations: [zh, en, ms]
+        UILaunchScreen: {}
+        NSFaceIDUsageDescription: "Verify Face ID to unlock and protect your financial records."
+        NSCameraUsageDescription: "Scan receipts locally on your iPhone to split bills or log expenses."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.siangloh.ledger
+        PRODUCT_NAME: LedgerApp
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        FRAMEWORK_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-framework"
+          - "Shared"
+    preBuildScripts:
+      - name: Compile Kotlin Shared Framework
+        script: |
+          cd "$SRCROOT/.."
+          ./gradlew :shared:embedAndSignAppleFrameworkForXcode

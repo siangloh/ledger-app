@@ -1,0 +1,58 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'android-companion/shared/**'
+      - 'android-companion/iosApp/**'
+      - 'android-companion/gradle/**'
+      - 'android-companion/build.gradle*'
+      - 'android-companion/settings.gradle*'
+      - '.github/workflows/build-ios.yml'
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Run Shared iOS Simulator Unit Tests
+        working-directory: ./android-companion
+        run: |
+          chmod +x gradlew
+          ./gradlew :shared:iosSimulatorArm64Test --stacktrace
+
+      - name: Generate Xcode Project via XcodeGen & Build Unsigned IPA
+        working-directory: ./android-companion/iosApp
+        run: |
+          if ! command -v xcodegen &> /dev/null; then
+            brew install xcodegen
+          fi
+          xcodegen generate
+          xcodebuild -project iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/LedgerApp.app Payload/
+          zip -qr LedgerApp-iOS.ipa Payload
+
+      - name: Upload iOS IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyLedger-iOS-Unsigned-IPA
+          path: android-companion/iosApp/LedgerApp-iOS.ipa
+          retention-days: 30
