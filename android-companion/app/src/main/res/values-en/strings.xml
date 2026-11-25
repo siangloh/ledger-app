@@ -1130,4 +1130,19 @@
     <string name="split_empty_title">Scan or Upload a Receipt</string>
     <string name="split_queue_header_fmt">Receipts (%1$d)</string>
     <string name="split_items_count_fmt">%1$d items</string>
+
+    <!-- Accounts Grouped View & Detail Sheet -->
+    <string name="accounts_group_bank">Bank Accounts</string>
+    <string name="accounts_group_ewallet">E-Wallets</string>
+    <string name="accounts_group_credit">Credit Cards</string>
+    <string name="accounts_group_cash">Cash</string>
+    <string name="accounts_group_invest">Investments &amp; Other</string>
+    <string name="accounts_action_adjust">Adjust</string>
+    <string name="accounts_action_edit">Edit</string>
+    <string name="accounts_recent_tx">Recent Transactions</string>
+    <string name="accounts_recent_empty">No recent transactions in this account</string>
+    <string name="accounts_adjust_title">Quick Balance Adjust</string>
+    <string name="accounts_adjust_hint">Enter your current real balance to automatically align the difference</string>
+    <string name="accounts_adjust_input_label">Actual Balance (MYR)</string>
+    <string name="accounts_edit_title">Edit Account</string>
 </resources>

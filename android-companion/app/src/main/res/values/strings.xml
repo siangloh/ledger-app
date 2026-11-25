@@ -1130,4 +1130,19 @@
     <string name="split_empty_title">拍摄或上传餐厅小票</string>
     <string name="split_queue_header_fmt">已上传小票 (%1$d)</string>
     <string name="split_items_count_fmt">%1$d 项明细</string>
+
+    <!-- 账户页分组与单卡详情 -->
+    <string name="accounts_group_bank">银行账户</string>
+    <string name="accounts_group_ewallet">电子钱包</string>
+    <string name="accounts_group_credit">信用卡</string>
+    <string name="accounts_group_cash">现金</string>
+    <string name="accounts_group_invest">投资与其他</string>
+    <string name="accounts_action_adjust">调余额</string>
+    <string name="accounts_action_edit">编辑</string>
+    <string name="accounts_recent_tx">该账户近期流水</string>
+    <string name="accounts_recent_empty">该账户暂无近期交易记录</string>
+    <string name="accounts_adjust_title">快速校准余额</string>
+    <string name="accounts_adjust_hint">输入银行或钱包当前的实际余额，系统将自动补齐差额</string>
+    <string name="accounts_adjust_input_label">当前实际余额 (MYR)</string>
+    <string name="accounts_edit_title">编辑账户</string>
 </resources>

@@ -1130,4 +1130,19 @@
     <string name="split_empty_title">Imbas atau Muat Naik Resit</string>
     <string name="split_queue_header_fmt">Resit (%1$d)</string>
     <string name="split_items_count_fmt">%1$d item</string>
+
+    <!-- Paparan Kumpulan Akaun & Butiran -->
+    <string name="accounts_group_bank">Akaun Bank</string>
+    <string name="accounts_group_ewallet">E-Dompet</string>
+    <string name="accounts_group_credit">Kad Kredit</string>
+    <string name="accounts_group_cash">Tunai</string>
+    <string name="accounts_group_invest">Pelaburan &amp; Lain</string>
+    <string name="accounts_action_adjust">Laras Baki</string>
+    <string name="accounts_action_edit">Sunting</string>
+    <string name="accounts_recent_tx">Transaksi Terkini</string>
+    <string name="accounts_recent_empty">Tiada transaksi terkini dalam akaun ini</string>
+    <string name="accounts_adjust_title">Laraskan Baki Pantas</string>
+    <string name="accounts_adjust_hint">Masukkan baki sebenar semasa untuk menyelaraskan perbezaan secara automatik</string>
+    <string name="accounts_adjust_input_label">Baki Sebenar (MYR)</string>
+    <string name="accounts_edit_title">Sunting Akaun</string>
 </resources>
