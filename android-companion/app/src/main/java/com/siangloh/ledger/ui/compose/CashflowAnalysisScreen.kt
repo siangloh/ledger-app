@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.animation.*
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -52,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -1645,11 +1647,19 @@ fun CashflowAnalysisScreen(
         ).show()
     }
 
+    var monthTransitionDir by remember { mutableIntStateOf(1) }
+
     LaunchedEffect(month, currency, refresh, isCustomRange, startDate, endDate) {
         val sDate = if (isCustomRange) startDate else null
         val eDate = if (isCustomRange) endDate else null
-        result = CashflowRepository.getCached(context, month, currency, sDate, eDate)
-        prevData = if (!isCustomRange) CashflowRepository.getCached(context, shiftMonth(month, -1), currency)?.data else null
+        val cached = CashflowRepository.getCached(context, month, currency, sDate, eDate)
+        if (cached != null) {
+            result = cached
+        }
+        val cachedPrev = if (!isCustomRange) CashflowRepository.getCached(context, shiftMonth(month, -1), currency)?.data else null
+        if (cachedPrev != null || isCustomRange) {
+            prevData = cachedPrev
+        }
         loading = true
         failed = false
         selection = null
@@ -1670,7 +1680,7 @@ fun CashflowAnalysisScreen(
         } finally {
             loading = false
         }
-        if (!isCustomRange && result != null && prevData == null) {
+        if (!isCustomRange && result != null) {
             try {
                 prevData = CashflowRepository.load(context, shiftMonth(month, -1), currency).data
             } catch (error: CancellationException) {
@@ -1681,13 +1691,22 @@ fun CashflowAnalysisScreen(
         }
         try {
             budgetOverview = LocalLedgerRepository.getBudgetOverview(context, month).getOrNull()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.d("Cashflow", "Budget overview unavailable for $month", e)
+        }
     }
 
     fun changeMonth(delta: Int) {
         val newMonth = shiftMonth(month, delta)
-        result = CashflowRepository.getCached(context, newMonth, currency)
-        prevData = CashflowRepository.getCached(context, shiftMonth(newMonth, -1), currency)?.data
+        monthTransitionDir = if (delta >= 0) 1 else -1
+        val cached = CashflowRepository.getCached(context, newMonth, currency)
+        if (cached != null) {
+            result = cached
+        }
+        val cachedPrev = CashflowRepository.getCached(context, shiftMonth(newMonth, -1), currency)?.data
+        if (cachedPrev != null) {
+            prevData = cachedPrev
+        }
         loading = true
         failed = false
         month = newMonth
@@ -1797,6 +1816,11 @@ fun CashflowAnalysisScreen(
                 }
 
                 val mainListState = rememberLazyListState()
+                val contentAlpha by animateFloatAsState(
+                    targetValue = if (loading && result != null) 0.78f else 1f,
+                    animationSpec = tween(180),
+                    label = "monthSwitchAlpha"
+                )
 
                 fun switchToTab(tab: CashflowDashboardTab) {
                     activeDetailTab = tab
@@ -1808,7 +1832,8 @@ fun CashflowAnalysisScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 16.dp)
+                        .graphicsLayer { alpha = contentAlpha },
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(top = 4.dp, bottom = 28.dp)
                 ) {
@@ -1873,7 +1898,19 @@ fun CashflowAnalysisScreen(
                                 ) {
                                     Row(Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                         IconButton(onClick = { changeMonth(-1) }) { Icon(Icons.Default.ChevronLeft, stringResource(R.string.prev_month), tint = Slate600) }
-                                        Text(formatDisplayMonth(month, context), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                                        AnimatedContent(
+                                            targetState = month,
+                                            transitionSpec = {
+                                                val dir = monthTransitionDir
+                                                (slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { w -> if (dir >= 0) w / 3 else -w / 3 } +
+                                                    fadeIn(tween(200))) togetherWith
+                                                    (slideOutHorizontally(tween(180, easing = FastOutSlowInEasing)) { w -> if (dir >= 0) -w / 3 else w / 3 } +
+                                                        fadeOut(tween(160)))
+                                            },
+                                            label = "monthLabelSlide"
+                                        ) { targetMonth ->
+                                            Text(formatDisplayMonth(targetMonth, context), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                                        }
                                         IconButton(onClick = { changeMonth(1) }) { Icon(Icons.Default.ChevronRight, stringResource(R.string.next_month), tint = Slate600) }
                                     }
                                 }
