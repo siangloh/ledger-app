@@ -3,6 +3,8 @@ package com.siangloh.ledger.util
 import android.content.Context
 import android.os.Build
 import android.os.LocaleList
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import com.siangloh.ledger.NetworkHelper
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -15,14 +17,34 @@ object AppLanguageManager {
 
     private const val PREFS_NAME = "ledger_lang_prefs"
     private const val KEY_LANG = "app_language"
+    private const val KEY_MIGRATED_TO_PER_APP_API = "migrated_to_per_app_api"
 
+    private fun normalizeLangTag(rawLang: String?): String? {
+        val lower = rawLang?.trim()?.lowercase(Locale.ROOT) ?: return null
+        return when {
+            lower.startsWith("zh") -> LANG_ZH
+            lower.startsWith("ms") || lower.startsWith("my") -> LANG_MS
+            lower.startsWith("en") -> LANG_EN
+            else -> null
+        }
+    }
+
+    /**
+     * 优先读取 AndroidX 官方 Per-App Language API（兼容系统「应用语言」独立设置），
+     * 若尚未在系统级指定则回退至本地偏好与系统默认语言。
+     */
     fun getLanguage(context: Context): String {
+        val appLocales = AppCompatDelegate.getApplicationLocales()
+        if (!appLocales.isEmpty) {
+            normalizeLangTag(appLocales[0]?.language)?.let { return it }
+        }
         val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return sp.getString(KEY_LANG, null) ?: getDefaultLanguage()
+        normalizeLangTag(sp.getString(KEY_LANG, null))?.let { return it }
+        return getDefaultLanguage()
     }
 
     private fun getDefaultLanguage(): String {
-        val sysLang = Locale.getDefault().language.lowercase()
+        val sysLang = Locale.getDefault().language.lowercase(Locale.ROOT)
         return when {
             sysLang.startsWith("zh") -> LANG_ZH
             sysLang.startsWith("ms") || sysLang.startsWith("my") -> LANG_MS
@@ -30,10 +52,29 @@ object AppLanguageManager {
         }
     }
 
+    /**
+     * 老版本平滑迁移：若老用户此前在 SharedPreferences 中自定义过语言，
+     * 首次启动新版时自动同步至 AndroidX 官方 Per-App Language API。
+     */
+    fun migrateLegacyLanguageIfNeeded(context: Context) {
+        val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (sp.getBoolean(KEY_MIGRATED_TO_PER_APP_API, false)) return
+
+        val appLocales = AppCompatDelegate.getApplicationLocales()
+        val legacyLang = normalizeLangTag(sp.getString(KEY_LANG, null))
+        sp.edit().putBoolean(KEY_MIGRATED_TO_PER_APP_API, true).apply()
+
+        if (appLocales.isEmpty && legacyLang != null) {
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(legacyLang))
+        }
+    }
+
     fun setLanguage(context: Context, lang: String) {
+        val normalized = normalizeLangTag(lang) ?: LANG_EN
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putString(KEY_LANG, lang)
+            .putString(KEY_LANG, normalized)
+            .putBoolean(KEY_MIGRATED_TO_PER_APP_API, true)
             .apply()
 
         // Sync with WebView Cookie
@@ -41,11 +82,14 @@ object AppLanguageManager {
             val serverUrl = NetworkHelper.getServerUrl(context)
             val cookieManager = android.webkit.CookieManager.getInstance()
             cookieManager.setAcceptCookie(true)
-            cookieManager.setCookie(serverUrl, "lang=$lang; path=/")
+            cookieManager.setCookie(serverUrl, "lang=$normalized; path=/")
             cookieManager.flush()
         } catch (e: Exception) {
             android.util.Log.w("AppLanguageManager", "Failed to sync language cookie: ${e.message}")
         }
+
+        // 调用 AndroidX 官方 Per-App Language API：系统原生接管语言持久化与 Activity 刷新
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(normalized))
 
         // 同步刷新桌面小部件，使其文案即时跟随自定义语言
         com.siangloh.ledger.widget.LedgerAppWidgetProvider.notifyDataChanged(context)

@@ -77,34 +77,9 @@ class MainActivity : AppCompatActivity() {
         private const val RECEIPT_GALLERY_REQUEST_CODE = 1003
     }
 
-    override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(com.siangloh.ledger.util.AppLanguageManager.wrapContext(newBase))
-    }
-
-    override fun applyOverrideConfiguration(overrideConfiguration: Configuration?) {
-        if (overrideConfiguration != null) {
-            val lang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(this)
-            val locale = com.siangloh.ledger.util.AppLanguageManager.getLocale(lang)
-            overrideConfiguration.setLocale(locale)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                overrideConfiguration.setLocales(LocaleList(locale))
-            }
-        }
-        super.applyOverrideConfiguration(overrideConfiguration)
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val appLang = com.siangloh.ledger.util.AppLanguageManager.getLanguage(this)
-        val appLocale = com.siangloh.ledger.util.AppLanguageManager.getLocale(appLang)
-        Locale.setDefault(appLocale)
-        val resConfig = resources.configuration
-        resConfig.setLocale(appLocale)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            resConfig.setLocales(LocaleList(appLocale))
-        }
-        @Suppress("DEPRECATION")
-        resources.updateConfiguration(resConfig, resources.displayMetrics)
+        com.siangloh.ledger.util.AppLanguageManager.migrateLegacyLanguageIfNeeded(this)
         setContentView(R.layout.activity_main)
 
         webView = findViewById(R.id.webView)
@@ -168,65 +143,41 @@ class MainActivity : AppCompatActivity() {
 
     private fun initComposeOverview() {
         composeView.setContent {
-            val hostContext = androidx.compose.ui.platform.LocalContext.current
-            val currentLang = androidx.compose.runtime.remember { com.siangloh.ledger.util.AppLanguageManager.getLanguage(hostContext) }
-            val targetLocale = androidx.compose.runtime.remember(currentLang) { com.siangloh.ledger.util.AppLanguageManager.getLocale(currentLang) }
-            val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-            val localizedConfig = androidx.compose.runtime.remember(configuration, targetLocale) {
-                Configuration(configuration).apply {
-                    setLocale(targetLocale)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        setLocales(LocaleList(targetLocale))
+            com.siangloh.ledger.ui.compose.theme.LedgerTheme {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                var isLoggedIn by androidx.compose.runtime.remember {
+                    androidx.compose.runtime.mutableStateOf(com.siangloh.ledger.data.AuthManager.isLoggedIn(context))
+                }
+
+                androidx.compose.runtime.DisposableEffect(Unit) {
+                    onLogoutCallback = {
+                        isLoggedIn = false
+                    }
+                    onDispose {
+                        onLogoutCallback = null
                     }
                 }
-            }
-            val localizedContext = androidx.compose.runtime.remember(hostContext, localizedConfig) {
-                val configCtx = hostContext.createConfigurationContext(localizedConfig)
-                object : android.content.ContextWrapper(hostContext) {
-                    override fun getResources(): android.content.res.Resources = configCtx.resources
-                }
-            }
 
-            androidx.compose.runtime.CompositionLocalProvider(
-                androidx.compose.ui.platform.LocalConfiguration provides localizedConfig,
-                androidx.compose.ui.platform.LocalContext provides localizedContext
-            ) {
-                com.siangloh.ledger.ui.compose.theme.LedgerTheme {
-                    val context = androidx.compose.ui.platform.LocalContext.current
-                    var isLoggedIn by androidx.compose.runtime.remember {
-                        androidx.compose.runtime.mutableStateOf(com.siangloh.ledger.data.AuthManager.isLoggedIn(context))
-                    }
-
-                    androidx.compose.runtime.DisposableEffect(Unit) {
-                        onLogoutCallback = {
+                if (isLoggedIn) {
+                    com.siangloh.ledger.ui.compose.MainAppScreen(
+                        openCashflowOnStart = openCashflowState.value,
+                        onScanReceipt = { showReceiptScanChooser() },
+                        onOpenSettings = { showAppSettingsDialog() },
+                        onLogout = {
+                            com.siangloh.ledger.data.AuthManager.logout(context)
                             isLoggedIn = false
+                            Toast.makeText(context, context.getString(R.string.tools_logout), Toast.LENGTH_SHORT).show()
+                        },
+                        onOpenWebUrl = {
+                            Toast.makeText(this@MainActivity, "Native Compose Mode", Toast.LENGTH_SHORT).show()
                         }
-                        onDispose {
-                            onLogoutCallback = null
+                    )
+                } else {
+                    com.siangloh.ledger.ui.compose.LoginScreen(
+                        onLoginSuccess = {
+                            isLoggedIn = true
                         }
-                    }
-
-                    if (isLoggedIn) {
-                        com.siangloh.ledger.ui.compose.MainAppScreen(
-                            openCashflowOnStart = openCashflowState.value,
-                            onScanReceipt = { showReceiptScanChooser() },
-                            onOpenSettings = { showAppSettingsDialog() },
-                            onLogout = {
-                                com.siangloh.ledger.data.AuthManager.logout(context)
-                                isLoggedIn = false
-                                Toast.makeText(context, context.getString(R.string.tools_logout), Toast.LENGTH_SHORT).show()
-                            },
-                            onOpenWebUrl = {
-                                Toast.makeText(this@MainActivity, "Native Compose Mode", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    } else {
-                        com.siangloh.ledger.ui.compose.LoginScreen(
-                            onLoginSuccess = {
-                                isLoggedIn = true
-                            }
-                        )
-                    }
+                    )
                 }
             }
         }
@@ -782,9 +733,8 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.language_select_dialog_title)
             .setSingleChoiceItems(langs, currentIdx) { dialog, which ->
                 val chosen = codes[which]
-                com.siangloh.ledger.util.AppLanguageManager.setLanguage(this, chosen)
                 dialog.dismiss()
-                recreate()
+                com.siangloh.ledger.util.AppLanguageManager.setLanguage(this, chosen)
             }
             .setNegativeButton(R.string.common_cancel, null)
             .show()

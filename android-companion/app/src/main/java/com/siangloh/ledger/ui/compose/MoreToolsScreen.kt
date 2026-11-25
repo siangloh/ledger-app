@@ -511,7 +511,6 @@ fun MoreToolsScreen(
                     currentLang = currentLang,
                     onSelectLanguage = { newLang ->
                         com.siangloh.ledger.util.AppLanguageManager.setLanguage(context, newLang)
-                        findActivity(context)?.recreate()
                     }
                 )
             }
