@@ -70,7 +70,8 @@ class LocalFinancialAdvisorTest {
         )
         assertEquals(100.0, snapshot.variableDailyRate, 0.01)
         assertEquals(5000.0, snapshot.projectedMonthEndExpense, 0.01)
-        assertEquals(-800.0, snapshot.projectedMonthEndNet, 0.01)
+        assertEquals(-800.0, snapshot.projectedTotalSaved, 0.01)
+        assertEquals(-1200.0, snapshot.projectedMonthEndNet, 0.01)
         // 10000 liquid / 5000 projected burn = 2.0 months runway
         assertNotNull(snapshot.runwayMonths)
         assertEquals(2.0, snapshot.runwayMonths!!, 0.05)

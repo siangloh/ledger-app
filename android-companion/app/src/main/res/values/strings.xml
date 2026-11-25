@@ -1145,4 +1145,8 @@
     <string name="accounts_adjust_hint">输入银行或钱包当前的实际余额，系统将自动补齐差额</string>
     <string name="accounts_adjust_input_label">当前实际余额 (MYR)</string>
     <string name="accounts_edit_title">编辑账户</string>
+
+    <!-- 智能财务顾问：预计总攒下 -->
+    <string name="ai_advisor_kpi_est_saved">预计总攒下</string>
+    <string name="ai_advisor_saved_breakdown_fmt">月底预计总攒下 %1$s（已存储蓄 %2$s + 预计余款 %3$s）</string>
 </resources>

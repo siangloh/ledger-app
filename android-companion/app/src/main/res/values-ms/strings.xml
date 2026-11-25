@@ -1145,4 +1145,8 @@
     <string name="accounts_adjust_hint">Masukkan baki sebenar semasa untuk menyelaraskan perbezaan secara automatik</string>
     <string name="accounts_adjust_input_label">Baki Sebenar (MYR)</string>
     <string name="accounts_edit_title">Sunting Akaun</string>
+
+    <!-- Penasihat Kewangan: Anggaran Jumlah Simpanan -->
+    <string name="ai_advisor_kpi_est_saved">Anggaran Simpanan</string>
+    <string name="ai_advisor_saved_breakdown_fmt">Anggaran jumlah disimpan akhir bulan: %1$s (Simpanan %2$s + Baki %3$s)</string>
 </resources>

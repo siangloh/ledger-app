@@ -213,13 +213,20 @@ fun AiFinancialAdvisorCard(
                     valueColor = if (!report.hasProjection || projPositive) Color(0xFF059669) else Color(0xFFDC2626),
                     modifier = Modifier.weight(1f)
                 )
+                val showEstSavedInThird = report.hasProjection
                 val showSavingsInThird = report.runwayMonths == null && report.hasProjection
                 val thirdVal = when {
+                    showEstSavedInThird -> {
+                        val savedPos = report.projectedTotalSaved >= 0.0
+                        val sign = if (savedPos) "" else "-"
+                        "$sign$currencyLabel ${String.format(java.util.Locale.US, "%,.0f", kotlin.math.abs(report.projectedTotalSaved))}"
+                    }
                     report.runwayMonths != null -> stringResource(R.string.ai_advisor_kpi_runway_fmt, report.runwayMonths)
                     showSavingsInThird -> String.format(java.util.Locale.US, "%.1f%%", report.savingsRatePct)
                     else -> String.format(java.util.Locale.US, "%.0f%%", report.wantsPct)
                 }
                 val thirdColor = when {
+                    showEstSavedInThird -> if (report.projectedTotalSaved >= 0.0) PrimaryTeal else Color(0xFFDC2626)
                     report.runwayMonths == null && showSavingsInThird -> PrimaryTeal
                     report.runwayMonths == null -> Color(0xFFD97706)
                     report.runwayMonths >= 6.0 -> Color(0xFF059669)
@@ -228,6 +235,7 @@ fun AiFinancialAdvisorCard(
                 }
                 AdvisorKpiChip(
                     label = when {
+                        showEstSavedInThird -> stringResource(R.string.ai_advisor_kpi_est_saved)
                         report.runwayMonths != null -> stringResource(R.string.ai_advisor_kpi_runway)
                         showSavingsInThird -> stringResource(R.string.ai_advisor_kpi_savings_rate)
                         else -> stringResource(R.string.ai_advisor_tag_optimize)
@@ -236,6 +244,38 @@ fun AiFinancialAdvisorCard(
                     valueColor = thirdColor,
                     modifier = Modifier.weight(1f)
                 )
+            }
+
+            if (report.hasProjection && report.savingsDeposited > 0.0) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    color = com.siangloh.ledger.ui.compose.theme.Slate50,
+                    border = BorderStroke(1.dp, Slate200)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Savings,
+                            contentDescription = null,
+                            tint = PrimaryTeal,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        val totalSavedStr = "$currencyLabel ${String.format(java.util.Locale.US, "%,.0f", report.projectedTotalSaved)}"
+                        val depositedStr = "$currencyLabel ${String.format(java.util.Locale.US, "%,.0f", report.savingsDeposited)}"
+                        val remainingStr = "$currencyLabel ${String.format(java.util.Locale.US, "%,.0f", report.projectedMonthEndNet)}"
+                        Text(
+                            text = stringResource(R.string.ai_advisor_saved_breakdown_fmt, totalSavedStr, depositedStr, remainingStr),
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Slate700,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
             }
 
             // 50/30/20 Spend Mix Bar

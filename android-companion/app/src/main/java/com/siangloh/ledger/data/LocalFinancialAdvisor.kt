@@ -57,6 +57,8 @@ object LocalFinancialAdvisor {
         val insights: List<FinancialInsightItem>,
         val categoryHealth: List<CategoryHealthItem> = emptyList(),
         val projectedMonthEndNet: Double = 0.0,
+        val projectedTotalSaved: Double = 0.0,
+        val savingsDeposited: Double = 0.0,
         val hasProjection: Boolean = false,
         val needsPct: Double = 0.0,
         val wantsPct: Double = 0.0,
@@ -100,6 +102,7 @@ object LocalFinancialAdvisor {
         val variableDailyRate: Double,
         val projectedMonthEndExpense: Double,
         val projectedMonthEndNet: Double,
+        val projectedTotalSaved: Double,
         val dailySafeAllowance: Double,
         val targetDailyCapToBreakEven: Double,
         val repeatMerchant: RepeatMerchantStat?,
@@ -246,7 +249,10 @@ object LocalFinancialAdvisor {
             val variableDailyRate = discretionaryExpenseTotal / safePassed
             val projectedVariable = variableDailyRate * safeTotal
             val projectedMonthEndExpense = fixedExpenseTotal + pendingBillsTotal + projectedVariable
-            val projectedMonthEndNet = income - projectedMonthEndExpense
+            // Total money expected to be retained by month-end (deposited savings + remaining free cash)
+            val projectedTotalSaved = income - projectedMonthEndExpense
+            // Free cash expected at month-end after deducting deposited savings (aligns with Cashflow Net Balance)
+            val projectedMonthEndNet = projectedTotalSaved - savings
 
             // True Daily Safe Allowance: tighten by remaining budget AND remaining free cash after bills
             val freeCashAfterBills = if (income > 0.0) min(available, income - expense - pendingBillsTotal) else available
@@ -288,6 +294,7 @@ object LocalFinancialAdvisor {
                 variableDailyRate = variableDailyRate,
                 projectedMonthEndExpense = projectedMonthEndExpense,
                 projectedMonthEndNet = projectedMonthEndNet,
+                projectedTotalSaved = projectedTotalSaved,
                 dailySafeAllowance = dailySafeAllowance,
                 targetDailyCapToBreakEven = targetDailyCapToBreakEven,
                 repeatMerchant = repeatMerchant,
@@ -741,6 +748,8 @@ object LocalFinancialAdvisor {
             insights = sortedInsights,
             categoryHealth = categoryHealthList,
             projectedMonthEndNet = metrics.projectedMonthEndNet,
+            projectedTotalSaved = metrics.projectedTotalSaved,
+            savingsDeposited = savings,
             hasProjection = hasProjection,
             needsPct = metrics.needsPct,
             wantsPct = metrics.wantsPct,

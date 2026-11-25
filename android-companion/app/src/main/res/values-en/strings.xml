@@ -1145,4 +1145,8 @@
     <string name="accounts_adjust_hint">Enter your current real balance to automatically align the difference</string>
     <string name="accounts_adjust_input_label">Actual Balance (MYR)</string>
     <string name="accounts_edit_title">Edit Account</string>
+
+    <!-- Smart Financial Advisor: Estimated Total Saved -->
+    <string name="ai_advisor_kpi_est_saved">Est. Total Saved</string>
+    <string name="ai_advisor_saved_breakdown_fmt">Est. total saved at month-end: %1$s (Saved %2$s + Remaining %3$s)</string>
 </resources>
