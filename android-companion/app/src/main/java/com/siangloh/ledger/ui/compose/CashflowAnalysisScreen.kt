@@ -1816,11 +1816,6 @@ fun CashflowAnalysisScreen(
                 }
 
                 val mainListState = rememberLazyListState()
-                val contentAlpha by animateFloatAsState(
-                    targetValue = if (loading && result != null) 0.78f else 1f,
-                    animationSpec = tween(180),
-                    label = "monthSwitchAlpha"
-                )
 
                 fun switchToTab(tab: CashflowDashboardTab) {
                     activeDetailTab = tab
@@ -1832,8 +1827,7 @@ fun CashflowAnalysisScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .graphicsLayer { alpha = contentAlpha },
+                        .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(top = 4.dp, bottom = 28.dp)
                 ) {
@@ -2042,7 +2036,7 @@ fun CashflowAnalysisScreen(
                                 }
                             }
 
-                            if (loading) {
+                            if (loading && result == null) {
                                 Spacer(Modifier.height(4.dp))
                                 LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)), color = Teal700, trackColor = Slate200)
                             }
