@@ -131,13 +131,18 @@ fun currentMonthString(timeZone: TimeZone = TimeZone.currentSystemDefault()): St
 }
 
 fun shiftMonth(yearMonth: String, deltaMonths: Int): String {
-    val first = parseYearMonthFirstDay(yearMonth)
-    val shifted = if (deltaMonths >= 0) {
-        first.plus(DatePeriod(months = deltaMonths))
-    } else {
-        first.minus(DatePeriod(months = -deltaMonths))
+    val first = parseYearMonthFirstDayOrNull(yearMonth) ?: parseYearMonthFirstDayOrNull(currentMonthString())
+        ?: return "2026-01"
+    return runCatching {
+        val shifted = if (deltaMonths >= 0) {
+            first.plus(DatePeriod(months = deltaMonths))
+        } else {
+            first.minus(DatePeriod(months = -deltaMonths))
+        }
+        formatYearMonth(shifted.year, shifted.monthNumber)
+    }.getOrElse {
+        formatYearMonth(first.year, first.monthNumber)
     }
-    return formatYearMonth(shifted.year, shifted.monthNumber)
 }
 
 fun shiftDays(dateStr: String, deltaDays: Int): String {
@@ -151,17 +156,20 @@ fun shiftDays(dateStr: String, deltaDays: Int): String {
 }
 
 fun daysInMonth(yearMonth: String): Int {
-    val first = parseYearMonthFirstDay(yearMonth)
-    val nextMonthFirst = first.plus(DatePeriod(months = 1))
-    return first.daysUntil(nextMonthFirst)
+    val first = parseYearMonthFirstDayOrNull(yearMonth) ?: return 30
+    return runCatching {
+        val nextMonthFirst = first.plus(DatePeriod(months = 1))
+        first.daysUntil(nextMonthFirst)
+    }.getOrDefault(30)
 }
 
-private fun parseYearMonthFirstDay(yearMonth: String): LocalDate {
-    val parts = yearMonth.split('-')
-    require(parts.size == 2) { "Expected yyyy-MM, got '$yearMonth'" }
-    val year = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Invalid year in '$yearMonth'")
-    val month = parts[1].toIntOrNull() ?: throw IllegalArgumentException("Invalid month in '$yearMonth'")
-    return LocalDate(year, month, 1)
+private fun parseYearMonthFirstDayOrNull(yearMonth: String): LocalDate? {
+    val parts = yearMonth.trim().split('-')
+    if (parts.size != 2) return null
+    val year = parts[0].toIntOrNull() ?: return null
+    val month = parts[1].toIntOrNull() ?: return null
+    if (year !in 1..9999 || month !in 1..12) return null
+    return runCatching { LocalDate(year, month, 1) }.getOrNull()
 }
 
 private fun formatYearMonth(year: Int, monthNumber: Int): String {

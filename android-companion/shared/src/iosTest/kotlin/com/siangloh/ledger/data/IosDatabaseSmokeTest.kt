@@ -5,12 +5,22 @@ import com.siangloh.ledger.core.format.todayDateString
 import com.siangloh.ledger.core.prefs.PlatformPrefs
 import com.siangloh.ledger.parser.LocalNotificationParser
 import com.siangloh.ledger.platform.LocaleStateHolder
+import com.siangloh.ledger.platform.PlatformBiometricAuth
+import com.siangloh.ledger.platform.PlatformReceiptScanner
+import com.siangloh.ledger.platform.sharePlatformTextFile
 import com.siangloh.ledger.platform.showPlatformToast
 import com.siangloh.ledger.shared.IosLedgerBridge
 import com.siangloh.ledger.ui.i18n.SharedStrings
 import kotlinx.coroutines.runBlocking
+import platform.Foundation.NSDate
+import platform.Foundation.NSFileManager
+import platform.Foundation.NSRunLoop
+import platform.Foundation.NSTemporaryDirectory
+import platform.Foundation.dateWithTimeIntervalSinceNow
+import platform.Foundation.runUntilDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -91,5 +101,104 @@ class IosDatabaseSmokeTest {
 
         // Non-blocking guard check on invalid amount (no main-queue await inside runBlocking)
         IosLedgerBridge.recordApplePayExpense(0.0, "", "") {}
+    }
+
+    @Test
+    fun shareBackupAndCsvWriteToTempDirectoryOnIos() = runBlocking {
+        SharedLedgerEngine.initDefaultsIfNeeded()
+        val db = AppDatabase.getInstance()
+        val jsonBackup = LedgerBackupCore.exportFromDatabase(db)
+        val csvBackup = LedgerBackupCore.exportCsvFromDatabase(db)
+
+        assertTrue(
+            sharePlatformTextFile("test-backup.json", "application/json", jsonBackup.jsonContent),
+            "sharePlatformTextFile should succeed for JSON backup"
+        )
+        assertTrue(
+            sharePlatformTextFile("test-export.csv", "text/csv", csvBackup.csvContent),
+            "sharePlatformTextFile should succeed for CSV export"
+        )
+
+        val tempDir = NSTemporaryDirectory()
+        val jsonPath = if (tempDir.endsWith("/")) "${tempDir}test-backup.json" else "$tempDir/test-backup.json"
+        val csvPath = if (tempDir.endsWith("/")) "${tempDir}test-export.csv" else "$tempDir/test-export.csv"
+        val fm = NSFileManager.defaultManager
+        assertTrue(fm.fileExistsAtPath(jsonPath), "Backup JSON should be written to NSTemporaryDirectory")
+        assertTrue(fm.fileExistsAtPath(csvPath), "Export CSV should be written to NSTemporaryDirectory")
+    }
+
+    @Test
+    fun destructiveRestoreToDatabaseOnIosRoomSqlite() = runBlocking {
+        SharedLedgerEngine.initDefaultsIfNeeded()
+        val db = AppDatabase.getInstance()
+        val accId = db.localAccountDao().getAll().first().id
+        val today = todayDateString()
+
+        val originalTxId = SharedLedgerEngine.recordTransaction(
+            date = today,
+            type = "expense",
+            category = "餐饮",
+            amount = 25.00,
+            note = "iOS Restore Baseline",
+            accountId = accId,
+            source = "ios_test",
+            db = db
+        )
+        assertTrue(originalTxId > 0L)
+
+        val jsonBackup = LedgerBackupCore.exportFromDatabase(db)
+        assertTrue(jsonBackup.jsonContent.contains("iOS Restore Baseline"))
+
+        val extraTxId = SharedLedgerEngine.recordTransaction(
+            date = today,
+            type = "expense",
+            category = "交通",
+            amount = 99.00,
+            note = "iOS Extra Should Be Wiped",
+            accountId = accId,
+            source = "ios_test",
+            db = db
+        )
+        assertTrue(extraTxId > 0L)
+        assertTrue(db.localTransactionDao().getAll().any { it.note == "iOS Extra Should Be Wiped" })
+
+        val parsedPayload = LedgerBackupCore.parseBackupJson(jsonBackup.jsonContent)
+        LedgerBackupCore.restoreToDatabase(db, parsedPayload)
+
+        val restoredTxs = db.localTransactionDao().getAll()
+        assertTrue(
+            restoredTxs.any { it.note == "iOS Restore Baseline" && it.amount == 25.00 },
+            "Restored DB should contain baseline transaction"
+        )
+        assertFalse(
+            restoredTxs.any { it.note == "iOS Extra Should Be Wiped" },
+            "Destructive restore should remove transactions created after backup"
+        )
+
+        // Clean up test transaction
+        restoredTxs.filter { it.note == "iOS Restore Baseline" }.forEach {
+            SharedLedgerEngine.deleteTransaction(it.id, db)
+        }
+    }
+
+    @Test
+    fun biometricAvailabilityAndEmptyReceiptScannerDoNotCrashOrDeadlockOnIos() {
+        val bioAvailable = PlatformBiometricAuth.isAvailable()
+        assertTrue(bioAvailable || !bioAvailable, "isAvailable() should return a valid Boolean")
+
+        var scanResult: Result<List<String>>? = null
+        PlatformReceiptScanner.recognizeTextFromImageBytes(ByteArray(0)) { result ->
+            scanResult = result
+        }
+        // Pump the run loop briefly outside runBlocking so dispatch_get_main_queue() never deadlocks
+        var ticks = 0
+        while (scanResult == null && ticks < 10) {
+            NSRunLoop.currentRunLoop.runUntilDate(NSDate.dateWithTimeIntervalSinceNow(0.05))
+            ticks++
+        }
+        scanResult?.let { result ->
+            assertTrue(result.isSuccess, "Empty image bytes should return Result.success(emptyList())")
+            assertEquals(emptyList(), result.getOrNull())
+        }
     }
 }

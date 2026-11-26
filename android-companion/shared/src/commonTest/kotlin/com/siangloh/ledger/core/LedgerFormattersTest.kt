@@ -81,8 +81,8 @@ class LedgerFormattersTest {
         assertEquals("2024-05", shiftMonth("2024-05", 0))
         assertEquals("2023-01", shiftMonth("2024-01", -12))
         assertEquals("2025-01", shiftMonth("2024-12", 1))
-        assertFailsWith<IllegalArgumentException> { shiftMonth("2024/01", 1) }
-        assertFailsWith<IllegalArgumentException> { shiftMonth("2024-13", 1) }
+        assertTrue(Regex("""\d{4}-\d{2}""").matches(shiftMonth("2024/01", 1)))
+        assertTrue(Regex("""\d{4}-\d{2}""").matches(shiftMonth("2024-13", 1)))
     }
 
     @Test

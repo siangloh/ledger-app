@@ -82,6 +82,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -114,7 +115,8 @@ fun SharedSegmentedTabs(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     activePillColor: Color = Color.White,
-    activeTextColor: Color = PrimaryTeal
+    activeTextColor: Color = PrimaryTeal,
+    itemTestTagPrefix: String? = null
 ) {
     if (options.isEmpty()) return
     val safeIndex = selectedIndex.coerceIn(0, options.lastIndex)
@@ -166,6 +168,9 @@ fun SharedSegmentedTabs(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
+                            .let { base ->
+                                if (itemTestTagPrefix != null) base.testTag("${itemTestTagPrefix}_$index") else base
+                            }
                             .clickable(
                                 interactionSource = interactionSource,
                                 indication = null

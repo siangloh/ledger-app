@@ -61,29 +61,10 @@ jobs:
           cp -R build/Build/Products/Release-iphoneos/LedgerApp.app Payload/
           zip -qr LedgerApp-iOS.ipa Payload
 
-      - name: Record iOS build failure log
-        if: failure()
-        run: |
-          if [ -f android-companion/iosApp/ios_build_output.txt ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            mkdir -p scratch
-            {
-              echo "=== Compiler / Test Errors ==="
-              grep -nE "^e:|error:|FAILURE:|Execution failed|> Task .* FAILED" android-companion/iosApp/ios_build_output.txt | head -n 80 || true
-              echo "=== Log Tail ==="
-              tail -n 120 android-companion/iosApp/ios_build_output.txt
-            } > scratch/ios_build_error.log
-            git add -f scratch/ios_build_error.log
-            git commit -m "ci(ios): record iOS build failure log [skip ci]" || true
-            git pull --rebase origin main || true
-            git push origin main || true
-          fi
-
-      - name: Boot iOS Simulator, Launch App & Capture Screenshot
+      - name: Run Real XCUITest on iPhone Simulator, Launch App & Capture Screenshot
         working-directory: ./android-companion/iosApp
         run: |
-          set -e
+          set -eo pipefail
           SIM_UDID=$(xcrun simctl list devices available iPhone --json | python3 -c "
           import json, sys
           data = json.load(sys.stdin)['devices']
@@ -97,23 +78,26 @@ jobs:
           echo "Using iOS Simulator UDID: $SIM_UDID"
           xcrun simctl boot "$SIM_UDID" || true
           xcrun simctl bootstatus "$SIM_UDID" -b
+          trap 'xcrun simctl shutdown "$SIM_UDID" || true' EXIT
 
-          xcodebuild -project iosApp.xcodeproj \
+          xcodebuild test \
+            -project iosApp.xcodeproj \
             -scheme iosApp \
-            -configuration Debug \
+            -configuration Release \
             -sdk iphonesimulator \
             -destination "id=$SIM_UDID" \
             -derivedDataPath build-sim \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES 2>&1 | tee ios_build_output.txt
 
-          SIM_APP="build-sim/Build/Products/Debug-iphonesimulator/LedgerApp.app"
+          SIM_APP="build-sim/Build/Products/Release-iphonesimulator/LedgerApp.app"
           xcrun simctl install "$SIM_UDID" "$SIM_APP"
           xcrun simctl ui "$SIM_UDID" appearance light || true
           mkdir -p ../../scratch
-          LAUNCH_OUT=$(xcrun simctl launch --terminate-running-process --stdout="$(pwd)/../../scratch/ios_app_stdout.log" --stderr="$(pwd)/../../scratch/ios_app_stderr.log" "$SIM_UDID" com.siangloh.ledger --uitest-smoke)
+          LAUNCH_OUT=$(xcrun simctl launch --terminate-running-process --stdout="$(pwd)/../../scratch/ios_app_stdout.log" --stderr="$(pwd)/../../scratch/ios_app_stderr.log" "$SIM_UDID" com.siangloh.ledger)
           echo "Launched: $LAUNCH_OUT"
-          APP_PID=$(echo "$LAUNCH_OUT" | awk '{print $2}')
-          sleep 12
+          sleep 5
 
           ALIVE_LINE=$(xcrun simctl spawn "$SIM_UDID" launchctl list | grep -iE "com\.siangloh\.ledger" || true)
           echo "Process check: ${ALIVE_LINE:-NOT RUNNING}"
@@ -123,19 +107,36 @@ jobs:
           cat ../../scratch/ios_app_stderr.log 2>/dev/null || true
 
           if [ -z "$ALIVE_LINE" ]; then
-            echo "ERROR: LedgerApp crashed or exited during --uitest-smoke!"
+            echo "ERROR: LedgerApp crashed or exited after launch!"
             LATEST_CRASH=$(ls -t "$HOME/Library/Logs/DiagnosticReports/"*LedgerApp* 2>/dev/null | head -n 1 || true)
             if [ -n "$LATEST_CRASH" ]; then
               echo "=== Crash Report ($LATEST_CRASH) ==="
               head -n 120 "$LATEST_CRASH"
             fi
-            xcrun simctl shutdown "$SIM_UDID" || true
             exit 1
           fi
 
           xcrun simctl io "$SIM_UDID" screenshot ios_simulator_boot.png
           ls -lh ios_simulator_boot.png
-          xcrun simctl shutdown "$SIM_UDID" || true
+
+      - name: Record iOS build failure log
+        if: failure()
+        run: |
+          if [ -f android-companion/iosApp/ios_build_output.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            mkdir -p scratch
+            {
+              echo "=== Compiler / Test Errors ==="
+              grep -nE "^e:|error:|FAILURE:|Execution failed|> Task .* FAILED|XCTest|Test Case .* failed|Assertion Failure" android-companion/iosApp/ios_build_output.txt | head -n 80 || true
+              echo "=== Log Tail ==="
+              tail -n 120 android-companion/iosApp/ios_build_output.txt
+            } > scratch/ios_build_error.log
+            git add -f scratch/ios_build_error.log
+            git commit -m "ci(ios): record iOS build failure log [skip ci]" || true
+            git pull --rebase origin main || true
+            git push origin main || true
+          fi
 
       - name: Upload iOS IPA Artifact
         uses: actions/upload-artifact@v4

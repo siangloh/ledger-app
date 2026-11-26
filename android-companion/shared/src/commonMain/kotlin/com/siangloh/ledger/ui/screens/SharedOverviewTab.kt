@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -119,7 +120,8 @@ fun SharedOverviewTab(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Slate50),
+            .background(Slate50)
+            .testTag("overview_root"),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -216,7 +218,9 @@ fun SharedOverviewTab(
                         onClick = onNavigateToAdd,
                         shape = CircleShape,
                         color = PrimaryTeal,
-                        modifier = Modifier.size(34.dp)
+                        modifier = Modifier
+                            .size(34.dp)
+                            .testTag("overview_btn_add")
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(

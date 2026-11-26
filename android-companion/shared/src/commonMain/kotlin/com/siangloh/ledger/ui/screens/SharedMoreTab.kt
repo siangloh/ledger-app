@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -112,6 +113,7 @@ fun SharedMoreTab(
         modifier = Modifier
             .fillMaxSize()
             .background(Slate50)
+            .testTag("more_root")
             .verticalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -158,6 +160,7 @@ fun SharedMoreTab(
                 }
                 Switch(
                     checked = appLockEnabled,
+                    modifier = Modifier.testTag("more_switch_applock"),
                     onCheckedChange = { enable ->
                         if (enable) {
                             if (!PlatformBiometricAuth.isAvailable()) {
@@ -240,7 +243,8 @@ fun SharedMoreTab(
                         LocaleStateHolder.setLanguage(code)
                         val updatedStrings = SharedStrings.forLanguage(code)
                         showPlatformToast(SharedStrings.format1(updatedStrings.languageSwitchedFmt, LanguageLabels[idx]))
-                    }
+                    },
+                    itemTestTagPrefix = "more_lang"
                 )
             }
         }
@@ -332,7 +336,9 @@ fun SharedMoreTab(
                             containerColor = PrimaryTeal,
                             contentColor = Color.White
                         ),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("more_btn_backup")
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Download,
@@ -382,7 +388,9 @@ fun SharedMoreTab(
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = Slate700
                         ),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("more_btn_csv")
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.TableChart,

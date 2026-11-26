@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -60,11 +62,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -98,6 +105,7 @@ import com.siangloh.ledger.ui.theme.Slate900
 import com.siangloh.ledger.ui.theme.Teal50
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate
 
 private val TypeKeys = listOf("expense", "income", "savings", "transfer")
 private val QuickAddAmounts = listOf(10, 50, 100)
@@ -109,6 +117,7 @@ fun SharedAddTab(
 ) {
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
     val currentLang by LocaleStateHolder.language.collectAsState()
     val s = remember(currentLang) { SharedStrings.forLanguage(currentLang) }
     val typeLabels = remember(s) { listOf(s.expense, s.income, s.savings, s.transfer) }
@@ -125,6 +134,7 @@ fun SharedAddTab(
     var categories by remember { mutableStateOf<List<LocalCategory>>(emptyList()) }
     var selectedAccountId by remember { mutableStateOf<Int?>(null) }
     var selectedToAccountId by remember { mutableStateOf<Int?>(null) }
+    var isAmountFocused by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
 
     LaunchedEffect(dataRevision) {
@@ -190,6 +200,10 @@ fun SharedAddTab(
         modifier = Modifier
             .fillMaxSize()
             .background(Slate50)
+            .testTag("add_root")
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { focusManager.clearFocus() })
+            }
             .verticalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -208,7 +222,8 @@ fun SharedAddTab(
             selectedIndex = selectedTypeIndex,
             onSelect = { selectedTypeIndex = it },
             activePillColor = accentColor,
-            activeTextColor = Color.White
+            activeTextColor = Color.White,
+            itemTestTagPrefix = "add_type"
         )
 
         // Amount input card + quick-add chips
@@ -263,14 +278,20 @@ fun SharedAddTab(
                             },
                             singleLine = true,
                             cursorBrush = SolidColor(accentColor),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Decimal,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                             textStyle = TextStyle(
                                 fontSize = 34.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Slate900,
                                 fontFeatureSettings = "tnum"
                             ),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { isAmountFocused = it.isFocused }
                         )
                     }
                     if (amountText.isNotEmpty()) {
@@ -288,10 +309,11 @@ fun SharedAddTab(
                     }
                 }
 
-                // Quick-add chips
+                // Quick-add chips + keyboard-dismiss Done chip
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     QuickAddAmounts.forEach { increment ->
                         Surface(
@@ -300,6 +322,7 @@ fun SharedAddTab(
                             border = BorderStroke(1.dp, accentColor.copy(alpha = 0.22f)),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
+                                .testTag("add_quick_$increment")
                                 .clickable {
                                     val current = amountText.toDoubleOrNull() ?: 0.0
                                     val updated = current + increment
@@ -313,6 +336,25 @@ fun SharedAddTab(
                                 color = accentColor,
                                 style = TextStyle(fontFeatureSettings = "tnum"),
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                            )
+                        }
+                    }
+                    if (isAmountFocused) {
+                        Spacer(Modifier.weight(1f))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Slate100,
+                            border = BorderStroke(1.dp, Slate200),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { focusManager.clearFocus() }
+                        ) {
+                            Text(
+                                text = s.done,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Slate700,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                             )
                         }
                     }
@@ -526,6 +568,8 @@ fun SharedAddTab(
                             )
                         },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = accentColor,
@@ -566,6 +610,8 @@ fun SharedAddTab(
                         )
                     },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = accentColor,
@@ -580,6 +626,7 @@ fun SharedAddTab(
         // Save button
         Button(
             onClick = {
+                focusManager.clearFocus()
                 val parsedAmount = amountText.toDoubleOrNull()
                 if (parsedAmount == null || parsedAmount <= 0.0) {
                     showPlatformToast(s.enterAmountGtZero)
@@ -596,6 +643,10 @@ fun SharedAddTab(
                     }
                 }
                 val cleanDate = dateText.trim().ifBlank { todayDateString() }
+                if (runCatching { LocalDate.parse(cleanDate) }.isFailure) {
+                    showPlatformToast(s.invalidDateFormat)
+                    return@Button
+                }
                 val effectiveCategory = if (txType == "transfer") {
                     "内部转账"
                 } else {
@@ -638,6 +689,7 @@ fun SharedAddTab(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp)
+                .testTag("add_btn_save")
         ) {
             if (isSaving) {
                 CircularProgressIndicator(

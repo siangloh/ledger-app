@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -61,8 +63,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -142,6 +148,7 @@ fun SharedAnalyticsAccountsTab(
 ) {
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
     val currentLang by LocaleStateHolder.language.collectAsState()
     val s = remember(currentLang) { SharedStrings.forLanguage(currentLang) }
 
@@ -175,6 +182,10 @@ fun SharedAnalyticsAccountsTab(
         modifier = Modifier
             .fillMaxSize()
             .background(Slate50)
+            .testTag("analytics_root")
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { focusManager.clearFocus() })
+            }
             .verticalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -182,7 +193,8 @@ fun SharedAnalyticsAccountsTab(
         SharedSegmentedTabs(
             options = listOf(s.cashflowTab, s.accountsTab),
             selectedIndex = selectedSubTab,
-            onSelect = { selectedSubTab = it }
+            onSelect = { selectedSubTab = it },
+            itemTestTagPrefix = "analytics_subtab"
         )
 
         if (selectedSubTab == 0) {
@@ -233,7 +245,12 @@ fun SharedAnalyticsAccountsTab(
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier.pointerInput(Unit) {
+                        detectTapGestures(onTap = { focusManager.clearFocus() })
+                    },
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Text(
                         text = SharedStrings.localizeAccountName(targetAccount.name, currentLang),
                         fontSize = 14.sp,
@@ -245,7 +262,11 @@ fun SharedAnalyticsAccountsTab(
                         onValueChange = { editBalanceText = it },
                         label = { Text(s.currentBalanceLabel) },
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = PrimaryTeal,
@@ -648,7 +669,9 @@ private fun AccountsSection(
                 )
                 IconButton(
                     onClick = onToggleHide,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier
+                        .size(32.dp)
+                        .testTag("accounts_toggle_hide")
                 ) {
                     Icon(
                         imageVector = if (hideBalances) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
