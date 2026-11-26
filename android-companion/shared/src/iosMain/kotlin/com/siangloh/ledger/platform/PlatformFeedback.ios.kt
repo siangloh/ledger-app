@@ -12,7 +12,6 @@ import platform.Foundation.NSLocale
 import platform.Foundation.NSTemporaryDirectory
 import platform.Foundation.NSURL
 import platform.Foundation.create
-import platform.Foundation.data
 import platform.Foundation.preferredLanguages
 import platform.Foundation.writeToFile
 import platform.UIKit.UIActivityViewController
@@ -37,7 +36,7 @@ actual fun sharePlatformTextFile(fileName: String, mimeType: String, content: St
         val filePath = if (tempDir.endsWith("/")) "$tempDir$safeName" else "$tempDir/$safeName"
         val bytes = content.encodeToByteArray()
         val nsData: NSData = if (bytes.isEmpty()) {
-            NSData.data()
+            NSData()
         } else {
             bytes.usePinned { pinned ->
                 NSData.create(bytes = pinned.addressOf(0), length = bytes.size.toULong())

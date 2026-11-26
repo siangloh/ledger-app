@@ -33,7 +33,7 @@ jobs:
         run: |
           set -o pipefail
           chmod +x gradlew
-          ./gradlew :shared:iosSimulatorArm64Test --stacktrace 2>&1 | tee iosApp/ios_build_output.txt
+          ./gradlew :shared:iosSimulatorArm64Test --console=plain 2>&1 | tee iosApp/ios_build_output.txt
 
       - name: Generate Xcode Project via XcodeGen & Build Unsigned IPA
         working-directory: ./android-companion/iosApp
@@ -68,7 +68,12 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             mkdir -p scratch
-            tail -n 200 android-companion/iosApp/ios_build_output.txt > scratch/ios_build_error.log
+            {
+              echo "=== Compiler / Test Errors ==="
+              grep -nE "^e:|error:|FAILURE:|Execution failed|> Task .* FAILED" android-companion/iosApp/ios_build_output.txt | head -n 80 || true
+              echo "=== Log Tail ==="
+              tail -n 120 android-companion/iosApp/ios_build_output.txt
+            } > scratch/ios_build_error.log
             git add -f scratch/ios_build_error.log
             git commit -m "ci(ios): record iOS build failure log [skip ci]" || true
             git pull --rebase origin main || true
