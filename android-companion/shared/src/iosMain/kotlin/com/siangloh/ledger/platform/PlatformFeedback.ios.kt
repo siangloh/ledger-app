@@ -12,6 +12,7 @@ import platform.Foundation.NSLocale
 import platform.Foundation.NSTemporaryDirectory
 import platform.Foundation.NSURL
 import platform.Foundation.create
+import platform.Foundation.data
 import platform.Foundation.preferredLanguages
 import platform.Foundation.writeToFile
 import platform.UIKit.UIActivityViewController
@@ -20,7 +21,6 @@ import platform.UIKit.UISceneActivationStateForegroundActive
 import platform.UIKit.UIViewController
 import platform.UIKit.UIWindow
 import platform.UIKit.UIWindowScene
-import platform.UIKit.popoverPresentationController
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
 
@@ -36,10 +36,10 @@ actual fun sharePlatformTextFile(fileName: String, mimeType: String, content: St
         val tempDir = NSTemporaryDirectory()
         val filePath = if (tempDir.endsWith("/")) "$tempDir$safeName" else "$tempDir/$safeName"
         val bytes = content.encodeToByteArray()
-        val nsData = bytes.usePinned { pinned ->
-            if (bytes.isEmpty()) {
-                NSData.create()
-            } else {
+        val nsData: NSData = if (bytes.isEmpty()) {
+            NSData.data()
+        } else {
+            bytes.usePinned { pinned ->
                 NSData.create(bytes = pinned.addressOf(0), length = bytes.size.toULong())
             }
         }
@@ -60,9 +60,9 @@ actual fun sharePlatformTextFile(fileName: String, mimeType: String, content: St
                     activityItems = listOf(fileUrl),
                     applicationActivities = null
                 )
-                activityVC.popoverPresentationController?.apply {
-                    sourceView = topController.view
-                    sourceRect = CGRectMake(0.0, 0.0, 1.0, 1.0)
+                activityVC.popoverPresentationController?.let { popover ->
+                    popover.sourceView = topController.view
+                    popover.sourceRect = CGRectMake(0.0, 0.0, 1.0, 1.0)
                 }
                 topController.presentViewController(activityVC, animated = true, completion = null)
             } catch (e: Throwable) {
@@ -84,7 +84,7 @@ private fun findTopViewController(): UIViewController? {
     } ?: scenes.firstOrNull() ?: return null
 
     val windows = activeScene.windows.filterIsInstance<UIWindow>()
-    val keyWindow = windows.firstOrNull { it.isKeyWindow() } ?: windows.firstOrNull() ?: return null
+    val keyWindow = windows.firstOrNull { it.keyWindow } ?: windows.firstOrNull() ?: return null
     var top = keyWindow.rootViewController ?: return null
     while (top.presentedViewController != null) {
         top = top.presentedViewController!!

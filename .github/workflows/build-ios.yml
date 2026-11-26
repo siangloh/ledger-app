@@ -31,8 +31,9 @@ jobs:
       - name: Run Shared iOS Simulator Unit Tests
         working-directory: ./android-companion
         run: |
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew :shared:iosSimulatorArm64Test --stacktrace
+          ./gradlew :shared:iosSimulatorArm64Test --stacktrace 2>&1 | tee iosApp/ios_build_output.txt
 
       - name: Generate Xcode Project via XcodeGen & Build Unsigned IPA
         working-directory: ./android-companion/iosApp

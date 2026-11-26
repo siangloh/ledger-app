@@ -11,6 +11,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IosDatabaseSmokeTest {
@@ -44,7 +45,7 @@ class IosDatabaseSmokeTest {
             assertEquals(true, prefs.getBoolean("k_bool", false))
             assertEquals(42, prefs.getInt("k_int", 0))
             prefs.clear()
-            assertEquals(null, prefs.getString("k_str", null))
+            assertNull(prefs.getString("k_str", null))
         } finally {
             LocaleStateHolder.setLanguage(original)
         }
