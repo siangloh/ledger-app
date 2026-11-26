@@ -50,9 +50,52 @@ jobs:
           cp -R build/Build/Products/Release-iphoneos/LedgerApp.app Payload/
           zip -qr LedgerApp-iOS.ipa Payload
 
+      - name: Boot iOS Simulator, Launch App & Capture Screenshot
+        working-directory: ./android-companion/iosApp
+        run: |
+          set -e
+          SIM_UDID=$(xcrun simctl list devices available iPhone --json | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)['devices']
+          for runtime in sorted(data.keys(), reverse=True):
+              for d in data[runtime]:
+                  if d.get('isAvailable') and 'iPhone' in d.get('name', ''):
+                      print(d['udid'])
+                      sys.exit(0)
+          sys.exit(1)
+          ")
+          echo "Using iOS Simulator UDID: $SIM_UDID"
+          xcrun simctl boot "$SIM_UDID" || true
+          xcrun simctl bootstatus "$SIM_UDID" -b
+
+          xcodebuild -project iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath build-sim \
+            CODE_SIGNING_ALLOWED=NO
+
+          SIM_APP="build-sim/Build/Products/Debug-iphonesimulator/LedgerApp.app"
+          xcrun simctl install "$SIM_UDID" "$SIM_APP"
+          LAUNCH_OUT=$(xcrun simctl launch "$SIM_UDID" com.siangloh.ledger)
+          echo "Launched: $LAUNCH_OUT"
+          sleep 6
+
+          xcrun simctl io "$SIM_UDID" screenshot ios_simulator_boot.png
+          ls -lh ios_simulator_boot.png
+          xcrun simctl shutdown "$SIM_UDID" || true
+
       - name: Upload iOS IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: MyLedger-iOS-Unsigned-IPA
           path: android-companion/iosApp/LedgerApp-iOS.ipa
+          retention-days: 30
+
+      - name: Upload iOS Simulator Screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyLedger-iOS-Simulator-Screenshot
+          path: android-companion/iosApp/ios_simulator_boot.png
           retention-days: 30
