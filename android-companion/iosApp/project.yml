@@ -17,6 +17,7 @@ targets:
         CFBundleVersion: "6"
         CFBundleLocalizations: [zh, en, ms]
         UILaunchScreen: {}
+        CADisableMinimumFrameDurationOnPhone: true
         NSFaceIDUsageDescription: "Verify Face ID to unlock and protect your financial records."
         NSCameraUsageDescription: "Scan receipts locally on your iPhone to split bills or log expenses."
     settings:
