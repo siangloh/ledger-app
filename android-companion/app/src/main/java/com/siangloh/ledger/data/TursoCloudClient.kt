@@ -12,9 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -35,12 +32,10 @@ import java.util.*
 object TursoCloudClient {
     private const val TAG = "TursoCloudClient"
 
-    const val DEFAULT_TURSO_PIPELINE_URL =
-        "https://ledger-app-siangloh.aws-ap-northeast-1.turso.io/v2/pipeline"
-    const val DEFAULT_TURSO_TOKEN =
-        "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI5OTYwMjksImlkIjoiMDFhMDc5NDctZDAwMS03MjZkLWE0NzQtNmM1MmYzODM5ZDVhIiwia2lkIjoiUFpvelZYb3JTZkVlSWFmNS1ZdGQyNEFGMG5xbTJ4UkxHZ1MyM3cxZTVsbyIsInJpZCI6IjQxN2YwNTVkLWZmMWQtNDhlZC04YmFjLTVhZDExNGY3MGUxNCJ9.ktieEm8f_mp6yh7CnwMA6Py6G8CrkCB9JYLCIj3eLcvc3VJZrmzqVAonJAi3-cb0YEusfZEaNksg7Jhd18bKDg"
+    const val DEFAULT_TURSO_PIPELINE_URL = TursoPipelineExecutor.DEFAULT_TURSO_PIPELINE_URL
+    const val DEFAULT_TURSO_TOKEN = TursoPipelineExecutor.DEFAULT_TURSO_TOKEN
 
-    const val ADMIN_TURSO_UUID = "f84e359d-b99e-4ac2-b098-298e9d2661ea"
+    const val ADMIN_TURSO_UUID = TursoPipelineExecutor.ADMIN_TURSO_UUID
 
     private const val PREFS_TURSO = "ledger_turso_prefs"
     private const val KEY_CUSTOM_URL = "custom_pipeline_url"
@@ -69,16 +64,7 @@ object TursoCloudClient {
     }
 
     private fun buildBumpVersionStatements(userId: String, nowIso: String): List<Pair<String, List<Any?>>> {
-        val vToken = UUID.randomUUID().toString().replace("-", "").take(16)
-        val sql = """
-            INSERT INTO system_metadata (key, val, updated_at)
-            VALUES (?, ?, ?)
-            ON CONFLICT(key) DO UPDATE SET val = excluded.val, updated_at = excluded.updated_at
-        """.trimIndent()
-        return listOf(
-            Pair(sql, listOf("global_data_version", vToken, nowIso)),
-            Pair(sql, listOf("user_data_version:$userId", vToken, nowIso))
-        )
+        return TursoPipelineExecutor.buildBumpVersionStatements(userId, nowIso)
     }
 
     private fun asDouble(v: Any?): Double = when (v) {
@@ -100,140 +86,21 @@ object TursoCloudClient {
     }
 
     /**
-     * 执行底层 Turso Pipeline HTTP 请求
+     * 执行底层 Turso Pipeline HTTP 请求 (委托至跨平台 Ktor 实现 TursoPipelineExecutor)
      */
     suspend fun executeBatch(
         context: Context,
         statements: List<Pair<String, List<Any?>>>
-    ): Result<List<List<Map<String, Any?>>>> = withContext(Dispatchers.IO) {
-        if (statements.isEmpty()) return@withContext Result.success(emptyList())
-        try {
-            val endpoint = getPipelineUrl(context)
-            val token = getAuthToken(context)
-
-            val requestsArray = JSONArray()
-            for ((sql, args) in statements) {
-                val stmtObj = JSONObject().apply {
-                    put("sql", sql)
-                    if (args.isNotEmpty()) {
-                        val argsArray = JSONArray()
-                        for (arg in args) {
-                            val argObj = JSONObject()
-                            when (arg) {
-                                null -> {
-                                    argObj.put("type", "null")
-                                }
-                                is Boolean -> {
-                                    argObj.put("type", "integer")
-                                    argObj.put("value", if (arg) "1" else "0")
-                                }
-                                is Number -> {
-                                    if (arg is Double || arg is Float) {
-                                        argObj.put("type", "float")
-                                        argObj.put("value", arg.toDouble())
-                                    } else {
-                                        argObj.put("type", "integer")
-                                        argObj.put("value", arg.toLong().toString())
-                                    }
-                                }
-                                else -> {
-                                    argObj.put("type", "text")
-                                    argObj.put("value", arg.toString())
-                                }
-                            }
-                            argsArray.put(argObj)
-                        }
-                        put("args", argsArray)
-                    }
-                }
-                requestsArray.put(JSONObject().apply {
-                    put("type", "execute")
-                    put("stmt", stmtObj)
-                })
-            }
-            requestsArray.put(JSONObject().apply {
-                put("type", "close")
-            })
-
-            val payload = JSONObject().apply {
-                put("requests", requestsArray)
-            }.toString()
-
-            val url = URL(endpoint)
-            val conn = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = 10000
-                readTimeout = 15000
-                setRequestProperty("Authorization", "Bearer $token")
-                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                setRequestProperty("User-Agent", "LedgerTursoNative/2.0 (Android; Dalvik)")
-                doOutput = true
-            }
-
-            OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use {
-                it.write(payload)
-                it.flush()
-            }
-
-            val respCode = conn.responseCode
-            val respBody = if (respCode in 200..299) {
-                conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            } else {
-                val errText = conn.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-                return@withContext Result.failure(Exception("Turso HTTP $respCode: $errText"))
-            }
-
-            val rootJson = JSONObject(respBody)
-            val resultsArr = rootJson.optJSONArray("results") ?: JSONArray()
-            val allStatementResults = mutableListOf<List<Map<String, Any?>>>()
-
-            for (i in 0 until resultsArr.length()) {
-                val resObj = resultsArr.optJSONObject(i) ?: continue
-                val type = resObj.optString("type")
-                if (type == "error") {
-                    val errMsg = resObj.optJSONObject("error")?.optString("message") ?: "Turso query error"
-                    return@withContext Result.failure(Exception(errMsg))
-                }
-                if (type != "ok") continue
-
-                val respObj = resObj.optJSONObject("response") ?: continue
-                if (respObj.optString("type") == "close") continue
-
-                val resultObj = respObj.optJSONObject("result") ?: continue
-                val colsArr = resultObj.optJSONArray("cols") ?: JSONArray()
-                val colNames = mutableListOf<String>()
-                for (c in 0 until colsArr.length()) {
-                    colNames.add(colsArr.optJSONObject(c)?.optString("name") ?: "col_$c")
-                }
-
-                val rowsArr = resultObj.optJSONArray("rows") ?: JSONArray()
-                val statementRows = mutableListOf<Map<String, Any?>>()
-                for (r in 0 until rowsArr.length()) {
-                    val rowArr = rowsArr.optJSONArray(r) ?: continue
-                    val rowMap = mutableMapOf<String, Any?>()
-                    for (c in 0 until rowArr.length()) {
-                        val colName = colNames.getOrElse(c) { "col_$c" }
-                        val cellObj = rowArr.optJSONObject(c)
-                        val cellValue = if (cellObj != null) {
-                            when (cellObj.optString("type")) {
-                                "null" -> null
-                                "integer" -> cellObj.optString("value").toLongOrNull()
-                                "float" -> cellObj.optDouble("value")
-                                else -> cellObj.opt("value")
-                            }
-                        } else null
-                        rowMap[colName] = cellValue
-                    }
-                    statementRows.add(rowMap)
-                }
-                allStatementResults.add(statementRows)
-            }
-
-            Result.success(allStatementResults)
-        } catch (e: Exception) {
+    ): Result<List<List<Map<String, Any?>>>> {
+        val result = TursoPipelineExecutor.executeBatch(
+            endpoint = getPipelineUrl(context),
+            authToken = getAuthToken(context),
+            statements = statements
+        )
+        result.onFailure { e ->
             Log.e(TAG, "executeBatch error: ${e.message}", e)
-            Result.failure(e)
         }
+        return result
     }
 
     /**

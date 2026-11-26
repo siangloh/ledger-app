@@ -1,9 +1,9 @@
 package com.siangloh.ledger.parser
 
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.regex.Pattern
+import com.siangloh.ledger.core.format.currentEpochMillis
+import com.siangloh.ledger.core.format.todayDateString
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlin.math.floor
 
 data class LocalParsedResult(
     val amount: Double,
@@ -59,11 +59,11 @@ object LocalNotificationParser {
 
     // Layer A 正则：动态金额型促销文案（如 "Get RM15", "Up to RM88", "RM10 off", "Spend RM50"）
     private val HARD_PROMO_PATTERNS = listOf(
-        Regex("""\b(?:up to|sehingga|save up to|save|jimat|get up to|get|dapatkan|enjoy up to|enjoy|earn up to|earn|win|menang|unlock|claim)\s+(?:RM|MYR|\$)\s*[0-9]""", RegexOption.IGNORE_CASE),
-        Regex("""\b(?:RM|MYR|\$)\s*[0-9]+(?:\.[0-9]{1,2})?\s+off\b""", RegexOption.IGNORE_CASE),
-        Regex("""\b(?:when you|once you|if you)\s+(?:spend|pay|transfer|reload|top up|order|shop|use)\b""", RegexOption.IGNORE_CASE),
-        Regex("""\b(?:spend|belanja|fuel up|refuel)\s+(?:RM|MYR|\$)\s*[0-9]""", RegexOption.IGNORE_CASE),
-        Regex("""\boff\s+your\s+(?:next|first|order|purchase|ride|meal)\b""", RegexOption.IGNORE_CASE)
+        Regex("""\b(?:up to|sehingga|save up to|save|jimat|get up to|get|dapatkan|enjoy up to|enjoy|earn up to|earn|win|menang|unlock|claim)\s+(?:RM|MYR|\$)\s*[0-9]""", setOf(RegexOption.IGNORE_CASE)),
+        Regex("""\b(?:RM|MYR|\$)\s*[0-9]+(?:\.[0-9]{1,2})?\s+off\b""", setOf(RegexOption.IGNORE_CASE)),
+        Regex("""\b(?:when you|once you|if you)\s+(?:spend|pay|transfer|reload|top up|order|shop|use)\b""", setOf(RegexOption.IGNORE_CASE)),
+        Regex("""\b(?:spend|belanja|fuel up|refuel)\s+(?:RM|MYR|\$)\s*[0-9]""", setOf(RegexOption.IGNORE_CASE)),
+        Regex("""\boff\s+your\s+(?:next|first|order|purchase|ride|meal)\b""", setOf(RegexOption.IGNORE_CASE))
     )
 
     // Layer B: 弱营销信号词（若通知中缺少真实已完成动账凭证，则按广告拦截；真实收据尾部附带积分提示则放行）
@@ -75,9 +75,9 @@ object LocalNotificationParser {
 
     // 明确的已完成动账凭证（过去式/已扣款/已入账，用于与弱营销信号区分）
     private val STRICT_COMPLETED_PATTERNS = listOf(
-        Regex("""\b(?:you have paid|you've paid|you paid|paid\s+(?:RM|MYR)|payment\s+of\s+(?:RM|MYR)|has been deducted|have been deducted|debited|charged\s+(?:RM|MYR)|transferred\s+(?:RM|MYR)|has been transferred|received\s+(?:RM|MYR)|credited\s+(?:RM|MYR)|has been credited|has been refunded|refunded\s+(?:RM|MYR)|using your (?:cd|card)|card transaction alert)\b""", RegexOption.IGNORE_CASE),
-        Regex("""\b(?:RM|MYR)\s*[0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?\s+(?:paid to|spent|deducted|debited|transferred to|has been deducted|has been transferred|credited|refunded)\b""", RegexOption.IGNORE_CASE),
-        Regex("""\b(?:bayaran|transaksi)\b.*\bberjaya\b|\bberjaya\b.*\b(?:bayaran|transaksi)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:you have paid|you've paid|you paid|paid\s+(?:RM|MYR)|payment\s+of\s+(?:RM|MYR)|has been deducted|have been deducted|debited|charged\s+(?:RM|MYR)|transferred\s+(?:RM|MYR)|has been transferred|received\s+(?:RM|MYR)|credited\s+(?:RM|MYR)|has been credited|has been refunded|refunded\s+(?:RM|MYR)|using your (?:cd|card)|card transaction alert)\b""", setOf(RegexOption.IGNORE_CASE)),
+        Regex("""\b(?:RM|MYR)\s*[0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?\s+(?:paid to|spent|deducted|debited|transferred to|has been deducted|has been transferred|credited|refunded)\b""", setOf(RegexOption.IGNORE_CASE)),
+        Regex("""\b(?:bayaran|transaksi)\b.*\bberjaya\b|\bberjaya\b.*\b(?:bayaran|transaksi)\b""", setOf(RegexOption.IGNORE_CASE)),
         Regex("""(?:已支付|成功支付|成功转账|成功扣款|已扣款|已到账|已入账|已退回|已退款)""")
     )
 
@@ -93,22 +93,36 @@ object LocalNotificationParser {
      * 默认窗口 3 分钟（180 秒），按 (type, amountCents) 跨包名去重。
      */
     class CrossAppDeduplicator(private val windowMs: Long = 180_000L) {
-        private val recentKeys = java.util.concurrent.ConcurrentHashMap<String, Long>()
+        private val recentKeysState = MutableStateFlow<Map<String, Long>>(emptyMap())
 
-        fun isDuplicateAndRecord(type: String, amount: Double, nowMs: Long = System.currentTimeMillis()): Boolean {
+        fun isDuplicateAndRecord(
+            type: String,
+            amount: Double,
+            nowMs: Long = currentEpochMillis()
+        ): Boolean {
             if (amount <= 0.0) return false
-            val cents = Math.round(amount * 100.0)
+            val cents = floor(amount * 100.0 + 0.5).toLong()
             val key = "$type:$cents"
-            val lastSeen = recentKeys[key]
-            if (lastSeen != null && (nowMs - lastSeen) in 0 until windowMs) {
-                return true
+            while (true) {
+                val current = recentKeysState.value
+                val lastSeen = current[key]
+                if (lastSeen != null && (nowMs - lastSeen) in 0 until windowMs) {
+                    return true
+                }
+                val next = LinkedHashMap<String, Long>(current.size + 1)
+                if (current.size >= 200) {
+                    val cutoff = nowMs - (windowMs * 2)
+                    for ((k, v) in current) {
+                        if (v >= cutoff) next[k] = v
+                    }
+                } else {
+                    next.putAll(current)
+                }
+                next[key] = nowMs
+                if (recentKeysState.compareAndSet(current, next)) {
+                    return false
+                }
             }
-            recentKeys[key] = nowMs
-            if (recentKeys.size > 200) {
-                val cutoff = nowMs - (windowMs * 2)
-                recentKeys.entries.removeIf { it.value < cutoff }
-            }
-            return false
         }
     }
 
@@ -118,7 +132,7 @@ object LocalNotificationParser {
     fun isPromotionalOrAd(text: String): Boolean {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return false
-        val lower = trimmed.lowercase(Locale.ROOT)
+        val lower = trimmed.lowercase()
 
         // 1. 强广告/促销/验证码词库或动态金额促销句式 -> 无条件拦截
         if (HARD_PROMO_KEYWORDS.any { lower.contains(it) }) return true
@@ -139,79 +153,79 @@ object LocalNotificationParser {
         "reload touch n go", "top up touch n go", "grab top up", "grabpay reload"
     )
 
-    private val TNG_PAYMENT_PATTERN = Pattern.compile(
+    private val TNG_PAYMENT_PATTERN = Regex(
         """(?:paid|payment of|spent)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:to|at)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val TNG_TRANSFER_OUT_PATTERN = Pattern.compile(
+    private val TNG_TRANSFER_OUT_PATTERN = Regex(
         """(?:transfer of|transferred|transfer)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:to|has been transferred to)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val TNG_TRANSFER_OUT_ALT_PATTERN = Pattern.compile(
+    private val TNG_TRANSFER_OUT_ALT_PATTERN = Regex(
         """(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:has been transferred to|transferred to|transfer to)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val TNG_DEDUCTED_PATTERN = Pattern.compile(
+    private val TNG_DEDUCTED_PATTERN = Regex(
         """Payment\s+To:\s*(.*?)(?::\s*|\s+)(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+has\s+been\s+deducted""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val TNG_TRANSFER_IN_PATTERN = Pattern.compile(
+    private val TNG_TRANSFER_IN_PATTERN = Regex(
         """(?:received|transfer from|duitnow transfer from)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:from)?\s*([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})?""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val REFUND_REBATE_PATTERN = Pattern.compile(
+    private val REFUND_REBATE_PATTERN = Regex(
         """(?:refund of|refunded|payment refunded|rebate of|cashback of|rebate|cashback)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)(?:\s+(?:from|for)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40}))?""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val MAYBANK_PAYMENT_PATTERN = Pattern.compile(
+    private val MAYBANK_PAYMENT_PATTERN = Regex(
         """(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:paid to|transferred to|transfer to)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val MAYBANK_TRANSFER_OUT_PATTERN = Pattern.compile(
+    private val MAYBANK_TRANSFER_OUT_PATTERN = Regex(
         """(?:transfer of|transferred|transfer|duitnow transfer to|duitnow transfer)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:to|kepada)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val MAYBANK_CARD_PATTERN = Pattern.compile(
+    private val MAYBANK_CARD_PATTERN = Regex(
         """(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+at\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val GRAB_PAYMENT_PATTERN = Pattern.compile(
+    private val GRAB_PAYMENT_PATTERN = Regex(
         """(?:you paid|payment of)\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:to|for)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val PBB_CARD_PATTERN = Pattern.compile(
+    private val PBB_CARD_PATTERN = Regex(
         """using\s+your\s+(?:cd|card)(?:\s+ending\s+\d+)?\s+(?:@|at)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})\s+(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val PBB_CARD_PATTERN_ALT = Pattern.compile(
+    private val PBB_CARD_PATTERN_ALT = Regex(
         """using\s+your\s+(?:cd|card)(?:\s+ending\s+\d+)?\s+(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:@|at)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val PBB_PAYMENT_PATTERN = Pattern.compile(
+    private val PBB_PAYMENT_PATTERN = Regex(
         """(?:payment|transfer)\s+of\s+(?:RM|MYR)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+to\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,40})""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val GENERIC_RM_PATTERN = Pattern.compile(
+    private val GENERIC_RM_PATTERN = Regex(
         """(?:RM|MYR)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
-    private val GENERIC_MERCHANT_PATTERN = Pattern.compile(
+    private val GENERIC_MERCHANT_PATTERN = Regex(
         """(?:\b(?:paid to|transfer to|transferred to|transfer of|payment to|payment at|spent at|purchase at|bayaran di|transaksi di|kepada|to|at|di|for)|@|转账给|付款给)\s+([A-Za-z0-9\u4e00-\u9fa5\s&'._-]{2,35})""",
-        Pattern.CASE_INSENSITIVE
+        setOf(RegexOption.IGNORE_CASE)
     )
 
     private val KNOWN_MERCHANT_LABELS = listOf(
@@ -284,10 +298,12 @@ object LocalNotificationParser {
         )
     )
 
+    private fun MatchResult.groupOrNull(index: Int): String? = groups[index]?.value
+
     fun parse(text: String, packageName: String? = null): LocalParsedResult? {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return null
-        val lower = trimmed.lowercase(Locale.ROOT)
+        val lower = trimmed.lowercase()
 
         // 1. 营销广告过滤（统一强/弱广告规则引擎）
         if (isPromotionalOrAd(trimmed)) {
@@ -302,7 +318,7 @@ object LocalNotificationParser {
             }
         }
 
-        val pkg = packageName?.lowercase(Locale.ROOT) ?: ""
+        val pkg = packageName?.lowercase() ?: ""
 
         // 1.5 Shopee 专属严控：仅允许明确涉及 ShopeePay / SPayLater / 支付退款的通知，拦截卖家聊天/物流/降价提醒
         if (pkg.contains("shopee")) {
@@ -344,44 +360,39 @@ object LocalNotificationParser {
 
         // 3. Touch 'n Go 解析
         if (isTng) {
-            val mTngPay = TNG_PAYMENT_PATTERN.matcher(trimmed)
-            if (mTngPay.find()) {
-                val amt = parseAmount(mTngPay.group(1))
-                val rawMerchant = cleanMerchant(mTngPay.group(2) ?: "")
+            TNG_PAYMENT_PATTERN.find(trimmed)?.let { mTngPay ->
+                val amt = parseAmount(mTngPay.groupOrNull(1))
+                val rawMerchant = cleanMerchant(mTngPay.groupOrNull(2) ?: "")
                 if (amt > 0) {
                     val cat = predictCategory(rawMerchant, lower)
                     return LocalParsedResult(amt, "expense", cat, rawMerchant, rawMerchant, "Touch 'n Go", today)
                 }
             }
-            val mTngOut = TNG_TRANSFER_OUT_PATTERN.matcher(trimmed)
-            if (mTngOut.find()) {
-                val amt = parseAmount(mTngOut.group(1))
-                val rawMerchant = cleanMerchant(mTngOut.group(2) ?: "转账")
+            TNG_TRANSFER_OUT_PATTERN.find(trimmed)?.let { mTngOut ->
+                val amt = parseAmount(mTngOut.groupOrNull(1))
+                val rawMerchant = cleanMerchant(mTngOut.groupOrNull(2) ?: "转账")
                 if (amt > 0) {
                     return LocalParsedResult(amt, "expense", predictCategory(rawMerchant, lower), rawMerchant, "转账给 $rawMerchant", "Touch 'n Go", today)
                 }
             }
-            val mTngOutAlt = TNG_TRANSFER_OUT_ALT_PATTERN.matcher(trimmed)
-            if (mTngOutAlt.find()) {
-                val amt = parseAmount(mTngOutAlt.group(1))
-                val rawMerchant = cleanMerchant(mTngOutAlt.group(2) ?: "转账")
+            TNG_TRANSFER_OUT_ALT_PATTERN.find(trimmed)?.let { mTngOutAlt ->
+                val amt = parseAmount(mTngOutAlt.groupOrNull(1))
+                val rawMerchant = cleanMerchant(mTngOutAlt.groupOrNull(2) ?: "转账")
                 if (amt > 0) {
                     return LocalParsedResult(amt, "expense", predictCategory(rawMerchant, lower), rawMerchant, "转账给 $rawMerchant", "Touch 'n Go", today)
                 }
             }
-            val mTngDed = TNG_DEDUCTED_PATTERN.matcher(trimmed)
-            if (mTngDed.find()) {
-                val rawMerchant = cleanMerchant(mTngDed.group(1) ?: "")
-                val amt = parseAmount(mTngDed.group(2))
+            TNG_DEDUCTED_PATTERN.find(trimmed)?.let { mTngDed ->
+                val rawMerchant = cleanMerchant(mTngDed.groupOrNull(1) ?: "")
+                val amt = parseAmount(mTngDed.groupOrNull(2))
                 if (amt > 0) {
                     val cat = predictCategory(rawMerchant, lower)
                     return LocalParsedResult(amt, "expense", cat, rawMerchant, rawMerchant, "Touch 'n Go", today)
                 }
             }
-            val mTngIn = TNG_TRANSFER_IN_PATTERN.matcher(trimmed)
-            if (mTngIn.find()) {
-                val amt = parseAmount(mTngIn.group(1))
-                val sender = cleanMerchant(mTngIn.group(2) ?: "朋友转账")
+            TNG_TRANSFER_IN_PATTERN.find(trimmed)?.let { mTngIn ->
+                val amt = parseAmount(mTngIn.groupOrNull(1))
+                val sender = cleanMerchant(mTngIn.groupOrNull(2) ?: "朋友转账")
                 if (amt > 0) {
                     return LocalParsedResult(amt, "income", "其他收入", sender, "收到 $sender 转账", "Touch 'n Go", today)
                 }
@@ -390,10 +401,9 @@ object LocalNotificationParser {
 
         // 4. Grab 解析
         if (isGrab) {
-            val mGrab = GRAB_PAYMENT_PATTERN.matcher(trimmed)
-            if (mGrab.find()) {
-                val amt = parseAmount(mGrab.group(1))
-                val rawMerchant = cleanMerchant(mGrab.group(2) ?: "Grab")
+            GRAB_PAYMENT_PATTERN.find(trimmed)?.let { mGrab ->
+                val amt = parseAmount(mGrab.groupOrNull(1))
+                val rawMerchant = cleanMerchant(mGrab.groupOrNull(2) ?: "Grab")
                 if (amt > 0) {
                     val cat = if (lower.contains("grabfood")) "餐饮" else if (lower.contains("grabcar") || lower.contains("ride")) "交通" else predictCategory(rawMerchant, lower)
                     return LocalParsedResult(amt, "expense", cat, rawMerchant, rawMerchant, "Grab", today)
@@ -403,27 +413,24 @@ object LocalNotificationParser {
 
         // 5. Maybank 解析
         if (isMaybank) {
-            val mMay = MAYBANK_PAYMENT_PATTERN.matcher(trimmed)
-            if (mMay.find()) {
-                val amt = parseAmount(mMay.group(1))
-                val rawMerchant = cleanMerchant(mMay.group(2) ?: "")
+            MAYBANK_PAYMENT_PATTERN.find(trimmed)?.let { mMay ->
+                val amt = parseAmount(mMay.groupOrNull(1))
+                val rawMerchant = cleanMerchant(mMay.groupOrNull(2) ?: "")
                 if (amt > 0) {
                     val cat = predictCategory(rawMerchant, lower)
                     return LocalParsedResult(amt, "expense", cat, rawMerchant, rawMerchant, "Maybank", today)
                 }
             }
-            val mMayOut = MAYBANK_TRANSFER_OUT_PATTERN.matcher(trimmed)
-            if (mMayOut.find()) {
-                val amt = parseAmount(mMayOut.group(1))
-                val rawMerchant = cleanMerchant(mMayOut.group(2) ?: "转账")
+            MAYBANK_TRANSFER_OUT_PATTERN.find(trimmed)?.let { mMayOut ->
+                val amt = parseAmount(mMayOut.groupOrNull(1))
+                val rawMerchant = cleanMerchant(mMayOut.groupOrNull(2) ?: "转账")
                 if (amt > 0) {
                     return LocalParsedResult(amt, "expense", predictCategory(rawMerchant, lower), rawMerchant, "转账给 $rawMerchant", "Maybank", today)
                 }
             }
-            val mCard = MAYBANK_CARD_PATTERN.matcher(trimmed)
-            if (mCard.find()) {
-                val amt = parseAmount(mCard.group(1))
-                val rawMerchant = cleanMerchant(mCard.group(2) ?: "")
+            MAYBANK_CARD_PATTERN.find(trimmed)?.let { mCard ->
+                val amt = parseAmount(mCard.groupOrNull(1))
+                val rawMerchant = cleanMerchant(mCard.groupOrNull(2) ?: "")
                 if (amt > 0) {
                     val cat = predictCategory(rawMerchant, lower)
                     return LocalParsedResult(amt, "expense", cat, rawMerchant, rawMerchant, "Maybank", today)
@@ -433,28 +440,25 @@ object LocalNotificationParser {
 
         // 6. Public Bank 解析
         if (isPublicBank) {
-            val mCard = PBB_CARD_PATTERN.matcher(trimmed)
-            if (mCard.find()) {
-                val rawMerchant = cleanMerchant(mCard.group(1) ?: "")
-                val amt = parseAmount(mCard.group(2))
+            PBB_CARD_PATTERN.find(trimmed)?.let { mCard ->
+                val rawMerchant = cleanMerchant(mCard.groupOrNull(1) ?: "")
+                val amt = parseAmount(mCard.groupOrNull(2))
                 if (amt > 0) {
                     val cat = predictCategory(rawMerchant, lower)
                     return LocalParsedResult(amt, "expense", cat, rawMerchant, rawMerchant, "Public Bank", today)
                 }
             }
-            val mCardAlt = PBB_CARD_PATTERN_ALT.matcher(trimmed)
-            if (mCardAlt.find()) {
-                val amt = parseAmount(mCardAlt.group(1))
-                val rawMerchant = cleanMerchant(mCardAlt.group(2) ?: "")
+            PBB_CARD_PATTERN_ALT.find(trimmed)?.let { mCardAlt ->
+                val amt = parseAmount(mCardAlt.groupOrNull(1))
+                val rawMerchant = cleanMerchant(mCardAlt.groupOrNull(2) ?: "")
                 if (amt > 0) {
                     val cat = predictCategory(rawMerchant, lower)
                     return LocalParsedResult(amt, "expense", cat, rawMerchant, rawMerchant, "Public Bank", today)
                 }
             }
-            val mPbbPay = PBB_PAYMENT_PATTERN.matcher(trimmed)
-            if (mPbbPay.find()) {
-                val amt = parseAmount(mPbbPay.group(1))
-                val rawMerchant = cleanMerchant(mPbbPay.group(2) ?: "Public Bank支出")
+            PBB_PAYMENT_PATTERN.find(trimmed)?.let { mPbbPay ->
+                val amt = parseAmount(mPbbPay.groupOrNull(1))
+                val rawMerchant = cleanMerchant(mPbbPay.groupOrNull(2) ?: "Public Bank支出")
                 if (amt > 0) {
                     val cat = predictCategory(rawMerchant, lower)
                     return LocalParsedResult(amt, "expense", cat, rawMerchant, rawMerchant, "Public Bank", today)
@@ -477,9 +481,8 @@ object LocalNotificationParser {
         ).any { lower.contains(it) }
 
         if (isExpense || isIncome) {
-            val mRm = GENERIC_RM_PATTERN.matcher(trimmed)
-            if (mRm.find()) {
-                val amt = parseAmount(mRm.group(1))
+            GENERIC_RM_PATTERN.find(trimmed)?.let { mRm ->
+                val amt = parseAmount(mRm.groupOrNull(1))
                 if (amt > 0) {
                     val type = if (isIncome) "income" else "expense"
                     val channel = when {
@@ -493,8 +496,8 @@ object LocalNotificationParser {
                         isHlb -> "Hong Leong"
                         else -> "银行/卡"
                     }
-                    val mMcht = GENERIC_MERCHANT_PATTERN.matcher(trimmed)
-                    val regexMerchant = if (mMcht.find()) cleanMerchant(mMcht.group(1) ?: "", "") else ""
+                    val mMcht = GENERIC_MERCHANT_PATTERN.find(trimmed)
+                    val regexMerchant = if (mMcht != null) cleanMerchant(mMcht.groupOrNull(1) ?: "", "") else ""
                     val rawMerchant = when {
                         regexMerchant.isNotBlank() -> regexMerchant
                         type == "income" -> "$channel 入账"
@@ -532,26 +535,23 @@ object LocalNotificationParser {
             if (!hasSettledRebate) return null
         }
 
-        val mRef = REFUND_REBATE_PATTERN.matcher(trimmed)
         var amt = 0.0
         var rawMerchant = ""
-        if (mRef.find()) {
-            amt = parseAmount(mRef.group(1))
-            rawMerchant = cleanMerchant(mRef.group(2) ?: "", "")
+        REFUND_REBATE_PATTERN.find(trimmed)?.let { mRef ->
+            amt = parseAmount(mRef.groupOrNull(1))
+            rawMerchant = cleanMerchant(mRef.groupOrNull(2) ?: "", "")
         }
         if (amt <= 0.0) {
-            val mRm = GENERIC_RM_PATTERN.matcher(trimmed)
-            if (mRm.find()) {
-                amt = parseAmount(mRm.group(1))
+            GENERIC_RM_PATTERN.find(trimmed)?.let { mRm ->
+                amt = parseAmount(mRm.groupOrNull(1))
             }
         }
         if (amt <= 0.0) return null
 
         if (rawMerchant.isBlank()) {
-            val mMcht = GENERIC_MERCHANT_PATTERN.matcher(trimmed)
-            if (mMcht.find()) {
-                val candidate = cleanMerchant(mMcht.group(1) ?: "", "")
-                if (candidate.isNotBlank() && !candidate.lowercase(Locale.ROOT).startsWith("your ")) {
+            GENERIC_MERCHANT_PATTERN.find(trimmed)?.let { mMcht ->
+                val candidate = cleanMerchant(mMcht.groupOrNull(1) ?: "", "")
+                if (candidate.isNotBlank() && !candidate.lowercase().startsWith("your ")) {
                     rawMerchant = candidate
                 }
             }
@@ -581,15 +581,21 @@ object LocalNotificationParser {
         }
     }
 
+    private val CLEAN_MERCHANT_SPLIT_REGEX = Regex(
+        """[\.\r\n]|\s+(?:on|via|ref|using|with|at|date|txid|claim|get|earn|for)\b""",
+        setOf(RegexOption.IGNORE_CASE)
+    )
+    private val TRAILING_DIGITS_REGEX = Regex("""\s+#?\d{3,10}$""")
+
     private fun cleanMerchant(raw: String, fallback: String = "日常消费"): String {
-        var cleaned = raw.split(Regex("""[\.\r\n]|\s+(?:on|via|ref|using|with|at|date|txid|claim|get|earn|for)\b""", RegexOption.IGNORE_CASE))[0].trim()
+        var cleaned = raw.split(CLEAN_MERCHANT_SPLIT_REGEX)[0].trim()
         cleaned = cleaned.trim(' ', '.', '-', ':', ',', '@')
-        cleaned = cleaned.replace(Regex("""\s+#?\d{3,10}$"""), "").trim()
+        cleaned = cleaned.replace(TRAILING_DIGITS_REGEX, "").trim()
         val words = cleaned.split(" ").filter { it.isNotBlank() }
         if (words.size >= 2 && words.size % 2 == 0) {
             val half = words.size / 2
-            val firstHalf = words.subList(0, half).joinToString(" ").lowercase(Locale.ROOT)
-            val secondHalf = words.subList(half, words.size).joinToString(" ").lowercase(Locale.ROOT)
+            val firstHalf = words.subList(0, half).joinToString(" ").lowercase()
+            val secondHalf = words.subList(half, words.size).joinToString(" ").lowercase()
             if (firstHalf == secondHalf) {
                 cleaned = words.subList(0, half).joinToString(" ")
             }
@@ -605,7 +611,7 @@ object LocalNotificationParser {
     }
 
     fun predictCategory(merchant: String, fullTextLower: String): String {
-        val mLower = merchant.lowercase(Locale.ROOT)
+        val mLower = merchant.lowercase()
         for ((cat, keywords) in CATEGORY_RULES) {
             if (keywords.any { kw -> matchesKeyword(mLower, kw) || matchesKeyword(fullTextLower, kw) }) {
                 return cat
@@ -614,7 +620,5 @@ object LocalNotificationParser {
         return "其他"
     }
 
-    private fun getToday(): String {
-        return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-    }
+    private fun getToday(): String = todayDateString()
 }
