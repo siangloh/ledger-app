@@ -1,0 +1,90 @@
+=== Compiler / Test Errors ===
+53:e: file:///Users/runner/work/ledger-app/ledger-app/android-companion/shared/src/iosMain/kotlin/com/siangloh/ledger/platform/PlatformFeedback.ios.kt:62:28 Unresolved reference 'popoverPresentationController'.
+54:e: file:///Users/runner/work/ledger-app/ledger-app/android-companion/shared/src/iosMain/kotlin/com/siangloh/ledger/platform/PlatformFeedback.ios.kt:62:59 Cannot infer type for this parameter. Please specify it explicitly.
+55:e: file:///Users/runner/work/ledger-app/ledger-app/android-companion/shared/src/iosMain/kotlin/com/siangloh/ledger/platform/PlatformFeedback.ios.kt:62:65 Cannot infer type for this parameter. Please specify it explicitly.
+56:e: file:///Users/runner/work/ledger-app/ledger-app/android-companion/shared/src/iosMain/kotlin/com/siangloh/ledger/platform/PlatformFeedback.ios.kt:63:29 Unresolved reference 'sourceView'.
+57:e: file:///Users/runner/work/ledger-app/ledger-app/android-companion/shared/src/iosMain/kotlin/com/siangloh/ledger/platform/PlatformFeedback.ios.kt:64:29 Unresolved reference 'sourceRect'.
+59:> Task :shared:compileKotlinIosSimulatorArm64 FAILED
+61:FAILURE: Build failed with an exception.
+64:Execution failed for task ':shared:compileKotlinIosSimulatorArm64'.
+=== Log Tail ===
+Downloading https://services.gradle.org/distributions/gradle-8.9-bin.zip
+............10%.............20%.............30%.............40%.............50%.............60%.............70%.............80%.............90%.............100%
+
+Welcome to Gradle 8.9!
+
+Here are the highlights of this release:
+ - Enhanced Error and Warning Messages
+ - IDE Integration Improvements
+ - Daemon JVM Information
+
+For more details see https://docs.gradle.org/8.9/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+
+> Configure project :shared
+w: file:///Users/runner/work/ledger-app/ledger-app/android-companion/shared/build.gradle.kts:15:9: Experimental API in the Kotlin Gradle Plugin: No stability guarantees can be provided. The API could get removed in the future without replacement
+
+> Task :shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :shared:convertXmlValueResourcesForAppleMain NO-SOURCE
+> Task :shared:copyNonXmlValueResourcesForAppleMain NO-SOURCE
+> Task :shared:prepareComposeResourcesTaskForAppleMain NO-SOURCE
+> Task :shared:generateResourceAccessorsForAppleMain NO-SOURCE
+> Task :shared:convertXmlValueResourcesForCommonMain
+> Task :shared:copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :shared:prepareComposeResourcesTaskForCommonMain
+> Task :shared:generateResourceAccessorsForCommonMain
+> Task :shared:convertXmlValueResourcesForIosMain NO-SOURCE
+> Task :shared:copyNonXmlValueResourcesForIosMain NO-SOURCE
+> Task :shared:prepareComposeResourcesTaskForIosMain NO-SOURCE
+> Task :shared:generateResourceAccessorsForIosMain NO-SOURCE
+> Task :shared:convertXmlValueResourcesForIosSimulatorArm64Main NO-SOURCE
+> Task :shared:copyNonXmlValueResourcesForIosSimulatorArm64Main NO-SOURCE
+> Task :shared:prepareComposeResourcesTaskForIosSimulatorArm64Main NO-SOURCE
+> Task :shared:generateResourceAccessorsForIosSimulatorArm64Main NO-SOURCE
+> Task :shared:convertXmlValueResourcesForNativeMain NO-SOURCE
+> Task :shared:copyNonXmlValueResourcesForNativeMain NO-SOURCE
+> Task :shared:prepareComposeResourcesTaskForNativeMain NO-SOURCE
+> Task :shared:generateResourceAccessorsForNativeMain NO-SOURCE
+> Task :shared:generateActualResourceCollectorsForIosSimulatorArm64Main
+> Task :shared:generateComposeResClass
+> Task :shared:generateExpectResourceCollectorsForCommonMain
+> Task :shared:kspKotlinIosSimulatorArm64
+Downloading native dependencies (LLVM, sysroot etc). This is a one-time action performed only on the first run of the compiler.
+Done.
+Extracting dependency: /Users/runner/.konan/dependencies/cache/llvm-11.1.0-aarch64-macos-essentials-60.tar.gz into /Users/runner/.konan/dependencies
+Done.
+Extracting dependency: /Users/runner/.konan/dependencies/cache/libffi-3.3-1-macos-arm64.tar.gz into /Users/runner/.konan/dependencies
+i: [ksp] loaded provider(s): [androidx.room.RoomKspProcessor$Provider]
+
+> Task :shared:copyRoomSchemas NO-SOURCE
+
+> Task :shared:compileKotlinIosSimulatorArm64
+e: file:///Users/runner/work/ledger-app/ledger-app/android-companion/shared/src/iosMain/kotlin/com/siangloh/ledger/platform/PlatformFeedback.ios.kt:62:28 Unresolved reference 'popoverPresentationController'.
+e: file:///Users/runner/work/ledger-app/ledger-app/android-companion/shared/src/iosMain/kotlin/com/siangloh/ledger/platform/PlatformFeedback.ios.kt:62:59 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///Users/runner/work/ledger-app/ledger-app/android-companion/shared/src/iosMain/kotlin/com/siangloh/ledger/platform/PlatformFeedback.ios.kt:62:65 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///Users/runner/work/ledger-app/ledger-app/android-companion/shared/src/iosMain/kotlin/com/siangloh/ledger/platform/PlatformFeedback.ios.kt:63:29 Unresolved reference 'sourceView'.
+e: file:///Users/runner/work/ledger-app/ledger-app/android-companion/shared/src/iosMain/kotlin/com/siangloh/ledger/platform/PlatformFeedback.ios.kt:64:29 Unresolved reference 'sourceRect'.
+
+> Task :shared:compileKotlinIosSimulatorArm64 FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':shared:compileKotlinIosSimulatorArm64'.
+> Compilation finished with errors
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.9/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 1m 55s
+8 actionable tasks: 8 executed
