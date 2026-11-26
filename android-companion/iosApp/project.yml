@@ -31,6 +31,8 @@ targets:
           - "$(inherited)"
           - "-framework"
           - "Shared"
+          - "-lsqlite3"
+          - "-lc++"
     preBuildScripts:
       - name: Compile Kotlin Shared Framework
         script: |

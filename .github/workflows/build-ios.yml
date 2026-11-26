@@ -37,21 +37,42 @@ jobs:
       - name: Generate Xcode Project via XcodeGen & Build Unsigned IPA
         working-directory: ./android-companion/iosApp
         run: |
+          set -o pipefail
           if ! command -v xcodegen &> /dev/null; then
             brew install xcodegen
           fi
           xcodegen generate
-          xcodebuild -project iosApp.xcodeproj \
+          if ! xcodebuild -project iosApp.xcodeproj \
             -scheme iosApp \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_IDENTITY="" 2>&1 | tee ios_build_output.txt; then
+            echo "### iOS XcodeBuild Failure" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -n 120 ios_build_output.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/LedgerApp.app Payload/
           zip -qr LedgerApp-iOS.ipa Payload
+
+      - name: Record iOS build failure log
+        if: failure()
+        run: |
+          if [ -f android-companion/iosApp/ios_build_output.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            mkdir -p scratch
+            tail -n 200 android-companion/iosApp/ios_build_output.txt > scratch/ios_build_error.log
+            git add scratch/ios_build_error.log
+            git commit -m "ci(ios): record iOS build failure log [skip ci]" || true
+            git pull --rebase origin main || true
+            git push origin main || true
+          fi
 
       - name: Boot iOS Simulator, Launch App & Capture Screenshot
         working-directory: ./android-companion/iosApp
