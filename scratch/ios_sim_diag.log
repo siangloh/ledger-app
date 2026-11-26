@@ -1,0 +1,87 @@
+=== Launch Output ===
+com.siangloh.ledger: 61651
+=== Running Process Check (PID=61651) ===
+(not in launchctl list)
+=== Recent LedgerApp Logs ===
+2026-11-26 08:35:20.384 Df LedgerApp[61651:25a6a] [com.apple.CoreAnalytics:client] No XPC connection in Simulator
+2026-11-26 08:35:20.384 E  LedgerApp[61651:25a6a] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+2026-11-26 08:35:20.390 A  LedgerApp[61651:25a6a] (RunningBoardServices) didChangeInheritances
+2026-11-26 08:35:20.407 Df LedgerApp[61651:25a37] [com.apple.Accessibility:AXCommon] Read Per-App on Init: Smart invert = (null)
+2026-11-26 08:35:20.407 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyWindow] Scene target of keyboard event deferring environment did change: 1; scene: UIWindowScene: 0x102c09920; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.siangloh.ledger-default
+2026-11-26 08:35:20.407 Df LedgerApp[61651:25a37] [com.apple.UIKit:EventDeferring] [0x103158cb0] Scene target of event deferring environments did update: scene: 0x102c09920; current systemShellManagesKeyboardFocus: 1; systemShellManagesKeyboardFocusForScene: 1; eligibleForRecordRemoval: 1;
+2026-11-26 08:35:20.408 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyWindow] Scene became target of keyboard event deferring environment: UIWindowScene: 0x102c09920; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.siangloh.ledger-default
+2026-11-26 08:35:20.408 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyWindow] Stack[KeyWindow] 0x1032ddf80: Migrate scenes from LastOneWins -> SystemShellManaged
+2026-11-26 08:35:20.408 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyWindow] Setting default evaluation strategy for UIUserInterfaceIdiomPhone to SystemShellManaged
+2026-11-26 08:35:20.446 Df LedgerApp[61651:25a37] [com.apple.UIKit:UpdateScheduler] Target list changed: <CADisplay:LCD PurpleMain>
+2026-11-26 08:35:20.450 Df LedgerApp[61651:25a37] [com.apple.KeyboardArbiter:Client] startConnection
+2026-11-26 08:35:20.456 Df LedgerApp[61651:25a37] [com.apple.xpc:connection] [0x1031435c0] activating connection: mach=true listener=false peer=false name=com.apple.UIKit.KeyboardManagement.hosted
+2026-11-26 08:35:20.459 Df LedgerApp[61651:25a37] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:com.siangloh.ledger-default  persistentID: DDB96CB6-E4D6-4A2C-BD35-00B31B962B82
+2026-11-26 08:35:20.460 Df LedgerApp[61651:25a37] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x102c09920> (DDB96CB6-E4D6-4A2C-BD35-00B31B962B82)
+2026-11-26 08:35:20.462 Df LedgerApp[61651:25a37] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x102c09920> (DDB96CB6-E4D6-4A2C-BD35-00B31B962B82)
+2026-11-26 08:35:20.463 Df LedgerApp[61651:25a37] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:com.siangloh.ledger-default  persistentID: DDB96CB6-E4D6-4A2C-BD35-00B31B962B82
+2026-11-26 08:35:20.464 Df LedgerApp[61651:25a37] [com.apple.UIKit:Application] Deactivation reason removed: 12; deactivation reasons: 4128 -> 32; animating application lifecycle event: 1
+2026-11-26 08:35:20.464 Df LedgerApp[61651:25a37] [com.apple.KeyboardArbiter:Client] Send setDeactivating: N (-DeactivationReason:SuspendedEventsOnly)
+2026-11-26 08:35:20.466 Df LedgerApp[61651:25a37] [com.apple.UIKit:Application] Deactivation reason removed: 5; deactivation reasons: 32 -> 0; animating application lifecycle event: 0
+2026-11-26 08:35:20.860 E  LedgerApp[61651:25a37] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
+2026-11-26 08:35:20.860 Df LedgerApp[61651:25a37] (libCoreFSCache.dylib) Invalidating cache
+2026-11-26 08:35:20.861 Df LedgerApp[61651:25a37] [com.apple.xpc:connection] [0x1033a0140] activating connection: mach=false listener=false peer=false name=com.apple.MTLCompilerService
+2026-11-26 08:35:21.019 Df LedgerApp[61651:25a37] [com.apple.xpc:connection] [0x1033a03c0] activating connection: mach=false listener=false peer=false name=com.apple.MTLCompilerService
+2026-11-26 08:35:21.019 A  LedgerApp[61651:25a6a] (Metal) Metal Compiling Shader
+2026-11-26 08:35:21.103 Df LedgerApp[61651:25a6b] [com.apple.xpc:connection] [0x1033a0640] activating connection: mach=true listener=false peer=false name=com.apple.coresymbolicationd
+2026-11-26 08:35:22.170 A  LedgerApp[61651:25a6a] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.188 E  LedgerApp[61651:25a37] (libCoreFSCache.dylib) fopen failed for data file: errno = 2 (No such file or directory)
+2026-11-26 08:35:22.188 Df LedgerApp[61651:25a37] (libCoreFSCache.dylib) Invalidating cache
+2026-11-26 08:35:22.189 A  LedgerApp[61651:25a69] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.208 A  LedgerApp[61651:25a69] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.220 A  LedgerApp[61651:25a6a] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.230 A  LedgerApp[61651:25a6a] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.246 A  LedgerApp[61651:25a69] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.250 A  LedgerApp[61651:25a69] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.258 A  LedgerApp[61651:25a6a] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.321 A  LedgerApp[61651:25a6a] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.375 A  LedgerApp[61651:25a6a] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.378 A  LedgerApp[61651:25a6a] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.386 A  LedgerApp[61651:25a69] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.402 A  LedgerApp[61651:25a6a] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.431 A  LedgerApp[61651:25a69] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.434 A  LedgerApp[61651:25a6a] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.441 A  LedgerApp[61651:25a69] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.453 A  LedgerApp[61651:25a6a] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.457 A  LedgerApp[61651:25a69] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.474 A  LedgerApp[61651:25a6a] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.489 A  LedgerApp[61651:25a69] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.491 A  LedgerApp[61651:25a6a] (Metal) Metal Compiling Shader
+2026-11-26 08:35:22.523 Df LedgerApp[61651:25a37] [com.apple.KeyboardArbiter:Client] handleKeyboardChange: set currentKeyboard:N (wasKeyboard:N)
+2026-11-26 08:35:22.524 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardSceneDelegate] forceReloadInputViews
+2026-11-26 08:35:22.524 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardSceneDelegate] Reloading input views for key-window scene responder: <Sharedandroidx.compose.ui.window.UserInputView7: 0x103259340; frame = (0 0; 402 874); > force:Y
+2026-11-26 08:35:22.524 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardSceneDelegate] _reloadInputViewsForKeyWindowSceneResponder: 1 force: 1, fromBecomeFirstResponder: 0 (automaticKeyboard: 1, reloadIdentifier: 115CDECE-5559-42F4-A86D-CC88AACD176D)
+2026-11-26 08:35:22.524 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardSceneDelegate] _inputViewsForResponder: <Sharedandroidx.compose.ui.window.UserInputView7: 0x103259340; frame = (0 0; 402 874); >, automaticKeyboard: 1, force: 1
+2026-11-26 08:35:22.524 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardSceneDelegate] _inputViewsForResponder, found custom inputView: <(null): 0x0>, customInputViewController: <(null): 0x0>
+2026-11-26 08:35:22.524 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardSceneDelegate] _inputViewsForResponder, found inputAccessoryView: <(null): 0x0>
+2026-11-26 08:35:22.524 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardSceneDelegate] _inputViewsForResponder, responderRequiresKeyboard 0 (automaticKeyboardEnabled: 1, activeInstance: <(null): 0x0>, self.isOnScreen: 0, requiresKBWhenFirstResponder: 0)
+2026-11-26 08:35:22.525 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardSceneDelegate] _inputViewsForResponder, useKeyboard 0 (allowsSystemInputView: 1, !inputView <(null): 0x0>, responderRequiresKeyboard 0)
+2026-11-26 08:35:22.525 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardSceneDelegate] _inputViewsForResponder, configuring _responderWithoutAutomaticAppearanceEnabled: <(null): 0x0> (_automaticAppearEnabled: 1)
+2026-11-26 08:35:22.525 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardSceneDelegate] _inputViewsForResponder, needsIVPlaceholder: 0, needsIAVPlaceholder: 0, needsInputSetWithPlaceholder: 0
+2026-11-26 08:35:22.525 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardSceneDelegate] _inputViewsForResponder returning: <<UIInputViewSet: 0x103332ac0>; (empty)>
+2026-11-26 08:35:22.526 Df LedgerApp[61651:25a37] [com.apple.UIKit:UIPeripheralHost] endPlacementForInputViewSet: <<UIInputViewSet: 0x103332ac0>; (empty)> windowScene: <UIWindowScene: 0x102c09920; role: UIWindowSceneSessionRoleApplication; persistentIdentifier: DDB96CB6-E4D6-4A2C-BD35-00B31B962B82; activationState: UISceneActivationStateForegroundActive>
+2026-11-26 08:35:22.526 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardSceneDelegate] [Interface Orientation] was:Interface Unknown now:UIInterfaceOrientationPortrait reason:Using key window scene
+2026-11-26 08:35:22.537 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardArbiterClientLog] isWritingToolsHandlingKeyboardTracking:Y (WT ready:Y, Arbiter ready:Y)
+2026-11-26 08:35:22.537 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardArbiterClientLog] -[_UIRemoteKeyboards prepareToMoveKeyboard:withIAV:isIAVRelevant:showing:notifyRemote:forScene:] position: {{0, 0}, {0, 0}} visible: 0; notifyRemote: 0; isMinimized: NO
+2026-11-26 08:35:22.537 Df LedgerApp[61651:25a37] [com.apple.UIKit:KeyboardVisualMode] Show keyboard with visual mode windowed (0)
+2026-11-26 08:35:22.711 Df LedgerApp[61651:25a37] [com.apple.network:activity] <nw_activity 50:1 [A7675E20-E772-4498-8268-FDE1993EF624] (global parent) (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 4874ms
+2026-11-26 08:35:22.711 Df LedgerApp[61651:25a37] [com.apple.network:activity] <nw_activity 50:2 [10BA17D4-D541-4B7C-9980-47D5A5150A63] (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 4874ms
+2026-11-26 08:35:22.711 Df LedgerApp[61651:25a37] [com.apple.network:activity] Unsetting the global parent activity <nw_activity 50:1 [A7675E20-E772-4498-8268-FDE1993EF624] (global parent) (reporting strategy default) complete (reason success)>
+2026-11-26 08:35:22.711 Df LedgerApp[61651:25a37] [com.apple.network:activity] Unset the global parent activity
+2026-11-26 08:35:22.711 Df LedgerApp[61651:25a37] [com.apple.app_launch_measurement:ApplicationLaunch] alm_release_pageins_recording_assertion: releasing pageins recording assertion
+2026-11-26 08:35:22.712 E  LedgerApp[61651:25a69] [com.apple.app_launch_measurement:General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+2026-11-26 08:35:24.655 Df launchd_sim[50639:25acb] [user/501/UIKitApplication:com.siangloh.ledger[0540][rb-legacy] [61651]:] exited due to SIGABRT | sent by LedgerApp[61651], ran for 6768ms
+2026-11-26 08:35:24.655 Df launchd_sim[50639:25acb] [user/501/UIKitApplication:com.siangloh.ledger[0540][rb-legacy] [61651]:] service has crashed 1 times in a row (last was not dirty)
+2026-11-26 08:35:24.655 Df launchd_sim[50639:25acb] [user/501/UIKitApplication:com.siangloh.ledger[0540][rb-legacy] [61651]:] service state: exited
+2026-11-26 08:35:24.655 Df launchd_sim[50639:25acb] [user/501/UIKitApplication:com.siangloh.ledger[0540][rb-legacy] [61651]:] internal event: EXITED, code = 0
+2026-11-26 08:35:24.655 Df launchd_sim[50639:25acb] [user/501/UIKitApplication:com.siangloh.ledger[0540][rb-legacy] [61651]:] job state = exited
+2026-11-26 08:35:24.655 Df launchd_sim[50639:25acb] [user/501/UIKitApplication:com.siangloh.ledger[0540][rb-legacy] [61651]:] service state: not running
+2026-11-26 08:35:24.665 Df launchd_sim[50639:25acb] [user/501/UIKitApplication:com.siangloh.ledger[0540][rb-legacy]:] removing job: caller = runningboardd
+2026-11-26 08:35:24.665 Df launchd_sim[50639:25acb] [user/501/UIKitApplication:com.siangloh.ledger[0540][rb-legacy]:] internal event: PETRIFIED, code = 0
+2026-11-26 08:35:24.665 Df launchd_sim[50639:25acb] [user/501/UIKitApplication:com.siangloh.ledger[0540][rb-legacy]:] job state = removed
+=== Latest Crash Reports ===
+No LedgerApp crash reports found.
