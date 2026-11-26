@@ -68,7 +68,7 @@ jobs:
             git config user.email "github-actions[bot]@users.noreply.github.com"
             mkdir -p scratch
             tail -n 200 android-companion/iosApp/ios_build_output.txt > scratch/ios_build_error.log
-            git add scratch/ios_build_error.log
+            git add -f scratch/ios_build_error.log
             git commit -m "ci(ios): record iOS build failure log [skip ci]" || true
             git pull --rebase origin main || true
             git push origin main || true

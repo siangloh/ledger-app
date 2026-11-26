@@ -27,7 +27,7 @@ class KmpJsonTest {
             .put("double", 12.75)
             .put("float", 3.5f)
             .put("bool", true)
-            .put("explicitNull", JSONObject.NULL)
+            .put("explicitNull", JSONObject.NULL_VALUE)
 
         assertTrue(returned === obj)
         assertEquals(7, obj.length())
@@ -50,7 +50,7 @@ class KmpJsonTest {
     @Test
     fun jsonObject_optStringNeverReturnsNullLiteral() {
         val obj = JSONObject("""{"present":"ok","nullField":null,"num":7,"literalNull":"null"}""")
-        obj.put("putNull", JSONObject.NULL)
+        obj.put("putNull", JSONObject.NULL_VALUE)
 
         assertEquals("ok", obj.optString("present"))
         assertEquals("", obj.optString("missing"))
@@ -138,7 +138,7 @@ class KmpJsonTest {
         val original = JSONObject()
             .put("name", "Ledger")
             .put("count", 3)
-            .put("nullable", JSONObject.NULL)
+            .put("nullable", JSONObject.NULL_VALUE)
             .put("tags", JSONArray(listOf("food", "transport")))
 
         val compact = original.toString()

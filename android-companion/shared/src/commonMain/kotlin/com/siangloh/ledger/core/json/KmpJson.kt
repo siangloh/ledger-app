@@ -36,7 +36,7 @@ private fun parseJsonElementOrThrow(jsonString: String): JsonElement {
 
 private fun fromJsonElement(element: JsonElement): Any {
     return when (element) {
-        is JsonNull -> JSONObject.NULL
+        is JsonNull -> JSONObject.NULL_VALUE
         is JsonObject -> JSONObject.fromJsonObject(element)
         is JsonArray -> JSONArray.fromJsonArray(element)
         is JsonPrimitive -> {
@@ -55,7 +55,7 @@ private fun fromJsonElement(element: JsonElement): Any {
 
 private fun toJsonElement(value: Any?): JsonElement {
     return when (value) {
-        null, JSONObject.NULL -> JsonNull
+        null, JSONObject.NULL_VALUE -> JsonNull
         is JSONObject -> value.toJsonObject()
         is JSONArray -> value.toJsonArray()
         is String -> JsonPrimitive(value)
@@ -72,7 +72,7 @@ private fun toJsonElement(value: Any?): JsonElement {
 private fun normalizePutValue(value: Any?): Any? {
     return when (value) {
         null -> null
-        JSONObject.NULL -> JSONObject.NULL
+        JSONObject.NULL_VALUE -> JSONObject.NULL_VALUE
         is JSONObject, is JSONArray, is String, is Boolean, is Int, is Long -> value
         is Double -> {
             if (!value.isFinite()) throw IllegalArgumentException("JSON does not allow non-finite numbers: $value")
@@ -95,7 +95,7 @@ private fun normalizePutValue(value: Any?): Any? {
 }
 
 private fun coerceString(value: Any?, fallback: String): String {
-    if (value == null || value === JSONObject.NULL) return fallback
+    if (value == null || value === JSONObject.NULL_VALUE) return fallback
     return value.toString()
 }
 
@@ -156,7 +156,7 @@ class JSONObject {
     }
 
     companion object {
-        val NULL: Any = JsonNullSentinel
+        val NULL_VALUE: Any = JsonNullSentinel
 
         internal fun fromJsonObject(obj: JsonObject): JSONObject {
             return JSONObject().apply {
@@ -172,7 +172,7 @@ class JSONObject {
     fun isNull(key: String): Boolean {
         if (!entries.containsKey(key)) return true
         val v = entries[key]
-        return v == null || v === NULL
+        return v == null || v === NULL_VALUE
     }
 
     fun keys(): Iterator<String> = entries.keys.toList().iterator()
@@ -187,7 +187,7 @@ class JSONObject {
         if (!entries.containsKey(key)) {
             throw IllegalArgumentException("No value for $key")
         }
-        return entries[key] ?: NULL
+        return entries[key] ?: NULL_VALUE
     }
 
     fun put(key: String, value: Any?): JSONObject {
@@ -206,7 +206,7 @@ class JSONObject {
 
     fun getString(key: String): String {
         val v = entries[key]
-        if (v == null || v === NULL) {
+        if (v == null || v === NULL_VALUE) {
             throw IllegalArgumentException("No String value for $key")
         }
         return v.toString()
@@ -308,7 +308,7 @@ class JSONArray {
 
     constructor(collection: Collection<Any?>) {
         for (item in collection) {
-            items.add(normalizePutValue(item) ?: JSONObject.NULL)
+            items.add(normalizePutValue(item) ?: JSONObject.NULL_VALUE)
         }
     }
 
@@ -325,18 +325,18 @@ class JSONArray {
     fun length(): Int = items.size
 
     fun put(value: Any?): JSONArray {
-        items.add(normalizePutValue(value) ?: JSONObject.NULL)
+        items.add(normalizePutValue(value) ?: JSONObject.NULL_VALUE)
         return this
     }
 
     fun put(index: Int, value: Any?): JSONArray {
         if (index < 0) throw IllegalArgumentException("JSONArray[$index] not found.")
-        val normalized = normalizePutValue(value) ?: JSONObject.NULL
+        val normalized = normalizePutValue(value) ?: JSONObject.NULL_VALUE
         if (index < items.size) {
             items[index] = normalized
         } else {
             while (items.size < index) {
-                items.add(JSONObject.NULL)
+                items.add(JSONObject.NULL_VALUE)
             }
             items.add(normalized)
         }
@@ -354,7 +354,7 @@ class JSONArray {
 
     fun isNull(index: Int): Boolean {
         if (index !in items.indices) return true
-        return items[index] === JSONObject.NULL
+        return items[index] === JSONObject.NULL_VALUE
     }
 
     fun getJSONObject(index: Int): JSONObject {
@@ -373,7 +373,7 @@ class JSONArray {
 
     fun getString(index: Int): String {
         val v = get(index)
-        if (v === JSONObject.NULL) {
+        if (v === JSONObject.NULL_VALUE) {
             throw IllegalArgumentException("JSONArray[$index] is null.")
         }
         return v.toString()

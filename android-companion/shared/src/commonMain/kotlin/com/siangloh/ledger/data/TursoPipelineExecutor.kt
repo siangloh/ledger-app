@@ -147,7 +147,7 @@ object TursoPipelineExecutor {
                             "float" -> cellObj.optDouble("value")
                             else -> {
                                 val raw = cellObj.opt("value")
-                                if (raw == null || raw === JSONObject.NULL) null else raw
+                                if (raw == null || raw === JSONObject.NULL_VALUE) null else raw
                             }
                         }
                     } else {
