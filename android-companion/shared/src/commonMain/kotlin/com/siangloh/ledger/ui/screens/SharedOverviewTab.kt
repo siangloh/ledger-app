@@ -19,9 +19,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,8 +50,12 @@ import com.siangloh.ledger.data.SharedAccountsSummary
 import com.siangloh.ledger.data.SharedLedgerEngine
 import com.siangloh.ledger.data.SharedOverviewStats
 import com.siangloh.ledger.data.entities.LocalTransaction
+import com.siangloh.ledger.platform.LocaleStateHolder
 import com.siangloh.ledger.ui.components.SharedCategoryBadge
 import com.siangloh.ledger.ui.components.SharedMonthSwitcher
+import com.siangloh.ledger.ui.i18n.LedgerUiStrings
+import com.siangloh.ledger.ui.i18n.SharedStrings
+import kotlinx.coroutines.CancellationException
 import com.siangloh.ledger.ui.theme.ExpenseRed
 import com.siangloh.ledger.ui.theme.IncomeGreen
 import com.siangloh.ledger.ui.theme.PrimaryTeal
@@ -69,6 +74,8 @@ fun SharedOverviewTab(
     onNavigateToAdd: () -> Unit,
     onNavigateToRecords: () -> Unit
 ) {
+    val currentLang by LocaleStateHolder.language.collectAsState()
+    val s = remember(currentLang) { SharedStrings.forLanguage(currentLang) }
     var selectedMonth by remember { mutableStateOf(currentMonthString()) }
     var slideDir by remember { mutableStateOf(0) }
     var overviewStats by remember {
@@ -96,13 +103,15 @@ fun SharedOverviewTab(
     }
 
     LaunchedEffect(selectedMonth, dataRevision) {
-        runCatching {
+        try {
             SharedLedgerEngine.initDefaultsIfNeeded()
             val loadedStats = SharedLedgerEngine.getOverviewStats(selectedMonth)
             val loadedAccounts = SharedLedgerEngine.getAccountsSummary(selectedMonth)
             overviewStats = loadedStats
             accountsSummary = loadedAccounts
-        }.onFailure { err ->
+        } catch (e: CancellationException) {
+            throw e
+        } catch (err: Throwable) {
             println("SharedOverviewTab load error: ${err.message}")
         }
     }
@@ -121,7 +130,7 @@ fun SharedOverviewTab(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Overview",
+                    text = s.overviewTitle,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Slate900
@@ -144,7 +153,7 @@ fun SharedOverviewTab(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = "Net Worth RM ${formatMoney(accountsSummary.netWorth)}",
+                            text = "${s.netWorth} RM ${formatMoney(accountsSummary.netWorth)}",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Slate900,
@@ -172,7 +181,7 @@ fun SharedOverviewTab(
         }
 
         item {
-            OverviewHeroCard(stats = overviewStats)
+            OverviewHeroCard(stats = overviewStats, s = s)
         }
 
         item {
@@ -184,7 +193,7 @@ fun SharedOverviewTab(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Recent Transactions",
+                    text = s.recentTransactions,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Slate900
@@ -196,7 +205,7 @@ fun SharedOverviewTab(
                 ) {
                     TextButton(onClick = onNavigateToRecords) {
                         Text(
-                            text = "View All",
+                            text = s.viewAll,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = PrimaryTeal
@@ -212,7 +221,7 @@ fun SharedOverviewTab(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Rounded.Add,
-                                contentDescription = "Add transaction",
+                                contentDescription = s.addTransaction,
                                 tint = Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -243,7 +252,7 @@ fun SharedOverviewTab(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = Icons.Rounded.ReceiptLong,
+                                    imageVector = Icons.AutoMirrored.Rounded.ReceiptLong,
                                     contentDescription = null,
                                     tint = PrimaryTeal,
                                     modifier = Modifier.size(26.dp)
@@ -252,14 +261,14 @@ fun SharedOverviewTab(
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "No transactions yet",
+                            text = s.noTransactionsYet,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Slate900
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Record your first entry for $selectedMonth.",
+                            text = SharedStrings.format1(s.recordFirstEntryFmt, selectedMonth),
                             fontSize = 13.sp,
                             color = Slate500
                         )
@@ -279,7 +288,7 @@ fun SharedOverviewTab(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Add Transaction",
+                                text = s.addTransaction,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -292,7 +301,7 @@ fun SharedOverviewTab(
                 items = overviewStats.recentTransactions,
                 key = { it.id }
             ) { tx ->
-                OverviewTransactionRow(tx = tx)
+                OverviewTransactionRow(tx = tx, lang = currentLang)
             }
         }
 
@@ -303,7 +312,7 @@ fun SharedOverviewTab(
 }
 
 @Composable
-private fun OverviewHeroCard(stats: SharedOverviewStats) {
+private fun OverviewHeroCard(stats: SharedOverviewStats, s: LedgerUiStrings) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -316,7 +325,7 @@ private fun OverviewHeroCard(stats: SharedOverviewStats) {
                 .padding(20.dp)
         ) {
             Text(
-                text = "Net Balance",
+                text = s.netBalance,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = Slate500
@@ -340,19 +349,19 @@ private fun OverviewHeroCard(stats: SharedOverviewStats) {
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 HeroMetricItem(
-                    label = "Income",
+                    label = s.income,
                     amount = stats.income,
                     valueColor = IncomeGreen,
                     modifier = Modifier.weight(1f)
                 )
                 HeroMetricItem(
-                    label = "Expense",
+                    label = s.expense,
                     amount = stats.expense,
                     valueColor = ExpenseRed,
                     modifier = Modifier.weight(1f)
                 )
                 HeroMetricItem(
-                    label = "Savings",
+                    label = s.savings,
                     amount = stats.savings,
                     valueColor = PrimaryTeal,
                     modifier = Modifier.weight(1f)
@@ -391,8 +400,9 @@ private fun HeroMetricItem(
 }
 
 @Composable
-private fun OverviewTransactionRow(tx: LocalTransaction) {
+private fun OverviewTransactionRow(tx: LocalTransaction, lang: String) {
     val cleanCategory = remember(tx.category) { SharedLedgerEngine.cleanCategoryName(tx.category) }
+    val displayCategory = remember(cleanCategory, lang) { SharedStrings.localizeCategory(cleanCategory, lang) }
     val amountPrefix = when (tx.type) {
         "income" -> "+"
         "expense" -> "-"
@@ -434,7 +444,7 @@ private fun OverviewTransactionRow(tx: LocalTransaction) {
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = cleanCategory,
+                    text = displayCategory,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Slate900,

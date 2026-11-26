@@ -8,53 +8,61 @@ actual object PlatformContextHolder {
 }
 
 actual class PlatformPrefs actual constructor(name: String) {
-    private val suiteName = "com.siangloh.ledger.$name"
-    private val customDefaults: NSUserDefaults? = NSUserDefaults(suiteName = suiteName)
-    private val defaults: NSUserDefaults = customDefaults ?: NSUserDefaults.standardUserDefaults
+    private val prefix = "pref_${name}_"
+    private val defaults: NSUserDefaults = NSUserDefaults.standardUserDefaults
+
+    private fun scopedKey(key: String): String = "$prefix$key"
 
     actual fun getString(key: String, defaultValue: String?): String? {
-        return defaults.stringForKey(key) ?: defaultValue
+        return defaults.stringForKey(scopedKey(key)) ?: defaultValue
     }
 
     actual fun putString(key: String, value: String?) {
+        val fullKey = scopedKey(key)
         if (value == null) {
-            defaults.removeObjectForKey(key)
+            defaults.removeObjectForKey(fullKey)
         } else {
-            defaults.setObject(value, forKey = key)
+            defaults.setObject(value, forKey = fullKey)
         }
     }
 
     actual fun getBoolean(key: String, defaultValue: Boolean): Boolean {
-        return if (defaults.objectForKey(key) == null) defaultValue else defaults.boolForKey(key)
+        val fullKey = scopedKey(key)
+        return if (defaults.objectForKey(fullKey) == null) defaultValue else defaults.boolForKey(fullKey)
     }
 
     actual fun putBoolean(key: String, value: Boolean) {
-        defaults.setBool(value, forKey = key)
+        defaults.setBool(value, forKey = scopedKey(key))
     }
 
     actual fun getInt(key: String, defaultValue: Int): Int {
-        return if (defaults.objectForKey(key) == null) defaultValue else defaults.integerForKey(key).toInt()
+        val fullKey = scopedKey(key)
+        return if (defaults.objectForKey(fullKey) == null) defaultValue else defaults.integerForKey(fullKey).toInt()
     }
 
     actual fun putInt(key: String, value: Int) {
-        defaults.setInteger(value.toLong(), forKey = key)
+        defaults.setInteger(value.toLong(), forKey = scopedKey(key))
     }
 
     actual fun getLong(key: String, defaultValue: Long): Long {
-        return if (defaults.objectForKey(key) == null) defaultValue else defaults.integerForKey(key)
+        val fullKey = scopedKey(key)
+        return if (defaults.objectForKey(fullKey) == null) defaultValue else defaults.integerForKey(fullKey)
     }
 
     actual fun putLong(key: String, value: Long) {
-        defaults.setInteger(value, forKey = key)
+        defaults.setInteger(value, forKey = scopedKey(key))
     }
 
     actual fun remove(key: String) {
-        defaults.removeObjectForKey(key)
+        defaults.removeObjectForKey(scopedKey(key))
     }
 
     actual fun clear() {
-        if (customDefaults != null) {
-            customDefaults.removePersistentDomainForName(suiteName)
+        val keysToRemove = defaults.dictionaryRepresentation().keys
+            .mapNotNull { it?.toString() }
+            .filter { it.startsWith(prefix) }
+        for (fullKey in keysToRemove) {
+            defaults.removeObjectForKey(fullKey)
         }
     }
 }

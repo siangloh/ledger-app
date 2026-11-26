@@ -10,7 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import platform.Foundation.NSLog
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
 
@@ -55,7 +54,7 @@ object IosLedgerBridge {
                 PlatformToastBus.emit(summary)
                 dispatchMain { onDone(summary) }
             } catch (e: Throwable) {
-                NSLog("IosLedgerBridge.recordApplePayExpense failed: %@", e.message ?: "unknown")
+                println("IosLedgerBridge.recordApplePayExpense failed: ${e.message ?: "unknown"}")
                 dispatchMain { onDone("Could not save expense. Please try again.") }
             }
         }
@@ -107,7 +106,7 @@ object IosLedgerBridge {
                 PlatformToastBus.emit(summary)
                 dispatchMain { onDone(summary) }
             } catch (e: Throwable) {
-                NSLog("IosLedgerBridge.parseAndRecordBankMessage failed: %@", e.message ?: "unknown")
+                println("IosLedgerBridge.parseAndRecordBankMessage failed: ${e.message ?: "unknown"}")
                 dispatchMain { onDone("Could not process bank message. Please try again.") }
             }
         }

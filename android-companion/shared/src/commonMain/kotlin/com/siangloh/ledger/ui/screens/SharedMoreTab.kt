@@ -58,9 +58,11 @@ import com.siangloh.ledger.data.LedgerBackupCore
 import com.siangloh.ledger.platform.LocaleStateHolder
 import com.siangloh.ledger.platform.PlatformBiometricAuth
 import com.siangloh.ledger.platform.PlatformCapabilities
-import com.siangloh.ledger.platform.PlatformLocaleBridge
+import com.siangloh.ledger.platform.sharePlatformTextFile
 import com.siangloh.ledger.platform.showPlatformToast
 import com.siangloh.ledger.ui.components.SharedSegmentedTabs
+import com.siangloh.ledger.ui.i18n.LedgerUiStrings
+import com.siangloh.ledger.ui.i18n.SharedStrings
 import com.siangloh.ledger.ui.theme.Emerald50
 import com.siangloh.ledger.ui.theme.IncomeGreen
 import com.siangloh.ledger.ui.theme.PrimaryTeal
@@ -100,6 +102,7 @@ fun SharedMoreTab(
     }
 
     val currentLang by LocaleStateHolder.language.collectAsState()
+    val s = remember(currentLang) { SharedStrings.forLanguage(currentLang) }
     val selectedLangIndex = LanguageCodes.indexOf(currentLang).coerceAtLeast(0)
 
     var isExporting by remember { mutableStateOf(false) }
@@ -114,7 +117,7 @@ fun SharedMoreTab(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Settings",
+            text = s.settingsTitle,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = Slate900
@@ -142,13 +145,13 @@ fun SharedMoreTab(
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Privacy App Lock",
+                        text = s.appLockTitle,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
                     )
                     Text(
-                        text = "Protect your ledger with Face ID, Touch ID, or device passcode",
+                        text = s.appLockSubtitle,
                         fontSize = 12.sp,
                         color = Slate500
                     )
@@ -158,18 +161,18 @@ fun SharedMoreTab(
                     onCheckedChange = { enable ->
                         if (enable) {
                             if (!PlatformBiometricAuth.isAvailable()) {
-                                showPlatformToast("Biometric or passcode lock is not set up on this device")
+                                showPlatformToast(s.biometricUnavailable)
                                 return@Switch
                             }
                             PlatformBiometricAuth.authenticate(
-                                title = "Enable App Lock",
-                                subtitle = "Verify your identity to protect your ledger",
-                                cancelLabel = "Cancel"
+                                title = s.enableAppLockTitle,
+                                subtitle = s.enableAppLockSubtitle,
+                                cancelLabel = s.cancel
                             ) { success, errMsg ->
                                 if (success) {
                                     securityPrefs.putBoolean(KEY_APP_LOCK_ENABLED, true)
                                     appLockEnabled = true
-                                    showPlatformToast("App Lock enabled")
+                                    showPlatformToast(s.appLockEnabledToast)
                                 } else if (!errMsg.isNullOrBlank()) {
                                     showPlatformToast(errMsg)
                                 }
@@ -177,7 +180,7 @@ fun SharedMoreTab(
                         } else {
                             securityPrefs.putBoolean(KEY_APP_LOCK_ENABLED, false)
                             appLockEnabled = false
-                            showPlatformToast("App Lock disabled")
+                            showPlatformToast(s.appLockDisabledToast)
                         }
                     },
                     colors = SwitchDefaults.colors(
@@ -216,13 +219,13 @@ fun SharedMoreTab(
                     )
                     Column {
                         Text(
-                            text = "Language",
+                            text = s.languageTitle,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate900
                         )
                         Text(
-                            text = "Choose your preferred display language",
+                            text = s.languageSubtitle,
                             fontSize = 12.sp,
                             color = Slate500
                         )
@@ -234,9 +237,9 @@ fun SharedMoreTab(
                     selectedIndex = selectedLangIndex,
                     onSelect = { idx ->
                         val code = LanguageCodes[idx]
-                        PlatformLocaleBridge.setLanguage(code)
-                        LocaleStateHolder.refresh()
-                        showPlatformToast("Language switched to ${LanguageLabels[idx]}")
+                        LocaleStateHolder.setLanguage(code)
+                        val updatedStrings = SharedStrings.forLanguage(code)
+                        showPlatformToast(SharedStrings.format1(updatedStrings.languageSwitchedFmt, LanguageLabels[idx]))
                     }
                 )
             }
@@ -267,13 +270,13 @@ fun SharedMoreTab(
                     )
                     Column {
                         Text(
-                            text = "Backup & Export",
+                            text = s.backupExportTitle,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate900
                         )
                         Text(
-                            text = "Create an offline backup or export your records for spreadsheets",
+                            text = s.backupExportSubtitle,
                             fontSize = 12.sp,
                             color = Slate500
                         )
@@ -291,16 +294,33 @@ fun SharedMoreTab(
                             scope.launch {
                                 try {
                                     val result = LedgerBackupCore.exportFromDatabase()
-                                    val summaryMsg = "Backed up ${result.transactionCount} transactions across ${result.accountCount} accounts"
-                                    showPlatformToast(summaryMsg)
-                                    exportDialog = ExportDialogInfo(
-                                        title = "Offline Backup Ready",
-                                        summary = summaryMsg,
-                                        detail = "Accounts: ${result.accountCount}  •  Categories: ${result.categoryCount}  •  Transactions: ${result.transactionCount}"
+                                    val summaryMsg = SharedStrings.format2(
+                                        s.backupSummaryFmt,
+                                        result.accountCount,
+                                        result.transactionCount
                                     )
+                                    val shared = sharePlatformTextFile(
+                                        fileName = "ledger-backup.json",
+                                        mimeType = "application/json",
+                                        content = result.jsonContent
+                                    )
+                                    showPlatformToast(summaryMsg)
+                                    if (!shared) {
+                                        exportDialog = ExportDialogInfo(
+                                            title = s.backupDialogTitle,
+                                            summary = summaryMsg,
+                                            detail = SharedStrings.format3(
+                                                s.backupDialogDetailFmt,
+                                                result.accountCount,
+                                                result.categoryCount,
+                                                result.transactionCount
+                                            )
+                                        )
+                                    }
                                     onDataChanged()
                                 } catch (e: Exception) {
-                                    showPlatformToast("Backup failed: ${e.message ?: "please try again"}")
+                                    println("Backup export error: ${e.message}")
+                                    showPlatformToast(s.backupFailed)
                                 } finally {
                                     isExporting = false
                                 }
@@ -321,7 +341,7 @@ fun SharedMoreTab(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = "Backup",
+                            text = s.backupButton,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -334,15 +354,23 @@ fun SharedMoreTab(
                             scope.launch {
                                 try {
                                     val result = LedgerBackupCore.exportCsvFromDatabase()
-                                    val summaryMsg = "Exported ${result.transactionCount} transactions to CSV"
-                                    showPlatformToast(summaryMsg)
-                                    exportDialog = ExportDialogInfo(
-                                        title = "CSV Export Ready",
-                                        summary = summaryMsg,
-                                        detail = "Your spreadsheet table includes dates, categories, amounts, accounts, and notes."
+                                    val summaryMsg = SharedStrings.format1(s.csvSummaryFmt, result.transactionCount)
+                                    val shared = sharePlatformTextFile(
+                                        fileName = "ledger-transactions.csv",
+                                        mimeType = "text/csv",
+                                        content = result.csvContent
                                     )
+                                    showPlatformToast(summaryMsg)
+                                    if (!shared) {
+                                        exportDialog = ExportDialogInfo(
+                                            title = s.csvDialogTitle,
+                                            summary = summaryMsg,
+                                            detail = s.csvDialogDetail
+                                        )
+                                    }
                                 } catch (e: Exception) {
-                                    showPlatformToast("CSV export failed: ${e.message ?: "please try again"}")
+                                    println("CSV export error: ${e.message}")
+                                    showPlatformToast(s.csvFailed)
                                 } finally {
                                     isExporting = false
                                 }
@@ -363,7 +391,7 @@ fun SharedMoreTab(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = "Export CSV",
+                            text = s.exportCsvButton,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -374,7 +402,7 @@ fun SharedMoreTab(
 
         // iOS-only Auto-Tracking via Shortcuts Guide Card
         if (PlatformCapabilities.isIos) {
-            IosShortcutsGuideCard()
+            IosShortcutsGuideCard(s = s)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -417,7 +445,7 @@ fun SharedMoreTab(
                         contentColor = Color.White
                     )
                 ) {
-                    Text("Done", fontWeight = FontWeight.SemiBold)
+                    Text(s.done, fontWeight = FontWeight.SemiBold)
                 }
             }
         )
@@ -425,7 +453,7 @@ fun SharedMoreTab(
 }
 
 @Composable
-private fun IosShortcutsGuideCard() {
+private fun IosShortcutsGuideCard(s: LedgerUiStrings) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -450,13 +478,13 @@ private fun IosShortcutsGuideCard() {
                 )
                 Column {
                     Text(
-                        text = "iPhone Auto-Tracking via Shortcuts",
+                        text = s.iosShortcutsTitle,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
                     )
                     Text(
-                        text = "Log Apple Pay taps and bank SMS alerts automatically",
+                        text = s.iosShortcutsSubtitle,
                         fontSize = 12.sp,
                         color = Slate500
                     )
@@ -467,14 +495,14 @@ private fun IosShortcutsGuideCard() {
 
             ShortcutStepItem(
                 icon = Icons.Rounded.CreditCard,
-                title = "1. Apple Pay Purchases",
-                description = "Open Apple Shortcuts -> Automation -> + -> Transaction. Pick your cards, choose Run Immediately, and add \"Log Apple Pay Expense\" from Ledger."
+                title = s.iosShortcutApplePayTitle,
+                description = s.iosShortcutApplePayDesc
             )
 
             ShortcutStepItem(
                 icon = Icons.Rounded.Sms,
-                title = "2. Bank & E-Wallet SMS",
-                description = "Open Apple Shortcuts -> Automation -> + -> Message. Filter by your bank sender or keywords (such as RM, MAE, CIMB, TNG) and add \"Parse Bank SMS Expense\"."
+                title = s.iosShortcutBankSmsTitle,
+                description = s.iosShortcutBankSmsDesc
             )
 
             Surface(
@@ -495,7 +523,7 @@ private fun IosShortcutsGuideCard() {
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = "Runs completely offline — your spending records stay private on your iPhone.",
+                        text = s.iosShortcutsPrivacyNote,
                         fontSize = 12.sp,
                         color = Slate600
                     )

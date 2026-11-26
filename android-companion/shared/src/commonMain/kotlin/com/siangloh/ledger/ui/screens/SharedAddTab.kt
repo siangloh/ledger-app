@@ -50,6 +50,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -75,9 +76,11 @@ import com.siangloh.ledger.data.AppDatabase
 import com.siangloh.ledger.data.SharedLedgerEngine
 import com.siangloh.ledger.data.entities.LocalAccount
 import com.siangloh.ledger.data.entities.LocalCategory
+import com.siangloh.ledger.platform.LocaleStateHolder
 import com.siangloh.ledger.platform.showPlatformToast
 import com.siangloh.ledger.ui.components.SharedCategoryBadge
 import com.siangloh.ledger.ui.components.SharedSegmentedTabs
+import com.siangloh.ledger.ui.i18n.SharedStrings
 import com.siangloh.ledger.ui.theme.Emerald50
 import com.siangloh.ledger.ui.theme.ExpenseRed
 import com.siangloh.ledger.ui.theme.IncomeGreen
@@ -93,10 +96,10 @@ import com.siangloh.ledger.ui.theme.Slate700
 import com.siangloh.ledger.ui.theme.Slate800
 import com.siangloh.ledger.ui.theme.Slate900
 import com.siangloh.ledger.ui.theme.Teal50
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 private val TypeKeys = listOf("expense", "income", "savings", "transfer")
-private val TypeLabels = listOf("Expense", "Income", "Savings", "Transfer")
 private val QuickAddAmounts = listOf(10, 50, 100)
 
 @Composable
@@ -106,6 +109,9 @@ fun SharedAddTab(
 ) {
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val currentLang by LocaleStateHolder.language.collectAsState()
+    val s = remember(currentLang) { SharedStrings.forLanguage(currentLang) }
+    val typeLabels = remember(s) { listOf(s.expense, s.income, s.savings, s.transfer) }
 
     var selectedTypeIndex by remember { mutableIntStateOf(0) }
     val txType = TypeKeys[selectedTypeIndex]
@@ -122,28 +128,40 @@ fun SharedAddTab(
     var isSaving by remember { mutableStateOf(false) }
 
     LaunchedEffect(dataRevision) {
-        SharedLedgerEngine.initDefaultsIfNeeded()
-        val loadedAccounts = AppDatabase.getInstance().localAccountDao().getAll()
-        accounts = loadedAccounts
-        if (selectedAccountId == null || loadedAccounts.none { it.id == selectedAccountId }) {
-            selectedAccountId = loadedAccounts.firstOrNull()?.id
-        }
-        if (selectedToAccountId == null || loadedAccounts.none { it.id == selectedToAccountId }) {
-            selectedToAccountId = loadedAccounts.getOrNull(1)?.id ?: loadedAccounts.firstOrNull()?.id
+        try {
+            SharedLedgerEngine.initDefaultsIfNeeded()
+            val loadedAccounts = AppDatabase.getInstance().localAccountDao().getAll()
+            accounts = loadedAccounts
+            if (selectedAccountId == null || loadedAccounts.none { it.id == selectedAccountId }) {
+                selectedAccountId = loadedAccounts.firstOrNull()?.id
+            }
+            if (selectedToAccountId == null || loadedAccounts.none { it.id == selectedToAccountId }) {
+                selectedToAccountId = loadedAccounts.getOrNull(1)?.id ?: loadedAccounts.firstOrNull()?.id
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (err: Throwable) {
+            println("SharedAddTab accounts load error: ${err.message}")
         }
     }
 
     LaunchedEffect(txType, dataRevision) {
-        if (txType == "transfer") {
-            categories = emptyList()
-            selectedCategory = "内部转账"
-        } else {
-            SharedLedgerEngine.initDefaultsIfNeeded()
-            val loaded = AppDatabase.getInstance().localCategoryDao().getByType(txType)
-            categories = loaded
-            if (loaded.none { it.name == selectedCategory }) {
-                selectedCategory = loaded.firstOrNull()?.name ?: ""
+        try {
+            if (txType == "transfer") {
+                categories = emptyList()
+                selectedCategory = "内部转账"
+            } else {
+                SharedLedgerEngine.initDefaultsIfNeeded()
+                val loaded = AppDatabase.getInstance().localCategoryDao().getByType(txType)
+                categories = loaded
+                if (loaded.none { it.name == selectedCategory }) {
+                    selectedCategory = loaded.firstOrNull()?.name ?: ""
+                }
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (err: Throwable) {
+            println("SharedAddTab categories load error: ${err.message}")
         }
     }
 
@@ -178,7 +196,7 @@ fun SharedAddTab(
     ) {
         // Header
         Text(
-            text = "New Transaction",
+            text = s.newTransactionTitle,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = Slate900
@@ -186,7 +204,7 @@ fun SharedAddTab(
 
         // 4-way spring-sliding type selector
         SharedSegmentedTabs(
-            options = TypeLabels,
+            options = typeLabels,
             selectedIndex = selectedTypeIndex,
             onSelect = { selectedTypeIndex = it },
             activePillColor = accentColor,
@@ -208,7 +226,7 @@ fun SharedAddTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Amount",
+                    text = s.amountLabel,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Slate500
@@ -318,7 +336,7 @@ fun SharedAddTab(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "Category",
+                        text = s.categoryLabel,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Slate500
@@ -354,7 +372,7 @@ fun SharedAddTab(
                                             size = 38.dp
                                         )
                                         Text(
-                                            text = cat.name,
+                                            text = SharedStrings.localizeCategory(cat.name, currentLang),
                                             fontSize = 11.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                             color = if (isSelected) accentColor else Slate700,
@@ -403,13 +421,13 @@ fun SharedAddTab(
                     }
                     Column {
                         Text(
-                            text = "Internal Transfer",
+                            text = s.internalTransferTitle,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Slate900
                         )
                         Text(
-                            text = "Moves balance between accounts without affecting monthly income or expense",
+                            text = s.internalTransferDesc,
                             fontSize = 12.sp,
                             color = Slate500
                         )
@@ -433,9 +451,9 @@ fun SharedAddTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 val primaryAccountLabel = when (txType) {
-                    "transfer", "savings" -> "From Account"
-                    "income" -> "Deposit To"
-                    else -> "Paid With"
+                    "transfer", "savings" -> s.fromAccountLabel
+                    "income" -> s.depositToLabel
+                    else -> s.paidWithLabel
                 }
                 Text(
                     text = primaryAccountLabel,
@@ -447,6 +465,7 @@ fun SharedAddTab(
                 AccountChipRow(
                     accounts = accounts,
                     selectedId = selectedAccountId,
+                    lang = currentLang,
                     accentColor = accentColor,
                     accentSoftBg = accentSoftBg,
                     onSelect = { selectedAccountId = it }
@@ -454,7 +473,7 @@ fun SharedAddTab(
 
                 if (txType == "transfer" || txType == "savings") {
                     Text(
-                        text = if (txType == "transfer") "To Account" else "Destination Account (Optional)",
+                        text = if (txType == "transfer") s.toAccountLabel else s.destinationAccountOptional,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Slate500,
@@ -463,6 +482,7 @@ fun SharedAddTab(
                     AccountChipRow(
                         accounts = accounts,
                         selectedId = selectedToAccountId,
+                        lang = currentLang,
                         accentColor = accentColor,
                         accentSoftBg = accentSoftBg,
                         onSelect = { id ->
@@ -495,7 +515,7 @@ fun SharedAddTab(
                     OutlinedTextField(
                         value = dateText,
                         onValueChange = { if (it.length <= 10) dateText = it },
-                        label = { Text("Date") },
+                        label = { Text(s.dateLabel) },
                         placeholder = { Text("YYYY-MM-DD") },
                         leadingIcon = {
                             Icon(
@@ -523,7 +543,7 @@ fun SharedAddTab(
                             .clickable { dateText = todayDateString() }
                     ) {
                         Text(
-                            text = "Today",
+                            text = s.todayLabel,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Slate700,
@@ -535,8 +555,8 @@ fun SharedAddTab(
                 OutlinedTextField(
                     value = noteText,
                     onValueChange = { noteText = it },
-                    label = { Text("Note") },
-                    placeholder = { Text("Merchant, item, or remark...") },
+                    label = { Text(s.noteLabel) },
+                    placeholder = { Text(s.notePlaceholder) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Rounded.Edit,
@@ -562,16 +582,16 @@ fun SharedAddTab(
             onClick = {
                 val parsedAmount = amountText.toDoubleOrNull()
                 if (parsedAmount == null || parsedAmount <= 0.0) {
-                    showPlatformToast("Please enter an amount greater than 0")
+                    showPlatformToast(s.enterAmountGtZero)
                     return@Button
                 }
                 if (txType == "transfer") {
                     if (selectedAccountId == null || selectedToAccountId == null) {
-                        showPlatformToast("Please select both source and destination accounts")
+                        showPlatformToast(s.selectBothAccounts)
                         return@Button
                     }
                     if (selectedAccountId == selectedToAccountId) {
-                        showPlatformToast("Source and destination accounts must be different")
+                        showPlatformToast(s.accountsMustDiffer)
                         return@Button
                     }
                 }
@@ -597,10 +617,11 @@ fun SharedAddTab(
                         )
                         amountText = ""
                         noteText = ""
-                        showPlatformToast("Saved RM ${formatMoney(parsedAmount)}")
+                        showPlatformToast(SharedStrings.format1(s.savedAmountFmt, formatMoney(parsedAmount)))
                         onSaved()
                     } catch (e: Exception) {
-                        showPlatformToast("Unable to save transaction: ${e.message ?: "unknown error"}")
+                        println("SharedAddTab save error: ${e.message}")
+                        showPlatformToast(s.saveFailed)
                     } finally {
                         isSaving = false
                     }
@@ -632,7 +653,7 @@ fun SharedAddTab(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "Save ${TypeLabels[selectedTypeIndex]}",
+                    text = SharedStrings.format1(s.saveTypeFmt, typeLabels[selectedTypeIndex]),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -647,6 +668,7 @@ fun SharedAddTab(
 private fun AccountChipRow(
     accounts: List<LocalAccount>,
     selectedId: Int?,
+    lang: String,
     accentColor: Color,
     accentSoftBg: Color,
     onSelect: (Int) -> Unit
@@ -680,7 +702,7 @@ private fun AccountChipRow(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = acc.name,
+                        text = SharedStrings.localizeAccountName(acc.name, lang),
                         fontSize = 13.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                         color = if (isSelected) accentColor else Slate700,

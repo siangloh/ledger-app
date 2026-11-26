@@ -13,10 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.PieChart
-import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -50,6 +50,7 @@ import com.siangloh.ledger.core.prefs.PlatformPrefs
 import com.siangloh.ledger.data.SharedLedgerEngine
 import com.siangloh.ledger.platform.LocaleStateHolder
 import com.siangloh.ledger.platform.PlatformToastBus
+import com.siangloh.ledger.platform.showPlatformToast
 import com.siangloh.ledger.ui.components.SharedAppLockOverlay
 import com.siangloh.ledger.ui.screens.SharedAddTab
 import com.siangloh.ledger.ui.screens.SharedAnalyticsAccountsTab
@@ -64,6 +65,7 @@ import com.siangloh.ledger.ui.theme.Slate50
 import com.siangloh.ledger.ui.theme.Slate500
 import com.siangloh.ledger.ui.theme.Slate600
 import com.siangloh.ledger.ui.theme.Teal50
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 
 private const val SECURITY_PREFS_NAME = "ledger_security_prefs"
@@ -85,14 +87,14 @@ private data class SharedNavTab(
 
 private val SHARED_NAV_TABS = listOf(
     SharedNavTab(0, Icons.Rounded.Home, "概览", "Overview", "Ringkasan"),
-    SharedNavTab(1, Icons.Rounded.ReceiptLong, "账单", "Records", "Rekod"),
+    SharedNavTab(1, Icons.AutoMirrored.Rounded.ReceiptLong, "账单", "Records", "Rekod"),
     SharedNavTab(2, Icons.Rounded.AddCircle, "记账", "Add", "Catat"),
     SharedNavTab(3, Icons.Rounded.PieChart, "分析", "Analytics", "Analisis"),
     SharedNavTab(4, Icons.Rounded.Tune, "更多", "More", "Lagi")
 )
 
 @Composable
-fun LedgerSharedApp() {
+fun LedgerSharedApp(runUiSmokeTest: Boolean = false) {
     LedgerSharedTheme {
         var selectedTab by rememberSaveable { mutableIntStateOf(0) }
         var dataRevision by remember { mutableIntStateOf(0) }
@@ -111,6 +113,30 @@ fun LedgerSharedApp() {
                 SharedLedgerEngine.initDefaultsIfNeeded()
             }
             dataRevision++
+        }
+
+        if (runUiSmokeTest) {
+            LaunchedEffect(Unit) {
+                delay(700)
+                selectedTab = 1
+                delay(600)
+                selectedTab = 2
+                delay(600)
+                selectedTab = 3
+                delay(600)
+                selectedTab = 4
+                delay(600)
+                LocaleStateHolder.setLanguage("en")
+                showPlatformToast("Language switched to English")
+                delay(700)
+                LocaleStateHolder.setLanguage("ms")
+                showPlatformToast("Bahasa ditukar ke Melayu")
+                delay(700)
+                LocaleStateHolder.setLanguage("zh")
+                showPlatformToast("已切换为中文")
+                delay(700)
+                selectedTab = 0
+            }
         }
 
         LaunchedEffect(snackbarHostState) {

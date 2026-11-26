@@ -1,7 +1,0 @@
-=== Launch Output ===
-com.siangloh.ledger: 61224
-=== Running Process Check (PID=61224) ===
-61224	0	UIKitApplication:com.siangloh.ledger[3991][rb-legacy]
-=== App STDOUT ===
-SharedOverviewTab load error: The coroutine scope left the composition
-=== App STDERR ===

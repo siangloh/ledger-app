@@ -73,6 +73,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,7 +89,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.siangloh.ledger.data.SharedLedgerEngine
+import com.siangloh.ledger.platform.LocaleStateHolder
 import com.siangloh.ledger.platform.PlatformBiometricAuth
+import com.siangloh.ledger.ui.i18n.SharedStrings
 import com.siangloh.ledger.ui.theme.Emerald50
 import com.siangloh.ledger.ui.theme.ExpenseRed
 import com.siangloh.ledger.ui.theme.IncomeGreen
@@ -412,6 +415,8 @@ fun SharedCategoryBadge(
 
 @Composable
 fun SharedAppLockOverlay(onUnlocked: () -> Unit) {
+    val currentLang by LocaleStateHolder.language.collectAsState()
+    val s = remember(currentLang) { SharedStrings.forLanguage(currentLang) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
 
     fun triggerUnlock() {
@@ -421,14 +426,14 @@ fun SharedAppLockOverlay(onUnlocked: () -> Unit) {
             return
         }
         PlatformBiometricAuth.authenticate(
-            title = "Unlock Ledger",
-            subtitle = "Verify your identity to access your financial records",
-            cancelLabel = "Cancel"
+            title = s.unlockLedgerTitle,
+            subtitle = s.unlockLedgerSubtitle,
+            cancelLabel = s.cancel
         ) { success, error ->
             if (success) {
                 onUnlocked()
             } else {
-                statusMessage = error?.takeIf { it.isNotBlank() } ?: "Verification cancelled. Tap below to try again."
+                statusMessage = error?.takeIf { it.isNotBlank() } ?: s.verificationCancelled
             }
         }
     }
@@ -469,7 +474,7 @@ fun SharedAppLockOverlay(onUnlocked: () -> Unit) {
             Spacer(modifier = Modifier.height(22.dp))
 
             Text(
-                text = "Privacy Lock Active",
+                text = s.privacyLockActive,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Slate900,
@@ -479,7 +484,7 @@ fun SharedAppLockOverlay(onUnlocked: () -> Unit) {
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Your balances and transaction history are protected.",
+                text = s.privacyLockDesc,
                 fontSize = 14.sp,
                 color = Slate500,
                 textAlign = TextAlign.Center
@@ -522,7 +527,7 @@ fun SharedAppLockOverlay(onUnlocked: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Unlock with Biometrics",
+                    text = s.unlockWithBiometrics,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold
                 )

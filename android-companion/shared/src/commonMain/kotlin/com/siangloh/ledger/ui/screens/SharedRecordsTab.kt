@@ -19,10 +19,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,10 +55,12 @@ import com.siangloh.ledger.core.format.shiftMonth
 import com.siangloh.ledger.data.AppDatabase
 import com.siangloh.ledger.data.SharedLedgerEngine
 import com.siangloh.ledger.data.entities.LocalTransaction
+import com.siangloh.ledger.platform.LocaleStateHolder
 import com.siangloh.ledger.platform.showPlatformToast
 import com.siangloh.ledger.ui.components.SharedCategoryBadge
 import com.siangloh.ledger.ui.components.SharedMonthSwitcher
 import com.siangloh.ledger.ui.components.SharedSegmentedTabs
+import com.siangloh.ledger.ui.i18n.SharedStrings
 import com.siangloh.ledger.ui.theme.ExpenseRed
 import com.siangloh.ledger.ui.theme.IncomeGreen
 import com.siangloh.ledger.ui.theme.PrimaryTeal
@@ -68,12 +71,11 @@ import com.siangloh.ledger.ui.theme.Slate500
 import com.siangloh.ledger.ui.theme.Slate600
 import com.siangloh.ledger.ui.theme.Slate900
 import com.siangloh.ledger.ui.theme.Teal50
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-private val RecordFilterOptions = listOf("All", "Expense", "Income", "Transfer")
 
 @Composable
 fun SharedRecordsTab(
@@ -81,6 +83,10 @@ fun SharedRecordsTab(
     onDataChanged: () -> Unit,
     onNavigateToAdd: () -> Unit
 ) {
+    val currentLang by LocaleStateHolder.language.collectAsState()
+    val s = remember(currentLang) { SharedStrings.forLanguage(currentLang) }
+    val filterOptions = remember(s) { listOf(s.filterAll, s.filterExpense, s.filterIncome, s.filterTransfer) }
+
     var selectedMonth by remember { mutableStateOf(currentMonthString()) }
     var slideDir by remember { mutableStateOf(0) }
     var selectedFilterIndex by remember { mutableStateOf(0) }
@@ -90,10 +96,16 @@ fun SharedRecordsTab(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(selectedMonth, dataRevision) {
-        val loaded = withContext(Dispatchers.IO) {
-            AppDatabase.getInstance().localTransactionDao().getByMonth("$selectedMonth%")
+        try {
+            val loaded = withContext(Dispatchers.IO) {
+                AppDatabase.getInstance().localTransactionDao().getByMonth("$selectedMonth%")
+            }
+            monthTransactions = loaded
+        } catch (e: CancellationException) {
+            throw e
+        } catch (err: Throwable) {
+            println("SharedRecordsTab load error: ${err.message}")
         }
-        monthTransactions = loaded
     }
 
     val filteredTransactions = remember(monthTransactions, selectedFilterIndex, searchQuery) {
@@ -134,7 +146,7 @@ fun SharedRecordsTab(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Records",
+                    text = s.recordsTitle,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Slate900
@@ -162,7 +174,7 @@ fun SharedRecordsTab(
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Rounded.Add,
-                        contentDescription = "Add transaction",
+                        contentDescription = s.addTransaction,
                         tint = Color.White,
                         modifier = Modifier.size(20.dp)
                     )
@@ -184,7 +196,7 @@ fun SharedRecordsTab(
         )
 
         SharedSegmentedTabs(
-            options = RecordFilterOptions,
+            options = filterOptions,
             selectedIndex = selectedFilterIndex,
             onSelect = { selectedFilterIndex = it }
         )
@@ -195,7 +207,7 @@ fun SharedRecordsTab(
             modifier = Modifier.fillMaxWidth(),
             placeholder = {
                 Text(
-                    text = "Search category, note, or amount",
+                    text = s.searchPlaceholder,
                     fontSize = 14.sp,
                     color = Slate400
                 )
@@ -255,7 +267,7 @@ fun SharedRecordsTab(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = Icons.Rounded.ReceiptLong,
+                                imageVector = Icons.AutoMirrored.Rounded.ReceiptLong,
                                 contentDescription = null,
                                 tint = PrimaryTeal,
                                 modifier = Modifier.size(26.dp)
@@ -264,7 +276,7 @@ fun SharedRecordsTab(
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "No matching records",
+                        text = s.noMatchingRecords,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Slate900
@@ -272,9 +284,9 @@ fun SharedRecordsTab(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = if (searchQuery.isNotBlank()) {
-                            "Try a different keyword or filter."
+                            s.tryDifferentFilter
                         } else {
-                            "No transactions recorded for $selectedMonth."
+                            SharedStrings.format1(s.noRecordsForMonthFmt, selectedMonth)
                         },
                         fontSize = 13.sp,
                         color = Slate500
@@ -296,7 +308,7 @@ fun SharedRecordsTab(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Add Transaction",
+                                text = s.addTransaction,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -316,6 +328,8 @@ fun SharedRecordsTab(
                 ) { tx ->
                     RecordTransactionCard(
                         tx = tx,
+                        lang = currentLang,
+                        deleteLabel = s.deleteTransactionTitle,
                         onRequestDelete = { pendingDeleteTx = tx }
                     )
                 }
@@ -326,19 +340,25 @@ fun SharedRecordsTab(
     val txToDelete = pendingDeleteTx
     if (txToDelete != null) {
         val cleanCat = SharedLedgerEngine.cleanCategoryName(txToDelete.category)
+        val displayCat = SharedStrings.localizeCategory(cleanCat, currentLang)
         AlertDialog(
             onDismissRequest = { pendingDeleteTx = null },
             containerColor = Color.White,
             title = {
                 Text(
-                    text = "Delete Transaction",
+                    text = s.deleteTransactionTitle,
                     fontWeight = FontWeight.Bold,
                     color = Slate900
                 )
             },
             text = {
                 Text(
-                    text = "Delete $cleanCat (RM ${formatMoney(txToDelete.amount)}) on ${txToDelete.date}? Account balances will be updated accordingly.",
+                    text = SharedStrings.format3(
+                        s.deleteTransactionConfirmFmt,
+                        displayCat,
+                        formatMoney(txToDelete.amount),
+                        txToDelete.date
+                    ),
                     color = Slate600,
                     fontSize = 14.sp
                 )
@@ -351,7 +371,7 @@ fun SharedRecordsTab(
                         scope.launch {
                             val deleted = SharedLedgerEngine.deleteTransaction(targetId)
                             if (deleted) {
-                                showPlatformToast("Transaction deleted")
+                                showPlatformToast(s.transactionDeleted)
                                 onDataChanged()
                             }
                         }
@@ -362,12 +382,12 @@ fun SharedRecordsTab(
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Delete", fontWeight = FontWeight.SemiBold)
+                    Text(s.delete, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { pendingDeleteTx = null }) {
-                    Text("Cancel", color = Slate600)
+                    Text(s.cancel, color = Slate600)
                 }
             }
         )
@@ -377,9 +397,12 @@ fun SharedRecordsTab(
 @Composable
 private fun RecordTransactionCard(
     tx: LocalTransaction,
+    lang: String,
+    deleteLabel: String,
     onRequestDelete: () -> Unit
 ) {
     val cleanCategory = remember(tx.category) { SharedLedgerEngine.cleanCategoryName(tx.category) }
+    val displayCategory = remember(cleanCategory, lang) { SharedStrings.localizeCategory(cleanCategory, lang) }
     val amountPrefix = when (tx.type) {
         "income" -> "+"
         "expense" -> "-"
@@ -416,7 +439,7 @@ private fun RecordTransactionCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = cleanCategory,
+                    text = displayCategory,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Slate900,
@@ -446,7 +469,7 @@ private fun RecordTransactionCard(
             IconButton(onClick = onRequestDelete) {
                 Icon(
                     imageVector = Icons.Rounded.DeleteOutline,
-                    contentDescription = "Delete transaction",
+                    contentDescription = deleteLabel,
                     tint = Slate400,
                     modifier = Modifier.size(20.dp)
                 )

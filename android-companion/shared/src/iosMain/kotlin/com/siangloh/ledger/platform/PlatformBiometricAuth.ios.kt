@@ -7,6 +7,8 @@ import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
 
 actual object PlatformBiometricAuth {
+    private var activeContext: LAContext? = null
+
     @OptIn(ExperimentalForeignApi::class)
     actual fun isAvailable(): Boolean {
         return try {
@@ -34,6 +36,7 @@ actual object PlatformBiometricAuth {
                 }
                 return
             }
+            activeContext = context
             val reason = when {
                 subtitle.isNotBlank() && title.isNotBlank() -> "$title — $subtitle"
                 title.isNotBlank() -> title
@@ -45,10 +48,12 @@ actual object PlatformBiometricAuth {
                 localizedReason = reason
             ) { success, error ->
                 dispatch_async(dispatch_get_main_queue()) {
+                    activeContext = null
                     onResult(success, error?.localizedDescription)
                 }
             }
         } catch (e: Throwable) {
+            activeContext = null
             dispatch_async(dispatch_get_main_queue()) {
                 onResult(false, e.message ?: "Authentication failed")
             }

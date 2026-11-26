@@ -20,6 +20,8 @@ object PlatformToastBus {
 
 expect fun showPlatformToast(message: String)
 
+expect fun sharePlatformTextFile(fileName: String, mimeType: String, content: String): Boolean
+
 val LocalPlatformBackHandlerRegistrar =
     staticCompositionLocalOf<(@Composable (enabled: Boolean, onBack: () -> Unit) -> Unit)?> {
         null
@@ -46,7 +48,11 @@ object LocaleStateHolder {
 
     fun setLanguage(lang: String) {
         val normalized = normalizeLanguage(lang)
-        PlatformLocaleBridge.setLanguage(normalized)
+        try {
+            PlatformLocaleBridge.setLanguage(normalized)
+        } catch (e: Throwable) {
+            println("LocaleStateHolder.setLanguage warning: ${e.message}")
+        }
         _language.value = normalized
     }
 

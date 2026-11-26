@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -76,10 +77,13 @@ import com.siangloh.ledger.data.SharedLedgerEngine
 import com.siangloh.ledger.data.SharedOverviewStats
 import com.siangloh.ledger.data.entities.LocalAccount
 import com.siangloh.ledger.data.entities.LocalTransaction
+import com.siangloh.ledger.platform.LocaleStateHolder
 import com.siangloh.ledger.platform.showPlatformToast
 import com.siangloh.ledger.ui.components.SharedCategoryBadge
 import com.siangloh.ledger.ui.components.SharedMonthSwitcher
 import com.siangloh.ledger.ui.components.SharedSegmentedTabs
+import com.siangloh.ledger.ui.i18n.LedgerUiStrings
+import com.siangloh.ledger.ui.i18n.SharedStrings
 import com.siangloh.ledger.ui.theme.Emerald50
 import com.siangloh.ledger.ui.theme.ExpenseRed
 import com.siangloh.ledger.ui.theme.IncomeGreen
@@ -95,6 +99,7 @@ import com.siangloh.ledger.ui.theme.Slate700
 import com.siangloh.ledger.ui.theme.Slate900
 import com.siangloh.ledger.ui.theme.Teal50
 import com.siangloh.ledger.ui.theme.WarningAmber
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -137,6 +142,8 @@ fun SharedAnalyticsAccountsTab(
 ) {
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val currentLang by LocaleStateHolder.language.collectAsState()
+    val s = remember(currentLang) { SharedStrings.forLanguage(currentLang) }
 
     var selectedSubTab by remember { mutableIntStateOf(0) }
     var selectedMonth by remember { mutableStateOf(currentMonthString()) }
@@ -151,11 +158,17 @@ fun SharedAnalyticsAccountsTab(
     var editBalanceText by remember { mutableStateOf("") }
 
     LaunchedEffect(selectedMonth, dataRevision) {
-        SharedLedgerEngine.initDefaultsIfNeeded()
-        val db = AppDatabase.getInstance()
-        stats = SharedLedgerEngine.getOverviewStats(selectedMonth, db)
-        monthTxs = db.localTransactionDao().getByMonth("$selectedMonth%")
-        accountsSummary = SharedLedgerEngine.getAccountsSummary(selectedMonth, db)
+        try {
+            SharedLedgerEngine.initDefaultsIfNeeded()
+            val db = AppDatabase.getInstance()
+            stats = SharedLedgerEngine.getOverviewStats(selectedMonth, db)
+            monthTxs = db.localTransactionDao().getByMonth("$selectedMonth%")
+            accountsSummary = SharedLedgerEngine.getAccountsSummary(selectedMonth, db)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (err: Throwable) {
+            println("SharedAnalyticsAccountsTab load error: ${err.message}")
+        }
     }
 
     Column(
@@ -167,7 +180,7 @@ fun SharedAnalyticsAccountsTab(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         SharedSegmentedTabs(
-            options = listOf("Cashflow", "Accounts"),
+            options = listOf(s.cashflowTab, s.accountsTab),
             selectedIndex = selectedSubTab,
             onSelect = { selectedSubTab = it }
         )
@@ -185,7 +198,9 @@ fun SharedAnalyticsAccountsTab(
                     selectedMonth = shiftMonth(selectedMonth, 1)
                 },
                 stats = stats,
-                monthTransactions = monthTxs
+                monthTransactions = monthTxs,
+                lang = currentLang,
+                s = s
             )
         } else {
             AccountsSection(
@@ -195,7 +210,9 @@ fun SharedAnalyticsAccountsTab(
                 onTapAccount = { acc ->
                     editingAccount = acc
                     editBalanceText = formatMoney(acc.balance, decimals = 2, grouping = false)
-                }
+                },
+                lang = currentLang,
+                s = s
             )
         }
 
@@ -209,7 +226,7 @@ fun SharedAnalyticsAccountsTab(
             containerColor = Color.White,
             title = {
                 Text(
-                    text = "Adjust Balance",
+                    text = s.adjustBalanceTitle,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Slate900
@@ -218,7 +235,7 @@ fun SharedAnalyticsAccountsTab(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = targetAccount.name,
+                        text = SharedStrings.localizeAccountName(targetAccount.name, currentLang),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Slate600
@@ -226,7 +243,7 @@ fun SharedAnalyticsAccountsTab(
                     OutlinedTextField(
                         value = editBalanceText,
                         onValueChange = { editBalanceText = it },
-                        label = { Text("Current Balance (RM)") },
+                        label = { Text(s.currentBalanceLabel) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         shape = RoundedCornerShape(12.dp),
@@ -244,7 +261,7 @@ fun SharedAnalyticsAccountsTab(
                     onClick = {
                         val parsed = editBalanceText.trim().toDoubleOrNull()
                         if (parsed == null) {
-                            showPlatformToast("Please enter a valid number")
+                            showPlatformToast(s.enterValidNumber)
                             return@Button
                         }
                         scope.launch {
@@ -253,10 +270,11 @@ fun SharedAnalyticsAccountsTab(
                                     .localAccountDao()
                                     .update(targetAccount.copy(balance = parsed))
                                 editingAccount = null
-                                showPlatformToast("Balance updated")
+                                showPlatformToast(s.balanceUpdated)
                                 onDataChanged()
                             } catch (e: Exception) {
-                                showPlatformToast("Failed to update balance")
+                                println("Update account balance failed: ${e.message}")
+                                showPlatformToast(s.balanceUpdateFailed)
                             }
                         }
                     },
@@ -266,12 +284,12 @@ fun SharedAnalyticsAccountsTab(
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Save", fontWeight = FontWeight.SemiBold)
+                    Text(s.save, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { editingAccount = null }) {
-                    Text("Cancel", color = Slate600)
+                    Text(s.cancel, color = Slate600)
                 }
             }
         )
@@ -285,7 +303,9 @@ private fun CashflowSection(
     onPrevMonth: () -> Unit,
     onNextMonth: () -> Unit,
     stats: SharedOverviewStats?,
-    monthTransactions: List<LocalTransaction>
+    monthTransactions: List<LocalTransaction>,
+    lang: String,
+    s: LedgerUiStrings
 ) {
     SharedMonthSwitcher(
         yearMonth = selectedMonth,
@@ -315,7 +335,7 @@ private fun CashflowSection(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Net Balance",
+                    text = s.netBalance,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Slate500
@@ -336,21 +356,21 @@ private fun CashflowSection(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 CashflowMetricTile(
-                    label = "Income",
+                    label = s.income,
                     amount = income,
                     color = IncomeGreen,
                     bg = Emerald50,
                     modifier = Modifier.weight(1f)
                 )
                 CashflowMetricTile(
-                    label = "Expense",
+                    label = s.expense,
                     amount = expense,
                     color = ExpenseRed,
                     bg = Rose50,
                     modifier = Modifier.weight(1f)
                 )
                 CashflowMetricTile(
-                    label = "Savings",
+                    label = s.savings,
                     amount = savings,
                     color = PrimaryTeal,
                     bg = Teal50,
@@ -399,7 +419,7 @@ private fun CashflowSection(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Expense Breakdown",
+                text = s.expenseBreakdown,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = Slate900
@@ -420,7 +440,7 @@ private fun CashflowSection(
                         modifier = Modifier.size(36.dp)
                     )
                     Text(
-                        text = "No expenses recorded this month",
+                        text = s.noExpensesThisMonth,
                         fontSize = 13.sp,
                         color = Slate500
                     )
@@ -458,7 +478,7 @@ private fun CashflowSection(
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "Total Expense",
+                            text = s.totalExpense,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = Slate500
@@ -508,7 +528,7 @@ private fun CashflowSection(
                                                 .background(slice.color)
                                         )
                                         Text(
-                                            text = slice.category,
+                                            text = SharedStrings.localizeCategory(slice.category, lang),
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = Slate900,
@@ -592,7 +612,9 @@ private fun AccountsSection(
     summary: SharedAccountsSummary?,
     hideBalances: Boolean,
     onToggleHide: () -> Unit,
-    onTapAccount: (LocalAccount) -> Unit
+    onTapAccount: (LocalAccount) -> Unit,
+    lang: String,
+    s: LedgerUiStrings
 ) {
     val netWorth = summary?.netWorth ?: 0.0
     val assets = summary?.totalAssets ?: 0.0
@@ -619,7 +641,7 @@ private fun AccountsSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Net Worth",
+                    text = s.netWorth,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Slate500
@@ -630,7 +652,7 @@ private fun AccountsSection(
                 ) {
                     Icon(
                         imageVector = if (hideBalances) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                        contentDescription = if (hideBalances) "Show balances" else "Hide balances",
+                        contentDescription = null,
                         tint = Slate500,
                         modifier = Modifier.size(20.dp)
                     )
@@ -653,7 +675,7 @@ private fun AccountsSection(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Total Assets",
+                        text = s.totalAssets,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = Slate500
@@ -668,7 +690,7 @@ private fun AccountsSection(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Total Liabilities",
+                        text = s.totalLiabilities,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = Slate500
@@ -692,6 +714,13 @@ private fun AccountsSection(
         } else {
             items.filter { it.account.type == group.typeKey }
         }
+        val groupLabel = when (group.typeKey) {
+            "e_wallet" -> s.groupEWallet
+            "savings" -> s.groupBank
+            "credit_card" -> s.groupCreditCard
+            "cash" -> s.groupCash
+            else -> s.groupOther
+        }
         if (groupItems.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
@@ -706,7 +735,7 @@ private fun AccountsSection(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = group.label,
+                        text = groupLabel,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate700
@@ -718,6 +747,8 @@ private fun AccountsSection(
                         item = item,
                         icon = group.icon,
                         hideBalances = hideBalances,
+                        lang = lang,
+                        s = s,
                         onClick = { onTapAccount(item.account) }
                     )
                 }
@@ -731,6 +762,8 @@ private fun AccountItemCard(
     item: SharedAccountItem,
     icon: ImageVector,
     hideBalances: Boolean,
+    lang: String,
+    s: LedgerUiStrings,
     onClick: () -> Unit
 ) {
     val acc = item.account
@@ -776,7 +809,7 @@ private fun AccountItemCard(
                     }
                     Column {
                         Text(
-                            text = acc.name,
+                            text = SharedStrings.localizeAccountName(acc.name, lang),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = Slate900,
@@ -794,7 +827,7 @@ private fun AccountItemCard(
                                 modifier = Modifier.size(11.dp)
                             )
                             Text(
-                                text = "Tap to adjust",
+                                text = s.tapToAdjust,
                                 fontSize = 11.sp,
                                 color = Slate400
                             )
@@ -821,9 +854,9 @@ private fun AccountItemCard(
                 ) {
                     Text(
                         text = if (hideBalances) {
-                            "In ••••"
+                            "${s.inShort} ••••"
                         } else {
-                            "In +RM ${formatMoney(item.monthlyIn)}"
+                            "${s.inShort} +RM ${formatMoney(item.monthlyIn)}"
                         },
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -838,9 +871,9 @@ private fun AccountItemCard(
                 ) {
                     Text(
                         text = if (hideBalances) {
-                            "Out ••••"
+                            "${s.outShort} ••••"
                         } else {
-                            "Out -RM ${formatMoney(item.monthlyOut)}"
+                            "${s.outShort} -RM ${formatMoney(item.monthlyOut)}"
                         },
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -856,9 +889,9 @@ private fun AccountItemCard(
                     ) {
                         Text(
                             text = if (hideBalances) {
-                                "Limit ••••"
+                                "${s.limitShort} ••••"
                             } else {
-                                "Limit RM ${formatMoney(acc.creditLimit, decimals = 0)}"
+                                "${s.limitShort} RM ${formatMoney(acc.creditLimit, decimals = 0)}"
                             },
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,

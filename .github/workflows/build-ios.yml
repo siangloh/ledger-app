@@ -104,21 +104,28 @@ jobs:
           xcrun simctl install "$SIM_UDID" "$SIM_APP"
           xcrun simctl ui "$SIM_UDID" appearance light || true
           mkdir -p ../../scratch
-          LAUNCH_OUT=$(xcrun simctl launch --terminate-running-process --stdout="$(pwd)/../../scratch/ios_app_stdout.log" --stderr="$(pwd)/../../scratch/ios_app_stderr.log" "$SIM_UDID" com.siangloh.ledger)
+          LAUNCH_OUT=$(xcrun simctl launch --terminate-running-process --stdout="$(pwd)/../../scratch/ios_app_stdout.log" --stderr="$(pwd)/../../scratch/ios_app_stderr.log" "$SIM_UDID" com.siangloh.ledger --uitest-smoke)
           echo "Launched: $LAUNCH_OUT"
           APP_PID=$(echo "$LAUNCH_OUT" | awk '{print $2}')
-          sleep 8
+          sleep 12
 
-          {
-            echo "=== Launch Output ==="
-            echo "$LAUNCH_OUT"
-            echo "=== Running Process Check (PID=$APP_PID) ==="
-            xcrun simctl spawn "$SIM_UDID" launchctl list | grep -iE "ledger|siangloh" || echo "(not in launchctl list)"
-            echo "=== App STDOUT ==="
-            cat ../../scratch/ios_app_stdout.log 2>/dev/null || true
-            echo "=== App STDERR ==="
-            cat ../../scratch/ios_app_stderr.log 2>/dev/null || true
-          } > ../../scratch/ios_sim_diag.log 2>&1 || true
+          ALIVE_LINE=$(xcrun simctl spawn "$SIM_UDID" launchctl list | grep -iE "com\.siangloh\.ledger" || true)
+          echo "Process check: ${ALIVE_LINE:-NOT RUNNING}"
+          echo "=== App STDOUT ==="
+          cat ../../scratch/ios_app_stdout.log 2>/dev/null || true
+          echo "=== App STDERR ==="
+          cat ../../scratch/ios_app_stderr.log 2>/dev/null || true
+
+          if [ -z "$ALIVE_LINE" ]; then
+            echo "ERROR: LedgerApp crashed or exited during --uitest-smoke!"
+            LATEST_CRASH=$(ls -t "$HOME/Library/Logs/DiagnosticReports/"*LedgerApp* 2>/dev/null | head -n 1 || true)
+            if [ -n "$LATEST_CRASH" ]; then
+              echo "=== Crash Report ($LATEST_CRASH) ==="
+              head -n 120 "$LATEST_CRASH"
+            fi
+            xcrun simctl shutdown "$SIM_UDID" || true
+            exit 1
+          fi
 
           xcrun simctl io "$SIM_UDID" screenshot ios_simulator_boot.png
           ls -lh ios_simulator_boot.png
@@ -145,13 +152,10 @@ jobs:
           cp android-companion/iosApp/ios_simulator_boot.png static/download/ios_simulator_latest.png
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- static/download/ios_simulator_latest.png && [ -n "$(git ls-files static/download/ios_simulator_latest.png)" ] && [ ! -f scratch/ios_sim_diag.log ]; then
+          if git diff --quiet -- static/download/ios_simulator_latest.png && [ -n "$(git ls-files static/download/ios_simulator_latest.png)" ]; then
             echo "iOS screenshot unchanged, nothing to publish."
           else
             git add static/download/ios_simulator_latest.png
-            if [ -f scratch/ios_sim_diag.log ]; then
-              git add -f scratch/ios_sim_diag.log
-            fi
             git commit -m "chore(ios): publish latest iOS simulator screenshot [skip ci]"
             git pull --rebase origin main
             git push origin main
