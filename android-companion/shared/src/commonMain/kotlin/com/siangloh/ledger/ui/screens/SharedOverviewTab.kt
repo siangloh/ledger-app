@@ -96,11 +96,15 @@ fun SharedOverviewTab(
     }
 
     LaunchedEffect(selectedMonth, dataRevision) {
-        SharedLedgerEngine.initDefaultsIfNeeded()
-        val loadedStats = SharedLedgerEngine.getOverviewStats(selectedMonth)
-        val loadedAccounts = SharedLedgerEngine.getAccountsSummary(selectedMonth)
-        overviewStats = loadedStats
-        accountsSummary = loadedAccounts
+        runCatching {
+            SharedLedgerEngine.initDefaultsIfNeeded()
+            val loadedStats = SharedLedgerEngine.getOverviewStats(selectedMonth)
+            val loadedAccounts = SharedLedgerEngine.getAccountsSummary(selectedMonth)
+            overviewStats = loadedStats
+            accountsSummary = loadedAccounts
+        }.onFailure { err ->
+            println("SharedOverviewTab load error: ${err.message}")
+        }
     }
 
     LazyColumn(

@@ -102,9 +102,29 @@ jobs:
 
           SIM_APP="build-sim/Build/Products/Debug-iphonesimulator/LedgerApp.app"
           xcrun simctl install "$SIM_UDID" "$SIM_APP"
-          LAUNCH_OUT=$(xcrun simctl launch "$SIM_UDID" com.siangloh.ledger)
+          xcrun simctl ui "$SIM_UDID" appearance light || true
+          LAUNCH_OUT=$(xcrun simctl launch --terminate-running-process "$SIM_UDID" com.siangloh.ledger)
           echo "Launched: $LAUNCH_OUT"
-          sleep 6
+          APP_PID=$(echo "$LAUNCH_OUT" | awk '{print $2}')
+          sleep 8
+
+          mkdir -p ../../scratch
+          {
+            echo "=== Launch Output ==="
+            echo "$LAUNCH_OUT"
+            echo "=== Running Process Check (PID=$APP_PID) ==="
+            xcrun simctl spawn "$SIM_UDID" launchctl list | grep -iE "ledger|siangloh" || echo "(not in launchctl list)"
+            echo "=== Recent LedgerApp Logs ==="
+            xcrun simctl spawn "$SIM_UDID" log show --last 2m --style compact --predicate 'process == "LedgerApp" OR subsystem CONTAINS "siangloh"' 2>/dev/null | tail -n 80 || true
+            echo "=== Latest Crash Reports ==="
+            LATEST_CRASH=$(ls -t "$HOME/Library/Logs/DiagnosticReports/"*LedgerApp* 2>/dev/null | head -n 1 || true)
+            if [ -n "$LATEST_CRASH" ]; then
+              echo "Crash file: $LATEST_CRASH"
+              head -n 120 "$LATEST_CRASH"
+            else
+              echo "No LedgerApp crash reports found."
+            fi
+          } > ../../scratch/ios_sim_diag.log 2>&1 || true
 
           xcrun simctl io "$SIM_UDID" screenshot ios_simulator_boot.png
           ls -lh ios_simulator_boot.png
@@ -131,10 +151,13 @@ jobs:
           cp android-companion/iosApp/ios_simulator_boot.png static/download/ios_simulator_latest.png
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- static/download/ios_simulator_latest.png && [ -n "$(git ls-files static/download/ios_simulator_latest.png)" ]; then
+          if git diff --quiet -- static/download/ios_simulator_latest.png && [ -n "$(git ls-files static/download/ios_simulator_latest.png)" ] && [ ! -f scratch/ios_sim_diag.log ]; then
             echo "iOS screenshot unchanged, nothing to publish."
           else
             git add static/download/ios_simulator_latest.png
+            if [ -f scratch/ios_sim_diag.log ]; then
+              git add -f scratch/ios_sim_diag.log
+            fi
             git commit -m "chore(ios): publish latest iOS simulator screenshot [skip ci]"
             git pull --rebase origin main
             git push origin main
