@@ -400,12 +400,14 @@ object LocalLedgerRepository {
             val old = db.localTransactionDao().getById(id) ?: return@withContext Result.failure(Exception("交易不存在"))
 
             // 1. 恢复旧余额
-            if (old.accountId != null) {
+            old.accountId?.let { oldAccountId ->
                 val oldRevert = if (old.type == "income") -old.amount else old.amount
-                db.localAccountDao().updateBalance(old.accountId, oldRevert)
+                db.localAccountDao().updateBalance(oldAccountId, oldRevert)
             }
-            if (old.type == "transfer" && old.toAccountId != null) {
-                db.localAccountDao().updateBalance(old.toAccountId, -old.amount)
+            if (old.type == "transfer") {
+                old.toAccountId?.let { oldToAccountId ->
+                    db.localAccountDao().updateBalance(oldToAccountId, -old.amount)
+                }
             }
 
             // 2. 更新交易
@@ -472,12 +474,14 @@ object LocalLedgerRepository {
                     sp.edit().putString("trash_items", trashArr.toString()).apply()
                 } catch (_: Exception) {}
 
-                if (old.accountId != null) {
+                old.accountId?.let { oldAccountId ->
                     val revert = if (old.type == "income") -old.amount else old.amount
-                    db.localAccountDao().updateBalance(old.accountId, revert)
+                    db.localAccountDao().updateBalance(oldAccountId, revert)
                 }
-                if (old.type == "transfer" && old.toAccountId != null) {
-                    db.localAccountDao().updateBalance(old.toAccountId, -old.amount)
+                if (old.type == "transfer") {
+                    old.toAccountId?.let { oldToAccountId ->
+                        db.localAccountDao().updateBalance(oldToAccountId, -old.amount)
+                    }
                 }
                 db.localTransactionDao().deleteById(id)
             }
@@ -2603,9 +2607,9 @@ object LocalLedgerRepository {
                     source = target.optString("source", "manual")
                 )
                 db.localTransactionDao().insert(tx)
-                if (tx.accountId != null) {
+                tx.accountId?.let { accId ->
                     val delta = if (tx.type == "income") tx.amount else -tx.amount
-                    db.localAccountDao().updateBalance(tx.accountId, delta)
+                    db.localAccountDao().updateBalance(accId, delta)
                 }
                 val appCtx = context.applicationContext
                 cloudSyncScope.launch {

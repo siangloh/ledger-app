@@ -1,7 +1,12 @@
 package com.siangloh.ledger.data.daos
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
 import com.siangloh.ledger.data.entities.LocalTransaction
+import kotlinx.datetime.Clock
 
 @Dao
 interface LocalTransactionDao {
@@ -33,7 +38,7 @@ interface LocalTransactionDao {
     suspend fun getByYear(yearPrefix: String): List<LocalTransaction>
 
     @Query("UPDATE local_transactions SET category = :category, updatedAt = :updatedAt WHERE id = :id")
-    suspend fun updateCategory(id: Long, category: String, updatedAt: Long = System.currentTimeMillis())
+    suspend fun updateCategory(id: Long, category: String, updatedAt: Long = Clock.System.now().toEpochMilliseconds())
 
     @Query("SELECT * FROM local_transactions WHERE accountId = :accountId OR toAccountId = :accountId ORDER BY date DESC, id DESC")
     suspend fun getByAccountId(accountId: Int): List<LocalTransaction>

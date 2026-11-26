@@ -12,6 +12,9 @@ on:
       - '.github/workflows/build-ios.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-ios:
     runs-on: macos-latest
@@ -99,3 +102,19 @@ jobs:
           name: MyLedger-iOS-Simulator-Screenshot
           path: android-companion/iosApp/ios_simulator_boot.png
           retention-days: 30
+
+      - name: Publish latest iOS Simulator screenshot to repo
+        run: |
+          set -e
+          mkdir -p static/download
+          cp android-companion/iosApp/ios_simulator_boot.png static/download/ios_simulator_latest.png
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- static/download/ios_simulator_latest.png && [ -n "$(git ls-files static/download/ios_simulator_latest.png)" ]; then
+            echo "iOS screenshot unchanged, nothing to publish."
+          else
+            git add static/download/ios_simulator_latest.png
+            git commit -m "chore(ios): publish latest iOS simulator screenshot [skip ci]"
+            git pull --rebase origin main
+            git push origin main
+          fi

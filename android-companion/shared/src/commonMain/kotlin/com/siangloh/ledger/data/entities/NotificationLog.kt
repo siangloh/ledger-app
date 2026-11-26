@@ -2,12 +2,13 @@ package com.siangloh.ledger.data.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.datetime.Clock
 
 @Entity(tableName = "notification_log")
 data class NotificationLog(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val timestamp: Long = System.currentTimeMillis(),
+    val timestamp: Long = Clock.System.now().toEpochMilliseconds(),
     val sourcePackage: String,
     val rawText: String,
     val matchedPhase1: Boolean,

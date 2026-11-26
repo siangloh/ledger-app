@@ -1,7 +1,11 @@
 package com.siangloh.ledger.data.daos
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
 import com.siangloh.ledger.data.entities.NotificationLog
+import kotlinx.datetime.Clock
 
 @Dao
 interface NotificationLogDao {
@@ -12,7 +16,7 @@ interface NotificationLogDao {
     suspend fun getRecentLogs(): List<NotificationLog>
 
     @Query("UPDATE notification_log SET sentToBackend = 1, backendVerdict = :verdict, outcome = :outcome, timestamp = :timestamp WHERE rawText = :rawText AND outcome = 'queued_offline'")
-    suspend fun updateQueuedLog(rawText: String, verdict: String?, outcome: String, timestamp: Long = System.currentTimeMillis()): Int
+    suspend fun updateQueuedLog(rawText: String, verdict: String?, outcome: String, timestamp: Long = Clock.System.now().toEpochMilliseconds()): Int
 
     @Query("DELETE FROM notification_log WHERE id NOT IN (SELECT id FROM notification_log ORDER BY timestamp DESC LIMIT 200)")
     suspend fun pruneOldLogs()

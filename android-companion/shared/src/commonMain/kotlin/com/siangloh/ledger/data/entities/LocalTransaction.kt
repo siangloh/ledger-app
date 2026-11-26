@@ -3,6 +3,7 @@ package com.siangloh.ledger.data.entities
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.datetime.Clock
 
 @Entity(
     tableName = "local_transactions",
@@ -27,6 +28,6 @@ data class LocalTransaction(
     val toAccountId: Int? = null,
     val source: String = "manual", // "manual", "auto_notification"
     val channel: String? = null,
-    val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val createdAt: Long = Clock.System.now().toEpochMilliseconds(),
+    val updatedAt: Long = Clock.System.now().toEpochMilliseconds()
 )

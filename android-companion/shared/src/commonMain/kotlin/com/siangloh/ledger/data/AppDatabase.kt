@@ -1,26 +1,29 @@
 package com.siangloh.ledger.data
 
-import android.content.Context
+import androidx.room.ConstructedBy
 import androidx.room.Database
-import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.RoomDatabaseConstructor
 import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import androidx.sqlite.execSQL
 import com.siangloh.ledger.data.daos.CachedCategoryDao
+import com.siangloh.ledger.data.daos.LocalAccountDao
+import com.siangloh.ledger.data.daos.LocalCategoryDao
+import com.siangloh.ledger.data.daos.LocalTransactionDao
 import com.siangloh.ledger.data.daos.NotificationLogDao
 import com.siangloh.ledger.data.daos.PendingNotificationDao
 import com.siangloh.ledger.data.daos.PendingTransactionDao
 import com.siangloh.ledger.data.entities.CachedCategory
-import com.siangloh.ledger.data.entities.NotificationLog
-import com.siangloh.ledger.data.entities.PendingNotification
-import com.siangloh.ledger.data.entities.PendingTransaction
-
-import com.siangloh.ledger.data.daos.LocalAccountDao
-import com.siangloh.ledger.data.daos.LocalCategoryDao
-import com.siangloh.ledger.data.daos.LocalTransactionDao
 import com.siangloh.ledger.data.entities.LocalAccount
 import com.siangloh.ledger.data.entities.LocalCategory
 import com.siangloh.ledger.data.entities.LocalTransaction
+import com.siangloh.ledger.data.entities.NotificationLog
+import com.siangloh.ledger.data.entities.PendingNotification
+import com.siangloh.ledger.data.entities.PendingTransaction
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 
 @Database(
     entities = [
@@ -35,6 +38,7 @@ import com.siangloh.ledger.data.entities.LocalTransaction
     version = 6,
     exportSchema = false
 )
+@ConstructedBy(AppDatabaseConstructor::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingTransactionDao(): PendingTransactionDao
     abstract fun cachedCategoryDao(): CachedCategoryDao
@@ -45,32 +49,32 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun localCategoryDao(): LocalCategoryDao
 
     companion object {
-        @Volatile
-        private var INSTANCE: AppDatabase? = null
+        const val DATABASE_NAME = "ledger_local.db"
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE pending_transactions ADD COLUMN account_id INTEGER")
-                db.execSQL("ALTER TABLE pending_transactions ADD COLUMN to_account_id INTEGER")
-                db.execSQL("ALTER TABLE pending_transactions ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE pending_transactions ADD COLUMN account_id INTEGER")
+                connection.execSQL("ALTER TABLE pending_transactions ADD COLUMN to_account_id INTEGER")
+                connection.execSQL("ALTER TABLE pending_transactions ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
             }
         }
 
         val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE pending_transactions ADD COLUMN sync_error TEXT")
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE pending_transactions ADD COLUMN sync_error TEXT")
             }
         }
 
         val MIGRATION_3_4 = object : Migration(3, 4) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE pending_notifications ADD COLUMN eventId TEXT NOT NULL DEFAULT ''")
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE pending_notifications ADD COLUMN eventId TEXT NOT NULL DEFAULT ''")
             }
         }
 
         val MIGRATION_4_5 = object : Migration(4, 5) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("""
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    """
                     CREATE TABLE IF NOT EXISTS local_transactions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         date TEXT NOT NULL,
@@ -87,8 +91,10 @@ abstract class AppDatabase : RoomDatabase() {
                         createdAt INTEGER NOT NULL,
                         updatedAt INTEGER NOT NULL
                     )
-                """.trimIndent())
-                db.execSQL("""
+                    """.trimIndent()
+                )
+                connection.execSQL(
+                    """
                     CREATE TABLE IF NOT EXISTS local_accounts (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         name TEXT NOT NULL,
@@ -98,8 +104,10 @@ abstract class AppDatabase : RoomDatabase() {
                         currency TEXT NOT NULL,
                         orderNum INTEGER NOT NULL
                     )
-                """.trimIndent())
-                db.execSQL("""
+                    """.trimIndent()
+                )
+                connection.execSQL(
+                    """
                     CREATE TABLE IF NOT EXISTS local_categories (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         name TEXT NOT NULL,
@@ -108,31 +116,35 @@ abstract class AppDatabase : RoomDatabase() {
                         color TEXT NOT NULL,
                         orderNum INTEGER NOT NULL
                     )
-                """.trimIndent())
+                    """.trimIndent()
+                )
             }
         }
 
         val MIGRATION_5_6 = object : Migration(5, 6) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_local_transactions_date ON local_transactions(date)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_local_transactions_type ON local_transactions(type)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_local_transactions_category ON local_transactions(category)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_local_transactions_accountId ON local_transactions(accountId)")
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_local_transactions_date ON local_transactions(date)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_local_transactions_type ON local_transactions(type)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_local_transactions_category ON local_transactions(category)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_local_transactions_accountId ON local_transactions(accountId)")
             }
         }
 
-        fun getInstance(context: Context): AppDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "ledger_local.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
-                 .fallbackToDestructiveMigration()
-                 .build()
-                INSTANCE = instance
-                instance
-            }
-        }
+        fun configureBuilder(builder: RoomDatabase.Builder<AppDatabase>): AppDatabase =
+            builder
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .fallbackToDestructiveMigration(dropAllTables = true)
+                .setDriver(BundledSQLiteDriver())
+                .setQueryCoroutineContext(Dispatchers.IO)
+                .build()
+
+        fun getInstance(context: Any? = null): AppDatabase = getPlatformAppDatabase(context)
     }
 }
+
+@Suppress("NO_ACTUAL_FOR_EXPECT")
+expect object AppDatabaseConstructor : RoomDatabaseConstructor<AppDatabase> {
+    override fun initialize(): AppDatabase
+}
+
+expect fun getPlatformAppDatabase(platformContext: Any? = null): AppDatabase

@@ -1,6 +1,9 @@
 package com.siangloh.ledger.data.daos
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
 import com.siangloh.ledger.data.entities.PendingNotification
 
 @Dao
@@ -13,7 +16,6 @@ interface PendingNotificationDao {
 
     @Query("SELECT * FROM pending_notifications ORDER BY timestamp ASC")
     suspend fun getAllNotifications(): List<PendingNotification>
-
 
     @Query("SELECT COUNT(*) FROM pending_notifications WHERE eventId = :eventId AND sync_status IN ('pending', 'syncing')")
     suspend fun countPendingWithEventId(eventId: String): Int
