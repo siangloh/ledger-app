@@ -3,14 +3,15 @@ package com.siangloh.ledger.data
 import com.siangloh.ledger.core.format.currentMonthString
 import com.siangloh.ledger.core.format.todayDateString
 import com.siangloh.ledger.core.prefs.PlatformPrefs
+import com.siangloh.ledger.parser.LocalNotificationParser
 import com.siangloh.ledger.platform.LocaleStateHolder
 import com.siangloh.ledger.platform.showPlatformToast
 import com.siangloh.ledger.shared.IosLedgerBridge
 import com.siangloh.ledger.ui.i18n.SharedStrings
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -81,11 +82,14 @@ class IosDatabaseSmokeTest {
 
         assertTrue(SharedLedgerEngine.deleteTransaction(txId, db))
 
-        val deferred = CompletableDeferred<String>()
-        IosLedgerBridge.parseAndRecordBankMessage("Maybank: You spent RM12.00 at Starbucks") { msg ->
-            deferred.complete(msg)
-        }
-        val bridgeMsg = deferred.await()
-        assertTrue(bridgeMsg.isNotBlank())
+        val parsed = LocalNotificationParser.parse(
+            "Maybank: You spent RM12.00 at Starbucks",
+            "ios.shortcuts"
+        )
+        assertNotNull(parsed)
+        assertEquals(12.0, parsed.amount)
+
+        // Non-blocking guard check on invalid amount (no main-queue await inside runBlocking)
+        IosLedgerBridge.recordApplePayExpense(0.0, "", "") {}
     }
 }

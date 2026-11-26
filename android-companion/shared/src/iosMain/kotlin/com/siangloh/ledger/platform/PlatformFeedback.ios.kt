@@ -20,6 +20,7 @@ import platform.UIKit.UISceneActivationStateForegroundActive
 import platform.UIKit.UIViewController
 import platform.UIKit.UIWindow
 import platform.UIKit.UIWindowScene
+import platform.UIKit.popoverPresentationController
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
 
@@ -35,12 +36,12 @@ actual fun sharePlatformTextFile(fileName: String, mimeType: String, content: St
         val tempDir = NSTemporaryDirectory()
         val filePath = if (tempDir.endsWith("/")) "$tempDir$safeName" else "$tempDir/$safeName"
         val bytes = content.encodeToByteArray()
-        val nsData: NSData = if (bytes.isEmpty()) {
-            NSData()
-        } else {
-            bytes.usePinned { pinned ->
-                NSData.create(bytes = pinned.addressOf(0), length = bytes.size.toULong())
-            }
+        if (bytes.isEmpty()) {
+            println("sharePlatformTextFile: empty content for $safeName")
+            return false
+        }
+        val nsData: NSData = bytes.usePinned { pinned ->
+            NSData.create(bytes = pinned.addressOf(0), length = bytes.size.toULong())
         }
         val written = nsData.writeToFile(filePath, atomically = true)
         if (!written) {
@@ -83,7 +84,7 @@ private fun findTopViewController(): UIViewController? {
     } ?: scenes.firstOrNull() ?: return null
 
     val windows = activeScene.windows.filterIsInstance<UIWindow>()
-    val keyWindow = windows.firstOrNull { it.keyWindow } ?: windows.firstOrNull() ?: return null
+    val keyWindow = windows.firstOrNull { it.rootViewController != null } ?: return null
     var top = keyWindow.rootViewController ?: return null
     while (top.presentedViewController != null) {
         top = top.presentedViewController!!
