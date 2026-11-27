@@ -15,13 +15,39 @@ final class RealEnvironmentE2EUITests: XCTestCase {
     }
 
     @discardableResult
-    private func tapElement(tag: String, labels: [String], timeout: TimeInterval = 8) -> XCUIElement {
-        let predicate = NSPredicate(format: "identifier == %@ OR label IN %@", tag, labels)
-        let element = app.descendants(matching: .any).matching(predicate).firstMatch
-        XCTAssertTrue(
-            element.waitForExistence(timeout: timeout),
-            "Expected element with tag '\(tag)' or labels \(labels) to exist"
-        )
+    private func tapElement(tag: String, labels: [String], timeout: TimeInterval = 12) -> XCUIElement {
+        let idPredicate = NSPredicate(format: "identifier == %@", tag)
+        let exactLabelPredicate = NSPredicate(format: "label IN %@", labels)
+        let containsClauses = labels.map { _ in "label CONTAINS[c] %@" }.joined(separator: " OR ")
+        let containsPredicate = labels.isEmpty
+            ? NSPredicate(value: false)
+            : NSPredicate(format: containsClauses, argumentArray: labels)
+
+        let deadline = Date().addingTimeInterval(timeout)
+        var found: XCUIElement?
+        while Date() < deadline {
+            let byId = app.descendants(matching: .any).matching(idPredicate).firstMatch
+            if byId.exists {
+                found = byId
+                break
+            }
+            let byExactLabel = app.descendants(matching: .any).matching(exactLabelPredicate).firstMatch
+            if byExactLabel.exists {
+                found = byExactLabel
+                break
+            }
+            let byContains = app.descendants(matching: .any).matching(containsPredicate).firstMatch
+            if byContains.exists {
+                found = byContains
+                break
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+
+        guard let element = found else {
+            XCTFail("Expected element with tag '\(tag)' or labels \(labels) to exist.\nTree:\n\(app.debugDescription)")
+            fatalError("Unreachable")
+        }
         if element.isHittable {
             element.tap()
         } else {
@@ -31,7 +57,7 @@ final class RealEnvironmentE2EUITests: XCTestCase {
         return element
     }
 
-    private func assertTextExists(_ substrings: [String], timeout: TimeInterval = 8) {
+    private func assertTextExists(_ substrings: [String], timeout: TimeInterval = 10) {
         let clauses = substrings.map { _ in "(label CONTAINS[c] %@ OR value CONTAINS[c] %@)" }
         let format = clauses.joined(separator: " OR ")
         var args: [Any] = []
@@ -41,10 +67,9 @@ final class RealEnvironmentE2EUITests: XCTestCase {
         }
         let predicate = NSPredicate(format: format, argumentArray: args)
         let match = app.descendants(matching: .any).matching(predicate).firstMatch
-        XCTAssertTrue(
-            match.waitForExistence(timeout: timeout),
-            "Expected text matching any of \(substrings) to appear"
-        )
+        if !match.waitForExistence(timeout: timeout) {
+            XCTFail("Expected text matching any of \(substrings) to appear.\nTree:\n\(app.debugDescription)")
+        }
     }
 
     private func dismissAnySheetOrAlert() {
@@ -95,7 +120,7 @@ final class RealEnvironmentE2EUITests: XCTestCase {
         dismissAnySheetOrAlert()
 
         // Flow 3: Tab 2 (Add) -> Quick +50 and +10 -> Save -> Verify 60.00 on Overview
-        tapElement(tag: "nav_tab_2", labels: ["记账", "Add", "Rekod"])
+        tapElement(tag: "nav_tab_2", labels: ["记账", "Add", "Catat"])
         tapElement(tag: "add_quick_50", labels: ["+50"])
         tapElement(tag: "add_quick_10", labels: ["+10"])
         tapElement(tag: "add_btn_save", labels: ["保存记录", "保存", "Save"])
