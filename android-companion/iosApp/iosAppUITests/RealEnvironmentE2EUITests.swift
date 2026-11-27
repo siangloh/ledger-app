@@ -89,9 +89,13 @@ final class RealEnvironmentE2EUITests: XCTestCase {
             }
             return
         }
-        let popoverDismiss = app.otherElements["PopoverDismissRegion"]
+        let popoverDismiss = app.otherElements["PopoverDismissRegion"].firstMatch
         if popoverDismiss.exists {
-            popoverDismiss.tap()
+            if popoverDismiss.isHittable {
+                popoverDismiss.tap()
+            } else {
+                popoverDismiss.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            }
         }
     }
 
