@@ -79,27 +79,37 @@ final class RealEnvironmentE2EUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 0.5)
             return
         }
-        let btnPredicate = NSPredicate(
-            format: "label CONTAINS[c] 'close' OR label CONTAINS[c] 'cancel' OR label CONTAINS[c] 'done' OR label CONTAINS[c] '关闭' OR label CONTAINS[c] '取消' OR label CONTAINS[c] '确定' OR identifier == 'Close'"
-        )
-        let dismissBtn = app.buttons.matching(btnPredicate).firstMatch
-        if dismissBtn.waitForExistence(timeout: 1.5) {
-            if dismissBtn.isHittable {
-                dismissBtn.tap()
-            } else {
-                dismissBtn.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-            }
-            Thread.sleep(forTimeInterval: 0.5)
-        }
+
+        let shareContent = app.otherElements["shareSheet.activity.contentView"].firstMatch
+        let activityContent = app.otherElements["UIActivityContentView"].firstMatch
         let popoverDismiss = app.otherElements["PopoverDismissRegion"].firstMatch
-        if popoverDismiss.exists {
-            // PopoverDismissRegion spans the full screen; tap top-center (above the bottom sheet) to dismiss
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
-            Thread.sleep(forTimeInterval: 0.5)
-        }
-        if popoverDismiss.exists {
-            app.swipeDown()
-            Thread.sleep(forTimeInterval: 0.5)
+
+        for _ in 0..<3 {
+            let sheetOpen = shareContent.exists || activityContent.exists || popoverDismiss.exists
+            if !sheetOpen {
+                return
+            }
+
+            let closePredicate = NSPredicate(
+                format: "label CONTAINS[c] 'close' OR label CONTAINS[c] 'cancel' OR label CONTAINS[c] '关闭' OR label CONTAINS[c] '取消' OR identifier == 'Close'"
+            )
+            let closeBtn = app.buttons.matching(closePredicate).firstMatch
+            if closeBtn.exists && closeBtn.isHittable {
+                closeBtn.tap()
+            } else if shareContent.exists {
+                shareContent.swipeDown()
+            } else if activityContent.exists {
+                activityContent.swipeDown()
+            } else {
+                // Tap top-center backdrop above the bottom sheet (y=0.15)
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
+            }
+            Thread.sleep(forTimeInterval: 0.8)
+
+            if shareContent.exists || activityContent.exists || popoverDismiss.exists {
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
+                Thread.sleep(forTimeInterval: 0.8)
+            }
         }
     }
 
