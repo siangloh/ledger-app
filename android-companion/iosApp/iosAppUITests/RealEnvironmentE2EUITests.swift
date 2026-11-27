@@ -76,10 +76,12 @@ final class RealEnvironmentE2EUITests: XCTestCase {
         let alertBtn = app.alerts.buttons.firstMatch
         if alertBtn.waitForExistence(timeout: 1.5) {
             alertBtn.tap()
+            Thread.sleep(forTimeInterval: 0.5)
             return
         }
-        let dismissLabels = ["Close", "Done", "Cancel", "OK", "取消", "关闭", "确定", "好"]
-        let btnPredicate = NSPredicate(format: "label IN %@", dismissLabels)
+        let btnPredicate = NSPredicate(
+            format: "label CONTAINS[c] 'close' OR label CONTAINS[c] 'cancel' OR label CONTAINS[c] 'done' OR label CONTAINS[c] '关闭' OR label CONTAINS[c] '取消' OR label CONTAINS[c] '确定' OR identifier == 'Close'"
+        )
         let dismissBtn = app.buttons.matching(btnPredicate).firstMatch
         if dismissBtn.waitForExistence(timeout: 1.5) {
             if dismissBtn.isHittable {
@@ -87,15 +89,17 @@ final class RealEnvironmentE2EUITests: XCTestCase {
             } else {
                 dismissBtn.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             }
-            return
+            Thread.sleep(forTimeInterval: 0.5)
         }
         let popoverDismiss = app.otherElements["PopoverDismissRegion"].firstMatch
         if popoverDismiss.exists {
-            if popoverDismiss.isHittable {
-                popoverDismiss.tap()
-            } else {
-                popoverDismiss.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-            }
+            // PopoverDismissRegion spans the full screen; tap top-center (above the bottom sheet) to dismiss
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        if popoverDismiss.exists {
+            app.swipeDown()
+            Thread.sleep(forTimeInterval: 0.5)
         }
     }
 
