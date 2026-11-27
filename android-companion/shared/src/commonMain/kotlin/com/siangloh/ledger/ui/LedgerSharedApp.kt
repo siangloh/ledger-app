@@ -3,10 +3,19 @@ package com.siangloh.ledger.ui
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -20,9 +29,6 @@ import androidx.compose.material.icons.rounded.PieChart
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
@@ -39,10 +45,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -183,48 +196,72 @@ fun LedgerSharedApp(runUiSmokeTest: Boolean = false) {
                     }
                 },
                 bottomBar = {
+                    val rawBottomInset = WindowInsets.navigationBars
+                        .asPaddingValues()
+                        .calculateBottomPadding()
+                    val compactBottomPadding = (rawBottomInset - 14.dp).coerceAtLeast(0.dp)
                     Surface(
                         color = Color.White,
                         tonalElevation = 0.dp,
                         shadowElevation = 0.dp
                     ) {
-                        Column {
+                        Column(modifier = Modifier.fillMaxWidth()) {
                             HorizontalDivider(thickness = 1.dp, color = Slate200)
-                            NavigationBar(
-                                containerColor = Color.White,
-                                tonalElevation = 0.dp,
-                                windowInsets = WindowInsets.navigationBars
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = compactBottomPadding)
+                                    .height(54.dp)
+                                    .padding(horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 SHARED_NAV_TABS.forEach { tab ->
                                     val isSelected = selectedTab == tab.index
-                                    NavigationBarItem(
-                                        selected = isSelected,
-                                        onClick = { selectedTab = tab.index },
-                                        modifier = Modifier.testTag("nav_tab_${tab.index}"),
-                                        icon = {
+                                    val label = tab.label(currentLang)
+                                    val interactionSource = remember { MutableInteractionSource() }
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .testTag("nav_tab_${tab.index}")
+                                            .semantics(mergeDescendants = true) {
+                                                role = Role.Tab
+                                                selected = isSelected
+                                                contentDescription = label
+                                            }
+                                            .clickable(
+                                                interactionSource = interactionSource,
+                                                indication = null,
+                                                onClick = { selectedTab = tab.index }
+                                            ),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(999.dp))
+                                                .background(if (isSelected) Teal50 else Color.Transparent)
+                                                .padding(horizontal = 14.dp, vertical = 3.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
                                             Icon(
                                                 imageVector = tab.icon,
-                                                contentDescription = tab.label(currentLang),
-                                                modifier = Modifier.size(if (tab.index == 2) 26.dp else 22.dp)
+                                                contentDescription = null,
+                                                tint = if (isSelected) PrimaryTeal else Slate400,
+                                                modifier = Modifier.size(if (tab.index == 2) 23.dp else 21.dp)
                                             )
-                                        },
-                                        label = {
-                                            Text(
-                                                text = tab.label(currentLang),
-                                                fontSize = 11.sp,
-                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = PrimaryTeal,
-                                            selectedTextColor = PrimaryTeal,
-                                            indicatorColor = Teal50,
-                                            unselectedIconColor = Slate400,
-                                            unselectedTextColor = Slate500
+                                        }
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = label,
+                                            fontSize = 11.sp,
+                                            lineHeight = 13.sp,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                            color = if (isSelected) PrimaryTeal else Slate500,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
-                                    )
+                                    }
                                 }
                             }
                         }
