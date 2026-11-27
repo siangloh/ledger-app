@@ -204,10 +204,15 @@ fun SharedAddTab(
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { focusManager.clearFocus() })
             }
-            .verticalScroll(scrollState)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(scrollState)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
         // Header
         Text(
             text = s.newTransactionTitle,
@@ -623,96 +628,104 @@ fun SharedAddTab(
             }
         }
 
-        // Save button
-        Button(
-            onClick = {
-                focusManager.clearFocus()
-                val parsedAmount = amountText.toDoubleOrNull()
-                if (parsedAmount == null || parsedAmount <= 0.0) {
-                    showPlatformToast(s.enterAmountGtZero)
-                    return@Button
-                }
-                if (txType == "transfer") {
-                    if (selectedAccountId == null || selectedToAccountId == null) {
-                        showPlatformToast(s.selectBothAccounts)
-                        return@Button
-                    }
-                    if (selectedAccountId == selectedToAccountId) {
-                        showPlatformToast(s.accountsMustDiffer)
-                        return@Button
-                    }
-                }
-                val cleanDate = dateText.trim().ifBlank { todayDateString() }
-                if (runCatching { LocalDate.parse(cleanDate) }.isFailure) {
-                    showPlatformToast(s.invalidDateFormat)
-                    return@Button
-                }
-                val effectiveCategory = if (txType == "transfer") {
-                    "内部转账"
-                } else {
-                    selectedCategory.ifBlank { categories.firstOrNull()?.name ?: "其他" }
-                }
-
-                isSaving = true
-                scope.launch {
-                    try {
-                        SharedLedgerEngine.recordTransaction(
-                            date = cleanDate,
-                            type = txType,
-                            category = effectiveCategory,
-                            amount = parsedAmount,
-                            note = noteText.trim(),
-                            accountId = selectedAccountId,
-                            toAccountId = if (txType == "transfer" || txType == "savings") selectedToAccountId else null,
-                            source = "manual"
-                        )
-                        amountText = ""
-                        noteText = ""
-                        showPlatformToast(SharedStrings.format1(s.savedAmountFmt, formatMoney(parsedAmount)))
-                        onSaved()
-                    } catch (e: Exception) {
-                        println("SharedAddTab save error: ${e.message}")
-                        showPlatformToast(s.saveFailed)
-                    } finally {
-                        isSaving = false
-                    }
-                }
-            },
-            enabled = !isSaving,
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = accentColor,
-                contentColor = Color.White,
-                disabledContainerColor = Slate200,
-                disabledContentColor = Slate500
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .testTag("add_btn_save")
-        ) {
-            if (isSaving) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(20.dp)
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Rounded.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = SharedStrings.format1(s.saveTypeFmt, typeLabels[selectedTypeIndex]),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+        Spacer(Modifier.height(4.dp))
         }
 
-        Spacer(Modifier.height(12.dp))
+        // Sticky Save button bar (always visible & hittable without scrolling)
+        Surface(
+            color = Color.White,
+            border = BorderStroke(1.dp, Slate200),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Button(
+                onClick = {
+                    focusManager.clearFocus()
+                    val parsedAmount = amountText.toDoubleOrNull()
+                    if (parsedAmount == null || parsedAmount <= 0.0) {
+                        showPlatformToast(s.enterAmountGtZero)
+                        return@Button
+                    }
+                    if (txType == "transfer") {
+                        if (selectedAccountId == null || selectedToAccountId == null) {
+                            showPlatformToast(s.selectBothAccounts)
+                            return@Button
+                        }
+                        if (selectedAccountId == selectedToAccountId) {
+                            showPlatformToast(s.accountsMustDiffer)
+                            return@Button
+                        }
+                    }
+                    val cleanDate = dateText.trim().ifBlank { todayDateString() }
+                    if (runCatching { LocalDate.parse(cleanDate) }.isFailure) {
+                        showPlatformToast(s.invalidDateFormat)
+                        return@Button
+                    }
+                    val effectiveCategory = if (txType == "transfer") {
+                        "内部转账"
+                    } else {
+                        selectedCategory.ifBlank { categories.firstOrNull()?.name ?: "其他" }
+                    }
+
+                    isSaving = true
+                    scope.launch {
+                        try {
+                            SharedLedgerEngine.recordTransaction(
+                                date = cleanDate,
+                                type = txType,
+                                category = effectiveCategory,
+                                amount = parsedAmount,
+                                note = noteText.trim(),
+                                accountId = selectedAccountId,
+                                toAccountId = if (txType == "transfer" || txType == "savings") selectedToAccountId else null,
+                                source = "manual"
+                            )
+                            amountText = ""
+                            noteText = ""
+                            showPlatformToast(SharedStrings.format1(s.savedAmountFmt, formatMoney(parsedAmount)))
+                            onSaved()
+                        } catch (e: Exception) {
+                            println("SharedAddTab save error: ${e.message}")
+                            showPlatformToast(s.saveFailed)
+                        } finally {
+                            isSaving = false
+                        }
+                    }
+                },
+                enabled = !isSaving,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accentColor,
+                    contentColor = Color.White,
+                    disabledContainerColor = Slate200,
+                    disabledContentColor = Slate500
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                    .height(50.dp)
+                    .testTag("add_btn_save")
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Rounded.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = SharedStrings.format1(s.saveTypeFmt, typeLabels[selectedTypeIndex]),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
     }
 }
 

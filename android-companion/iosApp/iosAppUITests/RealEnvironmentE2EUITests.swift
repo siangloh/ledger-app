@@ -48,6 +48,22 @@ final class RealEnvironmentE2EUITests: XCTestCase {
             XCTFail("Expected element with tag '\(tag)' or labels \(labels) to exist.\nTree:\n\(app.debugDescription)")
             fatalError("Unreachable")
         }
+
+        var scrollAttempts = 0
+        while !element.isHittable && scrollAttempts < 4 {
+            let appFrame = app.frame
+            let elFrame = element.frame
+            if elFrame.minY > appFrame.height * 0.75 {
+                app.swipeUp()
+            } else if elFrame.maxY < appFrame.height * 0.15 {
+                app.swipeDown()
+            } else {
+                break
+            }
+            scrollAttempts += 1
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+
         if element.isHittable {
             element.tap()
         } else {
