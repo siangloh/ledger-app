@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Payments
@@ -83,7 +84,9 @@ import com.siangloh.ledger.data.AppDatabase
 import com.siangloh.ledger.data.SharedLedgerEngine
 import com.siangloh.ledger.data.entities.LocalAccount
 import com.siangloh.ledger.data.entities.LocalCategory
+import com.siangloh.ledger.parser.SmartPasteHelper
 import com.siangloh.ledger.platform.LocaleStateHolder
+import com.siangloh.ledger.platform.readPlatformClipboardText
 import com.siangloh.ledger.platform.showPlatformToast
 import com.siangloh.ledger.ui.components.SharedCategoryBadge
 import com.siangloh.ledger.ui.components.SharedSegmentedTabs
@@ -213,13 +216,80 @@ fun SharedAddTab(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-        // Header
-        Text(
-            text = s.newTransactionTitle,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = Slate900
-        )
+        // Header + Zero-Setup Smart Paste Action
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = s.newTransactionTitle,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Slate900
+            )
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = Teal50,
+                border = BorderStroke(1.dp, PrimaryTeal.copy(alpha = 0.25f)),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .testTag("add_btn_smart_paste")
+                    .clickable {
+                        focusManager.clearFocus()
+                        val clipText = readPlatformClipboardText()
+                        if (clipText.isNullOrBlank()) {
+                            showPlatformToast(s.smartPasteEmpty)
+                            return@clickable
+                        }
+                        val parsed = SmartPasteHelper.parseClipboardTransaction(clipText)
+                        if (parsed == null) {
+                            showPlatformToast(s.smartPasteNoMatch)
+                            return@clickable
+                        }
+                        val targetTypeIdx = TypeKeys.indexOf(parsed.type).takeIf { it >= 0 } ?: 0
+                        selectedTypeIndex = targetTypeIdx
+                        amountText = formatMoney(parsed.amount, decimals = 2, grouping = false)
+                        selectedCategory = parsed.category
+                        if (parsed.date.isNotBlank()) {
+                            dateText = parsed.date
+                        }
+                        if (parsed.note.isNotBlank()) {
+                            noteText = parsed.note
+                        }
+                        SmartPasteHelper.matchAccountIdForChannel(parsed.channel, accounts)?.let { matchedId ->
+                            selectedAccountId = matchedId
+                        }
+                        val catLabel = SharedStrings.localizeCategory(parsed.category, currentLang)
+                        showPlatformToast(
+                            SharedStrings.format2(
+                                s.smartPasteFilledFmt,
+                                catLabel,
+                                formatMoney(parsed.amount, decimals = 2, grouping = true)
+                            )
+                        )
+                    }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ContentPaste,
+                        contentDescription = null,
+                        tint = PrimaryTeal,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Text(
+                        text = s.smartPasteButton,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PrimaryTeal
+                    )
+                }
+            }
+        }
 
         // 4-way spring-sliding type selector
         SharedSegmentedTabs(

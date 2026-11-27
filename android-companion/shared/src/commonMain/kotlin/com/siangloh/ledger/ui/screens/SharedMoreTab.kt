@@ -19,10 +19,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Sms
 import androidx.compose.material.icons.rounded.TableChart
@@ -59,6 +62,7 @@ import com.siangloh.ledger.data.LedgerBackupCore
 import com.siangloh.ledger.platform.LocaleStateHolder
 import com.siangloh.ledger.platform.PlatformBiometricAuth
 import com.siangloh.ledger.platform.PlatformCapabilities
+import com.siangloh.ledger.platform.openSystemShortcutsApp
 import com.siangloh.ledger.platform.sharePlatformTextFile
 import com.siangloh.ledger.platform.showPlatformToast
 import com.siangloh.ledger.ui.components.SharedSegmentedTabs
@@ -408,9 +412,11 @@ fun SharedMoreTab(
             }
         }
 
-        // iOS-only Auto-Tracking via Shortcuts Guide Card
+        // Platform-specific Auto-Tracking Setup Guide Card
         if (PlatformCapabilities.isIos) {
             IosShortcutsGuideCard(s = s)
+        } else {
+            AndroidAutoTrackGuideCard(s = s)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -502,16 +508,55 @@ private fun IosShortcutsGuideCard(s: LedgerUiStrings) {
             HorizontalDivider(color = Slate100)
 
             ShortcutStepItem(
+                icon = Icons.Rounded.ContentPaste,
+                title = s.iosSmartPasteTitle,
+                description = s.iosSmartPasteSteps
+            )
+
+            HorizontalDivider(color = Slate100)
+
+            ShortcutStepItem(
                 icon = Icons.Rounded.CreditCard,
                 title = s.iosShortcutApplePayTitle,
                 description = s.iosShortcutApplePayDesc
             )
+
+            HorizontalDivider(color = Slate100)
 
             ShortcutStepItem(
                 icon = Icons.Rounded.Sms,
                 title = s.iosShortcutBankSmsTitle,
                 description = s.iosShortcutBankSmsDesc
             )
+
+            Button(
+                onClick = {
+                    val opened = openSystemShortcutsApp()
+                    if (!opened) {
+                        showPlatformToast(s.openShortcutsUnavailable)
+                    }
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PrimaryTeal,
+                    contentColor = Color.White
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("more_btn_open_shortcuts")
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = s.openShortcutsButton,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
 
             Surface(
                 shape = RoundedCornerShape(10.dp),
@@ -536,6 +581,86 @@ private fun IosShortcutsGuideCard(s: LedgerUiStrings) {
                         color = Slate600
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AndroidAutoTrackGuideCard(s: LedgerUiStrings) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Slate200),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SectionIconBadge(
+                    icon = Icons.Rounded.NotificationsActive,
+                    tint = PrimaryTeal,
+                    bg = Teal50
+                )
+                Column {
+                    Text(
+                        text = s.androidAutoTrackTitle,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900
+                    )
+                    Text(
+                        text = s.androidAutoTrackSubtitle,
+                        fontSize = 12.sp,
+                        color = Slate500
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Slate100)
+
+            Text(
+                text = s.androidAutoTrackSteps,
+                fontSize = 12.sp,
+                color = Slate600,
+                lineHeight = 18.sp
+            )
+
+            Button(
+                onClick = {
+                    val opened = openSystemShortcutsApp()
+                    if (!opened) {
+                        showPlatformToast(s.openNotificationSettingsUnavailable)
+                    }
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PrimaryTeal,
+                    contentColor = Color.White
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("more_btn_open_notif_settings")
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = s.openNotificationSettingsButton,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
     }

@@ -22,6 +22,10 @@ expect fun showPlatformToast(message: String)
 
 expect fun sharePlatformTextFile(fileName: String, mimeType: String, content: String): Boolean
 
+expect fun readPlatformClipboardText(): String?
+
+expect fun openSystemShortcutsApp(): Boolean
+
 val LocalPlatformBackHandlerRegistrar =
     staticCompositionLocalOf<(@Composable (enabled: Boolean, onBack: () -> Unit) -> Unit)?> {
         null

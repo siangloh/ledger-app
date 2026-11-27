@@ -16,6 +16,7 @@ import platform.Foundation.preferredLanguages
 import platform.Foundation.writeToFile
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIApplication
+import platform.UIKit.UIPasteboard
 import platform.UIKit.UISceneActivationStateForegroundActive
 import platform.UIKit.UIViewController
 import platform.UIKit.UIWindow
@@ -72,6 +73,36 @@ actual fun sharePlatformTextFile(fileName: String, mimeType: String, content: St
         true
     } catch (e: Throwable) {
         println("sharePlatformTextFile failed: ${e.message}")
+        false
+    }
+}
+
+actual fun readPlatformClipboardText(): String? {
+    return try {
+        UIPasteboard.generalPasteboard.string
+    } catch (e: Throwable) {
+        println("readPlatformClipboardText failed: ${e.message}")
+        null
+    }
+}
+
+actual fun openSystemShortcutsApp(): Boolean {
+    val url = NSURL.URLWithString("shortcuts://") ?: return false
+    return try {
+        dispatch_async(dispatch_get_main_queue()) {
+            try {
+                UIApplication.sharedApplication.openURL(
+                    url = url,
+                    options = emptyMap<Any?, Any>(),
+                    completionHandler = null
+                )
+            } catch (e: Throwable) {
+                println("openSystemShortcutsApp openURL failed: ${e.message}")
+            }
+        }
+        true
+    } catch (e: Throwable) {
+        println("openSystemShortcutsApp failed: ${e.message}")
         false
     }
 }

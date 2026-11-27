@@ -1,7 +1,11 @@
 package com.siangloh.ledger.platform
 
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.Composable
@@ -34,6 +38,36 @@ actual fun sharePlatformTextFile(fileName: String, mimeType: String, content: St
         true
     } catch (e: Throwable) {
         Log.w("PlatformFeedback", "Failed to write exported file $fileName", e)
+        false
+    }
+}
+
+actual fun readPlatformClipboardText(): String? {
+    if (!PlatformContextHolder.isInitialized) return null
+    return try {
+        val clipboard = PlatformContextHolder.appContext.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val clip = clipboard?.primaryClip
+        if (clip != null && clip.itemCount > 0) {
+            clip.getItemAt(0)?.coerceToText(PlatformContextHolder.appContext)?.toString()
+        } else {
+            null
+        }
+    } catch (e: Throwable) {
+        Log.w("PlatformFeedback", "Failed to read clipboard text", e)
+        null
+    }
+}
+
+actual fun openSystemShortcutsApp(): Boolean {
+    if (!PlatformContextHolder.isInitialized) return false
+    return try {
+        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        PlatformContextHolder.appContext.startActivity(intent)
+        true
+    } catch (e: Throwable) {
+        Log.w("PlatformFeedback", "Failed to open notification listener settings", e)
         false
     }
 }

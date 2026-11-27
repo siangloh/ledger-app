@@ -20,6 +20,8 @@ targets:
         CADisableMinimumFrameDurationOnPhone: true
         NSFaceIDUsageDescription: "Verify Face ID to unlock and protect your financial records."
         NSCameraUsageDescription: "Scan receipts locally on your iPhone to split bills or log expenses."
+        LSApplicationQueriesSchemes:
+          - shortcuts
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.siangloh.ledger
